@@ -40,10 +40,10 @@ API helper reads the workspace's own `credentials.json`.
 ## Lessons learned
 
 Distilled from three prove2.me missions —
-[Brin–Squier's PLF(ℝ)](https://prove2.me/missions/d2714cf8-3ed9-4986-831b-4dbf45d957e1),
+[Brin–Squier's PLF(ℝ)](https://prove2.me/missions/Brin%E2%80%93Squier%3A%20the%20group%20of%20piecewise-linear%20homeomorphisms%20of%20the%20line%20with%20finitely%20many%20breakpoints%20has%20no%20free%20subgroup%20of%20rank%20greater%20than%20one),
 Thompson's group F after Cannon–Floyd–Parry
-([§1 and §4](https://prove2.me/missions/de325bfa-ce1b-4e5c-b855-05a1ecbeb28e),
-[§2](https://prove2.me/missions/ffd1e4ea-9f9a-4cb6-8419-78e70f2545e8)),
+([§1 and §4](https://prove2.me/missions/Cannon%E2%80%93Floyd%E2%80%93Parry%3A%20Thompson%27s%20group%20F%20and%20the%20simplicity%20of%20its%20commutator%20subgroup),
+[§2](https://prove2.me/missions/Cannon-Floyd-Parry%3A%20tree%20diagrams%20and%20the%20normal%20form%20for%20Thompson%27s%20group%20F)),
 and a quadratic-forms mission — and one abandoned one. Each item is a
 summary; the skill files hold the procedure and the measurements.
 
