@@ -198,7 +198,10 @@ citing it for both.
 Closing one later is the ordinary `/verify` flow, with two things the docs get wrong or leave
 open. The `202` from `POST /verify` tells you to poll `GET /submission/{id}` — that **404s**;
 the working forms are `GET /verify?submission_id=…` (as `prove.md` documents) and
-`GET /submissions/{id}`. And a *solution* file may carry its own helper `def`s and lemmas: the
+`GET /submissions/{id}`. **The first `/verify` that imports a freshly published definition can fail
+with "Verification timed out after 300s"** while the verifier builds the new bundle on
+demand — a 6,000-line file that compiles locally in 27 s did, and the identical resubmission
+a few minutes later was ACCEPTED. Resubmit before touching the file. And a *solution* file may carry its own helper `def`s and lemmas: the
 "never local `def`s" rule governs a statement's `preamble`, not a proof. Put helpers in their
 own namespace and leave `solution` at top level. Before submitting, pull the published
 `formal_statement` back from the API, re-elaborate it locally as a fresh declaration, and
@@ -608,8 +611,12 @@ one-off `cat`. All three locate the Lean workspace through `$P2M_WORKSPACE` or t
 **Version-track the mission record from the first file, and keep auditor inputs as evidence.**
 For part of the record the repo is not a convenience copy but the *only* copy: `readback` is a
 **draft proposal item** field, and reference items take none at all, so a milestone added after
-launch — published through `POST /submit-problem` — can never carry testimony on the platform,
-and no endpoint will attach one. On one mission that was 13 of 25 declarations. So keep
+launch — published through `POST /submit-problem` — has no way to receive testimony afterwards:
+`PATCH /theorems/:id` rejects it outright ("Unknown field(s): readback. Allowed:
+natural_language_statement, theorem_title, source, tags, deprecated, reason", checked
+2026-09-17). The published theorem object does carry a `readback` key (null), so
+`POST /submit-problem` may accept one at creation; that is untested — try it on the next
+statement you publish directly, and never on a throwaway. On one mission that was 13 of 25 declarations. So keep
 read-backs in their own directory, render them into the record next to the platform's own with
 each one's provenance labelled, and **print an explicit marker for any declaration with no
 read-back at all** — an audit gap you can see in `git diff` is one you will close.
