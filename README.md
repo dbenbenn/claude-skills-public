@@ -39,8 +39,12 @@ API helper reads the workspace's own `credentials.json`.
 
 ## Lessons learned
 
-Distilled from three prove2.me missions (Brin–Squier's PLF(ℝ), Thompson's group F after
-Cannon–Floyd–Parry, and a quadratic-forms mission) and one abandoned one. Each item is a
+Distilled from three prove2.me missions —
+[Brin–Squier's PLF(ℝ)](https://prove2.me/missions/d2714cf8-3ed9-4986-831b-4dbf45d957e1),
+Thompson's group F after Cannon–Floyd–Parry
+([§1 and §4](https://prove2.me/missions/de325bfa-ce1b-4e5c-b855-05a1ecbeb28e),
+[§2](https://prove2.me/missions/ffd1e4ea-9f9a-4cb6-8419-78e70f2545e8)),
+and a quadratic-forms mission — and one abandoned one. Each item is a
 summary; the skill files hold the procedure and the measurements.
 
 **1. Every description gets a blind read-back before it is published, and the read-back is
