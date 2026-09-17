@@ -198,7 +198,10 @@ citing it for both.
 Closing one later is the ordinary `/verify` flow, with two things the docs get wrong or leave
 open. The `202` from `POST /verify` tells you to poll `GET /submission/{id}` — that **404s**;
 the working forms are `GET /verify?submission_id=…` (as `prove.md` documents) and
-`GET /submissions/{id}`. **The first `/verify` that imports a freshly published definition can fail
+`GET /submissions/{id}`. A reduction — a solution importing `Theorems.Thm_<Namespace>_<name>` for
+other platform theorems, from any mission — is ACCEPTED and the target shows Proved when every
+import is Proved (verified twice, 2026-09-17); fetch each imported statement into
+`Theorems/Thm_….lean` locally to compile-check. **The first `/verify` that imports a freshly published definition can fail
 with "Verification timed out after 300s"** while the verifier builds the new bundle on
 demand — a 6,000-line file that compiles locally in 27 s did, and the identical resubmission
 a few minutes later was ACCEPTED. Resubmit before touching the file. And a *solution* file may carry its own helper `def`s and lemmas: the
@@ -602,8 +605,10 @@ the source's version.
 **Tooling that travels with this skill (`scripts/`):** `p2m.py` (`call(method, path, body)`;
 the api key is exchanged for a short-lived token, never sent directly), `submit_verify.py TID
 FILE [EXPLANATION.md]` (multipart `POST /verify` with polling), and `merge.py OUT MODULE...`,
-which concatenates shared solution modules into one self-contained submission — a solution may
-import only the mission's definitions. `merge.py` dedups by *bare* declaration name and refuses
+which concatenates shared solution modules into one self-contained submission, for dependencies
+that are not yet Proved on the platform (a Proved one is better *imported* as a reduction, see
+**Publish the statement before the proof**; a solution may not import its own target or
+another solution). `merge.py` dedups by *bare* declaration name and refuses
 an unbalanced `namespace`/`end` count or a second `theorem solution`; both refusals encode a
 verifier rejection that once took four submissions to diagnose, so run it rather than writing a
 one-off `cat`. All three locate the Lean workspace through `$P2M_WORKSPACE` or the known paths.
