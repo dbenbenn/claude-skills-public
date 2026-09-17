@@ -614,9 +614,9 @@ For part of the record the repo is not a convenience copy but the *only* copy: `
 launch — published through `POST /submit-problem` — has no way to receive testimony afterwards:
 `PATCH /theorems/:id` rejects it outright ("Unknown field(s): readback. Allowed:
 natural_language_statement, theorem_title, source, tags, deprecated, reason", checked
-2026-09-17). The published theorem object does carry a `readback` key (null), so
-`POST /submit-problem` may accept one at creation; that is untested — try it on the next
-statement you publish directly, and never on a throwaway. On one mission that was 13 of 25 declarations. So keep
+2026-09-17), and `POST /submit-problem` silently drops `readback`/`readback_model` from its
+body (tested the same day on a real statement: published fine, fields null afterwards). The
+published theorem object carries a `readback` key, but nothing you can send fills it. On one mission that was 13 of 25 declarations. So keep
 read-backs in their own directory, render them into the record next to the platform's own with
 each one's provenance labelled, and **print an explicit marker for any declaration with no
 read-back at all** — an audit gap you can see in `git diff` is one you will close.
