@@ -18,7 +18,7 @@ anyway. So this enforces what it can, structurally rather than by instruction:
     that reported having tidied up.
 
 Usage:
-  stage_auditor.py stage <slug> <statement.lean> [extra-file ...]   -> prints the prompt
+  stage_auditor.py stage <slug> <artifact.lean> [imported-def.lean ...] -> prints the prompt
   stage_auditor.py collect <slug> <dest-dir>                        -> moves testimony out
   stage_auditor.py teardown <slug> [--force]                        -> removes the staging dir
                                                                        (refuses while readback.md or
@@ -98,6 +98,13 @@ def stage(slug, statement, extras):
                 '&& pwd)/$1"\n' % WS)
     os.chmod(probe, 0o755)
     print(f"STAGED {d}  ({roots} library roots, {REV})\n")
+    # Name the artifact and its imports separately. Listed together as "task files", an
+    # auditor given a definition bundle plus the bundle it imports rendered both -- seven
+    # definitions in a read-back that gets published beside six (Chou mission, 2026-09-18).
+    imports = ('' if len(names) == 1 else
+               '\nImported definitions, already published, given so you can expand what the artifact uses: '
+               + ', '.join(names[1:]) + '. Do not render their declarations on their own; expand them '
+               'inline where the artifact uses them.')
     print(f"""Work only inside {d}. Everything below is relative to it.
 
 Read readback-brief.md and follow it exactly. Library source is here at its normal root, so
@@ -105,7 +112,7 @@ Mathlib/... and Init/... resolve directly; REVISION names the revision you are r
 To elaborate a probe, write it to scratch/ and run  ./probe scratch/yourfile.lean
 Leave probe files where they are -- you do not need to clean up.
 
-Task files: {', '.join(names)}
+Artifact: {names[0]} -- render every declaration in this file.{imports}
 
 Write two files in this directory: readback.md (the publishable testimony) and audit.md
 (your working notes). The brief says what belongs in each; do not merge them.
