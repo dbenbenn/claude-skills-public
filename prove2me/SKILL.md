@@ -372,14 +372,20 @@ Submit ready solutions as each one comes up; nothing waits for approval.
 
 ## Expansion 11 — after launch
 
-**Solutions.** Keep the development as small modules that import each other; build each
-submission by concatenating with `scripts/merge.py OUT MODULE…` (dedups by bare declaration name,
+**Solutions.** Keep the development as small modules that import each other; to submit a full proof, build
+the submission by concatenating with `scripts/merge.py OUT MODULE…` (dedups by bare declaration name,
 refuses unbalanced namespaces or a second `theorem solution`) and finishing with `theorem
 solution` stated verbatim; re-elaborate the published statement locally and discharge it with
 `solution <binders>` before submitting, which is the type check the server runs. A solution may
-import any Proved platform theorem as `Theorems.Thm_<Namespace>_<name>` (a tracked reduction,
-ACCEPTED and Proved when every import is Proved), the mission's definitions and Mathlib; never
-another solution or its own target. Submit with `scripts/submit_verify.py TID FILE EXPL.md`; poll
+import any platform theorem as `Theorems.Thm_<Namespace>_<name>`, the mission's definitions and
+Mathlib; never another solution or its own target. Importing only Proved theorems gives
+`ACCEPTED` and the target shows Proved; importing an Open theorem gives `SKETCH_ACCEPTED`, a
+reduction: the imported theorems become the target's decomposition children, the target sits in
+the mission's tree and auto-resolves when every leaf is proved (`prove.md`, `missions.md`). A
+reduction is the right submission when the decomposition is what you have and the leaves are
+worth publishing for others to attack; a full proof by concatenation is the right one when you
+have the whole argument and want the milestone Proved now. Fetch each imported statement into
+`Theorems/Thm_….lean` locally to compile-check. Submit with `scripts/submit_verify.py TID FILE EXPL.md`; poll
 `GET /verify?submission_id=…` (the documented `GET /submission/{id}` 404s). The first verify that
 imports a freshly published bundle can time out at 300 s while the server builds it: resubmit
 unchanged. Explanations are patchable; attach the route in prose and say the file is

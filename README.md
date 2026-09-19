@@ -116,9 +116,11 @@ submit and drifts from the live mission, so a renderer fed the proposal shows st
 Keep audit inputs as read-only evidence, never bulk-edit them, and do not write DOIs from
 memory — five remembered DOI patterns were all wrong.
 
-**10. A solution may import the mission's definitions and any Proved platform theorem, never
-another solution.** Developments that depend on still-Open results therefore live as modules and
-are concatenated per submission (`prove2me/scripts/merge.py`). The
+**10. A solution may import the mission's definitions and any platform theorem, never another
+solution.** Imports that are all Proved give `ACCEPTED`; an import that is still Open gives
+`SKETCH_ACCEPTED`, a reduction recorded in the decomposition tree whose target auto-resolves when
+the leaves are proved. To ship a full proof of a milestone whose inputs are still Open, the
+development lives as modules concatenated per submission (`prove2me/scripts/merge.py`). The
 concatenation has failure modes that compile locally and fail on the verifier — a dropped
 duplicate that swallows a file's closing `end`, a stray `theorem solution` in a module — and
 the script now refuses both.
