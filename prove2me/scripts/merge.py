@@ -77,10 +77,12 @@ def main():
             kept.append(chunk)
         pieces.append('\n'.join(kept).strip() + '\n')
     merged = '\n'.join(pieces)
-    n_ns = sum(1 for ln in merged.split('\n') if ln.startswith('namespace '))
-    n_end = sum(1 for ln in merged.split('\n') if ln.startswith('end '))
+    # `section` (named or anonymous) opens a scope exactly as `namespace` does, and a bare `end`
+    # closes an anonymous section; count both, or a module with a `section` is refused.
+    n_ns = sum(1 for ln in merged.split('\n') if re.match(r'^(namespace\s|section\b)', ln))
+    n_end = sum(1 for ln in merged.split('\n') if re.match(r'^end\b', ln))
     if n_ns != n_end:
-        sys.exit(f'refusing: {n_ns} namespace lines but {n_end} end lines -- a trailing '
+        sys.exit(f'refusing: {n_ns} namespace/section lines but {n_end} end lines -- a trailing '
                  '`theorem solution` would be namespaced and invisible to the verifier')
     solution_count = sum(1 for ln in merged.split('\n') if ln.startswith('theorem solution'))
     if solution_count > 0:
