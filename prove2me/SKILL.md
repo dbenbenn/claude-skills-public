@@ -348,7 +348,11 @@ Two scripts per mission, both idempotent: an uploader that creates the proposal 
 definitions with their read-backs, reference items, draft theorems (`preamble` split from the
 body by the import lines), sets `main_item_id` and `item_order`, and POSTs the milestones; and a
 verifier that fetches the Draft and compares every field to the repo, normalising whitespace,
-and prints `BAD 0`. Keep ids in `proposal_state.json`. Order: definition references, definition
+and prints `BAD 0`. Every field means the prose fields too: title, natural-language statement
+and source of each item, not only statements and read-backs. On the Milnor draft a pronoun fixed
+in the repo's item file stayed on the server all afternoon because only milestone prose and the
+description had upload scripts of their own; an item's prose changes only when the item is
+PATCHed or re-POSTed, and a verifier that skips those fields cannot see the gap. Keep ids in `proposal_state.json`. Order: definition references, definition
 bundles, the lemmas, the reference milestones, the goal last; milestones in that order too, since
 the milestones endpoint's own order is what the human sees numbered.
 
