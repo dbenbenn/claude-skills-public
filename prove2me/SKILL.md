@@ -93,9 +93,9 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 - Titles start with the source index ("Lemma 3.2 — …", "Chou, p. 400 — …" for a reference
   item) and are claims, checked as such.
 - The description opens "This mission formalizes <citation with DOI link>"; has Setting,
-  Target, What is left out, References; inline math rather than display-math `$$` blocks in the
-  description (one such block rendered badly on the Chou draft; whether display math renders in
-  general is untested); identifiers in backticks;
+  Target, What is left out, References; display math only for a formula short enough to fit on one line, since a display
+  line does not wrap (a sentence set in `$$…$$` ran off the page on the Chou draft); identifiers in
+  backticks;
   no citation paragraph duplicating References; the process kept out.
 - No pronoun for an author whose pronouns the paper does not establish: the surname or "the
   paper".
@@ -303,10 +303,9 @@ the papers' own sentences about their context: quote "we will show that…", "ra
 of whether…"; never paraphrase a cited problem or credit an answer from memory. Then **Setting**
 (each definition with its Lean name in backticks and the reading chosen for any ambiguous term,
 "normal series" say), **Target** (the goal quoted with page, how it is stated, the milestone
-plan), **What is left out** (with reasons), **References**. Prefer inline math to display-math `$$` blocks in the description: one such block
-rendered badly on the Chou draft (dbenbenn: "doesn't render well") and reads fine as a quoted
-sentence; whether display math renders in general has not been tested. The References never
-repeated as a paragraph; nothing about the process ("an
+plan), **What is left out** (with reasons), **References**. Display math renders but does not wrap, so use `$$…$$` only for a formula that fits on one
+line; a whole sentence set as display math ran off the page on the Chou draft and reads fine as a
+quoted sentence with inline math. The References never repeated as a paragraph; nothing about the process ("an
 independent audit verified…"). Keep every statement about what the mission does and does not
 prove: that honesty is what makes the rest credible.
 
