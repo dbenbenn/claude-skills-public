@@ -99,6 +99,9 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   no citation paragraph duplicating References; the process kept out.
 - No pronoun for an author whose pronouns the paper does not establish: the surname or "the
   paper".
+- No phrase lifted from the platform's rulebook ("the shape of the truth", "who cares and why"):
+  the rules say what a section must contain, not how to word it, and their register is not the
+  description's.
 - Date-dependent claims ("still open", "not in Mathlib") checked against today, not the source.
 
 **Platform**
