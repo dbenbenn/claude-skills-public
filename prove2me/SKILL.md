@@ -102,6 +102,11 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 - Date-dependent claims ("still open", "not in Mathlib") checked against today, not the source.
 
 **Platform**
+- The description and every field checked against the platform's own rules read as a checklist,
+  not from memory: `mission_description.md` (section structure, style, the sentences it requires,
+  such as the Lean representation and ruling out a trivializing formalization),
+  `mission_captain.md` (`source` with URL and page, milestone title and description conventions,
+  no proof sketch in the goal), `contribute.md` (naming). Nothing else looks at this axis.
 - `mission_type` is `ResearchPaper` for a paper; fields and tags set; goal marked; item order
   has definitions and references first, the goal last; milestone list excludes the goal.
 - The verify script reports every statement, definition, read-back, milestone, order and the
@@ -297,7 +302,8 @@ findings are hypotheses: two of thirty-eight were wrong. The measurements are in
 
 ## Expansion 7 — the prose
 
-**The description.** First sentence: "This mission formalizes <author, *title*, journal, year,
+**The description.** Write it against `mission_description.md` in the platform's references, which
+fixes the section structure and the sentences it requires. First sentence: "This mission formalizes <author, *title*, journal, year,
 pages (DOI link)>", with a companion paper in the same sentence. Then the motivation, built from
 the papers' own sentences about their context: quote "we will show that…", "raise the question
 of whether…"; never paraphrase a cited problem or credit an answer from memory. Then **Setting**
