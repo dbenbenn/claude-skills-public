@@ -87,3 +87,5 @@ paths and line numbers belong here, not in `readback.md`.
   statement makes but which are absent from it.
 - **Name check.** Whether the declaration's own name is an accurate label for what you read
   back.
+- **Imports.** For each definition file the artifact imports, whether the artifact uses
+  anything declared in it. Name every one it does not use.

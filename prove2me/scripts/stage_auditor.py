@@ -117,9 +117,10 @@ Artifact: {names[0]} -- render every declaration in this file.{imports}
 Write two files in this directory: readback.md (the publishable testimony) and audit.md
 (your working notes). The brief says what belongs in each; do not merge them.
 
-Do not read or write anything outside this directory. Reply with at most four lines:
+Do not read or write anything outside this directory. Reply with at most five lines:
 conventions you settled and whether source settled them; anything unsettled; whether the
-declaration's name is an accurate label.""")
+declaration's name is an accurate label; which imported definition files, if any, the
+artifact does not use.""")
 
 def collect(slug, dest):
     """Pull both artifacts out, and check the publishable one against the platform's spec.
@@ -138,6 +139,13 @@ def collect(slug, dest):
             print(f"MISSING {name}"); continue
         shutil.copy(src, os.path.join(dest, tgt)); out[name] = os.path.join(dest, tgt)
         print(f"COLLECTED {os.path.join(dest, tgt)}")
+    au = out.get('audit.md')
+    if au:
+        # An unused `import Definitions.*` is a dependency the statement would carry forever
+        # once its preamble freezes; the auditor reports it, so print it where it gets read.
+        for l in open(au).read().splitlines():
+            if re.search(r'(?i)import', l) and re.search(r'(?i)unused|not used|uses nothing|nothing from|never used|does not use', l):
+                print('IMPORTS ' + l.strip()[:160])
     rb = out.get('readback.md')
     if rb:
         t = open(rb).read()
