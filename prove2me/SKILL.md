@@ -64,6 +64,8 @@ the field. Snapshot the whole proposal to a local file first and probe with the 
 replacement value, so the worst case is a no-op rather than a silent overwrite of
 text nobody has a copy of.
 
+**Submit itself is asynchronous.** The click queues one publish job per draft item, in `item_order`, and the server compiles them one at a time (about two minutes per theorem, so an hour for thirty). Until the last one finishes the proposal still reads `status: Draft` with `submitted_at: null`, and items gain `theorem_id` one by one — definitions first, which then show as `reference` items. `GET /publish-jobs?limit=200` is the only place a failure appears (`FAILED` with `error_message`); a Draft status a quarter of an hour after the click is not one, and a second click does not duplicate the jobs.
+
 Two habits follow from the second path. A statement edited in the UI is **not
 type-checked** there, and `mission_captain.md:205` fails the *whole* submit if any one
 draft fails to compile — so re-fetch and rebuild every item in server shape
