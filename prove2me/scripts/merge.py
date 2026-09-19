@@ -77,6 +77,19 @@ def main():
             kept.append(chunk)
         pieces.append('\n'.join(kept).strip() + '\n')
     merged = '\n'.join(pieces)
+    # `universe` lines are not declarations, so the name dedup above never sees them, and Lean
+    # refuses a level declared twice. Two modules writing `universe u v` and `universe u` collide
+    # even though neither line repeats. Keep each level once, in first-seen order.
+    seen_lvl, out_lines = [], []
+    for ln in merged.split('\n'):
+        m = re.match(r'^universe\s+(.+)$', ln)
+        if not m:
+            out_lines.append(ln); continue
+        fresh = [u for u in m.group(1).split() if u not in seen_lvl]
+        seen_lvl += fresh
+        if fresh:
+            out_lines.append('universe ' + ' '.join(fresh))
+    merged = '\n'.join(out_lines)
     # `section` (named or anonymous) opens a scope exactly as `namespace` does, and a bare `end`
     # closes an anonymous section; count both, or a module with a `section` is refused.
     n_ns = sum(1 for ln in merged.split('\n') if re.match(r'^(namespace\s|section\b)', ln))
