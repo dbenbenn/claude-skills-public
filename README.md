@@ -7,12 +7,10 @@ loads when a task matches the description, plus any reference files it points at
 
 | Skill | For |
 | --- | --- |
-| `formalizing-a-paper` | Formalizing a mathematics paper in Lean 4 / Mathlib, and auditing an existing formalization for fidelity to its source. Includes a reference file of recurring Lean/Mathlib pitfalls. |
-| `prove2me` | Publishing Lean theorems to prove2.me, curating a mission's milestones, and keeping what is published faithful to its source. Includes a reference file on the upload pipeline and what silently breaks it. |
+| `prove2me` | Running a formalization mission on prove2.me from a mathematics paper: the algorithm (twelve steps), the double-check list, an expansion per step, and the lessons behind them. Reference files: the upload pipeline and what silently breaks it, the measured audit evidence, and recurring Lean/Mathlib pitfalls. |
 
-The two are paired: `formalizing-a-paper` is the artifact (a Lean development faithful to a
-source), `prove2me` is the venue (what that platform freezes, publishes and reviews). Each
-`SKILL.md` points at the other, since a mission that formalizes a paper needs both.
+(`formalizing-a-paper`, the earlier general skill for a faithful Lean development, is folded
+into `prove2me`; its fidelity, gap and bookkeeping rules live there now.)
 
 ## Using these on a machine
 
@@ -26,7 +24,7 @@ git clone https://github.com/dbenbenn/claude-skills-public.git ~/.claude/skills
 or clone it elsewhere and symlink the individual skills:
 
 ```
-ln -s ~/src/claude-skills-public/formalizing-a-paper ~/.claude/skills/formalizing-a-paper
+ln -s ~/src/claude-skills-public/prove2me ~/.claude/skills/prove2me
 ```
 
 A skill scoped to one project goes in that project's `.claude/skills/` instead,
@@ -118,8 +116,9 @@ submit and drifts from the live mission, so a renderer fed the proposal shows st
 Keep audit inputs as read-only evidence, never bulk-edit them, and do not write DOIs from
 memory — five remembered DOI patterns were all wrong.
 
-**10. A solution may import only the mission's definitions.** Shared developments therefore
-live as modules and are concatenated per submission (`prove2me/scripts/merge.py`). The
+**10. A solution may import the mission's definitions and any Proved platform theorem, never
+another solution.** Developments that depend on still-Open results therefore live as modules and
+are concatenated per submission (`prove2me/scripts/merge.py`). The
 concatenation has failure modes that compile locally and fail on the verifier — a dropped
 duplicate that swallows a file's closing `end`, a stray `theorem solution` in a module — and
 the script now refuses both.
@@ -130,7 +129,7 @@ proof and depart only when it has a gap, because proofs that mirror the paper ce
 paper, while proofs by other routes certify only the statements. Fidelity is about statements:
 the paper's constants, generality and definitions, not a convenient stronger or weaker form.
 When the paper has a gap, the new mathematics lives in its own file that the certification
-must not depend on. `formalizing-a-paper/SKILL.md`.
+must not depend on. `prove2me/SKILL.md`, *Expansion 3* and *Reading and bookkeeping habits*.
 
 **12. Milestones are an attack path, not a coverage index.** An unlinked milestone says
 "formalize this"; never use one to record something out of scope. Scope boundaries belong in
