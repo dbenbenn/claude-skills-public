@@ -103,7 +103,17 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 - Each natural-language statement says what the Lean says, written from that Lean and not from a
   sibling; siblings audited against each other.
 - Titles start with the source index ("Lemma 3.2 — …", "Chou, p. 400 — …" for a reference
-  item) and are claims, checked as such.
+  item) and are claims, checked against the Lean and against the quotation in their own
+  description — never written to be parallel with a neighbour. A title copied for shape carries
+  over the part that should have changed, exactly as a copied description does. Watch the
+  direction words: for a theorem with several conjuncts, one clause may run the other way, and a
+  title that reads smoothly can assert the wrong direction for it. Wolf's Theorem 3.11 concludes
+  that a finite-index subgroup *is* finitely generated, inherited downward, and separately that
+  its polynomial growth passes *upward*; the milestone title said both passed up, contradicting
+  the quotation printed under it.
+- The milestone title and the theorem title are different fields on different endpoints. Editing
+  one does not touch the other, so check both and check that they agree; a rename is when they
+  drift apart.
 - The description opens "This mission formalizes <citation with DOI link>"; has Setting,
   Target, What is left out, References; display math only for a formula short enough to fit on one line, since a display
   line does not wrap (a sentence set in `$$…$$` ran off the page on the Chou draft); identifiers in
