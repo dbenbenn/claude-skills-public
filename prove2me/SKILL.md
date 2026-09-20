@@ -388,6 +388,14 @@ Submit ready solutions as each one comes up; nothing waits for approval.
 
 ## Expansion 11 — after launch
 
+**Check the target before spending a proof.** Another contributor can close an Open statement while
+your prover runs: on the Chou mission `hall_finite_subgroups_of_index` was closed by another user
+seven minutes before our proof landed, and the whole proof was wasted. `scripts/watch_targets.py
+check <theorem_id>…` is the launch-time guard, one API call, run in the same breath as dispatching
+the proof; `watch_targets.py watch …` under a Monitor turns a status flip during a long proof into
+an event, and you decide whether to stop the prover. Do not automate the kill: the event is rare
+and a half-written proof of a now-closed statement is still evidence of an approach.
+
 **Solutions.** Keep the development as small modules that import each other; to submit a full proof, build
 the submission by concatenating with `scripts/merge.py OUT MODULE…` (dedups by bare declaration name,
 refuses unbalanced namespaces or a second `theorem solution`) and finishing with `theorem
