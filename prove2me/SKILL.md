@@ -68,6 +68,9 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 - The sentence does not *outrun* what it cites: when the paper says "by X and Y we conclude",
   read X and Y and check they reach the conclusion under the hypotheses actually stated.
   (*When the sentence outruns its citation*, below.)
+- Every author is *they*, in prose and in Lean docstrings alike, unless the source itself
+  states otherwise. A name is not evidence of anyone's pronouns, and a wrong guess about a
+  real person is the one wording error a reader will always notice.
 - A cited external result is stated from *its* source, in the form the paper applies, marked
   external.
 - The goal is the result the author names as the paper's contribution, not the most famous
@@ -447,6 +450,12 @@ of live work. When a mission teaches something, edit the algorithm, the list or 
 ## The irreversible surface
 
 **`formal_statement`, `theorem_name`, `preamble` and definition code freeze at publish.**
+**A statement's Lean docstring is part of `formal_statement`**, since everything but the
+`import` lines goes into that field — so the prose inside `/-- … -/` freezes too, while every
+other piece of prose on the platform stays patchable. Give a docstring the scrutiny you give
+the statement, not the scrutiny you give a description you can fix later. Cheaper still:
+keep docstrings short and put the discussion in `natural_language_statement`, where a
+correction costs one PATCH instead of a burned name.
 `theorem_title`, `natural_language_statement`, `source`, `tags` and a solution's `explanation`
 stay patchable forever, definitions included (`contribute.md`'s table omits `theorem_title` and
 is wrong; verified against the API). Two paths reach publish: `POST /submit-problem` and
