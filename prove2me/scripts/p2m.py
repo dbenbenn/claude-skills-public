@@ -16,8 +16,21 @@ def token():
           "https://prove2.me/api/v1/agent/refresh",data=json.dumps({"api_key":_key}).encode(),
           headers={"Content-Type":"application/json"})))["access_token"]
     return _T
+def _no_docstring(b):
+    """A published statement carries no doc comment: `formal_statement` freezes, and the blind
+    read-back never sees comments, so a docstring is both unauditable and unfixable. Definition
+    bundles are untouched — their code travels in `definition`, not here. Set P2M_ALLOW_DOCSTRING=1
+    to override deliberately."""
+    if os.environ.get("P2M_ALLOW_DOCSTRING"): return
+    for part in ([b] if isinstance(b,dict) else []) + (b.get("problems") or [] if isinstance(b,dict) else []):
+        fs = part.get("formal_statement") if isinstance(part,dict) else None
+        if fs and ("/--" in fs or "/-!" in fs):
+            raise SystemExit("refusing: formal_statement carries a doc comment, which freezes at "
+                             "publish and is never read back. Put it in "
+                             "natural_language_statement, or set P2M_ALLOW_DOCSTRING=1.")
 def call(m,p,b=None):
     url="https://prove2.me/api/v1"+p
+    if m in ("POST","PATCH") and isinstance(b,dict): _no_docstring(b)
     assert url.startswith("https://prove2.me/api/v1")
     d=json.dumps(b).encode() if b is not None else None
     h={"Authorization":"Bearer "+token()}

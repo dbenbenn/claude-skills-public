@@ -25,6 +25,39 @@ Usage:
                                                                         audit.md is missing)
 """
 import os, shutil, sys, subprocess
+import re
+
+
+def strip(text):
+    """Lean source with every comment removed: block comments (nested), docstrings and line
+    comments. Blind staging depends on this — a docstring handed to an auditor is the intended
+    reading leaking into a reading that is supposed to be independent."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        if text.startswith('/-', i):
+            depth, j = 0, i
+            while j < n:
+                if text.startswith('/-', j):
+                    depth += 1; j += 2
+                elif text.startswith('-/', j):
+                    depth -= 1; j += 2
+                    if depth == 0:
+                        break
+                else:
+                    j += 1
+            i = j
+        elif text.startswith('--', i):
+            j = text.find('\n', i)
+            i = n if j == -1 else j
+        else:
+            out.append(text[i]); i += 1
+    return re.sub(r'\n{3,}', '\n\n', ''.join(out)).strip() + '\n'
+
+
+def write_stripped(dst, src):
+    """Copy a Lean file into the staging directory with its comments removed."""
+    open(dst, 'w', encoding='utf-8').write(strip(open(src, encoding='utf-8').read()))
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIEF = os.path.join(HERE, 'readback-brief.md')
