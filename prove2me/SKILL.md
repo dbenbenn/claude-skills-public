@@ -88,7 +88,16 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 - Every statement compiles in server shape, `preamble` + `formal_statement`, with `:= by sorry`.
 - Names are accurate labels (Mathlib style, `_of_` for hypotheses in binder order), ASCII, and a
   name that would need a caution is the wrong name.
-- Docstrings assert nothing unaudited ("equivalent to the paper's definition").
+- **A published statement carries no docstring.** It is the only prose on the platform that both
+  freezes and is never audited: `formal_statement` is immutable, and the read-back staging strips
+  comments before the auditor sees the artifact, so nothing independent ever reads it. The
+  platform does not want it either — `upload_full_project.md` tells uploaders to strip it, warning
+  that a leading `/-- -/` can make the platform silently drop the declaration. Put the source
+  quotation and the encoding notes (a commutator written longhand, a chain condition spelled out
+  elementwise, a symbol renamed because Lean reserves it) in `natural_language_statement`, where
+  the reader meets them beside the claim and a correction costs one PATCH.
+- A docstring kept anywhere else — a development module, a definition bundle — asserts nothing
+  unaudited ("equivalent to the paper's definition").
 
 **Read-backs**
 - One per artifact, from the current Lean, with the imported bundles marked as context and not
