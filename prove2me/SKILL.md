@@ -96,8 +96,22 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   quotation and the encoding notes (a commutator written longhand, a chain condition spelled out
   elementwise, a symbol renamed because Lean reserves it) in `natural_language_statement`, where
   the reader meets them beside the claim and a correction costs one PATCH.
-- A docstring kept anywhere else — a development module, a definition bundle — asserts nothing
-  unaudited ("equivalent to the paper's definition").
+- **A definition bundle keeps docstrings, but only for what cannot rot.** Its code freezes too:
+  `PATCH /theorems/:id` answers `Unknown field(s): definition. Allowed: natural_language_statement,
+  theorem_title, source, tags, deprecated, reason`, and the read-back staging strips the bundle's
+  comments as well, so they are as unauditable and unfixable as a statement's were. They earn
+  their place anyway for one reason a statement cannot claim: a bundle holds many declarations
+  and has a single description for the lot, so a per-declaration docstring is the only
+  per-declaration documentation a reader of the code gets. Keep them to what the object *is* and
+  where in the source it comes from. Every sentence that asserts a *relationship* to the paper —
+  that this agrees with the author's notation, that it is equivalent to their definition, why a
+  formalization choice was made — belongs in `natural_language_statement`, which is patchable and
+  is what the blind auditor's testimony is compared against. Two of ours show the stakes: the
+  Milnor bundle claimed Wolf's words "are exactly" the published ball and was softened to "taken
+  here as" hours before publish, and the Chou growth bundle carries a correct but frozen sentence
+  about when its ball agrees with Chou's $F^n$.
+- A docstring in a development module, which is never published, asserts nothing unaudited
+  ("equivalent to the paper's definition").
 
 **Read-backs**
 - One per artifact, from the current Lean, with the imported bundles marked as context and not
