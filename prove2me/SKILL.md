@@ -310,6 +310,23 @@ rebuild every item that way before Submit; a UI edit is not type-checked and one
 fails the whole submit. A published statement cannot grow: if the paper's result is a
 conjunction and you publish two of three clauses, the third goes under a new name.
 
+**A published statement that turns out to be *false* is not the same case**, and must not be
+quietly superseded: the platform takes disproofs. `POST /verify` with `proof_type=disprove` and a
+`solution` proving the negation of the *whole quantified* statement — wrap the binders into one
+`∀` and negate that, not the conclusion. A disproof may import `Definitions.Def_*` and Mathlib
+but **not** `Theorems.Thm_*`, so lemmas it needs must be concatenated into the file. Accepted, it
+flips the theorem to `Disproved`, which is what a reader who lands on it deserves to see;
+deprecation says only that someone lost interest. `scripts/submit_verify.py --disprove` sends it.
+
+**The hypothesis that admits too much.** The defect that produces a false statement is usually a
+hypothesis that is weaker than the source's, not a wrong conclusion, and a blind read-back will
+not catch it: the auditor is describing the Lean, and the Lean does say what they say. Wolf's
+"minimal generating set" was read as *no proper subset generates*; that is equivalent to "basis"
+for vector spaces and not for `ℤ`-modules, where `{2, 3}` is inclusion-minimal in `ℤ`. **Test a
+hypothesis by instantiating the statement at its smallest case and asking what the hypothesis
+still admits** — here `n = 1`, where it should have admitted only `{±1}`. Do it for any
+hypothesis phrased as a minimality, maximality or independence condition.
+
 ## Expansion 6 — blind read-backs
 
 **A description is not publishable until someone blind-reads the Lean**, including milestones

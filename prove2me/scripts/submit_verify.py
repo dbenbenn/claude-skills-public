@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Submit a solution file to POST /verify (multipart) and poll for the verdict."""
+"""Submit a solution file to POST /verify (multipart) and poll for the verdict.
+
+usage: submit_verify.py [--disprove] <theorem_id> <solution.lean> [explanation.md]
+"""
 import json, os, sys, time, uuid, urllib.request, urllib.error
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from p2m import token, call
@@ -48,9 +51,13 @@ def poll(sid, tries=80, delay=15):
 
 
 if __name__ == '__main__':
-    tid, path = sys.argv[1], sys.argv[2]
-    expl = open(sys.argv[3], encoding='utf-8').read() if len(sys.argv) > 3 else None
-    r = post_verify(tid, path, expl)
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    # `--disprove` sends proof_type=disprove: the solution must prove the negation of the whole
+    # quantified statement, and may import Definitions.Def_* and Mathlib but not Theorems.Thm_*.
+    ptype = 'disprove' if '--disprove' in sys.argv else None
+    tid, path = args[0], args[1]
+    expl = open(args[2], encoding='utf-8').read() if len(args) > 2 else None
+    r = post_verify(tid, path, expl, ptype)
     print(json.dumps(r, indent=1)[:2000])
     sid = r.get('submission_id')
     if sid:
