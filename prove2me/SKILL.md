@@ -71,6 +71,12 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 - Every author is *they*, in prose and in Lean docstrings alike, unless the source itself
   states otherwise. A name is not evidence of anyone's pronouns, and a wrong guess about a
   real person is the one wording error a reader will always notice.
+- Every reference that has a DOI carries it as a link. Look each one up (the Crossref API takes a
+  bibliographic query and returns the DOI, the page range and the year, so it confirms you have
+  the right item and not its sequel), then check the link resolves. Where an identifier covers a
+  container rather than the item — a problems section holding one problem — say so in the entry
+  rather than letting it read as the item's own. Where there genuinely is none, a book, say that
+  too: an entry with no link should be visibly deliberate rather than an oversight.
 - A cited external result is stated from *its* source, in the form the paper applies, marked
   external.
 - The goal is the result the author names as the paper's contribution, not the most famous
