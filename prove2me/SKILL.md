@@ -574,6 +574,41 @@ in a description can be retired into a citation by publishing the claim as its o
 statement; pin its objects by pointwise hypotheses rather than a new definition, and keep
 `source` honest about what the source supplies.
 
+### A solution must not redeclare the target's name with a different signature
+
+A `/verify` submission is compiled in an environment that already declares the target theorem.
+If your solution file declares that **same full name** with a signature that is not identical,
+the verdict is `WA` with
+
+    expected token
+    Unknown identifier `<your target's full name>`
+    Unknown constant `_check`
+
+— a parse-style error, **with no location**, that looks nothing like a name collision and
+survives every local check: the merged file builds clean and the server-shape recheck (re-elaborate
+the published `formal_statement`, discharge it with `solution`) passes, because locally nothing
+else declares that name.
+
+This bites when a development proves the target under its own name and the solution is assembled
+by concatenating modules. An *identical* signature is harmless — one mission had a solution
+redeclaring its target's exact name and signature and it was ACCEPTED — so the trap only springs
+when the signatures differ, e.g. the module says `{G : Type u}` (a file with `universe u`) while
+the published statement says `{G : Type*}`.
+
+**Fix:** give the development's theorem a different name and let `solution` be the only
+declaration matching the target. Do not "fix" it by editing the signature to match — the name is
+the hazard, and a later edit can reintroduce the mismatch.
+
+**Diagnosing a locationless `WA` generally.** Do not guess at syntax. Bisect with submissions
+against targets where a `WA` costs nothing — an already-`Proved` theorem, or one that already has
+an accepted sketch — changing exactly one thing at a time:
+
+- same file, *different tail* proving some other theorem → isolates content from target;
+- a known-good small solution *plus the suspect import* → isolates the import.
+
+Two such submissions localised the above in minutes after two blind fixes had failed. Rule out
+size first from the record: a 102KB solution had been accepted, so a 70KB one is not too big.
+
 ## Auditing
 
 Four axes, and no one sees another's defects: **against the source**, **against a reader**,
