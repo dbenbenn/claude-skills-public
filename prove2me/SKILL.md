@@ -681,6 +681,13 @@ or merely redundant — stays visible until that submission is deprecated. Decid
 with the human *before* resubmitting a rewired proof, and tell them this is how the graph
 behaves: the choice looks free until you know it duplicates every node.
 
+**Look a known theorem up by `theorem_name`, not by `q=`.** The keyword search is for
+discovery; asked for a name you already know it is both noisy (`caret` matches "Treshchev") and,
+under load, unreliable — in one batch it returned nothing for five theorems that exist and had
+been submitted against an hour earlier, and the script skipped them as "not found". The exact
+filter `GET /theorems?theorem_name=<Namespace>.<name>` is documented in `mission_solver.md`.
+Retry any lookup whose failure would silently drop work.
+
 `GET /submissions` is unusual in three ways at once: it **ignores `theorem_id`**, it **ignores
 `offset`**, and it returns your entire history whatever `limit` says (762 rows for `limit=5`).
 So one call is the whole list, and the pagination loop you would write by habit never
