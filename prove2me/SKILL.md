@@ -670,8 +670,15 @@ or merely redundant — stays visible until that submission is deprecated. Decid
 with the human *before* resubmitting a rewired proof, and tell them this is how the graph
 behaves: the choice looks free until you know it duplicates every node.
 
-`GET /submissions` **ignores `theorem_id`**, returning your own submissions newest-first
-whatever you pass, and carries no solution code; its `status` is `ACCEPTED` in capitals.
+`GET /submissions` is unusual in three ways at once: it **ignores `theorem_id`**, it **ignores
+`offset`**, and it returns your entire history whatever `limit` says (762 rows for `limit=5`).
+So one call is the whole list, and the pagination loop you would write by habit never
+terminates — it re-reads the same page forever. It carries no solution code, and its `status`
+is `ACCEPTED` in capitals.
+
+A verify can come back `ERROR` with `Module compilation timed out after 300s` when the server
+has to build a module the submission imports. That is the transient `prove.md` describes:
+resubmit unchanged.
 
 ## Auditing
 
