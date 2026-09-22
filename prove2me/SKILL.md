@@ -138,7 +138,10 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   one does not touch the other, so check both and check that they agree; a rename is when they
   drift apart.
 - The description opens "This mission formalizes <citation with DOI link>"; has Setting,
-  Target, What is left out, References; display math only for a formula short enough to fit on one line, since a display
+  Target, What is left out, References. **Run `scripts/check_description.py` on it** — the
+  opening sentence, the required sections, display-line length, author pronouns, rulebook
+  phrases, first person and word count are all mechanical, and I have shipped a description
+  that never named its source while this very rule sat here unread; display math only for a formula short enough to fit on one line, since a display
   line does not wrap (a sentence set in `$$…$$` ran off the page on the Chou draft); identifiers in
   backticks;
   no citation paragraph duplicating References; the process kept out.
