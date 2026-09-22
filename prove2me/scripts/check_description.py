@@ -54,6 +54,18 @@ for m in re.finditer(r'(?<![\w-])(we|our|I|my)(?![\w-])', s):
     a, b = max(0, m.start() - 40), m.end() + 40
     warn.append('first person %r near: …%s…' % (m.group(0), ' '.join(s[a:b].split())))
 
+# 6b. every "**Name** (year)" attribution in the body has a Selected-references entry.
+# This is the defect dbenbenn caught by eye: "Ol'shanskii (1980)" was attributed with no
+# entry. Bold-name-then-parenthesised-year is this genre's attribution idiom, so it is
+# precise enough to check without firing on theorem names like Banach-Tarski.
+_split = re.split(r'^##\s+.*references', s, flags=re.M | re.I)
+if len(_split) > 1:
+    _body, _refs = _split[0], _split[1]
+    for m in re.finditer(r'\*\*([^*]{2,40}?)\*\*\s*\((?:1[6-9]\d\d|20\d\d)\)', _body):
+        surname = m.group(1).strip().split()[-1].strip('.,;:')
+        if surname and surname not in _refs:
+            fail.append('attributed in the body but absent from the references: %r' % surname)
+
 # 7. length
 words = len(re.sub(r'\$[^$]*\$', ' X ', s).split())
 if not 800 <= words <= 1500:
