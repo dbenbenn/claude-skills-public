@@ -85,6 +85,10 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 **Lean hygiene**
 - Every `import Definitions.*` is used; a bundle imported only transitively is not listed. The
   preamble freezes at publish and becomes a permanent dependency.
+- A solution carries no declaration unreachable from `solution`: run
+  `scripts/prune_solution.py FILE --check` before submitting. Assembled-by-concatenation files
+  routinely carry two thirds dead code, and a dead copy of a published theorem is the thing that
+  later gets "reconnected" into a dependency that never existed.
 - Every statement compiles in server shape, `preamble` + `formal_statement`, with `:= by sorry`.
 - Names are accurate labels (Mathlib style, `_of_` for hypotheses in binder order), ASCII, and a
   name that would need a caution is the wrong name.
@@ -464,7 +468,14 @@ and a half-written proof of a now-closed statement is still evidence of an appro
 **Solutions.** Keep the development as small modules that import each other; to submit a full proof, build
 the submission by concatenating with `scripts/merge.py OUT MODULE…` (dedups by bare declaration name,
 refuses unbalanced namespaces or a second `theorem solution`) and finishing with `theorem
-solution` stated verbatim; re-elaborate the published statement locally and discharge it with
+solution` stated verbatim; **then prune what the proof does not use**, with
+`scripts/prune_solution.py FILE --check`. Concatenation pulls in whole modules, so an assembled
+file carries lemmas its target never touches — one Chou submission was 684 lines of which 205
+were reachable. That is not only untidy: an unused copy of a *published* theorem reads as a
+missing graph edge, and importing it to "fix" that asserts a dependency the proof does not have.
+The script keeps what is reachable from `solution`, treats every attributed declaration and every
+`instance` as a root — `@[simp]` and typeclass resolution use a declaration without naming it, so
+unused-by-name is not unused — and `--check` re-elaborates the result, which is not optional; re-elaborate the published statement locally and discharge it with
 `solution <binders>` before submitting, which is the type check the server runs. A solution may
 import any platform theorem as `Theorems.Thm_<Namespace>_<name>`, the mission's definitions and
 Mathlib; never another solution or its own target. Importing only Proved theorems gives
