@@ -639,12 +639,39 @@ the general form as its own node, keep the milestone on the source's own stateme
 from the other, and relink with a `reason`. Establish that a variant *is* one before paying for
 it — twice now the difference has been in my comparison tool rather than in the mathematics.
 
-**API notes for this work.** There is no dependency endpoint: `/missions/:id/graph`,
-`/dependencies` and `/dependents` all 404, and a theorem object carries no dependency field, so
-the rendered graph is only checkable in the browser. `GET /submissions` **ignores
-`theorem_id`**, returning your own submissions newest-first whatever you pass, and carries no
-solution code; its `status` is `ACCEPTED` in capitals. Verify a rewiring from the files you
-submitted plus the accept verdicts, not from a graph query.
+### Import only what the proof uses — the rest is dead code, not a dependency
+
+A solution assembled by concatenating modules carries lemmas its target never uses. Replacing
+one of those with an import does not add a missing edge, it asserts **a dependency that does not
+exist**, and the file still compiles, so nothing catches it. Measured across our missions: of
+163 copies of published theorems sitting in submitted solutions, only **37** are reachable from
+`solution`. Chou: 0 of 57. CFP §3: 0 of 21. Wolf: 0 of 21.
+
+So classify before rewiring. Build the file's internal call graph and mark what is reachable
+from `solution`: reachable copies get the import, unreachable ones are simply deleted. Counting
+*references* is not enough — a copy referenced only by another dead copy is still dead, and that
+weaker test called 9 of our §2 removals live when they were not. I shipped those 9 as false
+edges before running the stronger one.
+
+A false edge is worse than a missing one: a missing edge understates the structure, a false edge
+misstates it, and the graph is the thing a reader trusts.
+
+**The dependency API exists** — `GET /theorems/:id/graph` (nodes plus edges, from `root_id`)
+and `GET /theorems/:id/decompositions`, both documented in `missions.md` and `prove.md`. Probing
+for `/dependencies` and `/dependents`, getting 404, and concluding there was no such endpoint
+was my error; read the docs for the route name rather than guessing it.
+
+**Every accepted submission adds its own sketch node.** Edges run
+`child -> sketch-<submission_id> -> parent`, so a theorem with three accepted solutions shows
+three sketch nodes, each with its own children, and `has_hidden_deprecated_sketches` reports
+whether any are suppressed. Resubmitting a cleaner proof therefore **adds** a decomposition
+beside the old one rather than replacing it, and an edge from a superseded submission — false
+or merely redundant — stays visible until that submission is deprecated. Decide deprecation
+with the human *before* resubmitting a rewired proof, and tell them this is how the graph
+behaves: the choice looks free until you know it duplicates every node.
+
+`GET /submissions` **ignores `theorem_id`**, returning your own submissions newest-first
+whatever you pass, and carries no solution code; its `status` is `ACCEPTED` in capitals.
 
 ## Auditing
 
