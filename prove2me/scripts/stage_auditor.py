@@ -89,7 +89,48 @@ def _rev():
     return 'unknown'
 REV = _rev()
 
+def fresh_oleans(files):
+    """Build the project library modules this auditor will read, before sealing anything.
+
+    The auditor reads the .lean text we stage, but `./probe` elaborates against the workspace's
+    *compiled* libraries. Those two can disagree: edit a definition, stage the new text, and the
+    probe still sees the old .olean. Nothing in the staged directory reveals it, so the auditor
+    reasons about one artifact and tests another, and its testimony can be confidently wrong.
+    That happened on the Garrido re-audit; an auditor noticed the mismatch itself, which is luck
+    rather than a check.
+
+    `lake build` is the authority on what is out of date -- it tracks content, not timestamps,
+    so this is a no-op when everything is current and a rebuild exactly when one is needed. An
+    earlier version of this gate compared mtimes instead and refused to stage after `touch`ing a
+    file whose content had not changed, because lake correctly declined to rebuild it.
+    """
+    mods = set()
+    for f in files:
+        rel = os.path.relpath(os.path.abspath(f), WS)
+        if not rel.startswith('..') and rel.endswith('.lean'):
+            mods.add(rel[:-5].replace(os.sep, '.'))
+        try:
+            text = open(f, encoding='utf-8').read()
+        except OSError:
+            continue
+        for m in re.findall(r'^import\s+((?:Definitions|Theorems)\.\S+)', text, re.M):
+            if os.path.exists(os.path.join(WS, m.replace('.', os.sep) + '.lean')):
+                mods.add(m)
+    if not mods:
+        return
+    r = subprocess.run(['lake', 'build'] + sorted(mods), cwd=WS,
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.stderr.write((r.stdout + r.stderr)[-1200:] + '\n')
+        raise SystemExit('REFUSING TO STAGE: %s does not build' % ', '.join(sorted(mods)))
+    built = [l for l in (r.stdout + r.stderr).split('\n') if 'Built' in l]
+    print('library checked (%d module%s)%s'
+          % (len(mods), '' if len(mods) == 1 else 's',
+             '; rebuilt %d' % len(built) if built else '; already current'))
+
+
 def stage(slug, statement, extras):
+    fresh_oleans([statement] + list(extras))
     d = os.path.join(ROOT, slug)
     if os.path.exists(d): shutil.rmtree(d)
     os.makedirs(os.path.join(d, 'scratch'))
