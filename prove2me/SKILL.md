@@ -362,6 +362,18 @@ read-back described. Only draft proposal items carry testimony on the platform (
 /theorems/:id` rejects `readback`; `POST /submit-problem` drops it silently), so the repo's
 `readbacks/` directory is the only record for anything published directly.
 
+**The text you stage and the library the probe uses can disagree.** An auditor reads the
+`.lean` text staged into its directory, but `./probe` elaborates against the workspace's
+*compiled* libraries. Edit a definition, stage the new text, and the probe still sees the old
+`.olean`: the auditor reasons about one artifact and tests another, and nothing in the sealed
+directory shows it. On the Garrido re-audit an auditor noticed the disagreement itself and said
+so — luck, not a check. `stage_auditor.py stage` now runs `lake build` on every project module
+the artifact reads before sealing anything, and refuses to stage if that build fails. Let
+**lake** decide what is out of date: it tracks content, not timestamps, and a first version of
+this gate compared mtimes and refused after a `touch` that changed nothing. The same trap
+catches the captain: a checker that elaborates `preamble + formal_statement` proves nothing
+about an edit whose module has not been rebuilt.
+
 **The brief is the N-way artifact.** A defect in it corrupts every read-back. Never hand an
 auditor a convention (the multiplication order, what a bracket expands to): let them read the
 libraries, require a citation per convention and both readings for anything unsettled, say the
