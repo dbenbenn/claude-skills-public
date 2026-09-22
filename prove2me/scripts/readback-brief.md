@@ -55,6 +55,15 @@ A natural-language rendering of what the declaration literally asserts, for **a 
 who does not read Lean**. One **self-contained** account per declaration: understandable without
 opening the source file, and preferring completeness over elegance — this is fine print.
 
+**Your artifact is one published item.** Usually that is a single statement and you write one
+account. A *definition bundle* is also one item but holds several definitions, and there you
+write an account of each — the item's published read-back covers them all, so they may share
+vocabulary and say so. Either way this file must read as testimony about the artifact in front
+of you, whole and on its own: no title or sentence counting declarations you were handed
+alongside it, and nothing that only makes sense to a reader holding a different document.
+Write as if yours is the only artifact, because to the person reading the published item it
+is.
+
 - **Plain mathematical English and real math notation, in Markdown + KaTeX.** Write $P_i$, not
   `P i`; $A^{m,n}$, not `A m n`. Avoid Lean syntax and Lean identifiers in this file. Use
   display-math blocks and paragraph breaks for readability.
