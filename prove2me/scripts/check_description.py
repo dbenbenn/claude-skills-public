@@ -41,7 +41,12 @@ for m in re.finditer(r'(?<![\w-])(she|her|hers|his|him)(?![\w-])', s, re.I):
     fail.append('pronoun %r near: …%s…' % (m.group(0), ' '.join(s[a:b].split())))
 
 # 5. no phrase lifted from the platform's rulebook
-for phrase in ('shape of the truth', 'who cares and why', 'wasted day', 'solvers will not guess'):
+# paraphrases count too: 'it fixes no constant ...' was the Target rule's rationale
+# about hard-coded constants, recited where the goal is a biconditional and it says
+# nothing. A checker cannot catch paraphrase in general, only known instances.
+for phrase in ('shape of the truth', 'who cares and why', 'wasted day',
+               'solvers will not guess', 'weakest stable statement',
+               'invalidated by the next improvement', 'fixes no constant'):
     if phrase in s.lower():
         fail.append('rulebook phrase present: %r' % phrase)
 
