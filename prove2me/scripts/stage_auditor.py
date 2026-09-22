@@ -176,9 +176,23 @@ def collect(slug, dest):
     if au:
         # An unused `import Definitions.*` is a dependency the statement would carry forever
         # once its preamble freezes; the auditor reports it, so print it where it gets read.
+        # The flag exists to surface an import the artifact does not use. Auditors answer the
+        # question either way, so most matching lines are denials -- "No imported definition
+        # file goes entirely unused", "a used file, not an unused import" -- and printing those
+        # buries the real ones. Drop a line whose unusedness is itself negated.
+        # NB: inline (?i) is only legal at the start of a pattern in modern Python, so the
+        # flag goes in the compile call.
+        denial = re.compile(r'\b(?:no|none)\b.{0,120}?(?:unused|not use)'
+                            r'|not an unused'
+                            r'|\bis\b\W{0,2}used\b', re.I)
         for l in open(au).read().splitlines():
-            if re.search(r'(?i)import', l) and re.search(r'(?i)unused|not used|uses nothing|nothing from|never used|does not use', l):
-                print('IMPORTS ' + l.strip()[:160])
+            if not (re.search(r'(?i)import', l)
+                    and re.search(r'(?i)unused|not used|uses nothing|nothing from|never used'
+                                  r'|does not use', l)):
+                continue
+            if denial.search(l):
+                continue
+            print('IMPORTS ' + l.strip()[:160])
     rb = out.get('readback.md')
     if rb:
         t = open(rb).read()
