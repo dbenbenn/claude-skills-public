@@ -645,6 +645,16 @@ published statement to published name. Then excise the block, import the publish
 rename the remaining references. A renamed copy costs one extra rewrite of its call sites and
 nothing else.
 
+**Rewrite the call sites to the fully-qualified name, never the bare one.** When the excised
+copy had a different local name, its uses must be renamed — and `Foo.bar`, not `bar`. A short
+name only resolves when the published theorem's namespace is the file's own or is `open`ed, so a
+solution in `namespace MilnorWolf` importing a `GroupFiniteness` theorem breaks; on our Chou
+pass exactly one of eight files was cross-namespace and exactly that one failed to compile. It
+failed with `rcases failed: x✝ : ?m.161 is not an inductive datatype` rather than "unknown
+identifier", because the bare name bound to *something else* in scope. That is the real hazard:
+here the wrong binding errored, but a bare name that happens to typecheck against a different
+theorem of the same short name changes what the proof proves, silently. Qualify, and compile.
+
 Where the local statement genuinely differs, the variant trap's remedy applies unchanged: publish
 the general form as its own node, keep the milestone on the source's own statement, derive one
 from the other, and relink with a `reason`. Establish that a variant *is* one before paying for
