@@ -682,6 +682,15 @@ and `GET /theorems/:id/decompositions`, both documented in `missions.md` and `pr
 for `/dependencies` and `/dependents`, getting 404, and concluding there was no such endpoint
 was my error; read the docs for the route name rather than guessing it.
 
+**Deprecating a superseded reduction is safe when the new one is a superset, and the way to
+know is the frontier.** `GET /theorems/:id/open-leaves` returns the open leaves under a theorem:
+record it before submitting, re-read it after deprecating, and compare. On the Chou reduction
+`isVirtuallyNilpotent_or_hasExponentialGrowth_of_elementaryAmenable` the new sketch added one
+*Proved* child to the existing five, so the target kept its single Open child and the frontier
+was the same three Wolf leaves before and after. Do that check rather than reasoning that it
+must be fine: a reduction is the mission's decomposition, and getting it wrong moves the
+frontier other people are working from.
+
 **Every accepted submission adds its own sketch node.** Edges run
 `child -> sketch-<submission_id> -> parent`, so a theorem with three accepted solutions shows
 three sketch nodes, each with its own children, and `has_hidden_deprecated_sketches` reports
@@ -698,11 +707,13 @@ been submitted against an hour earlier, and the script skipped them as "not foun
 filter `GET /theorems?theorem_name=<Namespace>.<name>` is documented in `mission_solver.md`.
 Retry any lookup whose failure would silently drop work.
 
-`GET /submissions` is unusual in three ways at once: it **ignores `theorem_id`**, it **ignores
-`offset`**, and it returns your entire history whatever `limit` says (762 rows for `limit=5`).
-So one call is the whole list, and the pagination loop you would write by habit never
-terminates — it re-reads the same page forever. It carries no solution code, and its `status`
-is `ACCEPTED` in capitals.
+`GET /submissions` is unusual in four ways at once: it **ignores `theorem_id`**, it **ignores
+`offset`**, it returns your entire history whatever `limit` says (762 rows for `limit=5`), and
+it **never reports `deprecated_at`** — only `GET /submissions/:id` does. So one call is the
+whole list and the pagination loop you would write by habit never terminates, re-reading the
+same page forever; and a script that filters the list on `deprecated_at` treats
+already-deprecated submissions as live. Confirm deprecation state per row against the detail
+endpoint. It carries no solution code, and its `status` is `ACCEPTED` in capitals.
 
 A verify can come back `ERROR` with `Module compilation timed out after 300s` when the server
 has to build a module the submission imports. That is the transient `prove.md` describes:
