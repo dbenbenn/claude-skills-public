@@ -612,6 +612,40 @@ an accepted sketch — changing exactly one thing at a time:
 Two such submissions localised the above in minutes after two blind fixes had failed. Rule out
 size first from the record: a 102KB solution had been accepted, so a 70KB one is not too big.
 
+### Find an inlined sibling by its statement, never by its name
+
+An edge in the mission graph exists only when a *solution* carries `import Theorems.Thm_<name>`.
+A solution that re-proves a published sibling inline creates no edge, so a mission whose files
+each re-derive their prerequisites renders as disconnected nodes hanging off its definition
+bundles — which is how a human notices, by looking at the graph.
+
+Finding the inlined copies is the whole job, and **a name-keyed scan is the wrong tool**, twice
+over. It misses copies the development renamed: `isSDP_marks` for the published
+`isStandardDyadicPartition_marks`, `exponents_getLast_eq_zero` for `getLast_exponents_eq_zero`.
+And matching `<name>\b` against a *primed* copy silently succeeds, because `\b` sits between a
+letter and `'` — so the extracted signature starts one character early, carries the apostrophe,
+and an identical statement reports as a variant differing by exactly one character. On CFP §2
+that pair of defects hid 12 of 25 copies and mislabelled 6 more as variants needing mathematical
+work they did not need.
+
+**So key the scan on the normalised statement and ignore names entirely**: parse every top-level
+declaration, normalise whitespace from the binders to `:= by`, and look each one up in a map from
+published statement to published name. Then excise the block, import the published theorem, and
+rename the remaining references. A renamed copy costs one extra rewrite of its call sites and
+nothing else.
+
+Where the local statement genuinely differs, the variant trap's remedy applies unchanged: publish
+the general form as its own node, keep the milestone on the source's own statement, derive one
+from the other, and relink with a `reason`. Establish that a variant *is* one before paying for
+it — twice now the difference has been in my comparison tool rather than in the mathematics.
+
+**API notes for this work.** There is no dependency endpoint: `/missions/:id/graph`,
+`/dependencies` and `/dependents` all 404, and a theorem object carries no dependency field, so
+the rendered graph is only checkable in the browser. `GET /submissions` **ignores
+`theorem_id`**, returning your own submissions newest-first whatever you pass, and carries no
+solution code; its `status` is `ACCEPTED` in capitals. Verify a rewiring from the files you
+submitted plus the accept verdicts, not from a graph query.
+
 ## Auditing
 
 Four axes, and no one sees another's defects: **against the source**, **against a reader**,
