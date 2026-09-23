@@ -324,6 +324,13 @@ quietly superseded: the platform takes disproofs. `POST /verify` with `proof_typ
 but **not** `Theorems.Thm_*`, so lemmas it needs must be concatenated into the file. Accepted, it
 flips the theorem to `Disproved`, which is what a reader who lands on it deserves to see;
 deprecation says only that someone lost interest. `scripts/submit_verify.py --disprove` sends it.
+**Fix the universe.** The verifier elaborates `solution @target`, so if the statement quantifies
+over `Type*` and `solution` does too, nothing pins the universe and the verdict is `WA` with
+"contains universe level metavariables". State the negation over `Type` and give the
+counterexample there: refuting one instance refutes the polymorphic statement, and the check then
+instantiates the target at universe 0. Check locally with `theorem _check : False := solution
+@Target` beside a sorried copy of the target. dbenbenn pre-approves disproofs of Open false
+statements; submit without asking.
 
 **The hypothesis that admits too much.** The defect that produces a false statement is usually a
 hypothesis that is weaker than the source's, not a wrong conclusion, and a blind read-back will
@@ -333,6 +340,18 @@ for vector spaces and not for `ℤ`-modules, where `{2, 3}` is inclusion-minimal
 hypothesis by instantiating the statement at its smallest case and asking what the hypothesis
 still admits** — here `n = 1`, where it should have admitted only `{±1}`. Do it for any
 hypothesis phrased as a minimality, maximality or independence condition.
+
+**The conclusion that asks for too much.** The mirror case: an *existence* conclusion about
+generating families of a finitely generated abelian group ("an independent generating set", "a
+basis", "a subfamily that…") holds for free abelian groups and can fail with torsion — the
+generating family `{(1,0), (0,2), (0,3)}` of `ℤ²` has no independent generating subfamily. Wolf's
+Lemma 3.7 asks for commutators whose images are an independent generating set of each
+lower-central factor; it was published, read back and sketched against twice before a class-2
+group with `Γ₁ ≅ ℤ⁵ ⊕ ℤ/2` disproved it, because the earlier search tried only torsion-free and
+cyclic factors. **Test such a conclusion on a non-cyclic factor with torsion before publishing**,
+and when a proof says "choose any … subset", check one exists. The repair is usually the form the
+source's own later proof uses (here p. 429: a subfamily generating a free abelian subgroup of
+finite index), which is what the dependants needed anyway.
 
 ## Expansion 6 — blind read-backs
 

@@ -34,7 +34,10 @@ import sys
 from collections import defaultdict
 
 KINDS = r'(?:lemma|theorem|def|abbrev|instance|structure|inductive|class)'
-DECL = re.compile(r'^(?P<mods>(?:private\s+|protected\s+|noncomputable\s+|partial\s+|unsafe\s+)*)'
+# an attribute may sit on the declaration's own line (`@[simp] theorem foo …`); such a
+# declaration is attributed exactly as if the attribute were on the line above
+DECL = re.compile(r'^(?P<attr>(?:@\[[^\]]*\]\s*)*)'
+                  r'(?P<mods>(?:private\s+|protected\s+|noncomputable\s+|partial\s+|unsafe\s+)*)'
                   r'(?P<kind>%s)\s+(?P<name>[A-Za-z_][A-Za-z0-9_.\'!?]*)' % KINDS)
 TOP = re.compile(r'^(?:@\[|/--|/-!|%s|private|protected|noncomputable|partial|unsafe|end\b|'
                  r'namespace\b|section\b|open\b|variable\b|universe\b|attribute\b|local\b)' % KINDS)
@@ -49,16 +52,16 @@ def parse(lines):
     for i, l in enumerate(lines):
         m = DECL.match(l)
         if m:
-            heads.append((i, m.group('name'), m.group('kind')))
+            heads.append((i, m.group('name'), m.group('kind'), bool(m.group('attr'))))
     out = []
-    for k, (i, name, kind) in enumerate(heads):
+    for k, (i, name, kind, inline_attr) in enumerate(heads):
         j = i + 1
         while j < len(lines) and not TOP.match(lines[j]):
             j += 1
         while j - 1 > i and lines[j - 1].strip() == '':
             j -= 1
         s = i
-        attributed = False
+        attributed = inline_attr
         # walk back over blank lines, a doc comment, and any attribute lines
         while s - 1 >= 0:
             prev = lines[s - 1].rstrip()
