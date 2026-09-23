@@ -281,6 +281,23 @@ imports from the identifiers it uses, never from a template: the preamble is fro
 so an unused `import Definitions.X` is a dependency every citing development inherits forever. A
 bundle beside the bundle that imports it changes no dependency and is not worth a click.
 
+**Name every concept a statement uses more than once.** A clause written out in several
+statements ("finitely additive", "`G`-invariant") is a definition the reader cannot cite and the
+source's word never maps onto; define it once in the bundle and use the name. Mathlib's own
+theorems often write such clauses inline (`IsFoelner.amenable` does), which is how the Garrido
+draft ended up with seven copies of one additivity clause; copying Mathlib's shape is not a
+reason to keep them. Say in the prose when the source uses a term it never defines, and what
+standard meaning the definition takes.
+
+**A universe-quantified definition must reach the object it will be applied to.** A property
+that quantifies over `X : Type v` with `v` independent of the ambient `G : Type u` is stated at
+every pair of levels, and a theorem using it can be false at some: Garrido's invariant extension
+property, so quantified, made a four-way equivalence false at `u = 1`, `v = 0` (a large simple
+group with a free subgroup acts trivially on every smaller set). `Type 0` is too small and an
+independent `v` is too loose; `Type (max u v)` keeps "every `X`" and always contains
+`ULift G`. And **re-run every local check file whenever a definition changes**: the universe
+check written for exactly this had been failing silently since the edit that broke it.
+
 **Doc comments inside a published definition are an unaudited surface.** A read-back audits the
 statement; a natural-language statement is audited against the Lean; a doc comment is neither,
 and it is published and read on trust. Either prove what it claims somewhere in the mission and
