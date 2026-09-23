@@ -127,6 +127,12 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   then a marked *Route* or *External* paragraph if one earns its place. The paper's words appear
   only inside quotation marks; quotes checked against the page image, including the subject
   they predicate.
+- **Recheck all the quotes, as the platform holds them.** Every quotation in every field — milestone
+  descriptions, natural-language statements, `source`, the mission description — read from the
+  live Draft and compared word for word, punctuation included, with the rendered page. Do it
+  last, after every upload, and preferably by an agent that did not write them: a check of your
+  own transcription does not see what a script did to it afterwards (three Garrido quotes shipped
+  as "Tarskis" and "Carathéodorys").
 - Each natural-language statement says what the Lean says, written from that Lean and not from a
   sibling; siblings audited against each other.
 - Titles start with the source index ("Lemma 3.2 — …", "Chou, p. 400 — …" for a reference
