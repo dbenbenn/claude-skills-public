@@ -23,7 +23,9 @@ them is treated as a root, and the result MUST be compiled before it is submitte
 usage:
     prune_solution.py FILE [-o OUT] [--check] [--dry]
 
-    --check  elaborate the pruned file with `lake env lean` (run from $P2M_WORKSPACE)
+    --check  elaborate the pruned file with `lake env lean -DautoImplicit=false` (run from
+             $P2M_WORKSPACE); the verifier has autoImplicit off, and `lake env lean` ignores the
+             lakefile's leanOptions, so without the flag an out-of-scope `universe u` passes here
     --dry    report what would go, write nothing
 """
 import argparse
@@ -165,9 +167,11 @@ def main():
     if a.check:
         ws = os.environ.get('P2M_WORKSPACE') or os.path.expanduser('~/claude/prove2me_workspace')
         rel = os.path.relpath(os.path.abspath(dest), ws)
-        p = subprocess.run(['lake', 'env', 'lean', rel], cwd=ws,
+        p = subprocess.run(['lake', 'env', 'lean', '-DautoImplicit=false', rel], cwd=ws,
                            capture_output=True, text=True)
-        errs = [l for l in (p.stdout + p.stderr).split('\n') if ': error:' in l]
+        # the verifier rejects a sorry as firmly as an error, so a sorry warning fails too
+        errs = [l for l in (p.stdout + p.stderr).split('\n')
+                if ': error:' in l or 'declaration uses \'sorry\'' in l]
         if errs:
             print('COMPILE FAILED — the prune removed something that was load-bearing:')
             for l in errs[:10]:
