@@ -157,8 +157,11 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 - **Titles against the platform's rule, then ours.** The platform's rule (`mission_captain.md`,
   milestone `title`): "Strict rule: start with the index in the source (e.g. `Lemma 3.2`),
   followed by a short label of the lemma"; `theorem_title` is a free display label, and may be a
-  name ("Sensitivity conjecture"). Our house rule on top: the label states the claim, the *whole*
-  conclusion (every conjunct), not a topic ("subgroups of amenable groups") and not half of it;
+  name ("Sensitivity conjecture"). Our house rule on top: **a result with a canonical name gets the
+  name** ("Tarski's theorem", "the Invariant Extension Theorem" — the source often gives it in
+  parentheses, "Theorem 1.11 (Tarski)"); only a result without one gets a spelled-out claim, and
+  then the label states the claim, the *whole* conclusion (every conjunct), not a topic
+  ("subgroups of amenable groups") and not half of it;
   the simplest way to keep the pair agreeing is one title for both fields. Keep it short:
   a claim that needs 120 characters is straining the platform's "short label". On the Garrido
   draft Proposition 1.14's two titles each named a different conjunct, one in a word Garrido never
