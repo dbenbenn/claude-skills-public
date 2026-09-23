@@ -80,6 +80,11 @@ def parse(lines):
                 attributed = True
                 s -= 1
                 continue
+            # a scoping prefix (`open Classical in`, `variable (m) in`, `set_option … in`)
+            # belongs to the declaration: left behind, it would attach to whatever follows
+            if re.match(r'(open|variable|set_option|omit|include)\b.*\bin$', prev.strip()):
+                s -= 1
+                continue
             break
         out.append((name, kind, s, j, attributed))
     return out
