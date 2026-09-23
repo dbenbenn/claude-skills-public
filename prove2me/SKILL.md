@@ -147,6 +147,16 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 - The milestone title and the theorem title are different fields on different endpoints. Editing
   one does not touch the other, so check both and check that they agree; a rename is when they
   drift apart.
+- **Titles against the platform's rule, then ours.** The platform's rule (`mission_captain.md`,
+  milestone `title`): "Strict rule: start with the index in the source (e.g. `Lemma 3.2`),
+  followed by a short label of the lemma"; `theorem_title` is a free display label, and may be a
+  name ("Sensitivity conjecture"). Our house rule on top: the label states the claim, the *whole*
+  conclusion (every conjunct), not a topic ("subgroups of amenable groups") and not half of it;
+  the simplest way to keep the pair agreeing is one title for both fields. Keep it short:
+  a claim that needs 120 characters is straining the platform's "short label". On the Garrido
+  draft Proposition 1.14's two titles each named a different conjunct, one in a word Garrido never
+  uses ("unparadoxical"); Corollary 2.5's theorem title claimed the non-existence of a paradox,
+  which the Lean does not assert.
 - The description opens "This mission formalizes <citation with DOI link>"; has Setting,
   Target, What is left out, References. **Run `scripts/check_description.py` on it** — the
   opening sentence, the required sections, display-line length, author pronouns, rulebook
