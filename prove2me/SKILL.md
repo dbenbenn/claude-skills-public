@@ -13,6 +13,13 @@ the relevant one *before* designing anything, and quote it when it conflicts wit
 the platform's semantics win, and the captain would rather hear the conflict named than have it
 quietly split. Check that your copy is current; the rulebook is a date-dependent claim.
 
+**Sync the rulebook to head at the start of every session**, before reading it:
+`git -C "$P2M_WORKSPACE" fetch -q origin && git -C "$P2M_WORKSPACE" log --oneline HEAD..origin/main`,
+then read the incoming diff of `references/` and `SKILL.md` and fast-forward
+(`git -C "$P2M_WORKSPACE" merge --ff-only origin/main`). On 2026-09-23 the local copy was seven
+releases behind, and those releases had rewritten the captain's faithfulness principles and
+added the moderation loop, all unread while a proposal was being drafted against the old text.
+
 This file is in three parts. **The algorithm** is the order of work for one mission, one line per
 step. **The double-check list** is step 9 written out. **The expansions** say what each step means
 and record what the docs do not say, learned by doing. General Lean/Mathlib tactic pitfalls are in
