@@ -80,12 +80,19 @@ def main():
     # `universe` lines are not declarations, so the name dedup above never sees them, and Lean
     # refuses a level declared twice. Two modules writing `universe u v` and `universe u` collide
     # even though neither line repeats. Keep each level once, in first-seen order.
+    # A scoped `universe u in` declares its levels for the next command only: drop the levels
+    # already in scope (dropping the whole line if none remain, never leaving a bare
+    # `universe in`), and do not record the scoped levels as declared for the rest of the file.
     seen_lvl, out_lines = [], []
     for ln in merged.split('\n'):
-        m = re.match(r'^universe\s+(.+)$', ln)
+        m = re.match(r'^universe\s+(.+?)(\s+in)?\s*$', ln)
         if not m:
             out_lines.append(ln); continue
         fresh = [u for u in m.group(1).split() if u not in seen_lvl]
+        if m.group(2):
+            if fresh:
+                out_lines.append('universe ' + ' '.join(fresh) + ' in')
+            continue
         seen_lvl += fresh
         if fresh:
             out_lines.append('universe ' + ' '.join(fresh))
