@@ -568,7 +568,12 @@ reduction is the right submission when the decomposition is what you have and th
 worth publishing for others to attack; a full proof by concatenation is the right one when you
 have the whole argument and want the milestone Proved now. Fetch each imported statement into
 `Theorems/Thm_….lean` locally to compile-check. Submit with `scripts/submit_verify.py TID FILE EXPL.md`; poll
-`GET /verify?submission_id=…` (the documented `GET /submission/{id}` 404s). The first verify that
+`GET /verify?submission_id=…` (the documented `GET /submission/{id}` 404s). **The verifier runs with `autoImplicit` off, and `lake env lean` does not**: it ignores the
+lakefile's `leanOptions`, so a `universe u` declared inside a `namespace … end` block that has
+closed passes locally (the stray `u` is auto-bound) and fails on the server — as `unknown universe
+level` or, worse, as SORRY on a declaration above it. Hoist every `universe` line to the top of an
+assembled file; `prune_solution.py --check` now elaborates with `-DautoImplicit=false`. Four of
+the 23 Garrido solutions failed this way. The first verify that
 imports a freshly published bundle can time out at 300 s while the server builds it: resubmit
 unchanged. Explanations are patchable; attach the route in prose and say the file is
 self-contained.
