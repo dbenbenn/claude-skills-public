@@ -443,6 +443,14 @@ sentence in quotation marks with its page, first; then, if it earns its paragrap
 does say. The paper's words never appear outside quotation marks. Keep descriptions in one file
 and PATCH them through the milestones endpoint with an echo check.
 
+**Check the quote after the script writes it, not before.** Checking a transcription against the
+page image certifies what you typed, not what the file holds. On the Garrido draft three quotes
+lost their apostrophes ("Tarskis theorem") because the script wrote `'Tarski''s'` in a Python
+single-quoted string, which is two adjacent literals, not an escaped quote; the echo check passed,
+since the server held exactly the damaged text, and dbenbenn found it reading M6. After generating
+prose, re-read the written field against the page, and grep it for words that end in `s` where the
+source has `'s`.
+
 **Natural-language statements say what the Lean says**, written from the declaration in front of
 you and not from a sibling: what it asserts, where it is stronger or weaker than the source,
 which hypotheses the source does not state. Describe; never assert a hypothesis is necessary
