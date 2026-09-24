@@ -42,7 +42,10 @@ KINDS = r'(?:lemma|theorem|def|abbrev|instance|structure|inductive|class|alias)'
 # declaration is attributed exactly as if the attribute were on the line above
 DECL = re.compile(r'^(?P<attr>(?:@\[[^\]]*\]\s*)*)'
                   r'(?P<mods>(?:private\s+|protected\s+|noncomputable\s+|partial\s+|unsafe\s+)*)'
-                  r'(?P<kind>%s)\s+(?P<name>[A-Za-z_][A-Za-z0-9_.\'!?]*)' % KINDS)
+                  # Lean identifiers are Unicode (`φ`, `ψₙ`) or «guillemeted»; an ASCII-only
+                  # pattern missed `def φ`, folded its body into the lemma above, and pruned
+                  # everything only φ used (two CFP replacements failed --check on it)
+                  r'(?P<kind>%s)\s+(?P<name>«[^»]+»|[^\W\d][\w.\'!?\u2080-\u209c]*)' % KINDS)
 # anything that starts a new top-level command ends the declaration above it; without this a
 # `set_option … in`, a `notation` or a `mutual` is absorbed into the previous declaration and
 # deleted along with it
@@ -52,7 +55,7 @@ TOP = re.compile(r'^(?:@\[|/--|/-!|%s|private|protected|noncomputable|partial|un
                  r'prefix\b|postfix\b|macro\b|macro_rules\b|syntax\b|elab\b|#)' % KINDS)
 # an anonymous instance has no name for DECL to capture, but it is a root all the same
 ANON_INSTANCE = re.compile(r'^(?:@\[[^\]]*\]\s*)*(?:(?:private|protected|noncomputable|scoped)\s+)*'
-                           r'instance\b(?!\s+[A-Za-z_«])')
+                           r'instance\b(?!\s+(?:«|[^\W\d]))')
 
 
 def parse(lines):
@@ -113,7 +116,7 @@ def callgraph(lines, decls):
     # analysis then reports live code as dead.
     # ...and a declaration `Foo.qux` is called as plain `qux` from inside `namespace Foo`, so its
     # last component counts too (over-matching only keeps more, which --check then confirms)
-    pats = {n: re.compile(r"(?<![A-Za-z0-9_'])(?:[A-Za-z_][A-Za-z0-9_']*\.)*(?:%s)(?![A-Za-z0-9_'])"
+    pats = {n: re.compile(r"(?<![\w'\u2080-\u209c])(?:[^\W\d][\w'\u2080-\u209c]*\.)*(?:%s)(?![\w'\u2080-\u209c])"
                           % '|'.join(sorted({re.escape(n), re.escape(n.split('.')[-1])})))
             for n in names}
     for name, kind, s, e, _ in decls:
@@ -197,7 +200,7 @@ def prune_theorem_imports(text, verbose=True):
                 d = None
             if d:
                 short = re.escape(d.group(1).split('.')[-1])
-                if not re.search(r"(?<![A-Za-z0-9_'])(?:[A-Za-z_][A-Za-z0-9_']*\.)*%s(?![A-Za-z0-9_'])"
+                if not re.search(r"(?<![\w'\u2080-\u209c])(?:[^\W\d][\w'\u2080-\u209c]*\.)*%s(?![\w'\u2080-\u209c])"
                                  % short, code):
                     dropped.append((m.group(1), 'import', 0, 0, False))
                     continue
