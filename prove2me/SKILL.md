@@ -567,6 +567,17 @@ the proof; `watch_targets.py watch …` under a Monitor turns a status flip duri
 an event, and you decide whether to stop the prover. Do not automate the kill: the event is rare
 and a half-written proof of a now-closed statement is still evidence of an approach.
 
+**Graph hygiene: rewire, submit, audit.** A proof's graph edges are exactly its `import
+Theorems.*` lines, so they are wrong in two ways: an import only dead code used (a false edge;
+`prune_solution.py` now drops it) and a published theorem re-derived inline instead of imported
+(a missing edge). `scripts/rewire.py FILE --target NAME -o OUT` turns each inline copy into a call
+to the published theorem, adds the import, prunes and compiles; `scripts/submit_solution.py THEOREM
+FILE --replaces OLD_SID…` submits, requires the new sketch's edges to equal the file's imports, and
+retires the old proof through `deprecate.py`; `scripts/edge_audit.py MISSION…` checks every live
+proof of a mission against its local file and reports INCORRECT, MISSING and UNMATCHED. Run the
+audit after a mission's solutions land. The 2026-09-24 audit found 36 false edges on 19 theorems,
+missing edges on 11, and two false edges on sketches submitted from test files.
+
 **Solutions.** Keep the development as small modules that import each other; to submit a full proof, build
 the submission by concatenating with `scripts/merge.py OUT MODULE…` (drops a declaration repeated
 verbatim, refuses one whose name repeats with different text, unbalanced blocks, or a `theorem
