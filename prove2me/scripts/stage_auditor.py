@@ -138,7 +138,9 @@ def stage(slug, statement, extras):
     names = []
     for f in [statement] + list(extras):
         b = os.path.basename(f)
-        shutil.copy(f, os.path.join(d, b))
+        # stripped, not copied: until 2026-09-24 this was a plain copy and strip() sat unused,
+        # so every bundle auditor read the docstrings it was meant to reconstruct blind
+        write_stripped(os.path.join(d, b), f)
         names.append(b)
     # Expose each library at its CANONICAL root, so the auditor's natural relative path is
     # already the citation form everyone else can resolve (`Mathlib/Algebra/...:76`). The layout
