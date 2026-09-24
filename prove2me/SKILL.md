@@ -48,7 +48,7 @@ the measurements behind the audit rules in `references/audit-evidence.md`.
 7. **Write the prose**: the mission description, one milestone description per milestone with
    the source's sentence quoted first, one natural-language statement per declaration.
    → *Expansion 7.*
-8. **Upload the Draft with a script, verify it with another**, commit the repo. → *Expansion 8.*
+8. **Upload the Draft and verify it with `scripts/draft.py`**, commit the repo. → *Expansion 8.*
 9. **Run the double-check list** below, then hand the Draft to the human. → *The list.*
 10. **Human audit and Submit.** Submit is asynchronous; watch the publish jobs; submit solutions as
     each statement goes Open. → *Expansion 10.*
@@ -510,15 +510,20 @@ carries a pronoun nobody could justify.
 
 ## Expansion 8 — upload and verify
 
-Two scripts per mission, both idempotent: an uploader that creates the proposal once, POSTs
-definitions with their read-backs, reference items, draft theorems (`preamble` split from the
-body by the import lines), sets `main_item_id` and `item_order`, and POSTs the milestones; and a
-verifier that fetches the Draft and compares every field to the repo, normalising whitespace,
-and prints `BAD 0`. Every field means the prose fields too: title, natural-language statement
+`scripts/draft.py MISSION_DIR upload [--go]` and `draft.py MISSION_DIR verify`; the mission
+supplies only data, in `MISSION_DIR/mission.py` (the docstring lists what it defines, and
+`extract_payloads()` builds each preamble from the bundles its statement uses). Every mission
+through Garrido III copied its own uploader and verifier instead, and most of those verifiers
+only checked that a read-back was non-empty. The upload creates the proposal once, posts
+definitions with their read-backs, reference items, draft theorems, `main_item_id`,
+`item_order` and the milestones -- and on every later run re-posts only what differs from the
+live Draft, so an unchanged item never loses a confirmation. The verifier compares every field
+to the repo, normalising whitespace, flags live items and milestones the repo lacks, and prints
+`BAD 0`. Every field means the prose fields too: title, natural-language statement
 and source of each item, not only statements and read-backs. On the Milnor draft a pronoun fixed
 in the repo's item file stayed on the server all afternoon because only milestone prose and the
 description had upload scripts of their own; an item's prose changes only when the item is
-PATCHed or re-POSTed, and a verifier that skips those fields cannot see the gap. Keep ids in `proposal_state.json`. Order: definition references, definition
+PATCHed or re-POSTed, and a verifier that skips those fields cannot see the gap. Ids live in `proposal.json`. Order: definition references, definition
 bundles, the lemmas, the reference milestones, the goal last; milestones in that order too, since
 the milestones endpoint's own order is what the human sees numbered.
 
