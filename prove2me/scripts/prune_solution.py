@@ -35,7 +35,7 @@ import subprocess
 import sys
 from collections import defaultdict
 
-KINDS = r'(?:lemma|theorem|def|abbrev|instance|structure|inductive|class)'
+KINDS = r'(?:lemma|theorem|def|abbrev|instance|structure|inductive|class|alias)'
 # an attribute may sit on the declaration's own line (`@[simp] theorem foo …`); such a
 # declaration is attributed exactly as if the attribute were on the line above
 DECL = re.compile(r'^(?P<attr>(?:@\[[^\]]*\]\s*)*)'
@@ -169,9 +169,10 @@ def main():
         rel = os.path.relpath(os.path.abspath(dest), ws)
         p = subprocess.run(['lake', 'env', 'lean', '-DautoImplicit=false', rel], cwd=ws,
                            capture_output=True, text=True)
-        # the verifier rejects a sorry as firmly as an error, so a sorry warning fails too
+        # the verifier rejects a sorry as firmly as an error, so a sorry warning fails too; and
+        # match `: error` as a prefix, since coded errors print as `: error(lean.unknownIdentifier):`
         errs = [l for l in (p.stdout + p.stderr).split('\n')
-                if ': error:' in l or 'declaration uses \'sorry\'' in l]
+                if re.search(r': error\b', l) or 'declaration uses \'sorry\'' in l]
         if errs:
             print('COMPILE FAILED — the prune removed something that was load-bearing:')
             for l in errs[:10]:
