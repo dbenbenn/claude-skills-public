@@ -44,7 +44,10 @@ the measurements behind the audit rules in `references/audit-evidence.md`.
 5. **Write the statements, one per source sentence and shaped like it**, each checked against the
    page image, named accurately, compiled in server shape. → *Expansion 5.*
 6. **Run a blind read-back on every artifact** with `scripts/stage_auditor.py`; act on its
-   `IMPORTS` lines; re-run whenever the Lean changes. → *Expansion 6.*
+   `IMPORTS` lines; re-run whenever the Lean changes. **Then a source-side audit on every
+   statement** with `scripts/source_audit.py`: it lists what the source sentence claims before it
+   sees the read-back, and a verdict that is not `faithful` blocks the hand-over until each gap
+   has a written disposition. → *Expansion 6.*
 7. **Write the prose**: the mission description, one milestone description per milestone with
    the source's sentence quoted first, one natural-language statement per declaration.
    → *Expansion 7.*
@@ -127,7 +130,15 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 **Read-backs**
 - One per artifact, from the current Lean, with the imported bundles marked as context and not
   rendered; no Lean identifiers, no `file:line`, no naming verdict in `readback.md`; the model
-  attributed correctly; never edited by hand.
+  attributed correctly; never edited by hand. The auditor's five-line reply is kept as
+  `<name>.reply.md` beside it.
+- A source-side audit per statement, verdict `faithful`, or every WEAKER / MISSING claim decided in
+  `<name>.dispositions.md`: **fixed** (the statement now says it), **carried** (another milestone
+  states it, named), or **dismissed** (with the reason, e.g. true by definition). A real gap --
+  one with a genuine near-miss -- leads the report to the human, not a list of routine results.
+  The read-back cannot do this job: it is blind to the source by design, and its own "What it
+  does not say" is a Lean-side list where the one real omission looks like boilerplate (Garrido
+  III, M3: "Not that a u a ∈ St(1)" sat second of five bullets and nobody read it).
 
 **Prose**
 - Each milestone description opens with the source's sentence in quotation marks and its page,
@@ -141,7 +152,10 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   own transcription does not see what a script did to it afterwards (three Garrido quotes shipped
   as "Tarskis" and "Carathéodorys").
 - Each natural-language statement says what the Lean says, written from that Lean and not from a
-  sibling; siblings audited against each other.
+  sibling; siblings audited against each other. **In particular it may restate the source in the
+  source's own notation ("that is, $aua = (u_1, u_0)$") only if the Lean proves everything that
+  notation asserts.** That "that is" carried the unproved half of M3 past three separate reviews:
+  the prose, the Draft hand-over and the proof report all repeated it.
 - Titles start with the source index ("Lemma 3.2 — …", "Chou, p. 400 — …" for a reference
   item) and are claims, checked against the Lean and against the quotation in their own
   description — never written to be parallel with a neighbour. A title copied for shape carries
@@ -313,6 +327,18 @@ cut the same way before formalizing the source's version.
 
 ## Expansion 4 — the definitions bundle
 
+**A sentence that introduces notation gets a bundle definition whose type carries the sentence's
+assumptions, and the statements use it wherever the source does.** Notation packs claims: Garrido
+writes "any element $u \in St(1)$ as $u = (u_0, u_1)$", so the later "$aua = (u_1, u_0)$" asserts
+$aua \in St(1)$ as well as the two components. Garrido III first absorbed that sentence into a
+general section map defined on every automorphism, so the restriction was written down nowhere,
+and M3 was stated with the two components only -- a statement $u \cdot a$ also satisfies. As
+`stOnePair : St(1) → Aut(T) × Aut(T)` the notation cannot be applied to $aua$ without a proof that
+$aua \in St(1)$, so no statement can drop it. Type the notation with what the defining sentence
+assumes, not with what a later result proves: the Remark *shows* the components lie in $\Gamma$,
+which is why the codomain is $\mathrm{Aut}(T)^2$ and not $\Gamma^2$. When a gap is found in a
+statement whose source uses no such notation, the default fix is simply the missing conjunct.
+
 A bundle holds only the definitions the mission's statements use, sourced to the pages that
 define them; a paper that defers its definitions to another paper gets a bundle sourced to that
 paper. Reuse published bundles (`Chou.wordBall` served three missions). Compute each file's
@@ -464,6 +490,28 @@ development's own traps. Batching several declarations into one auditor is fine 
 read-back must be self-contained; a bundle's read-back is one numbered document. Cold-audit
 findings are hypotheses: two of thirty-eight were wrong. The measurements are in
 `references/audit-evidence.md`.
+
+
+**The source-side audit (`scripts/source_audit.py`).** The read-back says what the Lean says; it
+never sees the source, so it cannot notice that the Lean says less than the source. A second
+agent works from the other side, in two phases the tool enforces:
+
+1. `source_audit.py stage MISSION_DIR NAME`: the agent gets the quoted sentence (the “…” of the
+   milestone description -- never the Route prose or the natural-language statement) and the page
+   images, context pages included since notation is set there (`SOURCE_PDF`, `CONTEXT_PAGES` in
+   `mission.py`). It writes `claims.md`: every atomic claim, notation-carried ones marked, and
+   the sentence's hypotheses, ending with the line `END OF CLAIMS`.
+2. `source_audit.py reveal MISSION_DIR NAME`, which refuses until that line is there, copies in
+   the blind read-back; continue the same agent (SendMessage) and it writes `coverage.md`: each
+   claim COVERED / WEAKER / MISSING, a **near-miss** object for every gap -- something the Lean
+   accepts that the source excludes -- and a VERDICT line.
+
+`collect` files both beside the read-back and exits 1 unless the verdict is `faithful`. Then write
+the dispositions (the double-check list says how), fix, and re-run only what changed: a fresh
+read-back of the changed statement, and phase 2 against it -- the claims do not change while the
+source does not. Measured on Garrido III: M3's missing $aua \in St(1)$ was listed in phase 1 from
+the source alone and given the near-miss $u \cdot a$; two faithful controls came back faithful.
+About 46k tokens and 100 s per item, roughly the cost of the read-back itself.
 
 ## Expansion 7 — the prose
 
