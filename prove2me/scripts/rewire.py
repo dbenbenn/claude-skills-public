@@ -31,10 +31,21 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def explicit_binders(header):
-    """Names of the explicit `(a b : T)` binders of a declaration header, in order."""
+    """Names of the explicit `(a b : T)` binders of a declaration header, in order -- read only
+    before the header's top-level `:`, since a conclusion like `(∃ m : …) ∧ …` looks like a binder
+    group and once produced `haveI := ∃` (the same trap the Garrido II wiring builder fell into)."""
+    depth, cut = 0, len(header)
+    for i, ch in enumerate(header):
+        if ch in '([{⦃':
+            depth += 1
+        elif ch in ')]}⦄':
+            depth -= 1
+        elif ch == ':' and depth == 0 and header[i:i + 2] != ':=':
+            cut = i
+            break
     names = []
-    for grp in re.findall(r'\(([^():]+?)\s*:', header):
-        names += grp.split()
+    for grp in re.findall(r'\(([^():]+?)\s*:', header[:cut]):
+        names += [n for n in grp.split() if re.fullmatch(r"[^\W\d][\w'₀-₉]*", n)]
     return names
 
 
@@ -123,6 +134,10 @@ def main():
             continue
         if a.only and base not in a.only:
             continue
+        # already a thin call to the published theorem (an earlier wiring): nothing to do
+        body = '\n'.join(text.split('\n')[d[2]:d[3]])
+        if re.search(r'(?<![\w.])%s(?![\w\'])' % re.escape(pub[base][0]), body[body.find(':='):]):
+            continue
         cands.append(name)
     print('copies of published theorems: %s' % (', '.join(
         '%s -> %s' % (c, pub[c.rstrip("'")][0]) for c in cands) or 'none'))
@@ -142,7 +157,9 @@ def main():
         if bad is None:
             sys.exit('compile failed outside every rewired copy -- the input itself may not compile:\n'
                      + out[-800:])
-        print('   could not prove %s from %s; left as it was' % (bad, pub[bad.rstrip("'")][0]))
+        print('   could not prove %s from %s; left as it was. Lean said:' % (bad, pub[bad.rstrip("'")][0]))
+        for l in [l for l in out.split('\n') if ': error' in l][:4]:
+            print('      ' + l[:220])
         kept.remove(bad); failed.append(bad)
     if not kept:
         shutil.copy(a.file, a.out)
