@@ -23,7 +23,11 @@ This auditor works from the other side, in two enforced phases:
 
 `collect` files claims.md and coverage.md beside the item's read-back and exits 1 unless the
 verdict is `faithful`. mission.py (draft.py's) may set SOURCE_PDF (path relative to MISSION_DIR)
-and CONTEXT_PAGES ('12-13'); --pages overrides the item's own page field.
+and CONTEXT_PAGES ('12-13'); an item may add `context_pages` (e.g. '4,7', where the notions it
+uses are defined); --pages overrides the item's own page field.
+
+The goal is audited like any milestone: it keeps its milestone_description (the quoted sentence)
+in the mission data even though draft.py never posts it as a milestone.
 """
 import os, re, shutil, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -68,7 +72,10 @@ def stage(mdir, name, page_spec=None):
         sys.exit('REFUSING: %s exists -- collect/teardown it first' % d)
     os.makedirs(os.path.join(d, 'scratch'))
     shutil.copy(os.path.join(HERE, 'source-audit-brief.md'), os.path.join(d, 'brief.md'))
-    want = pages(page_spec or T['page']) + pages(getattr(M, 'CONTEXT_PAGES', ''))
+    # the item's own page, the mission's context pages, and the item's own context pages -- where
+    # the notions its sentence uses are defined (Γ ∉ EG's auditor could not see EG's definition)
+    want = (pages(page_spec or T['page']) + pages(getattr(M, 'CONTEXT_PAGES', ''))
+            + pages(T.get('context_pages', '')))
     for p in sorted(set(want)):
         subprocess.run(['pdftoppm', '-f', str(p), '-l', str(p), '-r', '130', '-png', pdf,
                         os.path.join(d, 'page-%02d' % p)], check=True)

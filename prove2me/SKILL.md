@@ -506,6 +506,12 @@ agent works from the other side, in two phases the tool enforces:
    claim COVERED / WEAKER / MISSING, a **near-miss** object for every gap -- something the Lean
    accepts that the source excludes -- and a VERDICT line.
 
+**The goal is a milestone for every purpose but the platform's list**: it keeps a
+`milestone_title` and a `milestone_description` with its quoted sentence in the mission data,
+`draft.py` leaves it off the milestone list as the platform requires, and every audit covers it
+like the rest. An item may name `context_pages` where the notions its sentence uses are defined
+(Garrido's Theorem 4.1 needs Definition 1.13 on p. 4 and the class EG on p. 7).
+
 `collect` files both beside the read-back and exits 1 unless the verdict is `faithful`. Then write
 the dispositions (the double-check list says how), fix, and re-run only what changed: a fresh
 read-back of the changed statement, and phase 2 against it -- the claims do not change while the
