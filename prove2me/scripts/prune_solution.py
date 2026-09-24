@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Delete the declarations an assembled solution never uses, before submitting it.
 
-A solution built by concatenating modules carries lemmas its target does not touch. That is
+A solution built by concatenating modules carries lemmas its target does not touch, and
+`import Theorems.*` lines for published theorems only those lemmas used. Both go. That is
 not merely untidy:
 
   * a reader cannot tell which lemmas the proof depends on, and neither can you months later;
@@ -162,7 +163,50 @@ def prune(text, verbose=True):
         for i in range(s, e):
             keep_mask[i] = False
     out = '\n'.join(l for i, l in enumerate(lines) if keep_mask[i])
-    return out, doomed
+    out, dropped = prune_theorem_imports(out, verbose)
+    return out, doomed + dropped
+
+
+def _workspace():
+    for p in (os.environ.get('P2M_WORKSPACE'), '~/claude/prove2me_workspace', '~/prove2me_workspace'):
+        if p and os.path.isdir(os.path.expanduser(p)):
+            return os.path.expanduser(p)
+    return os.path.expanduser('~/claude/prove2me_workspace')
+
+
+def prune_theorem_imports(text, verbose=True):
+    """Drop each `import Theorems.X` whose theorem the remaining code never names.
+
+    The platform draws a dependency edge for every imported theorem, so an unused one is a false
+    edge -- and it survives everything else here, because the declaration pass never looks at
+    imports. Five live edges came from this (2026-09-24 audit): a rewire cut a helper and imported
+    it, then cut its only user too, and the first import stayed. A theorem is "named" by its full
+    name or its last component, comments excluded; --check then proves the import was unused."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from stage_auditor import strip
+    ws = _workspace()
+    code = '\n'.join(l for l in strip(text).split('\n') if not l.startswith('import '))
+    keep, dropped = [], []
+    for l in text.split('\n'):
+        m = re.match(r'^import\s+(Theorems\.\S+)\s*$', l)
+        if m:
+            f = os.path.join(ws, m.group(1).replace('.', os.sep) + '.lean')
+            try:
+                d = re.search(r'^\s*(?:theorem|lemma)\s+([^\s:({]+)', strip(open(f).read()), re.M)
+            except OSError:
+                d = None
+            if d:
+                short = re.escape(d.group(1).split('.')[-1])
+                if not re.search(r"(?<![A-Za-z0-9_'])(?:[A-Za-z_][A-Za-z0-9_']*\.)*%s(?![A-Za-z0-9_'])"
+                                 % short, code):
+                    dropped.append((m.group(1), 'import', 0, 0, False))
+                    continue
+        keep.append(l)
+    if verbose and dropped:
+        print('unused theorem imports (each would be a false graph edge): %d' % len(dropped))
+        for name, *_ in dropped:
+            print('   - import %s' % name)
+    return '\n'.join(keep), dropped
 
 
 def main():
