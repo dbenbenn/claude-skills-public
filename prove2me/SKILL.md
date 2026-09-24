@@ -260,7 +260,10 @@ the other development kept private, published on its own merits.
 covers: **Lean Pool**, canonical repository `Vilin97/lean-pool` (other copies are forks — check
 `fork`/`parent` with `gh api repos/<r>`), both its admitted projects (`LeanPool/projects.yml`) and
 its intake list (`candidates/decisions.jsonl`, `candidates/README.md`); and **Tau Ceti**,
-`TauCetiProject/TauCeti` and its roadmaps `TauCetiProject/TauCetiRoadmap`. Clone shallowly and
+`TauCetiProject/TauCeti` and its roadmaps `TauCetiProject/TauCetiRoadmap`. Also **Palomar**
+(palomar-registry.org, Tao et al.), a registry of machine-checked results: search its feed
+`https://data.palomar-registry.org/recent.json` (entries carry abstract, MSC codes and theorem
+names) for the goal and the named results. Registrations are frozen snapshots, not importable. Clone shallowly and
 grep: GitHub code search rate-limits after a few queries. A hit is prior art to credit in the
 description, and sometimes a reason not to run the mission; an arbitrary GitHub repository found
 along the way is less salient. Garrido II was designed without this step, and the Banach–Tarski
