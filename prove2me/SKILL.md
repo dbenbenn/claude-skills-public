@@ -579,7 +579,10 @@ reduction: the imported theorems become the target's decomposition children, the
 the mission's tree and auto-resolves when every leaf is proved (`prove.md`, `missions.md`). A
 reduction is the right submission when the decomposition is what you have and the leaves are
 worth publishing for others to attack; a full proof by concatenation is the right one when you
-have the whole argument and want the milestone Proved now. Fetch each imported statement into
+have the whole argument and want the milestone Proved now. After Submit, post every
+solution as soon as its own statement is published: a wired solution whose imports are still Open
+is accepted as a reduction and resolves to Proved when they are, so submitting in dependency
+layers and waiting for each layer's verdicts only adds delay (dbenbenn, 2026-09-24). Fetch each imported statement into
 `Theorems/Thm_….lean` locally to compile-check. Submit with `scripts/submit_verify.py TID FILE EXPL.md`; poll
 `GET /verify?submission_id=…` (the documented `GET /submission/{id}` 404s). **The verifier runs with `autoImplicit` off, and `lake env lean` does not**: it ignores the
 lakefile's `leanOptions`, so a `universe u` declared inside a `namespace … end` block that has
