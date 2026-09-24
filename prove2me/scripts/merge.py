@@ -57,13 +57,22 @@ def blocks(text):
 
 def main():
     out_path, mods = sys.argv[1], sys.argv[2:]
-    seen = set()
+    seen = {}  # name -> the declaration's own text, to tell a true duplicate from a clash
     pieces = [header(mods)]
     for mod in mods:
         body = [ln for ln in open(mod).read().split('\n') if not ln.startswith('import ')]
         kept = []
         for name, chunk in blocks('\n'.join(body)):
             if name is not None:
+                decl = '\n'.join(ln for ln in chunk.split('\n')
+                                 if not re.match(r'^(end|namespace|open|section)\b', ln)).strip()
+                if name in seen and seen[name] != decl:
+                    # same bare name, different declaration (e.g. two provers' helpers named
+                    # `ev` in different namespaces): keeping the first would silently
+                    # rebind the second module's uses to the wrong definition
+                    sys.exit(f'refusing: {name} in {mod} differs from an earlier declaration '
+                             'of the same name -- rename one, or give each module its own '
+                             'namespace and concatenate instead')
                 if name in seen:
                     sys.stderr.write(f'dropping duplicate {name} from {mod}\n')
                     # a chunk runs to the next declaration, so it may carry the module's
@@ -73,7 +82,7 @@ def main():
                     if structural:
                         kept.append('\n'.join(structural))
                     continue
-                seen.add(name)
+                seen[name] = decl
             kept.append(chunk)
         pieces.append('\n'.join(kept).strip() + '\n')
     merged = '\n'.join(pieces)
