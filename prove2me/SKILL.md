@@ -424,7 +424,11 @@ description and your understanding are wrong together.
 a directory holding only the brief, the artifact, the imported bundles marked as context to expand
 inline and not to render, the library roots, a probe wrapper and `scratch/`; `collect` pulls out
 the two files, runs the hygiene checks on the publishable one, and prints any `IMPORTS` line the
-auditor wrote about an unused import; `teardown` removes the directory. `stage` strips every
+auditor wrote about an unused import; `teardown` removes the directory. For a whole mission use `stage_auditor.py stage-all MISSION_DIR [NAME…]` and `collect-all
+MISSION_DIR [NAME…] [--teardown]`: driven by the same `mission.py` as `draft.py`, they stage each
+theorem as its exact publish payload with the bundles it imports, save each prompt to a file, and
+file the testimony under the names `draft.py` reads -- a pair that is missing a file or fails a
+check goes to `readbacks/_failed/` and never replaces a good read-back. `stage` strips every
 comment from what it stages, so pass the real files; it did not until 2026-09-24, when a bundle
 auditor was found quoting a docstring, and the Garrido II and III bundle read-backs were re-run.
 The prompt's reply asks for five lines: conventions settled and whether source
@@ -566,6 +570,17 @@ check <theorem_id>…` is the launch-time guard, one API call, run in the same b
 the proof; `watch_targets.py watch …` under a Monitor turns a status flip during a long proof into
 an event, and you decide whether to stop the prover. Do not automate the kill: the event is rare
 and a half-written proof of a now-closed statement is still evidence of an approach.
+
+**Published statements in the workspace.** After Submit, `scripts/fetch_theorems.py MISSION…`
+writes every published theorem and bundle of the missions into `Theorems/` and `Definitions/` in
+server shape and builds them, so solutions import exactly what the verifier compiles against; it
+asks the platform for the list, where the per-mission fetchers read a hand-kept id file.
+
+**A script that has had a bug is tracked and reused.** Every per-mission copy of a job carried its
+own defects -- collectors that dropped `FAIL` lines, deprecate scripts that kept a deprecated
+proof, forks without later fixes -- and each fix stayed stranded in one repo. When a one-off
+script needs a fix, or the same job is about to be written a second time, it moves into
+`scripts/` here.
 
 **Graph hygiene: rewire, submit, audit.** A proof's graph edges are exactly its `import
 Theorems.*` lines, so they are wrong in two ways: an import only dead code used (a false edge;

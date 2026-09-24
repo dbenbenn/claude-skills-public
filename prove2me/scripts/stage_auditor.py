@@ -27,6 +27,12 @@ Usage:
                                                                        (refuses an existing slug
                                                                         without --force)
   stage_auditor.py collect <slug> <dest-dir>                        -> moves testimony out
+  stage_auditor.py stage-all MISSION_DIR [NAME ...] [--force]         -> one auditor per item of
+                                                                       mission.py (draft.py's), each
+                                                                       prompt saved to _prompts/
+  stage_auditor.py collect-all MISSION_DIR [NAME ...] [--teardown]    -> every staged item into
+                                                                       MISSION_DIR/readbacks/; exit 1
+                                                                       on any MISSING or FAIL
   stage_auditor.py teardown <slug> [--force]                        -> removes the staging dir
                                                                        (refuses while readback.md or
                                                                         audit.md is missing)
@@ -317,8 +323,7 @@ def collect(slug, dest):
             failed = failed or not ok
     n = sum(len(fs) for _, _, fs in os.walk(os.path.join(d, 'scratch')))
     print(f"\nprobe files left in scratch/: {n} (discarded at teardown)")
-    if failed:
-        sys.exit(1)
+    return failed
 
 def teardown(slug, force=False):
     """Remove a staging directory -- but refuse while the auditor may still be writing.
@@ -348,13 +353,103 @@ def teardown(slug, force=False):
     shutil.rmtree(d, ignore_errors=True)
     print(f"TORN DOWN {d}")
 
+def mission_items(mdir):
+    """[(key, artifact path, [imported bundle paths])] for every item of MISSION_DIR/mission.py:
+    each definition bundle as its lib/ file, each theorem as its exact publish payload (preamble +
+    formal_statement) written to a scratch file -- what the platform will freeze is what the
+    auditor reads. Keys are the read-back names draft.py expects: Def_<name> or <name>."""
+    import draft
+    M = draft.load(os.path.abspath(mdir))
+    src = os.path.join(ROOT, '_src', os.path.basename(os.path.abspath(mdir)))
+    os.makedirs(src, exist_ok=True)
+    def bundles(text):
+        return [os.path.join(WS, m.replace('.', os.sep) + '.lean')
+                for m in re.findall(r'^import (Definitions\.\S+)', text, re.M)]
+    out = []
+    for D in M.DEFINITIONS:
+        path = os.path.join(os.path.abspath(mdir), 'lib', 'Def_%s.lean' % D['name'])
+        out.append(('Def_' + D['name'], path, bundles(open(path, encoding='utf-8').read())))
+    pay = M.payloads()
+    for T in M.THEOREMS:
+        pre, fs = pay[T['name']]
+        path = os.path.join(src, T['name'] + '.lean')
+        open(path, 'w', encoding='utf-8').write(pre + '\n\n' + fs + '\n')
+        out.append((T['name'], path, bundles(pre)))
+    return out
+
+
+def slug_of(mdir, key):
+    return ('%s-%s' % (os.path.basename(os.path.abspath(mdir)), key))[:150]
+
+
+def stage_all(mdir, names, force=False):
+    """Stage one auditor per item (or per NAME given); each prompt goes to _prompts/<slug>.txt."""
+    import io, contextlib
+    pdir = os.path.join(ROOT, '_prompts'); os.makedirs(pdir, exist_ok=True)
+    items = [i for i in mission_items(mdir) if not names or i[0] in names]
+    if names and len(items) != len(set(names)):
+        sys.exit('unknown item(s): %s' % sorted(set(names) - {i[0] for i in items}))
+    for key, art, extras in items:
+        slug = slug_of(mdir, key)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            stage(slug, art, extras, force=force)
+        prompt = buf.getvalue().split('\n\n', 1)[-1] if buf.getvalue().startswith('library') else buf.getvalue()
+        prompt = prompt[prompt.find('Work only inside'):]
+        open(os.path.join(pdir, slug + '.txt'), 'w').write(prompt)
+        print('staged %-60s %d bundle(s)   prompt: %s' % (key[:60], len(extras), os.path.join(pdir, slug + '.txt')))
+
+
+def collect_all(mdir, names, teardown_after=False):
+    """Collect every staged item into MISSION_DIR/readbacks/<key>.{readback,audit}.md; exit 1 if
+    any item is missing a file or fails a check, printing every IMPORTS line."""
+    import tempfile
+    rdir = os.path.join(os.path.abspath(mdir), 'readbacks'); os.makedirs(rdir, exist_ok=True)
+    bad = []
+    for key, _, _ in mission_items(mdir):
+        if names and key not in names:
+            continue
+        slug = slug_of(mdir, key)
+        if not os.path.isdir(os.path.join(ROOT, slug)):
+            if names:
+                bad.append(key); print('NOT STAGED', key)
+            continue
+        tmp = tempfile.mkdtemp()
+        print('== %s' % key)
+        failed = collect(slug, tmp)
+        # a failing pair never replaces the read-back in readbacks/ (it may be an auditor that has
+        # not finished, or testimony that breaks the spec); it goes to readbacks/_failed/ to inspect
+        dest = os.path.join(rdir, '_failed') if failed else rdir
+        os.makedirs(dest, exist_ok=True)
+        for kind in ('readback', 'audit'):
+            f = os.path.join(tmp, '%s.%s.md' % (slug, kind))
+            if os.path.exists(f):
+                shutil.move(f, os.path.join(dest, '%s.%s.md' % (key, kind)))
+        shutil.rmtree(tmp, ignore_errors=True)
+        if failed:
+            bad.append(key)
+        elif teardown_after:
+            teardown(slug)
+    print('\ncollected into %s; %s' % (rdir, 'FAILED: ' + ', '.join(bad) if bad else 'all clean'))
+    return not bad
+
+
 if __name__ == '__main__':
-    args = [a for a in sys.argv[1:] if a != '--force']
+    args = [a for a in sys.argv[1:] if a not in ('--force', '--teardown')]
     force = '--force' in sys.argv[1:]
+    if args and args[0] in ('stage-all', 'collect-all'):
+        if len(args) < 2:
+            sys.exit(__doc__)
+        if args[0] == 'stage-all':
+            stage_all(args[1], args[2:], force=force)
+        else:
+            sys.exit(0 if collect_all(args[1], [a for a in args[2:] if a != '--teardown'],
+                                      teardown_after='--teardown' in sys.argv) else 1)
+        sys.exit(0)
     need = {'stage': 3, 'collect': 3, 'teardown': 2}
     if not args or args[0] not in need or len(args) < need[args[0]]:
         sys.exit(__doc__)
     cmd = args[0]
     if cmd == 'stage': stage(args[1], args[2], args[3:], force=force)
-    elif cmd == 'collect': collect(args[1], args[2])
+    elif cmd == 'collect': sys.exit(1 if collect(args[1], args[2]) else 0)
     else: teardown(args[1], force=force)
