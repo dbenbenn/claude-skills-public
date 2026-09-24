@@ -256,6 +256,16 @@ per session and one before Submit. When the goal is already proved elsewhere the
 even if the decomposition is better; what survives is any public definition or reusable lemma
 the other development kept private, published on its own merits.
 
+**Search the neighbouring Lean projects too** (dbenbenn, 2026-09-24), which none of the above
+covers: **Lean Pool**, canonical repository `Vilin97/lean-pool` (other copies are forks — check
+`fork`/`parent` with `gh api repos/<r>`), both its admitted projects (`LeanPool/projects.yml`) and
+its intake list (`candidates/decisions.jsonl`, `candidates/README.md`); and **Tau Ceti**,
+`TauCetiProject/TauCeti` and its roadmaps `TauCetiProject/TauCetiRoadmap`. Clone shallowly and
+grep: GitHub code search rate-limits after a few queries. A hit is prior art to credit in the
+description, and sometimes a reason not to run the mission; an arbitrary GitHub repository found
+along the way is less salient. Garrido II was designed without this step, and the Banach–Tarski
+paradox turned out to be formalized already in a Lean Pool candidate.
+
 The platform carries a large layer of auto-generated theorems with private definition bundles and
 no source text (one account uploaded twelve percent of the catalogue in a week, one stub per
 declaration of a machine-generated repository). Read a hit from such an account with that in mind.
