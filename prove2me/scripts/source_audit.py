@@ -2,7 +2,7 @@
 """Source-side audit: what does the source sentence claim, and does the formalization say it?
 
 usage: source_audit.py stage   MISSION_DIR NAME [--pages 12-14]   -> phase 1 prompt
-       source_audit.py reveal  MISSION_DIR NAME [--finished]      -> phase 2 message
+       source_audit.py reveal  MISSION_DIR NAME                   -> phase 2 message
        source_audit.py collect MISSION_DIR NAME                   -> claims/coverage into readbacks/
 
 The blind read-back (stage_auditor.py) says what the Lean says, and by design never sees the
@@ -84,19 +84,15 @@ def stage(mdir, name, page_spec=None):
           'you must not look for one. Do not read or write anything outside this directory.' % d)
 
 
-def reveal(mdir, name, finished=False):
+def reveal(mdir, name):
     mdir = os.path.abspath(mdir)
     d = os.path.join(ROOT, slug(mdir, name))
     cp = os.path.join(d, 'claims.md')
     # phase 2 starts from a COMPLETE claims list, not an existing file: an agent creates the file
-    # before it has finished writing it. The brief makes `END OF CLAIMS` the last thing written;
-    # --finished is for an agent staged before that rule, and only after its completion notice.
-    done = os.path.exists(cp) and 'END OF CLAIMS' in open(cp, encoding='utf-8').read()
-    if not done and not finished:
-        sys.exit('REFUSING: %s is %s -- phase 1 is not finished (pass --finished only after the '
-                 "agent's completion notification)" % (cp, 'incomplete' if os.path.exists(cp) else 'missing'))
-    if not os.path.exists(cp):
-        sys.exit('REFUSING: no claims.md in %s' % d)
+    # before it has finished writing it, so the brief makes `END OF CLAIMS` the last line written
+    if not (os.path.exists(cp) and 'END OF CLAIMS' in open(cp, encoding='utf-8').read()):
+        sys.exit('REFUSING: %s is %s -- phase 1 is not finished'
+                 % (cp, 'incomplete' if os.path.exists(cp) else 'missing'))
     shutil.copy(os.path.join(mdir, 'readbacks', name + '.readback.md'), os.path.join(d, 'readback.md'))
     print('Continue with PHASE 2 of brief.md: readback.md is now in your directory. Compare it with\n'
           'claims.md, write coverage.md (with near-misses and the VERDICT line), and reply in at\n'
@@ -128,6 +124,6 @@ if __name__ == '__main__':
     if a[0] == 'stage':
         stage(a[1], a[2], a[a.index('--pages') + 1] if '--pages' in a else None)
     elif a[0] == 'reveal':
-        reveal(a[1], a[2], finished='--finished' in a)
+        reveal(a[1], a[2])
     else:
         sys.exit(0 if collect(a[1], a[2]) else 1)
