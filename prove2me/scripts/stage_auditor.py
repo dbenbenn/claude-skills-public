@@ -258,7 +258,7 @@ Write two files in this directory: readback.md (the publishable testimony) and a
 Do not read or write anything outside this directory. Reply with at most five lines:
 conventions you settled and whether source settled them; anything unsettled; whether the
 declaration's name is an accurate label; which imported definition files, if any, the
-artifact does not use.""")
+artifact does not use. Write the same five lines to reply.md before you reply.""")
 
 def collect(slug, dest):
     """Pull both artifacts out, and check the publishable one against the platform's spec.
@@ -271,6 +271,12 @@ def collect(slug, dest):
     d = os.path.join(ROOT, slug)
     os.makedirs(dest, exist_ok=True)
     out, failed = {}, False
+    # the five-line reply used to live only in the captain's session transcript; keep it beside
+    # the testimony (optional: auditors staged before 2026-09-24 did not write it)
+    rp = os.path.join(d, 'reply.md')
+    if os.path.exists(rp):
+        shutil.copy(rp, os.path.join(dest, slug + '.reply.md'))
+        print(f"COLLECTED {os.path.join(dest, slug + '.reply.md')}")
     for name, tgt in (('readback.md', slug + '.readback.md'), ('audit.md', slug + '.audit.md')):
         src = os.path.join(d, name)
         if not os.path.exists(src):
@@ -421,7 +427,7 @@ def collect_all(mdir, names, teardown_after=False):
         # not finished, or testimony that breaks the spec); it goes to readbacks/_failed/ to inspect
         dest = os.path.join(rdir, '_failed') if failed else rdir
         os.makedirs(dest, exist_ok=True)
-        for kind in ('readback', 'audit'):
+        for kind in ('readback', 'audit', 'reply'):
             f = os.path.join(tmp, '%s.%s.md' % (slug, kind))
             if os.path.exists(f):
                 shutil.move(f, os.path.join(dest, '%s.%s.md' % (key, kind)))
