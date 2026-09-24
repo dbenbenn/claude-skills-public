@@ -4,14 +4,15 @@ Written because the skill already carried the "opens with 'This mission formaliz
 I still shipped a description that never named its source. A rule I have to remember is a rule
 I will drop, so the checkable parts are checked here.
 
-usage: check_description.py [path]   (default: description.md beside this file)
+usage: check_description.py PATH
 """
 import os
 import re
 import sys
 
-p = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), 'description.md')
+if len(sys.argv) != 2:
+    sys.exit(__doc__)
+p = sys.argv[1]
 s = open(p, encoding='utf-8').read()
 fail, warn = [], []
 
@@ -36,7 +37,7 @@ for m in re.finditer(r'\$\$(.+?)\$\$', s, re.S):
         fail.append('display math %d chars, will not wrap: %s…' % (len(t), t[:60]))
 
 # 4. no pronoun for an author whose pronouns the source does not establish
-for m in re.finditer(r'(?<![\w-])(she|her|hers|his|him)(?![\w-])', s, re.I):
+for m in re.finditer(r'(?<![\w-])(he|she|her|hers|his|him)(?![\w-])', s, re.I):
     a, b = max(0, m.start() - 40), m.end() + 40
     fail.append('pronoun %r near: …%s…' % (m.group(0), ' '.join(s[a:b].split())))
 

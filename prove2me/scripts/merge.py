@@ -6,15 +6,16 @@ usage: merge.py OUT MODULE [MODULE ...]
 A solution may import only the mission's definitions, so a development shared across
 submissions is kept as modules (`Solutions/*.lean`, importing each other) and concatenated per
 submission. Import lines are dropped and one header is prefixed: the union of the modules' own
-non-`Solutions.` imports. A declaration that appears in more than one module is dropped from the
-later module, by BARE name -- so two modules must not reuse a name in different namespaces.
-Any `namespace`/`end`/`open`/`section` line inside a dropped block is kept: dropping one once
-deleted a file's closing `end`, the merged file compiled locally with `solution` silently
+non-`Solutions.` imports. A declaration that appears in more than one module with identical
+text is dropped from the later module; one whose name matches an earlier declaration but whose
+text differs is refused, since keeping either would rebind the other's uses. Names are compared
+as written, so two modules must not reuse a name in different namespaces. Only the declaration's
+own span is ever dropped (see blocks()): dropping more once deleted a file's closing `end`, the merged file compiled locally with `solution` silently
 namespaced, and the verifier answered "Unknown identifier solution" four times. The script now
 refuses to write a file whose namespace/end counts differ or that holds more than one
 `theorem solution`; append the `solution` tail AFTER merging.
 """
-import re, sys
+import os, re, sys
 
 def header(mods):
     """The merged file's imports: every non-`Solutions.` import any module makes, first-seen
@@ -26,32 +27,29 @@ def header(mods):
                 seen.add(ln); out.append(ln)
     return '\n'.join(out) + '\n'
 
-DECL = re.compile(r'^(?:@\[simp\] )?(?:noncomputable )?(?:lemma|theorem|def|abbrev) ([^\s:({]+)')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from prune_solution import parse
 
 
 def blocks(text):
-    """Split into (name-or-None, text) chunks at top-level declarations."""
+    """Split into (name-or-None, text) chunks: each declaration's own span, as prune_solution
+    parses it (attributes, a docstring and a `set_option … in` above it included, its body, up to
+    the next top-level command), and between them unnamed chunks holding everything else --
+    `namespace`, `end`, `open`, `variable`, `notation` and the like.
+
+    Only a named chunk can be dropped as a duplicate, so dropping one can no longer take a
+    following `@[simp]`, docstring, `variable` or closing `end` with it: an earlier version ran
+    each chunk to the next declaration it recognised, and a dropped duplicate silently stripped
+    the `@[simp]` off the lemma after it."""
     lines = text.split('\n')
-    out, cur, name = [], [], None
-    i = 0
-    while i < len(lines):
-        ln = lines[i]
-        m = DECL.match(ln)
-        if m:
-            # attach a directly preceding docstring
-            doc = []
-            while cur and (cur[-1].startswith('/--') or (doc and not cur[-1].startswith('/--'))):
-                doc.insert(0, cur.pop())
-                if doc[0].startswith('/--'):
-                    break
-            if cur:
-                out.append((name, '\n'.join(cur)))
-            cur, name = doc + [ln], m.group(1)
-        else:
-            cur.append(ln)
-        i += 1
-    if cur:
-        out.append((name, '\n'.join(cur)))
+    out, cur = [], 0
+    for name, _kind, st, en, _attr in sorted(parse(lines), key=lambda d: d[2]):
+        if st > cur:
+            out.append((None, '\n'.join(lines[cur:st])))
+        out.append((name, '\n'.join(lines[st:en])))
+        cur = en
+    if cur < len(lines):
+        out.append((None, '\n'.join(lines[cur:])))
     return out
 
 
@@ -64,8 +62,7 @@ def main():
         kept = []
         for name, chunk in blocks('\n'.join(body)):
             if name is not None:
-                decl = '\n'.join(ln for ln in chunk.split('\n')
-                                 if not re.match(r'^(end|namespace|open|section)\b', ln)).strip()
+                decl = chunk.strip()
                 if name in seen and seen[name] != decl:
                     # same bare name, different declaration (e.g. two provers' helpers named
                     # `ev` in different namespaces): keeping the first would silently
@@ -75,12 +72,6 @@ def main():
                              'namespace and concatenate instead')
                 if name in seen:
                     sys.stderr.write(f'dropping duplicate {name} from {mod}\n')
-                    # a chunk runs to the next declaration, so it may carry the module's
-                    # closing `end` (or a stray `namespace`/`open`): keep those lines
-                    structural = [ln for ln in chunk.split('\n')
-                                  if re.match(r'^(end|namespace|open|section)\b', ln)]
-                    if structural:
-                        kept.append('\n'.join(structural))
                     continue
                 seen[name] = decl
             kept.append(chunk)
@@ -106,14 +97,15 @@ def main():
         if fresh:
             out_lines.append('universe ' + ' '.join(fresh))
     merged = '\n'.join(out_lines)
-    # `section` (named or anonymous) opens a scope exactly as `namespace` does, and a bare `end`
-    # closes an anonymous section; count both, or a module with a `section` is refused.
-    n_ns = sum(1 for ln in merged.split('\n') if re.match(r'^(namespace\s|section\b)', ln))
+    # `section` (named, anonymous or `noncomputable`) and `mutual` open a block closed by `end`
+    # exactly as `namespace` does; count them all, or a module using one is refused.
+    n_ns = sum(1 for ln in merged.split('\n')
+               if re.match(r'^(namespace\s|(noncomputable\s+)?section\b|mutual\b)', ln))
     n_end = sum(1 for ln in merged.split('\n') if re.match(r'^end\b', ln))
     if n_ns != n_end:
         sys.exit(f'refusing: {n_ns} namespace/section lines but {n_end} end lines -- a trailing '
                  '`theorem solution` would be namespaced and invisible to the verifier')
-    solution_count = sum(1 for ln in merged.split('\n') if ln.startswith('theorem solution'))
+    solution_count = sum(1 for ln in merged.split('\n') if re.match(r'^theorem\s+solution\b', ln))
     if solution_count > 0:
         sys.exit(f'refusing: {solution_count} `theorem solution` already in the modules; '
                  'strip it (the verifier takes the FIRST one)')

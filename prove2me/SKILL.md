@@ -424,8 +424,10 @@ description and your understanding are wrong together.
 a directory holding only the brief, the artifact, the imported bundles marked as context to expand
 inline and not to render, the library roots, a probe wrapper and `scratch/`; `collect` pulls out
 the two files, runs the hygiene checks on the publishable one, and prints any `IMPORTS` line the
-auditor wrote about an unused import; `teardown` removes the directory. Strip docstrings from the
-staged Lean first. The prompt's reply asks for five lines: conventions settled and whether source
+auditor wrote about an unused import; `teardown` removes the directory. `stage` strips every
+comment from what it stages, so pass the real files; it did not until 2026-09-24, when a bundle
+auditor was found quoting a docstring, and the Garrido II and III bundle read-backs were re-run.
+The prompt's reply asks for five lines: conventions settled and whether source
 settled them, anything unsettled, the name check, unused imported files.
 
 **Two files from one blind reading.** `readback.md` is testimony, published beside the statement
@@ -561,8 +563,9 @@ an event, and you decide whether to stop the prover. Do not automate the kill: t
 and a half-written proof of a now-closed statement is still evidence of an approach.
 
 **Solutions.** Keep the development as small modules that import each other; to submit a full proof, build
-the submission by concatenating with `scripts/merge.py OUT MODULE…` (dedups by bare declaration name,
-refuses unbalanced namespaces or a second `theorem solution`) and finishing with `theorem
+the submission by concatenating with `scripts/merge.py OUT MODULE…` (drops a declaration repeated
+verbatim, refuses one whose name repeats with different text, unbalanced blocks, or a `theorem
+solution`) and finishing with `theorem
 solution` stated verbatim; **then prune what the proof does not use**, with
 `scripts/prune_solution.py FILE --check`. Concatenation pulls in whole modules, so an assembled
 file carries lemmas its target never touches — one Chou submission was 684 lines of which 205

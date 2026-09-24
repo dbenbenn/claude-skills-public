@@ -33,11 +33,15 @@ def post_verify(theorem_id, path, explanation=None, proof_type=None):
         'https://prove2.me/api/v1/verify', data=data, method='POST',
         headers={'Authorization': 'Bearer ' + token(),
                  'Content-Type': 'multipart/form-data; boundary=' + boundary})
-    try:
-        with urllib.request.urlopen(req, timeout=300) as f:
-            return json.loads(f.read().decode() or '{}')
-    except urllib.error.HTTPError as e:
-        return {'__error': '%d %s' % (e.code, e.read().decode()[:600])}
+    for attempt in (0, 1):
+        try:
+            with urllib.request.urlopen(req, timeout=300) as f:
+                return json.loads(f.read().decode() or '{}')
+        except urllib.error.HTTPError as e:
+            if e.code == 401 and attempt == 0:    # the cached token expired: refresh once
+                req.add_header('Authorization', 'Bearer ' + token(refresh=True))
+                continue
+            return {'__error': '%d %s' % (e.code, e.read().decode()[:600])}
 
 
 def poll(sid, tries=80, delay=15):
@@ -52,14 +56,22 @@ def poll(sid, tries=80, delay=15):
 
 if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    flags = [a for a in sys.argv[1:] if a.startswith('--')]
+    # a mistyped flag (`--disproof`) must not silently submit a proof instead of a disproof
+    if set(flags) - {'--disprove'} or len(args) not in (2, 3):
+        sys.exit(__doc__)
     # `--disprove` sends proof_type=disprove: the solution must prove the negation of the whole
     # quantified statement, and may import Definitions.Def_* and Mathlib but not Theorems.Thm_*.
-    ptype = 'disprove' if '--disprove' in sys.argv else None
+    ptype = 'disprove' if '--disprove' in flags else None
     tid, path = args[0], args[1]
     expl = open(args[2], encoding='utf-8').read() if len(args) > 2 else None
     r = post_verify(tid, path, expl, ptype)
     print(json.dumps(r, indent=1)[:2000])
     sid = r.get('submission_id')
-    if sid:
-        print('POLLING', sid)
-        print(json.dumps(poll(sid), indent=1)[:3000])
+    if not sid:
+        sys.exit(1)
+    print('POLLING', sid)
+    v = poll(sid)
+    print(json.dumps(v, indent=1)[:3000])
+    # exit status is the verdict, so a caller in a loop cannot mistake a rejection for success
+    sys.exit(0 if v.get('status') in ('ACCEPTED', 'SKETCH_ACCEPTED') else 1)

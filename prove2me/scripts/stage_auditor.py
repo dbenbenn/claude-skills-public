@@ -13,12 +13,19 @@ anyway. So this enforces what it can, structurally rather than by instruction:
   * every path in the prompt is relative to that directory, which is also what stops absolute
     paths leaking into the published citations;
   * scratch/ is per-auditor, so concurrent auditors cannot collide;
+  * every staged Lean file is stripped of comments (see strip()). One leak remains by design:
+    ./probe elaborates against the workspace's compiled modules, which keep their docstrings, so
+    an auditor that goes looking (meta code calling findDocString?) could read them. Probes are
+    for #check/#reduce/rfl, and the brief does not invite that;
   * teardown is the captain's job, not the auditor's. Auditors are demonstrably unreliable
     about cleanup: thirteen probe files were once left in the shared workspace by auditors
     that reported having tidied up.
 
 Usage:
-  stage_auditor.py stage <slug> <artifact.lean> [imported-def.lean ...] -> prints the prompt
+  stage_auditor.py stage <slug> <artifact.lean> [imported-def.lean ...] [--force]
+                                                                    -> prints the prompt
+                                                                       (refuses an existing slug
+                                                                        without --force)
   stage_auditor.py collect <slug> <dest-dir>                        -> moves testimony out
   stage_auditor.py teardown <slug> [--force]                        -> removes the staging dir
                                                                        (refuses while readback.md or
@@ -28,12 +35,32 @@ import os, shutil, sys, subprocess
 import re
 
 
+_IDCHAR = re.compile(r"[\w'.!?\u2080-\u209c]")
+_CHARLIT = re.compile(r"'(?:\\(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|.)|[^\\'\n])'")
+_RAW = re.compile(r'r(#*)"')
+
+
 def strip(text):
     """Lean source with every comment removed: block comments (nested), docstrings and line
     comments. Blind staging depends on this — a docstring handed to an auditor is the intended
-    reading leaking into a reading that is supposed to be independent."""
-    out, i, n = [], 0, len(text)
+    reading leaking into a reading that is supposed to be independent.
+
+    Literals are copied verbatim, so a comment marker inside one is not a comment: `"/-"`,
+    `"a--b"`, `r#"-- x"#`, `«foo--bar»` and `'-'`. An unclosed block comment is an error rather
+    than a silent truncation of the rest of the file. Runs of blank lines left by deleted
+    comments are collapsed, outside literals only."""
+    code, lits, i, n = [''], [], 0, len(text)
+    buf = []
+
+    def lit(j):                       # text[i:j] is a literal: keep it out of the collapse
+        buf.append(('c', ''.join(code_acc)))
+        code_acc.clear()
+        buf.append(('l', text[i:j]))
+
+    code_acc = []
     while i < n:
+        prev = text[i - 1] if i else ''
+        ident_before = bool(prev) and bool(_IDCHAR.match(prev))
         if text.startswith('/-', i):
             depth, j = 0, i
             while j < n:
@@ -45,13 +72,35 @@ def strip(text):
                         break
                 else:
                     j += 1
+            if depth:
+                line = text.count('\n', 0, i) + 1
+                raise ValueError('unclosed block comment starting at line %d' % line)
             i = j
         elif text.startswith('--', i):
             j = text.find('\n', i)
             i = n if j == -1 else j
+        elif text[i] == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == '\\' else 1
+            lit(min(j + 1, n)); i = min(j + 1, n)
+        elif text[i] == '«':
+            j = text.find('»', i)
+            j = n if j == -1 else j + 1
+            lit(j); i = j
+        elif text[i] == 'r' and not ident_before and _RAW.match(text, i):
+            close = '"' + _RAW.match(text, i).group(1)
+            j = text.find(close, _RAW.match(text, i).end())
+            j = n if j == -1 else j + len(close)
+            lit(j); i = j
+        elif text[i] == "'" and not ident_before and _CHARLIT.match(text, i):
+            j = _CHARLIT.match(text, i).end()
+            lit(j); i = j
         else:
-            out.append(text[i]); i += 1
-    return re.sub(r'\n{3,}', '\n\n', ''.join(out)).strip() + '\n'
+            code_acc.append(text[i]); i += 1
+    buf.append(('c', ''.join(code_acc)))
+    out = ''.join(re.sub(r'\n{3,}', '\n\n', t) if k == 'c' else t for k, t in buf)
+    return out.strip() + '\n'
 
 
 def write_stripped(dst, src):
@@ -129,10 +178,17 @@ def fresh_oleans(files):
              '; rebuilt %d' % len(built) if built else '; already current'))
 
 
-def stage(slug, statement, extras):
-    fresh_oleans([statement] + list(extras))
+def stage(slug, statement, extras, force=False):
     d = os.path.join(ROOT, slug)
-    if os.path.exists(d): shutil.rmtree(d)
+    # Re-staging over a live directory is the teardown hazard by another door: an auditor still
+    # working there loses its files mid-flight. Tear down first (which has the guard), or --force.
+    if os.path.exists(d) and not force:
+        sys.exit(f"REFUSING to stage {slug}: {d} exists -- tear it down first, or pass --force")
+    bases = [os.path.basename(f) for f in [statement] + list(extras)]
+    if len(set(bases)) != len(bases):
+        sys.exit(f"REFUSING to stage {slug}: two staged files share a basename: {bases}")
+    fresh_oleans([statement] + list(extras))
+    if os.path.exists(d): teardown(slug, force=True)
     os.makedirs(os.path.join(d, 'scratch'))
     shutil.copy(BRIEF, os.path.join(d, 'readback-brief.md'))
     names = []
@@ -208,11 +264,11 @@ def collect(slug, dest):
     import re
     d = os.path.join(ROOT, slug)
     os.makedirs(dest, exist_ok=True)
-    out = {}
+    out, failed = {}, False
     for name, tgt in (('readback.md', slug + '.readback.md'), ('audit.md', slug + '.audit.md')):
         src = os.path.join(d, name)
         if not os.path.exists(src):
-            print(f"MISSING {name}"); continue
+            print(f"MISSING {name}"); failed = True; continue
         shutil.copy(src, os.path.join(dest, tgt)); out[name] = os.path.join(dest, tgt)
         print(f"COLLECTED {os.path.join(dest, tgt)}")
     au = out.get('audit.md')
@@ -225,11 +281,13 @@ def collect(slug, dest):
         # buries the real ones. Drop a line whose unusedness is itself negated.
         # NB: inline (?i) is only legal at the start of a pattern in modern Python, so the
         # flag goes in the compile call.
-        denial = re.compile(r'\b(?:no|none)\b.{0,120}?(?:unused|not use)'
+        # `no` followed by a comma is an answer ("No, the import ... is not used"), not a denial
+        denial = re.compile(r'\b(?:no(?!,)|none)\b.{0,120}?(?:unused|not use)'
                             r'|not an unused'
                             r'|\bis\b\W{0,2}used\b', re.I)
         for l in open(au).read().splitlines():
-            if not (re.search(r'(?i)import', l)
+            # a bullet may name the file ("Def_Bar is not used") without the word "import"
+            if not (re.search(r'(?i)import|\bDef_\w+|definition file|\.lean\b', l)
                     and re.search(r'(?i)unused|not used|uses nothing|nothing from|never used'
                                   r'|does not use', l)):
                 continue
@@ -256,8 +314,11 @@ def collect(slug, dest):
             want_zero = "want 0" in label
             ok = (n == 0) if want_zero else (n > 0)
             print(f"  {'ok ' if ok else 'FAIL'} {label}: {n}")
+            failed = failed or not ok
     n = sum(len(fs) for _, _, fs in os.walk(os.path.join(d, 'scratch')))
     print(f"\nprobe files left in scratch/: {n} (discarded at teardown)")
+    if failed:
+        sys.exit(1)
 
 def teardown(slug, force=False):
     """Remove a staging directory -- but refuse while the auditor may still be writing.
@@ -277,9 +338,10 @@ def teardown(slug, force=False):
     if not force and os.path.isdir(d):
         missing = [f for f in ('readback.md', 'audit.md') if not os.path.exists(os.path.join(d, f))]
         if missing:
-            print(f"REFUSING to tear down {slug}: missing {', '.join(missing)} "
-                  f"-- the auditor may still be writing. Pass --force to override.")
-            return
+            sys.exit(f"REFUSING to tear down {slug}: missing {', '.join(missing)} "
+                     f"-- the auditor may still be writing. Pass --force to override.")
+    if not os.path.isdir(d):
+        sys.exit(f"NO SUCH staging directory: {d}")
     for e in os.listdir(d) if os.path.isdir(d) else []:   # never follow into shared libraries
         q = os.path.join(d, e)
         if os.path.islink(q): os.unlink(q)
@@ -287,8 +349,12 @@ def teardown(slug, force=False):
     print(f"TORN DOWN {d}")
 
 if __name__ == '__main__':
-    cmd = sys.argv[1]
-    if cmd == 'stage': stage(sys.argv[2], sys.argv[3], sys.argv[4:])
-    elif cmd == 'collect': collect(sys.argv[2], sys.argv[3])
-    elif cmd == 'teardown': teardown(sys.argv[2], force='--force' in sys.argv[3:])
-    else: sys.exit(__doc__)
+    args = [a for a in sys.argv[1:] if a != '--force']
+    force = '--force' in sys.argv[1:]
+    need = {'stage': 3, 'collect': 3, 'teardown': 2}
+    if not args or args[0] not in need or len(args) < need[args[0]]:
+        sys.exit(__doc__)
+    cmd = args[0]
+    if cmd == 'stage': stage(args[1], args[2], args[3:], force=force)
+    elif cmd == 'collect': collect(args[1], args[2])
+    else: teardown(args[1], force=force)

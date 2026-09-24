@@ -24,8 +24,9 @@ usage:
     prune_solution.py FILE [-o OUT] [--check] [--dry]
 
     --check  elaborate the pruned file with `lake env lean -DautoImplicit=false` (run from
-             $P2M_WORKSPACE); the verifier has autoImplicit off, and `lake env lean` ignores the
-             lakefile's leanOptions, so without the flag an out-of-scope `universe u` passes here
+             $P2M_WORKSPACE) BEFORE writing it; the destination is replaced only if it compiles.
+             The verifier has autoImplicit off, and `lake env lean` ignores the lakefile's
+             leanOptions, so without the flag an out-of-scope `universe u` passes here
     --dry    report what would go, write nothing
 """
 import argparse
@@ -41,8 +42,16 @@ KINDS = r'(?:lemma|theorem|def|abbrev|instance|structure|inductive|class|alias)'
 DECL = re.compile(r'^(?P<attr>(?:@\[[^\]]*\]\s*)*)'
                   r'(?P<mods>(?:private\s+|protected\s+|noncomputable\s+|partial\s+|unsafe\s+)*)'
                   r'(?P<kind>%s)\s+(?P<name>[A-Za-z_][A-Za-z0-9_.\'!?]*)' % KINDS)
+# anything that starts a new top-level command ends the declaration above it; without this a
+# `set_option … in`, a `notation` or a `mutual` is absorbed into the previous declaration and
+# deleted along with it
 TOP = re.compile(r'^(?:@\[|/--|/-!|%s|private|protected|noncomputable|partial|unsafe|end\b|'
-                 r'namespace\b|section\b|open\b|variable\b|universe\b|attribute\b|local\b)' % KINDS)
+                 r'namespace\b|section\b|open\b|variable\b|universe\b|attribute\b|local\b|'
+                 r'scoped\b|set_option\b|mutual\b|omit\b|include\b|notation\b|infix[lr]?\b|'
+                 r'prefix\b|postfix\b|macro\b|macro_rules\b|syntax\b|elab\b|#)' % KINDS)
+# an anonymous instance has no name for DECL to capture, but it is a root all the same
+ANON_INSTANCE = re.compile(r'^(?:@\[[^\]]*\]\s*)*(?:(?:private|protected|noncomputable|scoped)\s+)*'
+                           r'instance\b(?!\s+[A-Za-z_«])')
 
 
 def parse(lines):
@@ -55,6 +64,8 @@ def parse(lines):
         m = DECL.match(l)
         if m:
             heads.append((i, m.group('name'), m.group('kind'), bool(m.group('attr'))))
+        elif ANON_INSTANCE.match(l):
+            heads.append((i, '_anonymous_instance_%d' % i, 'instance', True))
     out = []
     for k, (i, name, kind, inline_attr) in enumerate(heads):
         j = i + 1
@@ -99,8 +110,11 @@ def callgraph(lines, decls):
     # `namespace Chou.Lib`), so allow a dotted prefix. Excluding a preceding '.' — the obvious
     # way to stop `Foo.bar` matching `bar` — makes every qualified call invisible, and the
     # analysis then reports live code as dead.
-    pats = {n: re.compile(r"(?<![A-Za-z0-9_'])(?:[A-Za-z_][A-Za-z0-9_']*\.)*%s(?![A-Za-z0-9_'])"
-                          % re.escape(n)) for n in names}
+    # ...and a declaration `Foo.qux` is called as plain `qux` from inside `namespace Foo`, so its
+    # last component counts too (over-matching only keeps more, which --check then confirms)
+    pats = {n: re.compile(r"(?<![A-Za-z0-9_'])(?:[A-Za-z_][A-Za-z0-9_']*\.)*(?:%s)(?![A-Za-z0-9_'])"
+                          % '|'.join(sorted({re.escape(n), re.escape(n.split('.')[-1])})))
+            for n in names}
     for name, kind, s, e, _ in decls:
         body = '\n'.join(lines[s:e])
         for other in names:
@@ -116,6 +130,12 @@ def prune(text, verbose=True):
         raise SystemExit('no `solution` declaration — refusing to prune')
 
     roots = {'solution'}
+    # `attribute [simp] foo` registers foo with a tactic exactly as `@[simp]` on it would
+    for l in lines:
+        m = re.match(r'^(?:local\s+|scoped\s+)?attribute\s*\[[^\]]*\]\s+(.*)$', l)
+        if m:
+            for ref in m.group(1).split():
+                roots.update(d[0] for d in decls if ref in (d[0], d[0].split('.')[-1]))
     for name, kind, s, e, attributed in decls:
         # implicit users: tactics and typeclass resolution find these without naming them
         if attributed or kind in ('instance', 'structure', 'inductive', 'class'):
@@ -152,6 +172,8 @@ def main():
     ap.add_argument('--check', action='store_true')
     ap.add_argument('--dry', action='store_true')
     a = ap.parse_args()
+    if a.dry and a.check:
+        sys.exit('--dry writes nothing, so there is nothing to --check; drop one of them')
 
     text = open(a.file, encoding='utf-8').read()
     n0 = len(text.split('\n'))
@@ -161,25 +183,38 @@ def main():
     if a.dry:
         return
     dest = a.out or a.file
-    open(dest, 'w', encoding='utf-8').write(out)
-    print('wrote %s' % dest)
+    if not a.check:
+        open(dest, 'w', encoding='utf-8').write(out)
+        print('wrote %s' % dest)
+        return
 
-    if a.check:
-        ws = os.environ.get('P2M_WORKSPACE') or os.path.expanduser('~/claude/prove2me_workspace')
-        rel = os.path.relpath(os.path.abspath(dest), ws)
-        p = subprocess.run(['lake', 'env', 'lean', '-DautoImplicit=false', rel], cwd=ws,
-                           capture_output=True, text=True)
+    # check a candidate next to the destination, and replace the destination only if it passes:
+    # overwriting first would leave nothing but the broken version when the prune was wrong
+    ws = os.environ.get('P2M_WORKSPACE') or next(
+        (p for p in map(os.path.expanduser, ('~/claude/prove2me_workspace', '~/prove2me_workspace'))
+         if os.path.isdir(p)), os.path.expanduser('~/claude/prove2me_workspace'))
+    cand = os.path.join(os.path.dirname(os.path.abspath(dest)),
+                        '.pruned_%d_%s' % (os.getpid(), os.path.basename(dest)))
+    open(cand, 'w', encoding='utf-8').write(out)
+    try:
+        p = subprocess.run(['lake', 'env', 'lean', '-DautoImplicit=false',
+                            os.path.relpath(cand, ws)], cwd=ws, capture_output=True, text=True)
         # the verifier rejects a sorry as firmly as an error, so a sorry warning fails too; and
         # match `: error` as a prefix, since coded errors print as `: error(lean.unknownIdentifier):`
         errs = [l for l in (p.stdout + p.stderr).split('\n')
-                if re.search(r': error\b', l) or 'declaration uses \'sorry\'' in l]
-        if errs:
-            print('COMPILE FAILED — the prune removed something that was load-bearing:')
-            for l in errs[:10]:
+                if re.search(r': error\b', l) or re.search(r"declaration uses .sorry.", l)]
+        if errs or p.returncode != 0:
+            print('COMPILE FAILED (exit %d) — an error or a sorry; if the unpruned file was clean, '
+                  'the prune removed something load-bearing. %s left unchanged:' % (p.returncode, dest))
+            for l in (errs or (p.stdout + p.stderr).strip().split('\n')[-5:])[:10]:
                 print('   ', l[:200])
             sys.exit(1)
-        print('compiles clean')
-
+        os.replace(cand, dest)
+        cand = None
+        print('wrote %s\ncompiles clean' % dest)
+    finally:
+        if cand and os.path.exists(cand):
+            os.remove(cand)
 
 if __name__ == '__main__':
     main()

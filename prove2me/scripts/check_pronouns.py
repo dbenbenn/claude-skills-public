@@ -9,7 +9,7 @@ or "the paper" — so the rule needed to be checkable, not remembered.
 Use the surname, "the paper", or "they".
 
 usage:
-  check_pronouns.py local <dir> [<dir> ...]    # prose files (.md, .py) under each dir
+  check_pronouns.py local <dir> [<dir> ...]    # prose (.md, .py) and Lean comments (.lean)
   check_pronouns.py live --mine                # every mission you created
   check_pronouns.py live <name-substring>      # missions whose name contains this
 
@@ -31,6 +31,8 @@ import sys
 PRON = re.compile(r'(?<![\w-])(he|him|his|she|her|hers)(?![\w-])', re.I)
 SKIP_DIRS = {'.git', '__pycache__', '.lake', 'worktrees', '.claude', 'readbacks_raw',
              'readbacks'}
+# live mode reads milestone theorems only; definition bundles are not fetched, so run `local` on
+# the bundle's .lean before publishing it
 FROZEN = {'formal_statement', 'preamble', 'definition'}
 CODE_SPAN = re.compile(r'`[^`]*`')
 LEAN_PROSE = re.compile(r'/--(.*?)-/|/-(.*?)-/|--([^\n]*)', re.S)
@@ -55,13 +57,18 @@ def scan_local(dirs):
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
             for fn in filenames:
-                if not fn.endswith(('.md', '.py')):
+                if not fn.endswith(('.md', '.py', '.lean')):
                     continue
                 path = os.path.join(dirpath, fn)
                 try:
-                    lines = open(path, encoding='utf-8').read().split('\n')
+                    text = open(path, encoding='utf-8').read()
                 except Exception:
                     continue
+                # in Lean only the comments are prose, and a docstring there freezes at publish,
+                # so this is the last moment a pronoun in one can be caught
+                if fn.endswith('.lean'):
+                    text = lean_prose_only(text)
+                lines = text.split('\n')
                 for i, line in enumerate(lines, 1):
                     if 'PRON' in line or 're.finditer' in line:
                         continue          # the checker's own regex is not prose

@@ -33,7 +33,12 @@ def main():
     for tid in ids:
         st, name = status(tid)
         seen[tid] = st
-        print(f'{st or "?":10s} {name}')
+        print(f'{st or "FETCH FAILED":10s} {name or tid}', flush=True)
+    # an unreadable target is not a clear one: `check` must not green-light it, and `watch`
+    # must not report "none Open" because it never learned the status
+    if any(st is None for st in seen.values()):
+        print('FETCH FAILED for at least one target -- status unknown')
+        sys.exit(2)
     if mode == 'check':
         if any(st == 'Proved' for st in seen.values()):
             print('ALREADY PROVED — do not spend a proof on it')
@@ -43,11 +48,12 @@ def main():
         time.sleep(60)
         for tid in ids:
             st, name = status(tid)
-            if st is not None and st != seen[tid]:
-                print(f'CHANGED {seen[tid]} -> {st}  {name}')
+            if st is None:
+                print(f'FETCH FAILED {tid} (will retry)', flush=True)
+            elif st != seen[tid]:
+                print(f'CHANGED {seen[tid]} -> {st}  {name}', flush=True)
                 seen[tid] = st
     print('DONE none Open')
-
 
 if __name__ == '__main__':
     main()
