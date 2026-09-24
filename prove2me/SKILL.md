@@ -805,6 +805,10 @@ beside the old one rather than replacing it, and an edge from a superseded submi
 or merely redundant — stays visible until that submission is deprecated. Decide deprecation
 with the human *before* resubmitting a rewired proof, and tell them this is how the graph
 behaves: the choice looks free until you know it duplicates every node.
+Then deprecate with `scripts/deprecate.py --keep NEW_SID OLD_SID… [--go]`: you name the proof
+that stays, each id is checked against the detail endpoint, and a deprecation that leaves the
+theorem un-Proved is undone. The mission scripts it replaces guessed the keeper as the newest
+list row, which can be a proof deprecated long ago.
 
 **Look a known theorem up by `theorem_name`, not by `q=`.** The keyword search is for
 discovery; asked for a name you already know it is both noisy (`caret` matches "Treshchev") and,
