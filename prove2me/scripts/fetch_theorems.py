@@ -3,6 +3,7 @@
 
 usage: fetch_theorems.py MISSION_ID_OR_PREFIX [...] [--out DIR] [--no-build]
        fetch_theorems.py --proposal PROPOSAL_ID [--out DIR] [--no-build]
+       fetch_theorems.py --names NS.name [NS.name ...] [--out DIR] [--no-build]
 
 --proposal is for the window between Submit and approval: the statements are published but the
 mission does not exist yet, so each item's theorem is looked up by its exact name instead.
@@ -40,17 +41,20 @@ def main():
     args = [a for a in args if a != '--no-build']
     if '--out' in args:
         i = args.index('--out'); out_dir = args[i + 1]; del args[i:i + 2]; build = False
-    if not args or (args[0] != '--proposal' and any(a.startswith('--') for a in args)) \
-            or (args[0] == '--proposal' and len(args) != 2):
+    if not args or (args[0] not in ('--proposal', '--names') and any(a.startswith('--') for a in args)) \
+            or (args[0] == '--proposal' and len(args) != 2) or (args[0] == '--names' and len(args) < 2):
         sys.exit(__doc__)
     ws = _workspace()
     root = out_dir or ws
     ids = []
-    if args[0] == '--proposal':
-        p = call('GET', '/mission-proposals/' + args[1])
-        p = p.get('proposal', p)
-        for it in p.get('items') or []:
-            n = it.get('theorem_name') or it.get('definition_name')
+    if args[0] in ('--proposal', '--names'):
+        if args[0] == '--proposal':
+            p = call('GET', '/mission-proposals/' + args[1])
+            p = p.get('proposal', p)
+            wanted = [it.get('theorem_name') or it.get('definition_name') for it in p.get('items') or []]
+        else:
+            wanted = args[1:]           # standalone theorems belong to no mission or proposal
+        for n in wanted:
             r = call('GET', '/theorems?theorem_name=%s&limit=5' % n)
             hit = [t for t in (r.get('theorems') or []) if t.get('theorem_name') == n]
             if hit:

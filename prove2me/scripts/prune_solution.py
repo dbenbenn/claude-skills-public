@@ -165,6 +165,11 @@ def prune(text, verbose=True):
     for _, _, s, e, _ in doomed:
         for i in range(s, e):
             keep_mask[i] = False
+    # diagnostic commands (#print axioms, #check, #eval, #reduce) are no part of a solution, and one
+    # naming a declaration just pruned would no longer compile (Grigorchuk-Pak, 2026-09-25)
+    for i, l in enumerate(lines):
+        if re.match(r'^#(print|check|eval|reduce)\b', l):
+            keep_mask[i] = False
     out = '\n'.join(l for i, l in enumerate(lines) if keep_mask[i])
     out, dropped = prune_theorem_imports(out, verbose)
     return out, doomed + dropped
