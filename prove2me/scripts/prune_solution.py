@@ -93,7 +93,10 @@ def parse(lines):
                     s = d
                     continue
                 break
-            if prev.lstrip().startswith('@['):
+            # an attribute line, but not a whole one-line declaration `@[simp] lemma x … := …`:
+            # taken as an attribute, it made the NEXT declaration's span swallow it, and
+            # merge.py then emitted it twice ("already declared", CFP §5, 2026-09-25)
+            if prev.lstrip().startswith('@[') and not DECL.match(prev) and not ANON_INSTANCE.match(prev):
                 attributed = True
                 s -= 1
                 continue

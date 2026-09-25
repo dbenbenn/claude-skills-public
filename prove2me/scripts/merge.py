@@ -44,6 +44,11 @@ def blocks(text):
     lines = text.split('\n')
     out, cur = [], 0
     for name, _kind, st, en, _attr in sorted(parse(lines), key=lambda d: d[2]):
+        # spans must not overlap; if parse ever returns one that does, emitting it whole
+        # duplicates the overlap (it once doubled a run of one-line `@[simp]` lemmas)
+        st = max(st, cur)
+        if en <= st:
+            continue
         if st > cur:
             out.append((None, '\n'.join(lines[cur:st])))
         out.append((name, '\n'.join(lines[st:en])))
