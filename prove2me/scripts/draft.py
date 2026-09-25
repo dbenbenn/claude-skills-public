@@ -12,7 +12,8 @@ data, not code: MISSION_DIR/mission.py defines
   NAME, FIELDS (field ids), MISSION_TYPE ('ResearchPaper' | 'Textbook'), NAMESPACE ('Garrido')
   DEFINITIONS  [{name, title, nls, tags, page, result[, extra, ref]}]   code: lib/Def_<name>.lean
   THEOREMS     [{name, title, nls, tags, page, result, milestone_title, milestone_description, ...}]
-  REFERENCES   [{theorem_id, theorem_name, milestone_title, milestone_description}]
+  REFERENCES   [{theorem_id, theorem_name[, milestone_title, milestone_description]}]  (no title:
+               an item only, e.g. an imported definition bundle)
   GOAL         the goal theorem's short name (never a milestone)
   src(page, result, extra=None, ref=None) -> the `source` string
   payloads()   -> {short_name: (preamble, formal_statement)}; extract_payloads() below does it
@@ -90,7 +91,9 @@ def desired(M, mdir):
             'readback': rb(T['name']), 'readback_model': READBACK_MODEL}
     miles = {}
     for R in M.REFERENCES:
-        miles['ref:' + R['theorem_name']] = (R['milestone_title'], R['milestone_description'])
+        # a referenced definition bundle is an item, not an attack target: no milestone_title
+        if R.get('milestone_title'):
+            miles['ref:' + R['theorem_name']] = (R['milestone_title'], R['milestone_description'])
     for T in M.THEOREMS:
         if T['name'] != M.GOAL:
             miles[T['name']] = (T['milestone_title'], T['milestone_description'])
