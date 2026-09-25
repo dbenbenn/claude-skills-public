@@ -369,8 +369,15 @@ def mission_items(mdir):
     src = os.path.join(ROOT, '_src', os.path.basename(os.path.abspath(mdir)))
     os.makedirs(src, exist_ok=True)
     def bundles(text):
-        return [os.path.join(WS, m.replace('.', os.sep) + '.lean')
-                for m in re.findall(r'^import (Definitions\.\S+)', text, re.M)]
+        # transitively: a bundle's own imports are needed to expand it (CFP §5's T bundle uses
+        # IsDyadic and mapA from the F bundle, which a statement about T never imports itself)
+        out, todo = [], re.findall(r'^import (Definitions\.\S+)', text, re.M)
+        while todo:
+            p = os.path.join(WS, todo.pop(0).replace('.', os.sep) + '.lean')
+            if p not in out:
+                out.append(p)
+                todo += re.findall(r'^import (Definitions\.\S+)', open(p, encoding='utf-8').read(), re.M)
+        return out
     out = []
     for D in M.DEFINITIONS:
         path = os.path.join(os.path.abspath(mdir), 'lib', 'Def_%s.lean' % D['name'])
