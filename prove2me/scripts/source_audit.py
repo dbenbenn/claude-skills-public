@@ -23,7 +23,8 @@ This auditor works from the other side, in two enforced phases:
 
 `collect` files claims.md and coverage.md beside the item's read-back and exits 1 unless the
 verdict is `faithful`. mission.py (draft.py's) may set SOURCE_PDF (path relative to MISSION_DIR)
-and CONTEXT_PAGES ('12-13'); an item may add `context_pages` (e.g. '4,7', where the notions it
+CONTEXT_PAGES ('12-13') and PDF_PAGE_OFFSET (PDF page minus printed page, for a journal
+reprint whose PDF does not start at the printed page 1); an item may add `context_pages` (e.g. '4,7', where the notions it
 uses are defined); --pages overrides the item's own page field.
 
 The goal is audited like any milestone: it keeps its milestone_description (the quoted sentence)
@@ -80,9 +81,12 @@ def stage(mdir, name, page_spec=None):
     # the notions its sentence uses are defined (Γ ∉ EG's auditor could not see EG's definition)
     want = (pages(page_spec or T['page']) + pages(getattr(M, 'CONTEXT_PAGES', ''))
             + pages(T.get('context_pages', '')))
+    # pages are the source's own numbers (what `source` cites); a journal reprint's PDF starts
+    # elsewhere, so mission.py sets PDF_PAGE_OFFSET = PDF page - printed page (CFP: -213)
+    off = getattr(M, 'PDF_PAGE_OFFSET', 0)
     for p in sorted(set(want)):
-        subprocess.run(['pdftoppm', '-f', str(p), '-l', str(p), '-r', '130', '-png', pdf,
-                        os.path.join(d, 'page-%02d' % p)], check=True)
+        subprocess.run(['pdftoppm', '-f', str(p + off), '-l', str(p + off), '-r', '130', '-png',
+                        pdf, os.path.join(d, 'page-%03d' % p)], check=True)
     with open(os.path.join(d, 'source.md'), 'w', encoding='utf-8') as f:
         f.write('# Sentence under audit\n\nSource: %s, p. %s (%s)\n\n' % (
             os.path.basename(pdf), T['page'], T.get('result', '')))
