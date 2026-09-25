@@ -31,21 +31,45 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def explicit_binders(header):
-    """Names of the explicit `(a b : T)` binders of a declaration header, in order -- read only
-    before the header's top-level `:`, since a conclusion like `(∃ m : …) ∧ …` looks like a binder
-    group and once produced `haveI := ∃` (the same trap the Garrido II wiring builder fell into)."""
-    depth, cut = 0, len(header)
-    for i, ch in enumerate(header):
+    """Names of the explicit `(a b : T)` binders of a declaration header, in order.
+
+    Only TOP-LEVEL binder groups count, and only before the header's top-level `:`. A conclusion
+    like `(∃ m : …) ∧ …` looks like a binder group (it once produced `haveI := ∃`), and so does a
+    parenthesised term inside a binder's type: Lemma 4.8's `(hh : ∀ v, (h v : BinaryTreeAut) = …)`
+    once contributed two phantom arguments `h v`."""
+    names, depth, i, n = [], 0, 0, len(header)
+    while i < n:
+        ch = header[i]
+        if depth == 0 and ch == ':' and header[i:i + 2] != ':=':
+            break                                   # the conclusion starts here
         if ch in '([{⦃':
+            if depth == 0 and ch == '(':
+                d, j = 0, i                         # scan to the matching `)`
+                while j < n:
+                    if header[j] in '([{⦃':
+                        d += 1
+                    elif header[j] in ')]}⦄':
+                        d -= 1
+                        if d == 0:
+                            break
+                    j += 1
+                grp = header[i + 1:j]
+                k, dd = 0, 0                        # the group's own top-level `:`
+                while k < len(grp):
+                    if grp[k] in '([{⦃':
+                        dd += 1
+                    elif grp[k] in ')]}⦄':
+                        dd -= 1
+                    elif grp[k] == ':' and dd == 0:
+                        names += [x for x in grp[:k].split() if re.fullmatch(r"[^\W\d][\w'₀-₉]*", x)]
+                        break
+                    k += 1
+                i = j + 1
+                continue
             depth += 1
         elif ch in ')]}⦄':
             depth -= 1
-        elif ch == ':' and depth == 0 and header[i:i + 2] != ':=':
-            cut = i
-            break
-    names = []
-    for grp in re.findall(r'\(([^():]+?)\s*:', header[:cut]):
-        names += [n for n in grp.split() if re.fullmatch(r"[^\W\d][\w'₀-₉]*", n)]
+        i += 1
     return names
 
 
@@ -153,7 +177,8 @@ def main():
         # restore it and try again without it
         spans = {d[0].split('.')[-1]: (d[2] + 1, d[3]) for d in parse(open(a.out).read().split('\n'))}
         errl = [int(n) for n in re.findall(r'\.lean:(\d+):\d+: error', out)]
-        bad = next((c for c in kept for n in errl if spans.get(c, (0, -1))[0] <= n <= spans[c][1]), None)
+        # a copy the prune deleted has no span any more (it was unused): it cannot hold the error
+        bad = next((c for c in kept for n in errl if c in spans and spans[c][0] <= n <= spans[c][1]), None)
         if bad is None:
             sys.exit('compile failed outside every rewired copy -- the input itself may not compile:\n'
                      + out[-800:])
