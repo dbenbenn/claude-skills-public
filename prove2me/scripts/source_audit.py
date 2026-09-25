@@ -64,9 +64,13 @@ def stage(mdir, name, page_spec=None):
     pdf = os.path.join(mdir, getattr(M, 'SOURCE_PDF', ''))
     if not os.path.isfile(pdf):
         sys.exit('set SOURCE_PDF in mission.py (path to the source PDF)')
+    # the goal is a milestone for auditing purposes; an older mission's goal may carry no
+    # milestone description, so an item may give its sentence directly as `source_quote`
     quote = re.findall(r'[“"](.+?)[”"]', T.get('milestone_description') or '', re.S)
+    if not quote and T.get('source_quote'):
+        quote = [T['source_quote']]
     if not quote:
-        sys.exit('%s: no quoted sentence in its milestone description' % name)
+        sys.exit('%s: no quoted sentence (milestone description or source_quote)' % name)
     d = os.path.join(ROOT, slug(mdir, name))
     if os.path.exists(d):
         sys.exit('REFUSING: %s exists -- collect/teardown it first' % d)
