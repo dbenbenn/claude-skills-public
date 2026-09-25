@@ -2,6 +2,10 @@
 """Write a mission's published statements into the workspace, so solutions can import them.
 
 usage: fetch_theorems.py MISSION_ID_OR_PREFIX [...] [--out DIR] [--no-build]
+       fetch_theorems.py --proposal PROPOSAL_ID [--out DIR] [--no-build]
+
+--proposal is for the window between Submit and approval: the statements are published but the
+mission does not exist yet, so each item's theorem is looked up by its exact name instead.
 
 For every theorem of the missions, writes Theorems/Thm_<Name_with_underscores>.lean in server
 shape (preamble + formal_statement, whose proof is `sorry`), and for every definition bundle
@@ -36,17 +40,33 @@ def main():
     args = [a for a in args if a != '--no-build']
     if '--out' in args:
         i = args.index('--out'); out_dir = args[i + 1]; del args[i:i + 2]; build = False
-    if not args or any(a.startswith('--') for a in args):
+    if not args or (args[0] != '--proposal' and any(a.startswith('--') for a in args)) \
+            or (args[0] == '--proposal' and len(args) != 2):
         sys.exit(__doc__)
     ws = _workspace()
     root = out_dir or ws
-    missions = [m for m in paged('/missions', 'missions') if any(m['id'].startswith(a) for a in args)]
-    if not missions:
-        sys.exit('no mission matches %s' % args)
+    ids = []
+    if args[0] == '--proposal':
+        p = call('GET', '/mission-proposals/' + args[1])
+        p = p.get('proposal', p)
+        for it in p.get('items') or []:
+            n = it.get('theorem_name') or it.get('definition_name')
+            r = call('GET', '/theorems?theorem_name=%s&limit=5' % n)
+            hit = [t for t in (r.get('theorems') or []) if t.get('theorem_name') == n]
+            if hit:
+                ids.append(hit[0].get('id') or hit[0].get('theorem_id'))
+            else:
+                print('   not published (yet?): %s' % n)
+    else:
+        missions = [m for m in paged('/missions', 'missions') if any(m['id'].startswith(a) for a in args)]
+        if not missions:
+            sys.exit('no mission matches %s' % args)
+        for m in missions:
+            ids += [t.get('id') or t.get('theorem_id') for t in paged('/theorems?mission_id=%s' % m['id'], 'theorems')]
     written, same, mods = [], 0, []
-    for m in missions:
-        for t in paged('/theorems?mission_id=%s' % m['id'], 'theorems'):
-            d = call('GET', '/theorems/' + (t.get('id') or t.get('theorem_id')))
+    for tid in ids:
+        if True:
+            d = call('GET', '/theorems/' + tid)
             d = d.get('theorem', d)
             name = d['theorem_name']
             if d.get('status') == 'Definition':
