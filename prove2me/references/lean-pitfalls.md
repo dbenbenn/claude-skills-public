@@ -311,3 +311,19 @@ Seen in one project: `Set.mem_setOf_eq` → `Set.mem_ofPred_eq`, `measure_diff` 
 `rcases le_total`). Build with warnings visible and fix them as they appear —
 they are cheap then and a large diff later.
 
+
+## `linarith` as a `simp` discharger, and `ring` inside `first`
+
+**Symptom:** `simp (disch := linarith) only [f_of_mem1, f_of_mem2]` reports "made no progress"
+although each side condition is one `linarith` away (seen at Mathlib `0df444a`, CFP §5).
+
+Evaluating a composition of piecewise maps is better done with explicit steps: one
+`have e : f (s * y + t) = s' * y + t' := by rw [f_of_memK] <;> first | ring1 | linarith` per map,
+then `rw [e₀, e₁, …]`. The lemma's hypotheses become side goals of `rw`. Use `ring1`, not `ring`:
+Mathlib's `ring` falls back to `ring_nf` instead of failing, so `first | ring | linarith` stops
+at `ring` and leaves the side goal open. CFP §5's `scripts/gen_relations.py` generates such
+proofs from exact breakpoint computations.
+
+## `lt_or_le`
+
+Renamed `lt_or_ge` (with `le_or_lt` → `le_or_gt`) at `0df444a`.
