@@ -36,13 +36,21 @@ def theorem_id(name):
 
 
 def import_names(path):
+    """The theorem each `import Theorems.Thm_<X>` line brings in. The declaration is the one
+    whose name, dots read as underscores, is `<X>`: a first-match regex once read a module
+    docstring line beginning "theorem for balls" as the theorem `for`, and missed `lemma`s."""
     ws = _workspace()
     out = set()
     for mod in re.findall(r'^import (Theorems\.\S+)', open(path, encoding='utf-8').read(), re.M):
         t = open(os.path.join(ws, mod.replace('.', '/') + '.lean'), encoding='utf-8').read()
         ns = re.search(r'^namespace (\S+)', t, re.M)
-        m = re.search(r'^\s*theorem\s+(\S+)', t, re.M)
-        out.add((ns.group(1) + '.' if ns else '') + m.group(1))
+        want = mod.split('.', 1)[1][len('Thm_'):]
+        cands = [(ns.group(1) + '.' if ns else '') + n
+                 for n in re.findall(r'^\s*(?:private\s+)?(?:theorem|lemma)\s+(\S+)', t, re.M)]
+        hit = [c for c in cands if c.replace('.', '_') == want or c.split('.')[-1] == want]
+        if not hit:
+            sys.exit('cannot find the theorem of %s' % mod)
+        out.add(hit[0])
     return out
 
 
