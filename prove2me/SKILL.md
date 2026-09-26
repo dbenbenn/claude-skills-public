@@ -646,7 +646,18 @@ the checker wants it at top level and answers WA "Unknown identifier `solution`"
 2026-09-26; close the namespace and write `open Ns in`), requires the new sketch's edges to equal
 the file's imports, and retires the old proof through `deprecate.py`; `scripts/edge_audit.py MISSION…` checks every live
 proof of a mission against its local file and reports INCORRECT, MISSING and UNMATCHED. Run the
-audit after a mission's solutions land. The 2026-09-24 audit found 36 false edges on 19 theorems,
+audit after a mission's solutions land.
+
+**Build order for a mission's solutions: merge → `rewire.py` → `prune_solution.py --check` →
+`submit_solution.py`.** A development written before Submit can only use its own primed copies of
+sibling statements (`XT1_mul_XT1'`), so every assembled solution carries them; rewiring is not a
+repair for the odd mistake but a required step, run with no `--only` after `fetch_theorems.py` so
+every published name is in `Theorems/`. CFP §5's builder skipped it: Lemmas 5.5 and 5.6 shipped
+with an inline p. 236 identity and no edge, found only by the post-launch edge audit. V's
+development has the same pattern across 11 of its 22 statements. `submit_solution.py` now refuses
+a file declaring a copy of a *different* published theorem whose module it does not import (a
+rewired copy, whose proof calls the imported theorem, passes); `--allow-copy NAME` for a genuine
+name clash. The guard only knows names in `Theorems/`, so fetch first. The 2026-09-24 audit found 36 false edges on 19 theorems,
 missing edges on 11, and two false edges on sketches submitted from test files.
 
 **Solutions.** Keep the development as small modules that import each other; to submit a full proof, build

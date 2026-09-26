@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Submit a solution, check the graph shows exactly its imports, then retire what it replaces.
 
-usage: submit_solution.py THEOREM FILE [--explanation FILE.md] [--replaces SID ...] [--go]
+usage: submit_solution.py THEOREM FILE [--explanation FILE.md] [--allow-copy NAME ...] [--replaces SID ...] [--go]
        (dry run without --go; THEOREM is a full name like Chou.hasPackingProperty_of_finite,
         or a theorem id)
 
@@ -74,6 +74,31 @@ def check_solution_top_level(path):
         sys.exit('REFUSED: no top-level `theorem solution` in %s' % path)
 
 
+def check_no_inline_copies(path, target, allow):
+    """A declaration named after a *different* published theorem (primes dropped) is an inline copy:
+    the proof uses that theorem without importing it, so the graph misses the edge. CFP §5's
+    Lemmas 5.5/5.6 shipped this way (a local `XT1_mul_XT1'`, found only by the post-launch edge
+    audit). Refuse, and point at rewire.py, which replaces the copy with an import."""
+    from prune_solution import parse
+    from rewire import published
+    from prune_solution import _workspace
+    pub = published(_workspace())
+    short = target.split('.')[-1]
+    text = open(path, encoding='utf-8').read()
+    imported = set(re.findall(r'^import (\S+)', text, re.M))
+    hits = []
+    for name, kind, _, _, _ in parse(text.splitlines()):
+        base = name.split('.')[-1].rstrip("'")
+        # a rewired copy (proof = call to the published theorem, which is imported) has its edge
+        if base in pub and base != short and base not in allow and name != 'solution' \
+                and pub[base][1] not in imported:
+            hits.append('%s (copy of %s)' % (name, pub[base][0]))
+    if hits:
+        sys.exit('REFUSED: inline copies of published theorems, so their graph edges would be missing:\n  '
+                 + '\n  '.join(hits) + '\nrun rewire.py FILE --target %s -o OUT, or pass --allow-copy NAME '
+                 'for a genuinely different statement that shares a name.' % short)
+
+
 def main():
     args = sys.argv[1:]
     go = '--go' in args
@@ -81,12 +106,18 @@ def main():
     expl, replaces = None, []
     if '--explanation' in args:
         i = args.index('--explanation'); expl = open(args[i + 1], encoding='utf-8').read(); del args[i:i + 2]
+    allow = []
+    while '--allow-copy' in args:
+        i = args.index('--allow-copy'); allow.append(args[i + 1]); del args[i:i + 2]
     if '--replaces' in args:
         i = args.index('--replaces'); replaces = args[i + 1:]; del args[i:]
     if len(args) != 2 or any(a.startswith('--') for a in args + replaces):
         sys.exit(__doc__)
     tid, path = theorem_id(args[0]), args[1]
     check_solution_top_level(path)
+    target = args[0] if not re.fullmatch(r'[0-9a-f-]{36}', args[0]) \
+        else call('GET', '/theorems/%s' % tid).get('theorem_name', '')
+    check_no_inline_copies(path, target, allow)
     want = import_names(path)
     print('%s\n   file %s\n   edges it should create: %s\n   replaces: %s'
           % (args[0], path, sorted(want) or 'none (a full proof)', replaces or 'nothing'))
