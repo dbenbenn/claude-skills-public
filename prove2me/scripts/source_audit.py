@@ -25,7 +25,8 @@ This auditor works from the other side, in two enforced phases:
 verdict is `faithful`. mission.py (draft.py's) may set SOURCE_PDF (path relative to MISSION_DIR)
 CONTEXT_PAGES ('12-13') and PDF_PAGE_OFFSET (PDF page minus printed page, for a journal
 reprint whose PDF does not start at the printed page 1); an item may add `context_pages` (e.g. '4,7', where the notions it
-uses are defined); --pages overrides the item's own page field.
+uses are defined), and a cited external result its own `source_pdf` (and `pdf_page_offset`);
+--pages overrides the item's own page field.
 
 The goal is audited like any milestone: it keeps its milestone_description (the quoted sentence)
 in the mission data even though draft.py never posts it as a milestone.
@@ -41,6 +42,9 @@ def item(M, name):
     for T in M.THEOREMS:
         if T['name'] == name:
             return T
+    for R in getattr(M, 'REFERENCES', []):   # a published item the mission audits (has `page`)
+        if R['theorem_name'] == name and R.get('page'):
+            return dict(R, name=name)
     sys.exit('no theorem %s in mission.py' % name)
 
 
@@ -62,9 +66,12 @@ def stage(mdir, name, page_spec=None):
     mdir = os.path.abspath(mdir)
     M = draft.load(mdir)
     T = item(M, name)
-    pdf = os.path.join(mdir, getattr(M, 'SOURCE_PDF', ''))
+    # an item from another source (a cited external result) names its own PDF, and then the
+    # mission's context pages and page offset do not apply to it
+    own = bool(T.get('source_pdf'))
+    pdf = os.path.join(mdir, T.get('source_pdf') or getattr(M, 'SOURCE_PDF', ''))
     if not os.path.isfile(pdf):
-        sys.exit('set SOURCE_PDF in mission.py (path to the source PDF)')
+        sys.exit('set SOURCE_PDF in mission.py, or source_pdf on the item (path to the source PDF)')
     # the goal is a milestone for auditing purposes; an older mission's goal may carry no
     # milestone description, so an item may give its sentence directly as `source_quote`
     quote = re.findall(r'[“"](.+?)[”"]', T.get('milestone_description') or '', re.S)
@@ -79,11 +86,11 @@ def stage(mdir, name, page_spec=None):
     shutil.copy(os.path.join(HERE, 'source-audit-brief.md'), os.path.join(d, 'brief.md'))
     # the item's own page, the mission's context pages, and the item's own context pages -- where
     # the notions its sentence uses are defined (Γ ∉ EG's auditor could not see EG's definition)
-    want = (pages(page_spec or T['page']) + pages(getattr(M, 'CONTEXT_PAGES', ''))
+    want = (pages(page_spec or T['page']) + ([] if own else pages(getattr(M, 'CONTEXT_PAGES', '')))
             + pages(T.get('context_pages', '')))
     # pages are the source's own numbers (what `source` cites); a journal reprint's PDF starts
     # elsewhere, so mission.py sets PDF_PAGE_OFFSET = PDF page - printed page (CFP: -213)
-    off = getattr(M, 'PDF_PAGE_OFFSET', 0)
+    off = T.get('pdf_page_offset', 0) if own else getattr(M, 'PDF_PAGE_OFFSET', 0)
     for p in sorted(set(want)):
         subprocess.run(['pdftoppm', '-f', str(p + off), '-l', str(p + off), '-r', '130', '-png',
                         pdf, os.path.join(d, 'page-%03d' % p)], check=True)

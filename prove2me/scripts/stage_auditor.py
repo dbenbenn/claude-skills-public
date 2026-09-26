@@ -388,6 +388,14 @@ def mission_items(mdir):
         path = os.path.join(src, T['name'] + '.lean')
         open(path, 'w', encoding='utf-8').write(pre + '\n\n' + fs + '\n')
         out.append((T['name'], path, bundles(pre)))
+    # published items the mission audits too (a mission redone around frozen statements): the
+    # artifact is the published statement in server shape, as fetch_theorems.py writes it
+    for R in getattr(M, 'REFERENCES', []):
+        if R.get('page') or R.get('audit'):
+            path = os.path.join(WS, 'Theorems', 'Thm_%s.lean' % R['theorem_name'].replace('.', '_'))
+            if not os.path.exists(path):
+                sys.exit('%s is not in Theorems/: run fetch_theorems.py first' % R['theorem_name'])
+            out.append((R['theorem_name'], path, bundles(open(path, encoding='utf-8').read())))
     return out
 
 

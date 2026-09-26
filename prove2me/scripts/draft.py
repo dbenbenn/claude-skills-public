@@ -12,9 +12,15 @@ data, not code: MISSION_DIR/mission.py defines
   NAME, FIELDS (field ids), MISSION_TYPE ('ResearchPaper' | 'Textbook'), NAMESPACE ('Garrido')
   DEFINITIONS  [{name, title, nls, tags, page, result[, extra, ref]}]   code: lib/Def_<name>.lean
   THEOREMS     [{name, title, nls, tags, page, result, milestone_title, milestone_description, ...}]
+               (optional `namespace`, when an item is another author's, e.g. a cited external result)
   REFERENCES   [{theorem_id, theorem_name[, milestone_title, milestone_description]}]  (no title:
-               an item only, e.g. an imported definition bundle)
-  GOAL         the goal theorem's short name (never a milestone)
+               an item only, e.g. an imported definition bundle); a reference with `page` (and
+               `result`, optional `context_pages`) is audited like a theorem by stage_auditor.py
+               stage-all and source_audit.py, from its published statement in Theorems/
+  GOAL         the goal theorem's short name (never a milestone); 'ref:<theorem_name>' when the
+               goal is already published
+  ORDER        optional item_order as a list of keys (Def names, 'ref:<name>', theorem names);
+               the default is definitions, references, theorems; the goal always goes last
   src(page, result, extra=None, ref=None) -> the `source` string
   payloads()   -> {short_name: (preamble, formal_statement)}; extract_payloads() below does it
                for the usual layout (one statements file, bundles imported by use)
@@ -85,20 +91,24 @@ def desired(M, mdir):
     for T in M.THEOREMS:
         pre, fs = pay[T['name']]
         items[T['name']] = {
-            'kind': 'theorem', 'theorem_name': M.NAMESPACE + '.' + T['name'], 'theorem_title': T['title'],
+            'kind': 'theorem', 'theorem_name': T.get('namespace', M.NAMESPACE) + '.' + T['name'],
+            'theorem_title': T['title'],
             'preamble': pre, 'formal_statement': fs, 'natural_language_statement': T['nls'],
             'tags': T['tags'], 'source': M.src(T['page'], T['result'], T.get('extra'), T.get('ref')),
             'readback': rb(T['name']), 'readback_model': READBACK_MODEL}
     miles = {}
     for R in M.REFERENCES:
         # a referenced definition bundle is an item, not an attack target: no milestone_title
-        if R.get('milestone_title'):
+        # a published goal is a reference too (QFS): it keeps its milestone text for the audits
+        if R.get('milestone_title') and 'ref:' + R['theorem_name'] != M.GOAL:
             miles['ref:' + R['theorem_name']] = (R['milestone_title'], R['milestone_description'])
     for T in M.THEOREMS:
         if T['name'] != M.GOAL:
             miles[T['name']] = (T['milestone_title'], T['milestone_description'])
-    order = ([D['name'] for D in M.DEFINITIONS] + ['ref:' + R['theorem_name'] for R in M.REFERENCES]
-             + [T['name'] for T in M.THEOREMS])
+    order = getattr(M, 'ORDER', None) or ([D['name'] for D in M.DEFINITIONS]
+             + ['ref:' + R['theorem_name'] for R in M.REFERENCES] + [T['name'] for T in M.THEOREMS])
+    # the goal is always last, also when it is a published reference
+    order = [k for k in order if k != M.GOAL] + [M.GOAL]
     desc = open(os.path.join(mdir, 'description.md'), encoding='utf-8').read()
     return items, miles, order, desc
 
