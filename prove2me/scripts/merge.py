@@ -9,7 +9,9 @@ submission. Import lines are dropped and one header is prefixed: the union of th
 non-`Solutions.` imports. A declaration that appears in more than one module with identical
 text is dropped from the later module; one whose name matches an earlier declaration but whose
 text differs is refused, since keeping either would rebind the other's uses. Names are compared
-as written, so two modules must not reuse a name in different namespaces. Only the declaration's
+by their namespace-qualified name (tracked from `namespace`/`section`/`end` lines), so two
+modules may reuse a short name in different namespaces (CFP §6's `S6.W` and `S6.CoxA.W` were
+refused while names were compared as written). Only the declaration's
 own span is ever dropped (see blocks()): dropping more once deleted a file's closing `end`, the merged file compiled locally with `solution` silently
 namespaced, and the verifier answered "Unknown identifier solution" four times. The script now
 refuses to write a file whose namespace/end counts differ or that holds more than one
@@ -65,7 +67,19 @@ def main():
     for mod in mods:
         body = [ln for ln in open(mod).read().split('\n') if not ln.startswith('import ')]
         kept = []
-        for name, chunk in blocks('\n'.join(body)):
+        scope = []  # [(kind, name)] for the open namespace/section blocks of this module
+        for bare, chunk in blocks('\n'.join(body)):
+            if bare is None:
+                for ln in chunk.split('\n'):
+                    m = re.match(r'^namespace\s+(\S+)', ln)
+                    if m:
+                        scope.append(('ns', m.group(1)))
+                    elif re.match(r'^((noncomputable\s+)?section\b|mutual\b)', ln):
+                        scope.append(('sec', ''))
+                    elif re.match(r'^end\b', ln) and scope:
+                        scope.pop()
+            name = None if bare is None else \
+                '.'.join([n for k, n in scope if k == 'ns'] + [bare.removeprefix('_root_.')])
             if name is not None:
                 decl = chunk.strip()
                 if name in seen and seen[name] != decl:
