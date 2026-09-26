@@ -127,6 +127,11 @@ def collect(mdir, name):
     cov = os.path.join(rdir, name + '.coverage.md')
     verdict = re.search(r'VERDICT:\s*(.+)', open(cov, encoding='utf-8').read()) if os.path.exists(cov) else None
     print('VERDICT', verdict.group(1).strip() if verdict else '(none)')
+    # advisory: a faithful statement can still hide the source's object (CFP §7's 𝒯′ was a
+    # bijection with binary words; the graph was never named). Printed, never a failure.
+    direct = re.search(r'DIRECTNESS:\s*(.+)', open(cov, encoding='utf-8').read()) if os.path.exists(cov) else None
+    if direct and not direct.group(1).strip().lower().startswith('direct'):
+        print('DIRECTNESS', direct.group(1).strip(), '  <- consider restating to name the source object')
     if ok:
         teardown(slug(mdir, name), force=True)
     return ok and verdict and verdict.group(1).strip().lower().startswith('faithful')

@@ -49,8 +49,15 @@ statement, written by someone who never saw the source. Compare it with `claims.
   claim may be implied after all, and say by what.
 - End with a verdict line: `VERDICT: faithful` or `VERDICT: gaps: C2, C5` (the claims missing
   or weaker).
+- Then a directness line, separate from the verdict and never changing it:
+  `DIRECTNESS: direct`, or `DIRECTNESS: indirect: <what>` when covering a claim needed you to
+  reconstruct something the source names but the read-back never mentions -- a structure the
+  sentence is about (a graph, a tree, an action, a relation) replaced by an isomorphism to a model
+  object, a notion encoded through an auxiliary construction, or a claim that holds only after an
+  argument the statement leaves to the reader. Say in one or two lines what a statement that
+  names the source's object would say. A faithful but indirect statement is still faithful.
 
-Reply in at most five lines: the verdict and one line per gap.
+Reply in at most five lines: the verdict, the directness line, and one line per gap.
 
 ## Rules
 

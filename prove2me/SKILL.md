@@ -387,6 +387,16 @@ general form, if wanted, is a separate theorem. Take quantifier dependence from 
 proof cites, not only from the sentence: English statements under-specify it, and the intended
 strength lives in the cited lemma or in a remark after the statement.
 
+**Name the object the sentence is about.** When the source asserts a property of a structure it
+defines -- a graph, a tree, an action, a relation -- define that structure and state the property of
+it, rather than an isomorphism to a model object. CFP §7's "𝒯′ is connected and hence an ordered
+rooted binary tree" was stated as a bijection between binary words and integral subintervals: at
+least as strong, but the graph 𝒯′ (vertices, left/right-part edges) never appeared, and the source
+auditor had to rebuild it to confirm coverage. The direct form defines the edges in the bundle and
+states connectedness and tree shape of that graph; the bijection, which later proofs use, becomes a
+corollary. `source_audit.py` now asks for a `DIRECTNESS:` line and prints `indirect` findings; treat
+one as a refactor to make before the Draft goes out, not as a gap.
+
 **Names** are accurate labels: conclusion, then `_of_` hypotheses in binder order, ASCII, no
 subscript abbreviations binders could capture. A name that needs a caution is the wrong name
 (`no_free_subgroup` carried a 52-word paragraph; `no_free_subgroup_of_rank_two` deleted it).
