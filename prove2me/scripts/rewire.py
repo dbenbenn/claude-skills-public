@@ -165,8 +165,30 @@ def main():
         cands.append(name)
     print('copies of published theorems: %s' % (', '.join(
         '%s -> %s' % (c, pub[c.rstrip("'")][0]) for c in cands) or 'none'))
-    if a.dry or not cands:
+    if a.dry:
         return
+    # a copy declared under the published theorem's own full name cannot be rewired (the import
+    # would clash: "has already been declared"); delete it and import the theorem instead.
+    # CFP §6's Lemma 6.1 carried §2's `represents_mul` this way.
+    lines = text.split('\n')
+    same = [d for d in parse(lines) if d[0].split('.')[-1] in cands
+            and d[0].split('.')[-1] == pub[d[0].split('.')[-1].rstrip("'")][0].split('.')[-1]]
+    for d in sorted(same, key=lambda d: -d[2]):
+        name = d[0].split('.')[-1]
+        del lines[d[2]:d[3]]
+        imp = 'import ' + pub[name][1]
+        if imp not in lines:
+            lines.insert(0, imp)
+        cands.remove(name)
+        print('   %s had the published name; deleted and imported %s' % (name, pub[name][1]))
+    text = '\n'.join(lines)
+    if not cands:
+        open(a.out, 'w', encoding='utf-8').write(text)
+        ok, out = check(a.out)
+        print(('compiles clean: %s' if ok else 'DOES NOT COMPILE: %s') % a.out)
+        if not ok:
+            print(out[-800:])
+        sys.exit(0 if ok else 1)
     kept, failed = list(cands), []
     while kept:
         open(a.out, 'w', encoding='utf-8').write(rewrite(text, kept, pub))
