@@ -115,3 +115,13 @@ Keep the upload state file outside any per-session scratchpad — scratchpads ar
 per-session, not per-project, and collide across projects. Record every action before
 and after its API call so an interrupted run resumes without duplicates. Never edit
 the state file while an uploader holds it.
+
+## Confirmations and edits (measured 2026-09-26)
+
+An item's human confirmation is `confirmed_at` on the proposal item (reference items carry
+`pre_confirmed` instead). Re-POSTing or PATCHing an item clears it (the docs say so). A PATCH of
+the proposal **description** does not: measured on CFP §6, 3 confirmed items before, 0 cleared.
+`draft.py upload` now reports this precisely instead of guessing: the dry run lists every
+confirmed item it would edit, and `--go` re-reads the proposal and prints each confirmation it
+actually cleared. Quote that output to the human rather than "any confirmation may be cleared".
+Milestone-only edits are still unmeasured; the `--go` report will show the answer the first time.

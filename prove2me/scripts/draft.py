@@ -200,6 +200,7 @@ def main():
         if go:
             json.dump(st, open(stp, 'w'), indent=1)
 
+    live_d = None
     if 'id' not in st:
         r = do('POST', '/mission-proposals', {'name': M.NAME, 'description': desc,
                                                'mission_type': M.MISSION_TYPE, 'field_ids': M.FIELDS}, 'create')
@@ -209,7 +210,21 @@ def main():
         bad = [(k, 'missing item') for k in items] + [(k, 'missing milestone') for k in miles] \
             + [('item_order', ''), ('goal', '')]
     else:
-        bad, _, _ = diff(M, mdir, call, st)
+        bad, live_d, _ = diff(M, mdir, call, st)
+    # confirmation bookkeeping: the platform clears a human's confirmation when an item is
+    # edited, so say exactly which confirmations this upload touches, before and after
+    ids0 = st.get('items', {})
+    name_of = {v: k for k, v in ids0.items()}
+    conf_before = {}
+    if live_d:
+        conf_before = {it['id']: it.get('confirmed_at') for it in live_d.get('items') or []
+                       if it.get('confirmed_at')}
+    touched = {ids0.get(k) for k, w in bad if ids0.get(k) in conf_before}
+    for iid in sorted(touched, key=lambda i: name_of.get(i, i)):
+        whats = sorted({w for k, w in bad if ids0.get(k) == iid})
+        print('   CONFIRMED item %s is %s: %s (confirmed %s)' % (
+            name_of.get(iid, iid), 'edited by this upload' if go else 'would be edited',
+            ', '.join(whats), conf_before[iid]))
     MS = ('missing milestone', 'milestone title', 'milestone description')
     todo = {k for k, w in bad if w not in MS}              # items (and the proposal-level keys)
     ms_todo = {k for k, w in bad if w in MS}                # milestones, tracked separately so an
@@ -228,6 +243,18 @@ def main():
     if todo & {'item_order', 'goal'} or any(w == 'missing item' for _, w in bad):
         do('PATCH', '/mission-proposals/' + pid, {'item_order': [st['items'].get(k) for k in order]}, 'order')
         do('PATCH', '/mission-proposals/' + pid, {'main_item_id': st['items'].get(M.GOAL)}, 'goal')
+    if go and conf_before:
+        d2 = call('GET', '/mission-proposals/' + pid)
+        d2 = d2.get('proposal', d2)
+        after = {it['id']: it.get('confirmed_at') for it in d2.get('items') or []}
+        cleared = [i for i in conf_before if not after.get(i)]
+        for iid in sorted(cleared, key=lambda i: name_of.get(i, i)):
+            print('   CONFIRMATION CLEARED: %s (was confirmed %s)' % (name_of.get(iid, iid), conf_before[iid]))
+        print('   confirmations: %d before, %d cleared by this upload, %d kept'
+              % (len(conf_before), len(cleared), len(conf_before) - len(cleared)))
+    elif conf_before:
+        print('   confirmations now: %d item(s) confirmed; %d would be touched'
+              % (len(conf_before), len(touched)))
     strays = [(k, w) for k, w in bad if w.startswith('stray')]
     for k, w in strays:
         print('   NOTE %s: %s -- not deleted; remove it deliberately if it should go' % (k, w))
