@@ -643,7 +643,7 @@ Theorems.*` lines, so they are wrong in two ways: an import only dead code used 
 to the published theorem, adds the import, prunes and compiles; `scripts/submit_solution.py THEOREM
 FILE --replaces OLD_SID…` submits (refusing a `theorem solution` declared inside a `namespace`:
 the checker wants it at top level and answers WA "Unknown identifier `solution`", measured
-2026-09-26; close the namespace and write `open Ns in`), requires the new sketch's edges to equal
+2026-09-26; close the namespace and write `open Ns in`; and refusing `macro`/`syntax`/`elab`, which the verifier's soundness guard rejects even when merged in unused from a module), requires the new sketch's edges to equal
 the file's imports, and retires the old proof through `deprecate.py`; `scripts/edge_audit.py MISSION…` checks every live
 proof of a mission against its local file and reports INCORRECT, MISSING and UNMATCHED. Run the
 audit after a mission's solutions land.

@@ -74,6 +74,17 @@ def check_solution_top_level(path):
         sys.exit('REFUSED: no top-level `theorem solution` in %s' % path)
 
 
+def check_no_metaprogramming(path):
+    """The platform's soundness guard rejects custom syntax/elaborator registration ("line N: `macro`
+    ... metaprogramming is not supported in submissions"); CFP §6's Lemma 6.1 was refused for a
+    `local macro "grp"` merged in from a development module. Refuse first. `notation` is allowed."""
+    bad = [(i + 1, l.strip()) for i, l in enumerate(open(path, encoding='utf-8'))
+           if re.match(r'\s*((local|scoped)\s+)?(macro|macro_rules|syntax|elab|elab_rules|declare_syntax_cat|initialize)\b', l)]
+    if bad:
+        sys.exit('REFUSED: metaprogramming the verifier rejects:\n  ' +
+                 '\n  '.join('line %d: %s' % b for b in bad[:5]) + '\ninline the tactic instead.')
+
+
 def check_no_inline_copies(path, target, allow):
     """A declaration named after a *different* published theorem (primes dropped) is an inline copy:
     the proof uses that theorem without importing it, so the graph misses the edge. CFP §5's
@@ -115,6 +126,7 @@ def main():
         sys.exit(__doc__)
     tid, path = theorem_id(args[0]), args[1]
     check_solution_top_level(path)
+    check_no_metaprogramming(path)
     target = args[0] if not re.fullmatch(r'[0-9a-f-]{36}', args[0]) \
         else call('GET', '/theorems/%s' % tid).get('theorem_name', '')
     check_no_inline_copies(path, target, allow)
