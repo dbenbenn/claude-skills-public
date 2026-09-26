@@ -673,6 +673,21 @@ rewired copy, whose proof calls the imported theorem, passes); `--allow-copy NAM
 name clash. The guard only knows names in `Theorems/`, so fetch first. The 2026-09-24 audit found 36 false edges on 19 theorems,
 missing edges on 11, and two false edges on sketches submitted from test files.
 
+**Rewiring by name is not enough.** A development can pass through a sibling's statement under
+other names, and neither `rewire.py` nor the edge audit sees it. CFP §7 shipped five such
+solutions, all accepted:
+- Theorem 7.2 was `mulEquivF.trans psiEquiv`, with `psiEquiv` the published Δ₁ conjugation
+  rebuilt inline.
+- Two Farey lemmas re-proved one direction of the published criterion as `subsimplex_of_farey`.
+- restrict/glue re-proved the published unique-map lemma as `mob_unique`.
+- index two rebuilt "PIP is a group" as `pipSubgroup`.
+
+After the build, run `scripts/edge_overlap.py SOLUTIONS_DIR`. It lists each pair of solutions whose
+top proofs name a common declaration of their own, where one does not import the other. Read each
+listed pair. A shared basic lemma is fine. When the step *is* the sibling's statement, take it from
+the published theorem, prune, and resubmit with `--replaces`. Counting shared declarations instead
+was tried and does not work: a common lemma library puts every pair above 60%.
+
 **Solutions.** Keep the development as small modules that import each other; to submit a full proof, build
 the submission by concatenating with `scripts/merge.py OUT MODULE…` (drops a declaration repeated
 verbatim, refuses one whose name repeats with different text, unbalanced blocks, or a `theorem
