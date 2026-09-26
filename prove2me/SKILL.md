@@ -206,6 +206,10 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   has definitions and references first, the goal last; milestone list excludes the goal.
 - The verify script reports every statement, definition, read-back, milestone, order and the
   description matching the repo (`BAD 0`).
+- **The goal quotes its source sentence in its natural-language statement.** The goal is never
+  a milestone, so its milestone text (the quote) is never uploaded; without this the Draft shows
+  only a paraphrase of the main theorem and the live quote recheck never sees it. `draft.py
+  verify` counts it as BAD.
 - **Every item earns its place**: each reference is the goal, a milestone, or a bundle (or theorem)
   that one of their statements imports, directly or through another bundle; each draft theorem
   is the goal or a milestone. `draft.py verify` counts the rest as BAD (a deliberate exception

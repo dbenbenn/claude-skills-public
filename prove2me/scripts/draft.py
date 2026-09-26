@@ -230,6 +230,27 @@ def unneeded_refs(M, mdir, items, miles, call):
     return out
 
 
+def goal_unquoted(M, items):
+    """[(goal, why)] when the source's sentence for the goal never reaches the platform.
+
+    The goal is never a milestone, so its milestone_description -- where every other item carries
+    the quoted source sentence -- is not uploaded. Unless its natural-language statement quotes the
+    sentence, the Draft shows the goal only as a paraphrase, and the live-Draft quote recheck
+    never sees it (QFS and Monod, 2026-09-27)."""
+    it = items.get(M.GOAL) or {}
+    if it.get('kind') != 'theorem':
+        return []                               # a published goal: its NLS is patched by hand
+    T = [T for T in M.THEOREMS if T['name'] == M.GOAL][0]
+    nls = norm(it.get('natural_language_statement'))
+    q = re.search(r'“(.+?)”', norm(T.get('milestone_description')))
+    if q and norm(q.group(1))[:80] in nls:
+        return []
+    if not q and '“' in nls:
+        return []
+    return [(M.GOAL, "goal's natural-language statement does not quote the source sentence "
+                     '(the goal has no milestone, so that is the only place it can appear)')]
+
+
 def main():
     if len(sys.argv) < 3 or sys.argv[2] not in ('verify', 'upload'):
         sys.exit(__doc__)
@@ -246,6 +267,7 @@ def main():
         bad, d, lm = diff(M, mdir, call, st)
         its, mls, _, _ = desired(M, mdir)
         bad += unneeded_refs(M, mdir, its, mls, call)
+        bad += goal_unquoted(M, its)
         for k, what in bad:
             print('BAD', k, what)
         print('items %d  milestones %d  status %s | BAD %d'
@@ -321,6 +343,8 @@ def main():
     elif conf_before:
         print('   confirmations now: %d item(s) confirmed; %d would be touched'
               % (len(conf_before), len(touched)))
+    for k, w in goal_unquoted(M, items):
+        print('   NOTE %s: %s' % (k, w))
     for k, w in unneeded_refs(M, mdir, items, miles, call):
         print('   NOTE %s: %s' % (k, w))
     strays = [(k, w) for k, w in bad if w.startswith('stray')]
