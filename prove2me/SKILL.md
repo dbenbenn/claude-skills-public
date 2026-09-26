@@ -641,8 +641,10 @@ Theorems.*` lines, so they are wrong in two ways: an import only dead code used 
 `prune_solution.py` now drops it) and a published theorem re-derived inline instead of imported
 (a missing edge). `scripts/rewire.py FILE --target NAME -o OUT` turns each inline copy into a call
 to the published theorem, adds the import, prunes and compiles; `scripts/submit_solution.py THEOREM
-FILE --replaces OLD_SID…` submits, requires the new sketch's edges to equal the file's imports, and
-retires the old proof through `deprecate.py`; `scripts/edge_audit.py MISSION…` checks every live
+FILE --replaces OLD_SID…` submits (refusing a `theorem solution` declared inside a `namespace`:
+the checker wants it at top level and answers WA "Unknown identifier `solution`", measured
+2026-09-26; close the namespace and write `open Ns in`), requires the new sketch's edges to equal
+the file's imports, and retires the old proof through `deprecate.py`; `scripts/edge_audit.py MISSION…` checks every live
 proof of a mission against its local file and reports INCORRECT, MISSING and UNMATCHED. Run the
 audit after a mission's solutions land. The 2026-09-24 audit found 36 false edges on 19 theorems,
 missing edges on 11, and two false edges on sketches submitted from test files.

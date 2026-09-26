@@ -55,6 +55,25 @@ def sketch_edges(tid, sid):
                      if e['target'] == node and '.' in (names.get(e['source']) or '')}
 
 
+def check_solution_top_level(path):
+    """The checker looks for a top-level `solution`: one declared inside a `namespace` block is
+    `Ns.solution` and is rejected as an unknown identifier (WA). Refuse before submitting."""
+    depth, found = [], False
+    for line in open(path, encoding='utf-8'):
+        m = re.match(r'namespace (\S+)', line)
+        if m:
+            depth.append(m.group(1)); continue
+        if re.match(r'end(\s|$)', line) and depth:
+            depth.pop(); continue
+        if re.match(r'(theorem|lemma) solution\b', line):
+            if depth:
+                sys.exit('REFUSED: `solution` is declared inside namespace %s; the checker needs it at '
+                         'top level (close the namespace and use `open %s in`).' % ('.'.join(depth), depth[0]))
+            found = True
+    if not found:
+        sys.exit('REFUSED: no top-level `theorem solution` in %s' % path)
+
+
 def main():
     args = sys.argv[1:]
     go = '--go' in args
@@ -67,6 +86,7 @@ def main():
     if len(args) != 2 or any(a.startswith('--') for a in args + replaces):
         sys.exit(__doc__)
     tid, path = theorem_id(args[0]), args[1]
+    check_solution_top_level(path)
     want = import_names(path)
     print('%s\n   file %s\n   edges it should create: %s\n   replaces: %s'
           % (args[0], path, sorted(want) or 'none (a full proof)', replaces or 'nothing'))
