@@ -206,6 +206,12 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   has definitions and references first, the goal last; milestone list excludes the goal.
 - The verify script reports every statement, definition, read-back, milestone, order and the
   description matching the repo (`BAD 0`).
+- **Every item earns its place**: each reference is the goal, a milestone, or a bundle (or theorem)
+  that one of their statements imports, directly or through another bundle; each draft theorem
+  is the goal or a milestone. `draft.py verify` counts the rest as BAD (a deliberate exception
+  goes in `KEEP_REFS` with its reason). A superseded statement's reference is *removed* from
+  the proposal, not just unlinked from its milestone (`mission_captain.md`). QFS's second
+  edition passed BAD 0 carrying 18 leftover references out of 42.
 - The library search re-run today.
 - The repo committed and pushed with read-backs, statements, scripts and `proposal_state.json`.
 

@@ -19,6 +19,8 @@ data, not code: MISSION_DIR/mission.py defines
                stage-all and source_audit.py, from its published statement in Theorems/
   GOAL         the goal theorem's short name (never a milestone); 'ref:<theorem_name>' when the
                goal is already published
+  KEEP_REFS    optional {'<theorem_name>': 'reason'}: references kept on purpose although no statement
+               needs them (verify otherwise flags them; see unneeded_refs)
   ORDER        optional item_order as a list of keys (Def names, 'ref:<name>', theorem names);
                the default is definitions, references, theorems; the goal always goes last
   src(page, result, extra=None, ref=None) -> the `source` string
@@ -176,6 +178,58 @@ def diff(M, mdir, call, st):
     return bad, d, lm
 
 
+def unneeded_refs(M, mdir, items, miles, call):
+    """References the Draft does not need: [(key, why)].
+
+    A reference earns its place by being the goal, a milestone, or a definition bundle (or
+    theorem) that one of those statements imports, directly or through another bundle. Anything
+    else is left over from an earlier design: on QFS (2026-09-26) 18 of 42 references were --
+    superseded statements, a dead route, five bundles nothing imported -- and passed BAD 0 because
+    verify only compared what the repo listed against what the Draft held, and the repo still
+    listed them. mission.py may name deliberate exceptions in KEEP_REFS {name: reason}."""
+    from prune_solution import _workspace
+    ws = _workspace()
+    keep = getattr(M, 'KEEP_REFS', {}) or {}
+    imp = lambda t: (set(re.findall(r'^import Definitions\.Def_(\w+)', t or '', re.M)),
+                     set(re.findall(r'^import Theorems\.Thm_(\w+?)_(\w+)', t or '', re.M)))
+    roots = {M.GOAL} | set(miles)
+    defs, thms, seen_pre = set(), set(), []
+    for k in roots:
+        it = items.get(k) or {}
+        if it.get('kind') == 'theorem':
+            seen_pre.append(it['preamble'])
+        elif it.get('kind') == 'reference':
+            name = k[len('ref:'):]
+            r = [t for t in (call('GET', '/theorems?theorem_name=' + name).get('theorems') or [])
+                 if t.get('theorem_name') == name]
+            seen_pre.append((r[0].get('preamble') or '') if r else '')
+    for D in M.DEFINITIONS:                     # a draft bundle is always wanted: its own imports count
+        seen_pre.append(items[D['name']]['definition'])
+    for t in seen_pre:
+        d, th = imp(t)
+        defs |= d; thms |= {'%s.%s' % x for x in th}
+    todo = list(defs)
+    while todo:                                 # bundles import bundles
+        n = todo.pop()
+        for f in (os.path.join(ws, 'Definitions', 'Def_%s.lean' % n), os.path.join(mdir, 'lib', 'Def_%s.lean' % n)):
+            if os.path.exists(f):
+                for m in imp(open(f, encoding='utf-8').read())[0] - defs:
+                    defs.add(m); todo.append(m)
+                break
+    out = []
+    for R in M.REFERENCES:
+        n, k = R['theorem_name'], 'ref:' + R['theorem_name']
+        if k in roots or n in defs or n in thms or n in keep:
+            continue
+        kind = 'definition bundle' if os.path.exists(os.path.join(ws, 'Definitions', 'Def_%s.lean' % n)) else 'theorem'
+        out.append((k, 'unneeded reference (%s: not the goal, not a milestone, not imported by one); '
+                       'remove it, or list it in KEEP_REFS with a reason' % kind))
+    for T in M.THEOREMS:                        # the same question for a draft theorem
+        if T['name'] not in roots:
+            out.append((T['name'], 'draft theorem that is neither the goal nor a milestone'))
+    return out
+
+
 def main():
     if len(sys.argv) < 3 or sys.argv[2] not in ('verify', 'upload'):
         sys.exit(__doc__)
@@ -190,6 +244,8 @@ def main():
         if 'id' not in st:
             sys.exit('no proposal.json -- nothing uploaded yet')
         bad, d, lm = diff(M, mdir, call, st)
+        its, mls, _, _ = desired(M, mdir)
+        bad += unneeded_refs(M, mdir, its, mls, call)
         for k, what in bad:
             print('BAD', k, what)
         print('items %d  milestones %d  status %s | BAD %d'
@@ -265,6 +321,8 @@ def main():
     elif conf_before:
         print('   confirmations now: %d item(s) confirmed; %d would be touched'
               % (len(conf_before), len(touched)))
+    for k, w in unneeded_refs(M, mdir, items, miles, call):
+        print('   NOTE %s: %s' % (k, w))
     strays = [(k, w) for k, w in bad if w.startswith('stray')]
     for k, w in strays:
         print('   NOTE %s: %s -- not deleted; remove it deliberately if it should go' % (k, w))
