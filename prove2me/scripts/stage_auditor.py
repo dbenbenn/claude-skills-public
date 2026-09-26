@@ -26,7 +26,10 @@ Usage:
                                                                     -> prints the prompt
                                                                        (refuses an existing slug
                                                                         without --force)
-  stage_auditor.py collect <slug> <dest-dir>                        -> moves testimony out
+  stage_auditor.py collect <slug> <dest-dir>                        -> moves testimony out, named
+                                                                       by SLUG; for a mission item use
+                                                                       collect-all MISSION_DIR NAME, which
+                                                                       names by key as source_audit expects
   stage_auditor.py stage-all MISSION_DIR [NAME ...] [--force]         -> one auditor per item of
                                                                        mission.py (draft.py's), each
                                                                        prompt saved to _prompts/
@@ -472,5 +475,11 @@ if __name__ == '__main__':
         sys.exit(__doc__)
     cmd = args[0]
     if cmd == 'stage': stage(args[1], args[2], args[3:], force=force)
-    elif cmd == 'collect': sys.exit(1 if collect(args[1], args[2]) else 0)
+    elif cmd == 'collect':
+        if os.path.basename(os.path.normpath(args[2])) == 'readbacks':
+            # QFS 2026-09-26: files landed as mission-QFS.x.readback.md, and source_audit.py
+            # reveal (which looks for QFS.x.readback.md) failed on them
+            print('WARNING: collect names files by slug; for a mission item use collect-all '
+                  'MISSION_DIR NAME, which names them by key')
+        sys.exit(1 if collect(args[1], args[2]) else 0)
     else: teardown(args[1], force=force)
