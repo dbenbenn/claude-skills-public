@@ -659,7 +659,10 @@ proof of a mission against its local file and reports INCORRECT, MISSING and UNM
 audit after a mission's solutions land.
 
 **Build order for a mission's solutions: merge → `rewire.py` → `prune_solution.py --check` →
-`submit_solution.py`.** A development written before Submit can only use its own primed copies of
+`submit_solution.py`.** When the development is an ordinary Lean project rather than `Solutions/` modules (QFS,
+2026-09-26), merge its modules each wrapped in `section … end` and run
+`scripts/resolve_imports.py BODY OUT --src DIR`: it imports each unknown name that is published
+and Proved and inlines the rest from the source tree, round by round, before the prune. A development written before Submit can only use its own primed copies of
 sibling statements (`XT1_mul_XT1'`), so every assembled solution carries them; rewiring is not a
 repair for the odd mistake but a required step, run with no `--only` after `fetch_theorems.py` so
 every published name is in `Theorems/`. CFP §5's builder skipped it: Lemmas 5.5 and 5.6 shipped
