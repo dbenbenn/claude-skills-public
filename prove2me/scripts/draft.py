@@ -234,6 +234,33 @@ def unneeded_refs(M, mdir, items, miles, call):
     return out
 
 
+def deprecated_refs(M, items, miles, desc, call):
+    """[(where, why)] for uploaded prose that names a deprecated platform theorem.
+
+    A deprecated theorem is hidden from discovery, so a pointer to it sends the reader to a page
+    the platform no longer shows; QFS (2026-09-27) kept "the published `QFS.core_induction` gives
+    ..." in three statements after retiring 42 superseded theorems. Backticked dotted names
+    (`NS.name`) in every natural-language statement, source, milestone text and the description
+    are looked up once each."""
+    texts = [('description', desc)]
+    for k, it in items.items():
+        for f in ('natural_language_statement', 'source'):
+            if it.get(f):
+                texts.append((k, it[f]))
+    for k, (t, d) in miles.items():
+        texts.append((k + ' milestone', t + '\n' + d))
+    cache, out = {}, []
+    for where, t in texts:
+        for n in sorted(set(re.findall(r'`((?:[A-Z]\w*\.)+\w+)`', t))):
+            if n not in cache:
+                r = [x for x in (call('GET', '/theorems?theorem_name=' + n).get('theorems') or [])
+                     if x.get('theorem_name') == n]
+                cache[n] = bool(r and r[0].get('deprecated_at'))
+            if cache[n]:
+                out.append((where, 'names the deprecated theorem `%s`' % n))
+    return out
+
+
 def goal_unquoted(M, items):
     """[(goal, why)] when the source's sentence for the goal never reaches the platform.
 
@@ -272,6 +299,7 @@ def main():
         its, mls, _, _ = desired(M, mdir)
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
+        bad += deprecated_refs(M, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         import decisions
         bad += decisions.check(mdir)
         for k, what in bad:
