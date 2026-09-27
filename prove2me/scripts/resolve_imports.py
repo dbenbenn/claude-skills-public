@@ -51,6 +51,30 @@ def extract(path, name):
     return None
 
 
+def variables_before(path, name):
+    """The `variable` commands of `path` that precede declaration `name` (continuation lines
+    included), deduplicated. An inlined lemma needs them: the verifier runs with autoImplicit off,
+    so a lemma written under `variable {d : ℕ}` fails on `d` once copied out of its file (QFS,
+    2026-09-27: thirteen Section6 lemmas)."""
+    L = open(path, encoding='utf-8').read().split('\n')
+    end = next((i for i, l in enumerate(L)
+                if re.match(r'^(private )?(theorem|lemma) ' + re.escape(name) + r'(\s|$)', l)), len(L))
+    out = []
+    i = 0
+    while i < end:
+        if re.match(r'^variable\b', L[i]):
+            j = i + 1
+            while j < end and L[j].startswith((' ', '\t')) and L[j].strip():
+                j += 1
+            cmd = '\n'.join(L[i:j])
+            if cmd not in out:
+                out.append(cmd)
+            i = j
+        else:
+            i += 1
+    return out
+
+
 def find_src(src_dir, name):
     for f in sorted(glob.glob(os.path.join(src_dir, '**', '*.lean'), recursive=True)):
         if re.search(r'^(private )?(theorem|lemma) ' + re.escape(name) + r'(\s|$)',
@@ -64,7 +88,9 @@ def proved(ns, name):
         try:
             r = call('GET', '/theorems?theorem_name=%s.%s' % (ns, name)).get('theorems') or []
             hit = [t for t in r if t.get('theorem_name') == '%s.%s' % (ns, name)]
-            return bool(hit) and hit[0].get('status') == 'Proved'
+            # a deprecated theorem is hidden from discovery: importing it puts a retired node on
+            # the graph (QFS 2026-09-27 retired 42 superseded theorems still Proved), so copy it in
+            return bool(hit) and hit[0].get('status') == 'Proved' and not hit[0].get('deprecated_at')
         except Exception:
             continue
     return False
@@ -88,8 +114,13 @@ def main():
     def build():
         hdr = ['import Definitions.%s' % os.path.basename(f)[:-5]
                for f in sorted(glob.glob(os.path.join(ws, 'Definitions', prefix + '*.lean')))]
-        hdr += ['import Theorems.Thm_%s_%s' % (a.ns, n) for n in imports] + ['import Mathlib', '']
-        inl = ''.join(extract(s, n) + '\n' for s, n in inline)
+        # an import is (namespace, name): a lemma may live in another namespace (QFS's goal uses
+        # Dyda.lintegral_le_regional_unitBall); a bare name is in --ns
+        hdr += ['import Theorems.Thm_%s_%s' % ((n.rsplit('.', 1)[0], n.rsplit('.', 1)[1]) if '.' in n
+                                              else (a.ns, n)) for n in imports] + ['import Mathlib', '']
+        # each copied declaration in its own section, with its source file's `variable`s
+        inl = ''.join('section\n' + ''.join(v + '\n' for v in variables_before(s, n)) + '\n'
+                      + extract(s, n) + '\nend\n\n' for s, n in inline)
         txt = '\n'.join(hdr)
         if inl:
             txt += ('\n/-! Lemmas of the development that are not published, copied verbatim. -/\n\n'
@@ -100,10 +131,29 @@ def main():
     for it in range(a.max_iter):
         txt = build()
         open(scratch, 'w', encoding='utf-8').write(txt)
-        out = subprocess.run(['lake', 'env', 'lean', scratch], cwd=ws, capture_output=True, text=True).stdout
+        # autoImplicit off, as the verifier compiles (`lake env lean` ignores the lakefile's options)
+        out = subprocess.run(['lake', 'env', 'lean', '-DautoImplicit=false', scratch], cwd=ws,
+                             capture_output=True, text=True).stdout
         unk = sorted(set(re.findall(r'Unknown (?:identifier|constant) `(?:%s\.)?([^`]+)`' % a.ns, out)))
         errs = [l for l in out.split('\n') if 'error' in l]
         print('round %d: %d errors, unknown %s' % (it, len(errs), unk), flush=True)
+        # a missing dot-notation lemma (`h.isBounded` needs `IsAdmissible.isBounded`) is reported as
+        # an invalid field, not an unknown identifier (QFS Theorem 1.4, 2026-09-27): find the unique
+        # `X.field` declaration in the sources and copy it in
+        fields = sorted(set(re.findall(r'Invalid field `(\w+)`', out)))
+        for fld in fields:
+            hits = []
+            for f in sorted(glob.glob(os.path.join(a.src, '**', '*.lean'), recursive=True)):
+                for m in re.finditer(r'^(?:private )?(?:theorem|lemma) ((?:\w+\.)+' + re.escape(fld) + r')(?:\s|$)',
+                                     open(f, encoding='utf-8').read(), re.M):
+                    hits.append((f, m.group(1)))
+            if len(hits) != 1:
+                sys.exit('invalid field `%s`: %d candidate declarations %s; copy the right one in by hand'
+                         % (fld, len(hits), [h[1] for h in hits]))
+            if hits[0] not in inline:
+                inline.insert(0, hits[0]); print('  inline', hits[0][1], os.path.relpath(hits[0][0], a.src))
+        if fields:
+            continue
         if not unk:
             open(a.out, 'w', encoding='utf-8').write(txt)
             os.remove(scratch)
@@ -113,10 +163,17 @@ def main():
             print('wrote %s: %d imports, %d inlined' % (a.out, len(imports), len(inline)))
             return
         for n in unk:
-            if os.path.exists(os.path.join(ws, 'Theorems', 'Thm_%s_%s.lean' % (a.ns, n))) and proved(a.ns, n):
+            ns_n, short_n = n.rsplit('.', 1) if '.' in n else (a.ns, n)
+            if os.path.exists(os.path.join(ws, 'Theorems', 'Thm_%s_%s.lean' % (ns_n, short_n))) and proved(ns_n, short_n):
                 imports.append(n); print('  import', n)
             else:
                 s = find_src(a.src, n)
+                if not s and '.' in n and n.rsplit('.', 1)[0] != a.ns:
+                    # declared inside `namespace X` rather than as `theorem X.name`: copying it into
+                    # the --ns block would rename it, so stop and say so
+                    sys.exit('%s is in another namespace and not importable; merge its module instead' % n)
+                if not s and '.' in n:
+                    n = n.rsplit('.', 1)[1]; s = find_src(a.src, n)
                 if not s:
                     sys.exit('cannot find a source for %s' % n)
                 inline.insert(0, (s, n)); print('  inline', n, os.path.relpath(s, a.src))

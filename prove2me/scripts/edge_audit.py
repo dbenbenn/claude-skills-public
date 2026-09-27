@@ -106,6 +106,14 @@ def main():
         imps[f] = names
 
     incorrect, missing, unmatched = [], [], []
+    _dep = {}
+
+    def is_deprecated(full):
+        if full not in _dep:
+            r = [x for x in (call('GET', '/theorems?theorem_name=' + full).get('theorems') or [])
+                 if x.get('theorem_name') == full]
+            _dep[full] = bool(r and r[0].get('deprecated_at'))
+        return _dep[full]
     for tid, t in sorted(thms.items(), key=lambda kv: kv[1]['theorem_name']):
         live = []
         for s in subs:
@@ -143,6 +151,10 @@ def main():
                     base = d[0].split('.')[-1].rstrip("'")
                     if d[0] in live_decls and d[0] != 'solution' and base != short and base in full_of \
                             and full_of[base] not in reach:
+                        if is_deprecated(full_of[base]):
+                            # a deliberate copy: importing a retired theorem would put a hidden node
+                            # on the graph (resolve_imports.py and submit_solution.py agree)
+                            continue
                         missing.append((t['theorem_name'], sid[:8], full_of[base], os.path.relpath(f)))
     dedup = lambda xs: sorted(set(xs))
     print('\nINCORRECT edges (imports the proof never uses): %d' % len(dedup(x[:3] for x in incorrect)))

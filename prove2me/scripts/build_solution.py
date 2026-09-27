@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""Build the solution file for one published theorem from a Lean development, ready to submit.
+
+usage: build_solution.py TARGET MODULE OUT --root REPO --merge-dir DIR [--merge-dir DIR ...]
+                         [--drop NAME ...] [--package QuadraticFormsSobolev]
+
+  TARGET     the published theorem, e.g. QFS.theoremOneFour_univ
+  MODULE     the development file that proves it (relative to REPO)
+  --merge-dir  directories (relative to REPO) whose modules are merged whole when MODULE imports
+             them, directly or not; every other module is left to resolve_imports.py, which
+             imports what is published and Proved (and not deprecated) and copies in the rest
+  --drop     declarations to remove from the merge so that resolve_imports imports them instead:
+             the mission's OTHER milestones once they are Proved, so the graph records the
+             dependency rather than an inlined copy (a missing edge)
+
+The steps, each an existing tracked tool:
+  1. the import closure of MODULE inside the merge dirs, in dependency order, each module's
+     imports stripped and its text wrapped in `section ... end` (module-level `open`s otherwise
+     leak into later modules and change what a bare name resolves to);
+  2. merge.py (refuses conflicting duplicates);
+  3. the `solution` wrapper, generated from the PUBLISHED formal_statement: the statement renamed
+     to a root-level `solution`, its `namespace NS` replaced by `open NS` so its bare names still
+     resolve, proved by applying the development's own theorem, with the preamble's `open`s;
+  4. resolve_imports.py, then prune_solution.py --check (compiles with autoImplicit off, as the
+     verifier does). Submit the result with submit_solution.py.
+"""
+import argparse, os, re, subprocess, sys
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from p2m import call
+from prune_solution import parse
+
+
+def published(name):
+    r = [t for t in (call('GET', '/theorems?theorem_name=' + name).get('theorems') or [])
+         if t.get('theorem_name') == name]
+    if not r:
+        sys.exit('no published theorem named ' + name)
+    return r[0]
+
+
+def closure(repo, pkg, module, dirs):
+    """Modules (paths) to merge, dependencies first."""
+    order, seen = [], set()
+
+    def visit(path):
+        if path in seen:
+            return
+        seen.add(path)
+        for m in re.findall(r'^import\s+(\S+)', open(path, encoding='utf-8').read(), re.M):
+            if not m.startswith(pkg + '.'):
+                continue
+            p = os.path.join(repo, *m.split('.')) + '.lean'
+            rel = os.path.relpath(p, repo)
+            if os.path.exists(p) and any(rel.startswith(d.rstrip('/') + '/') for d in dirs):
+                visit(p)
+        order.append(path)
+    visit(os.path.join(repo, module))
+    return order
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('target'); ap.add_argument('module'); ap.add_argument('out')
+    ap.add_argument('--root', required=True)
+    ap.add_argument('--merge-dir', action='append', required=True)
+    ap.add_argument('--drop', action='append', default=[])
+    ap.add_argument('--package', default='QuadraticFormsSobolev')
+    a = ap.parse_args()
+    ns, short = a.target.rsplit('.', 1)
+    work = a.out + '.work'
+    os.makedirs(work, exist_ok=True)
+
+    # 1. wrapped copies of the closure
+    mods = closure(a.root, a.package, a.module, a.merge_dir)
+    wrapped = []
+    for i, p in enumerate(mods):
+        body = '\n'.join(l for l in open(p, encoding='utf-8').read().split('\n')
+                         if not l.startswith('import '))
+        w = os.path.join(work, '%02d_%s' % (i, os.path.basename(p)))
+        open(w, 'w', encoding='utf-8').write('section\n' + body.strip() + '\n\nend\n')
+        wrapped.append(w)
+    print('merging %d module(s): %s' % (len(mods), ' '.join(os.path.relpath(m, a.root) for m in mods)))
+
+    # 2. merge
+    merged = os.path.join(work, 'merged.lean')
+    subprocess.run([sys.executable, os.path.join(HERE, 'merge.py'), merged] + wrapped, check=True)
+    text = '\n'.join(l for l in open(merged, encoding='utf-8').read().split('\n')
+                     if not l.startswith('import '))
+
+    # drop the declarations to be imported instead
+    if a.drop:
+        lines = text.split('\n')
+        spans = []
+        for name, _k, st, en, _attr in parse(lines):
+            if any(name.split('.')[-1] == d.split('.')[-1] for d in a.drop):
+                spans.append((st, en)); print('  drop', name)
+        for st, en in sorted(spans, reverse=True):
+            del lines[st:en]
+        text = '\n'.join(lines)
+
+    # 3. the solution wrapper, from the published statement
+    t = published(a.target)
+    fs = t['formal_statement']
+    # a root-level `solution` (prune_solution and the verifier look for exactly that name); the
+    # statement's own `namespace NS ... end NS` becomes `open NS`, so its bare names still resolve
+    fs = '\n'.join(l for l in fs.split('\n') if l.strip() not in ('namespace ' + ns, 'end ' + ns))
+    fs2, n = re.subn(r'\btheorem\s+' + re.escape(short) + r'\b', 'theorem solution', fs, count=1)
+    if n != 1:
+        sys.exit('cannot find `theorem %s` in the published formal_statement' % short)
+    fs2, n = re.subn(r':=\s*by\s+sorry\s*', ':= by\n  apply %s <;> assumption\n' % a.target, fs2, count=1)
+    if n != 1:
+        sys.exit('cannot find `:= by sorry` in the published formal_statement')
+    opens = [l for l in (t.get('preamble') or '').split('\n') if l.startswith('open')]
+    text = (text.rstrip() + '\n\nsection\n' + '\n'.join(opens + ['open ' + ns]) + '\n\n'
+            + fs2.strip() + '\n\nend\n')
+    body = os.path.join(work, 'body.lean')
+    open(body, 'w', encoding='utf-8').write(text)
+
+    # 4. resolve, prune, check
+    subprocess.run([sys.executable, os.path.join(HERE, 'resolve_imports.py'), body, a.out,
+                    '--src', os.path.join(a.root, a.package), '--ns', ns], check=True)
+    subprocess.run([sys.executable, os.path.join(HERE, 'prune_solution.py'), a.out, '--check'], check=True)
+    print('built %s' % a.out)
+
+
+if __name__ == '__main__':
+    main()

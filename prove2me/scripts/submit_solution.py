@@ -111,7 +111,18 @@ def check_no_inline_copies(path, target, allow):
         # a rewired copy (proof = call to the published theorem, which is imported) has its edge
         if base in pub and base != short and base not in allow and name != 'solution' \
                 and pub[base][1] not in imported:
-            hits.append('%s (copy of %s)' % (name, pub[base][0]))
+            hits.append((name, pub[base][0]))
+    # a copy of a DEPRECATED theorem is deliberate: importing it would hang the proof off a retired,
+    # hidden node (resolve_imports.py copies those in; QFS 2026-09-27, Lemma 5.7 and core_induction)
+    def deprecated(full):
+        r = [t for t in (call('GET', '/theorems?theorem_name=' + full).get('theorems') or [])
+             if t.get('theorem_name') == full]
+        return bool(r and r[0].get('deprecated_at'))
+    kept = [(n, f) for n, f in hits if not deprecated(f)]
+    for n, f in hits:
+        if (n, f) not in kept:
+            print('   copy of the deprecated %s allowed (no edge to a retired theorem)' % f)
+    hits = ['%s (copy of %s)' % h for h in kept]
     if hits:
         sys.exit('REFUSED: inline copies of published theorems, so their graph edges would be missing:\n  '
                  + '\n  '.join(hits) + '\nrun rewire.py FILE --target %s -o OUT, or pass --allow-copy NAME '

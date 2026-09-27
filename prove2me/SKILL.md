@@ -646,6 +646,17 @@ review`; approval makes it a live mission.
 **A statement is Open the moment its job publishes**, before review and before the last item.
 Submit ready solutions as each one comes up; nothing waits for approval.
 
+**Build each solution with `scripts/build_solution.py`** (merge the development module and its
+closure, drop the OTHER milestones so they are imported once Proved, generate the `solution`
+wrapper from the published statement, then `resolve_imports.py` and `prune_solution.py --check`),
+and submit with `submit_solution.py`. Submit leaves first: a proof can import a milestone only
+after it is Proved, and the import is what puts the dependency on the graph. Check the goal's
+imports before submitting: on QFS the goal's development proof repeated Lemma A.1's argument
+rather than calling it, so the graph would have missed goal ← Lemma A.1 until the proof was
+rewritten to use the milestone. Deprecated theorems are copied in, never imported (all four tools
+agree). **A private mission's theorems are private**: a proof of a PUBLIC theorem cannot import
+them (`unknown import`), so such proofs wait until the mission is made public.
+
 ## Expansion 11 — after launch
 
 **Check the target before spending a proof.** Another contributor can close an Open statement while
