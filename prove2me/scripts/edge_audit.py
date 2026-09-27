@@ -78,8 +78,13 @@ def main():
 
     # GET /submissions ignores theorem_id and returns the whole history: fetch once, filter here
     subs = call('GET', '/submissions?limit=100000').get('submissions') or []
-    files = [f for r in roots for f in glob.glob(os.path.join(r, '**', '*.lean'), recursive=True)
-             if '/.lake/' not in f]
+    # os.walk, not glob('**'): glob skips hidden directories, and mission worktrees live under
+    # .claude/worktrees (CFP §7's 16 solutions all came back UNMATCHED). Skip only .lake and .git.
+    files = []
+    for r in roots:
+        for d, sub, fs in os.walk(r):
+            sub[:] = [s for s in sub if s not in ('.lake', '.git', '__pycache__')]
+            files += [os.path.join(d, f) for f in fs if f.endswith('.lean')]
     solsig, imps = {}, {}
     for f in files:
         try:
