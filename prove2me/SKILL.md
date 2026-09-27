@@ -48,6 +48,13 @@ the measurements behind the audit rules in `references/audit-evidence.md`.
    statement** with `scripts/source_audit.py`: it lists what the source sentence claims before it
    sees the read-back, and a verdict that is not `faithful` blocks the hand-over until each gap
    has a written disposition. → *Expansion 6.*
+6b. **Gap review with the human** -- the second approval step, after the item list. Run
+   `scripts/source_audit.py decisions MISSION_DIR`: it writes `DECISIONS.md`, one row per finding
+   on the goal and every milestone (each MISSING / WEAKER claim, each EXTRA hypothesis, each
+   DIRECTNESS other than `direct`, each paper item with no audit). Write a `proposed:` line on
+   every row, then go over the table with the human; **only the human's answer goes on the
+   `decided:` line**, and never a disposition of your own, however obvious. `draft.py verify`
+   counts every undecided row as BAD, and reopens an item's rows when its audit is re-run.
 7. **Write the prose**: the mission description, one milestone description per milestone with
    the source's sentence quoted first, one natural-language statement per declaration.
    → *Expansion 7.*
@@ -59,8 +66,8 @@ the measurements behind the audit rules in `references/audit-evidence.md`.
     into this file. → *Expansion 11.*
 
 While a task list has an unblocked item, keep going; report progress without stopping. Ask the
-human only at the decision points marked in the expansions: the item list, the split into
-missions, deletions, and anything the docs call irreversible.
+human only at the decision points marked in the expansions: the item list, the gap review
+(6b), the split into missions, deletions, and anything the docs call irreversible.
 
 ## The double-check list
 
@@ -132,9 +139,13 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   rendered; no Lean identifiers, no `file:line`, no naming verdict in `readback.md`; the model
   attributed correctly; never edited by hand. The auditor's five-line reply is kept as
   `<name>.reply.md` beside it.
-- A source-side audit per statement, verdict `faithful`, or every WEAKER / MISSING claim decided in
-  `<name>.dispositions.md`: **fixed** (the statement now says it), **carried** (another milestone
-  states it, named), or **dismissed** (with the reason, e.g. true by definition). A real gap --
+- A source-side audit per statement, and every finding decided **by the human** in the gap review
+  (`DECISIONS.md`, step 6b): **fixed** (the statement now says it), **carried** (another milestone
+  states it, named), **out of scope** (named in *What is left out*), or **dismissed** (with the
+  reason, e.g. true by definition). A "faithful but indirect" result is a finding too. On QFS
+  (2026-09-27) two findings -- Theorem 1.4's unstated norm comparability and the goal's kernel
+  diagonal -- were dismissed by the captain in a running log and summarised away by verdict
+  word; the first surfaced only because the human happened to ask about that milestone. A real gap --
   one with a genuine near-miss -- leads the report to the human, not a list of routine results.
   The read-back cannot do this job: it is blind to the source by design, and its own "What it
   does not say" is a Lean-side list where the one real omission looks like boilerplate (Garrido

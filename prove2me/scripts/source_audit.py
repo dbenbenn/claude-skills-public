@@ -2,6 +2,10 @@
 """Source-side audit: what does the source sentence claim, and does the formalization say it?
 
 usage: source_audit.py stage   MISSION_DIR NAME [--pages 12-14]   -> phase 1 prompt
+       source_audit.py decisions MISSION_DIR                   -> DECISIONS.md: every finding on the
+                                                                  goal and milestones, for the human
+                                                                  to decide (the gap review; see
+                                                                  decisions.py)
        source_audit.py reveal  MISSION_DIR NAME                   -> phase 2 message
        source_audit.py collect MISSION_DIR NAME                   -> claims/coverage into readbacks/
 
@@ -146,6 +150,10 @@ def collect(mdir, name):
 
 if __name__ == '__main__':
     a = sys.argv[1:]
+    if len(a) == 2 and a[0] == 'decisions':
+        import decisions
+        decisions.build(os.path.abspath(a[1]))
+        sys.exit(0)
     if len(a) < 3 or a[0] not in ('stage', 'reveal', 'collect'):
         sys.exit(__doc__)
     if a[0] == 'stage':

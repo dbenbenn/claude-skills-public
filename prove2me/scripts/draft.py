@@ -30,6 +30,10 @@ data, not code: MISSION_DIR/mission.py defines
 and the repo holds description.md, readbacks/<name>.readback.md (Def_<name> for a bundle), and
 proposal.json (the proposal id and item ids, written by upload --go; never by a dry run).
 
+`verify` also requires DECISIONS.md (source_audit.py decisions): every source-audit finding on the
+goal and the milestones decided by the human, none stale -- the gap review, a human decision point
+like the item-list approval.
+
 `upload` is diff-based. It reads the live Draft first and re-posts only what differs, so an item
 that has not changed is never touched and cannot lose a confirmation to a no-op edit. It creates
 the proposal on the first run. `verify` compares every field the upload sets, flags live items
@@ -268,6 +272,8 @@ def main():
         its, mls, _, _ = desired(M, mdir)
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
+        import decisions
+        bad += decisions.check(mdir)
         for k, what in bad:
             print('BAD', k, what)
         print('items %d  milestones %d  status %s | BAD %d'
