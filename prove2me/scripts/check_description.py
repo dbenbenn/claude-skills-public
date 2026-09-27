@@ -72,6 +72,15 @@ if len(_split) > 1:
         if surname and surname not in _refs:
             fail.append('attributed in the body but absent from the references: %r' % surname)
 
+# 6c. date-dependent status claims: each must be checked against the platform today, not the
+# source. QFS shipped "To date none of these results has a machine-checked proof" while six of its
+# own milestones were Proved (2026-09-27); the checklist line on date-dependent claims did not
+# catch it, so every such phrase is surfaced here for a look.
+for m in re.finditer(r'(?i)\b(to date|as of|not yet|still open|remains? open|no (?:machine-checked|formal)|'
+                     r'machine-checked|not in mathlib|has not been (?:formali[sz]ed|proved))\b', s):
+    a, b = max(0, m.start() - 50), m.end() + 50
+    warn.append('status claim, check it against the platform today: …%s…' % ' '.join(s[a:b].split()))
+
 # 7. length
 words = len(re.sub(r'\$[^$]*\$', ' X ', s).split())
 if not 800 <= words <= 1500:
