@@ -285,6 +285,32 @@ def bundle_relation_docstrings(M, mdir):
     return out
 
 
+def description_misses_definitions(M, mdir):
+    """[(where, why)] for a bundle definition some statement uses that the description never names.
+
+    The description's Setting section explains the objects the statements are about; when the
+    bundle changes, nothing else keeps it in step. Monod's description (2026-09-30) still lacked
+    `IsAmenableRel` and `volP1` after the statements C1 and C9 began to use them. A definition
+    counts as named when it appears in backticks, e.g. `G A` or `IsAmenableRel μ R`."""
+    desc = os.path.join(mdir, 'description.md')
+    if not os.path.exists(desc):
+        return []
+    named = set(re.findall(r'`([^`]+)`', open(desc, encoding='utf-8').read()))
+    named_words = {w for n in named for w in re.findall(r"[\w']+", n)}
+    stm = open(os.path.join(mdir, 'lib', 'Thm_%s.lean' % M.NAMESPACE), encoding='utf-8').read() \
+        if os.path.exists(os.path.join(mdir, 'lib', 'Thm_%s.lean' % M.NAMESPACE)) else ''
+    out = []
+    for D in getattr(M, 'DEFINITIONS', []):
+        f = os.path.join(mdir, 'lib', 'Def_%s.lean' % D['name'])
+        if not os.path.exists(f):
+            continue
+        decls = re.findall(r'^(?:noncomputable )?(?:def|structure|abbrev) (\w+)', open(f, encoding='utf-8').read(), re.M)
+        for d in decls:
+            if re.search(r'(?<![\w.])%s\b' % re.escape(d), stm) and d not in named_words:
+                out.append(('description', 'never names `%s`, which a statement uses' % d))
+    return out
+
+
 def title_mismatch(items, miles):
     """[(where, why)] for a milestone whose title differs from its theorem's title.
 
@@ -363,6 +389,7 @@ def main():
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
         bad += title_mismatch(its, mls)
+        bad += description_misses_definitions(M, mdir)
         bad += bundle_relation_docstrings(M, mdir)
         bad += double_backslash(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
         bad += deprecated_refs(M, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
