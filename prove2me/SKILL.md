@@ -55,6 +55,10 @@ the measurements behind the audit rules in `references/audit-evidence.md`.
    every row, then go over the table with the human; **only the human's answer goes on the
    `decided:` line**, and never a disposition of your own, however obvious. `draft.py verify`
    counts every undecided row as BAD, and reopens an item's rows when its audit is re-run.
+   When a row is decided **documented** (explained in the statement's Formalization Note rather
+   than fixed), run `scripts/caveat_audit.py` on the item: the source audit never sees prose, so
+   this is the only check that the note names the gap accurately and asserts nothing the Lean or
+   a citation does not back (`--cite` passes a cited text in).
 7. **Write the prose**: the mission description, one milestone description per milestone with
    the source's sentence quoted first, one natural-language statement per declaration.
    → *Expansion 7.*
