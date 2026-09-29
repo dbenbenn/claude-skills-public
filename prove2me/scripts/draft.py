@@ -261,6 +261,27 @@ def deprecated_refs(M, items, miles, desc, call):
     return out
 
 
+def double_backslash(items, miles, desc):
+    """[(where, why)] for uploaded prose with `\\\\` before a letter inside math.
+
+    A raw-string prose file keeps both backslashes of `\\\\mathbf`, which KaTeX renders as a line
+    break followed by the letters "mathbf". Monod's GRat ≅ T statement shipped `$G(\\\\mathbf{Z})$`
+    that way and the human caught it in review (2026-09-29). A genuine `\\\\` line break is never
+    followed directly by a letter in our prose, so this has no false positives so far."""
+    texts = [('description', desc)]
+    for k, it in items.items():
+        for f in ('natural_language_statement', 'source'):
+            if it.get(f):
+                texts.append((k, it[f]))
+    for k, (t, d) in miles.items():
+        texts.append((k + ' milestone', t + '\n' + d))
+    out = []
+    for where, t in texts:
+        for m in re.finditer(r'\$[^$]*?(\\\\[A-Za-z]+)[^$]*?\$', t):
+            out.append((where, 'doubled backslash `%s` in math (renders as a line break)' % m.group(1)))
+    return out
+
+
 def goal_unquoted(M, items):
     """[(goal, why)] when the source's sentence for the goal never reaches the platform.
 
@@ -299,6 +320,7 @@ def main():
         its, mls, _, _ = desired(M, mdir)
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
+        bad += double_backslash(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
         bad += deprecated_refs(M, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         import decisions
         bad += decisions.check(mdir)
