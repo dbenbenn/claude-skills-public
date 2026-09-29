@@ -140,9 +140,53 @@ def reveal(mdir, name):
         sys.exit('REFUSING: %s is %s -- phase 1 is not finished'
                  % (cp, 'incomplete' if os.path.exists(cp) else 'missing'))
     shutil.copy(os.path.join(mdir, 'readbacks', name + '.readback.md'), os.path.join(d, 'readback.md'))
+    if name.startswith('Def_'):
+        write_bundle_context(mdir, name, os.path.join(d, 'context.md'))
+        print('Continue with PHASE 2 of brief.md: readback.md and context.md are now in your directory.\n'
+              'Compare them with claims.md, write coverage.md exactly as Phase 2 specifies, and reply in at\n'
+              'most five lines. Do not change claims.md.')
+        return
     print('Continue with PHASE 2 of brief.md: readback.md is now in your directory. Compare it with\n'
           'claims.md, write coverage.md (with near-misses and the VERDICT line), and reply in at\n'
           'most five lines. Do not change claims.md.')
+
+
+def write_bundle_context(mdir, name, dst):
+    """context.md for phase 2 of a bundle audit: what else the formalization has.
+
+    The first bundle audit (Monod, 2026-09-29) saw only the bundle's read-back and flagged 27 rows,
+    most of them notions provided by another bundle, by Mathlib, or inline in a statement, or needed
+    only by proofs or by results the mission leaves out. This gives phase 2 that context."""
+    M = draft.load(mdir)
+    # statement preambles from the payloads, not draft.desired(): that needs every read-back, and
+    # the bundle is audited before (or while) the statements get theirs
+    pre = [p for p, _ in (M.payloads().values() if hasattr(M, 'payloads') else [])]
+    ws = draft.WS if hasattr(draft, 'WS') else os.path.expanduser('~/claude/prove2me_workspace')
+    mods = set()
+    for f in [os.path.join(mdir, 'lib', name + '.lean')]:
+        if os.path.exists(f):
+            mods |= set(re.findall(r'^import Definitions\.(Def_\w+)', open(f, encoding='utf-8').read(), re.M))
+    for pr in pre:
+        mods |= set(re.findall(r'^import Definitions\.(Def_\w+)', pr or '', re.M))
+    mods.discard(name)
+    out = ['# Context for the definitions audit\n',
+           '## Other definition files the formalization imports\n']
+    for m in sorted(mods):
+        f = os.path.join(ws, 'Definitions', m + '.lean')
+        names = re.findall(r'^(?:noncomputable )?(?:def|structure|abbrev|class|inductive) (\S+)',
+                           open(f, encoding='utf-8').read(), re.M) if os.path.exists(f) else []
+        out.append('- `%s`: %s' % (m, ', '.join('`%s`' % n for n in names) or '(file not found)'))
+    out.append('\nMathlib\'s own notions (groups, subgroups, commutators and derived subgroups, free '
+               'groups, orders, measures, …) count as available.\n')
+    out.append('## The statements of the formalization\n')
+    for T in M.THEOREMS:
+        out.append('### %s\n\n%s\n' % (T.get('title') or T['name'], T.get('nls') or ''))
+    desc = os.path.join(mdir, 'description.md')
+    if os.path.exists(desc):
+        m = re.search(r'^## What is left out\s*\n(.*?)(?=^## |\Z)', open(desc, encoding='utf-8').read(), re.M | re.S)
+        if m:
+            out.append('## What the formalization leaves out\n\n' + m.group(1).strip() + '\n')
+    open(dst, 'w', encoding='utf-8').write('\n'.join(out))
 
 
 def collect(mdir, name):

@@ -30,9 +30,13 @@ implicit claims. **Do not look for any formalization; there is none in your dire
 
 ## Phase 2: coverage (only when you are told to continue)
 
-A file `readback.md` will then be added: a blind, plain-mathematics rendering of the definitions
-file, written by someone who never saw the source. Compare it with `claims.md` and write
-`coverage.md`, one entry per row Dᵢ:
+Two files are then added. `readback.md` is a blind, plain-mathematics rendering of the definitions
+file, written by someone who never saw the source. `context.md` says what else the formalization
+has: the other definition files it imports (with the names they declare), the fact that Mathlib's
+own notions (groups, subgroups, commutators, free groups, orders, measures, …) count as available,
+every statement of the formalization (title and plain-language statement), and what the
+formalization deliberately leaves out. Compare with `claims.md` and write `coverage.md`, one entry
+per row Dᵢ:
 
 - **LITERAL**: the file defines the object as the source does. Quote the read-back.
 - **ENCODED**: the file defines it differently (a generated subgroup for a set that is already a
@@ -40,19 +44,27 @@ file, written by someone who never saw the source. Compare it with `claims.md` a
   exactly how, whether the two agree, and by what argument. If they do not agree in every case,
   give a near-miss: an object one admits and the other does not.
 - **STAND-IN**: the source's object has no definition of its own and is represented by another
-  object (an instance of a more general definition, "G" as "G(R)"). Say what identifies them.
-- **MISSING**: no definition. Say whether the file could state results about it at all.
-- For each *(implicit)* claim: the file cannot assert it (definitions do not prove things); say
-  whether the read-back's definition makes it true by construction, or whether it is a claim some
-  theorem must carry, and state that theorem.
-- For each *(convention)*: whether the file adopts it.
+  object (an instance of a more general definition). Say what identifies them, and whether a
+  statement in `context.md` states that identification.
+- **AVAILABLE**: not in this file, but provided elsewhere: an imported definition file, Mathlib, or
+  written out inline in a statement. Name where.
+- **PROOF-INTERNAL**: only the source's proofs use it (support of an element, germs); no statement
+  needs it. Say which result's proof.
+- **OUT OF SCOPE**: only results that `context.md` lists as left out need it.
+- **MISSING**: none of the above: a stated result needs the object and nothing provides it.
+- For each *(implicit)* claim: **BY CONSTRUCTION** (the file's definition makes it true),
+  **CARRIED BY** a statement in `context.md` (name it), **PROOF FACT** (only proofs need it), or
+  **UNCARRIED** (a statement relies on it and nothing states or proves it).
+- For each *(convention)*: whether the file adopts it, and whether any statement depends on it.
 - Then **EXTRA**: definitions in the read-back with no counterpart in the source, one line each
   (an auxiliary notion is fine; say what it is for).
 
-End with a verdict line: `VERDICT: literal` when every object is LITERAL and every convention is
-adopted, else `VERDICT: findings: D2, D5` (every row that is ENCODED, STAND-IN or MISSING, and
-every implicit claim no construction makes true). An ENCODED row with a sound argument is still a
-finding: the human decides whether the encoding stays.
+End with a verdict line: `VERDICT: literal` when nothing below is present, else
+`VERDICT: findings: D2, D5` listing every row that is ENCODED, STAND-IN or MISSING, every
+UNCARRIED implicit claim, and every convention a statement depends on that the file does not
+adopt. AVAILABLE, PROOF-INTERNAL, OUT OF SCOPE, BY CONSTRUCTION, CARRIED BY and PROOF FACT rows are
+not findings. An ENCODED row with a sound argument is still a finding: the human decides whether
+the encoding stays.
 
 Reply in at most five lines: the verdict and one line per finding.
 
