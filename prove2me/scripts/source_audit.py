@@ -81,7 +81,9 @@ def stage(mdir, name, page_spec=None):
     # the opening paragraph only: that is where the source's sentence is quoted; quotations in a
     # later *Route* or *External* paragraph explain how the source gets there and are not claims of
     # this statement (Monod M7 handed its auditor two Route quotes as "the sentence under audit")
-    opening = (T.get('milestone_description') or '').split('\n\n')[0]
+    # (cut at the first *Route* / *External* paragraph, not at a blank line: a quoted sentence may
+    # contain a displayed formula set off by blank lines, as Monod's Proposition 9 does)
+    opening = re.split(r'\n\n\*(?:Route|External)\b', T.get('milestone_description') or '')[0]
     quote = re.findall(r'[“"](.+?)[”"]', opening, re.S)
     if not quote and T.get('source_quote'):
         quote = [T['source_quote']]
