@@ -133,6 +133,10 @@ def _claims(path):
         return {}
     lines, out = open(path, encoding='utf-8').read().split('\n'), {}
     for n, l in enumerate(lines):
+        h = re.match(r'^#{2,4}\s+(D\d+)\.?\s+(.*)$', l)   # a bundle inventory titles each object as a heading
+        if h:
+            out[h.group(1)] = h.group(2).strip()
+            continue
         m = re.match(r'^\s*[-*]\s*(?:\*\*)?([CHD]\d+[a-z]?)\.?(?:\*\*)?[.:]?\s+(.*)$', l)  # bold or not
         if not m:
             continue
@@ -171,6 +175,7 @@ def build(mdir):
     path = os.path.join(mdir, 'DECISIONS.md')
     old, old_fp = _parse(path)
     out, n_open, n_rows, clean = [HEAD], 0, 0, []
+    info = []
     for key, cov, has_src, label in _items(mdir):
         fp = _fp(cov)
         if not os.path.exists(cov):
@@ -179,8 +184,17 @@ def build(mdir):
             finds = [('AUDIT', 'no source audit on record for this item (run source_audit.py)')]
         else:
             finds = _findings(cov)
+        # encodings the auditor judged equivalent: listed for skimming, never a decision
+        # (dbenbenn, 2026-09-29: "I want to see cases where there's some real issue to decide")
+        equiv = []
+        if os.path.exists(cov):
+            e = re.search(r'^EQUIVALENT:\s*(.+)$', open(cov, encoding='utf-8').read(), re.M)
+            if e:
+                equiv = re.findall(r'\b(D\d+)\b', e.group(1))
         if not finds:
             clean.append(key)
+            if equiv:
+                info.append((key, label, equiv, _claims(cov.replace('.coverage.md', '.claims.md'))))
             continue
         out.append('## %s — audit %s\n\n**%s**\n\n' % (key, fp, label))
         claims = _claims(cov.replace('.coverage.md', '.claims.md'))
@@ -199,6 +213,12 @@ def build(mdir):
             out.append('\n')
             n_rows += 1
             n_open += not decided
+    for key, label, equiv, cl in info:
+        out.append('## %s — encodings (no decision needed)\n\n**%s**\n\nThe audit found these defined '
+                   'differently from the source but equivalent to it; the arguments are in `readbacks/%s.coverage.md`.\n\n'
+                   % (key, label, key))
+        out += ['- %s: %s\n' % (i, cl.get(i, '')[:140]) for i in equiv]
+        out.append('\n')
     out.append('## Clean\n\nFaithful and direct, nothing to decide: %s\n' % (
         ', '.join('`%s`' % k for k in clean) or '(none)'))
     open(path, 'w', encoding='utf-8').write(''.join(out))

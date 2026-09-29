@@ -39,13 +39,15 @@ formalization deliberately leaves out. Compare with `claims.md` and write `cover
 per row Dᵢ:
 
 - **LITERAL**: the file defines the object as the source does. Quote the read-back.
-- **ENCODED**: the file defines it differently (a generated subgroup for a set that is already a
-  group, an operator for a family of means, a local condition for "finitely many pieces"). Say
-  exactly how, whether the two agree, and by what argument. If they do not agree in every case,
-  give a near-miss: an object one admits and the other does not.
+- **EQUIVALENT**: the file defines it differently (a generated subgroup for a set that is already a
+  group, SL₂ acting on ℝ ∪ {∞} for PSL₂ on P¹, a finitely additive measure for a mean), and the two
+  agree in every case within the source's setting. Give the argument in one or two lines, and
+  where it needs a theorem, the statement in `context.md` that carries it.
+- **DIFFERENT**: the file defines it differently and the two do *not* agree somewhere within the
+  source's setting. Give the near-miss: an object one admits and the other does not.
 - **STAND-IN**: the source's object has no definition of its own and is represented by another
-  object (an instance of a more general definition). Say what identifies them, and whether a
-  statement in `context.md` states that identification.
+  object (an instance of a more general definition). Say what identifies them and whether a
+  statement in `context.md` states that identification (then it is carried, not a finding).
 - **AVAILABLE**: not in this file, but provided elsewhere: an imported definition file, Mathlib, or
   written out inline in a statement. Name where.
 - **PROOF-INTERNAL**: only the source's proofs use it (support of an element, germs); no statement
@@ -59,12 +61,12 @@ per row Dᵢ:
 - Then **EXTRA**: definitions in the read-back with no counterpart in the source, one line each
   (an auxiliary notion is fine; say what it is for).
 
-End with a verdict line: `VERDICT: literal` when nothing below is present, else
-`VERDICT: findings: D2, D5` listing every row that is ENCODED, STAND-IN or MISSING, every
-UNCARRIED implicit claim, and every convention a statement depends on that the file does not
-adopt. AVAILABLE, PROOF-INTERNAL, OUT OF SCOPE, BY CONSTRUCTION, CARRIED BY and PROOF FACT rows are
-not findings. An ENCODED row with a sound argument is still a finding: the human decides whether
-the encoding stays.
+End with a verdict line: `VERDICT: literal` when there are no findings, else
+`VERDICT: findings: D2, D5`. A finding is a real issue for the human to decide: every DIFFERENT
+row, every MISSING row, every STAND-IN whose identification no statement carries, every UNCARRIED
+implicit claim, and every convention a statement depends on that the file does not adopt.
+EQUIVALENT rows are *not* findings: list them after the verdict under `EQUIVALENT: D2, D3, …`,
+each already argued above, so the human can skim them without being asked to decide.
 
 Reply in at most five lines: the verdict and one line per finding.
 
