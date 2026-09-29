@@ -89,21 +89,31 @@ def _findings(cov):
         for i in re.findall(r'\b([CH]\d+[a-z]?)\b', bare):
             if i not in ids:
                 ids.append(i)
+        lines = txt.split('\n')
         for i in ids:
             line = None
-            for l in txt.split('\n'):
+            for n, l in enumerate(lines):
                 # the claim's own bullet: its ID leads the line, or sits in the leading bold span
                 # ("- **C3, C4, C5** MISSING", Monod) -- not a later mention in someone else's row
                 b = re.match(r'^\s*[-*]\s*(?:\*\*([^*]+)\*\*|(\S+))', l)
                 if b and i in re.findall(r'\b([CH]\d+[a-z]?)\b', b.group(1) or b.group(2) or ''):
-                    line = ' '.join(l.split()); break
-            line = line or '(named in VERDICT: %s)' % verdict
-            rows.append((i, line[:600] + ('…' if len(line) > 600 else '')))
+                    # the whole bullet, not its first line: auditors wrap a bullet over several
+                    # lines, and the human decides from this text ("The read-back uses C1 only in
+                    # the single instance where the relation is the" -- cut off, Monod M6)
+                    body = [l]
+                    for c in lines[n + 1:]:
+                        if not c.strip() or re.match(r'^\s*[-*]\s', c) or c.startswith('#'):
+                            break
+                        body.append(c)
+                    line = ' '.join(' '.join(body).split()); break
+            rows.append((i, line or '(named in VERDICT: %s)' % verdict))
         if not ids:
             rows.append(('VERDICT', verdict))
     d = re.search(r'^DIRECTNESS:\s*(.+)$', txt, re.M)
     if d and not d.group(1).strip().lower().startswith('direct'):
-        rows.append(('DIRECTNESS', ' '.join(d.group(1).split())[:600]))
+        # the whole paragraph: the line may wrap, and nothing here is truncated
+        para = re.match(r'^DIRECTNESS:\s*(.+?)(?:\n\s*\n|\Z)', txt[d.start():], re.S)
+        rows.append(('DIRECTNESS', ' '.join(para.group(1).split())))
     return rows
 
 
