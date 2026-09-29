@@ -261,6 +261,30 @@ def deprecated_refs(M, items, miles, desc, call):
     return out
 
 
+def bundle_relation_docstrings(M, mdir):
+    """[(where, why)] for a bundle docstring that asserts a relationship to another object.
+
+    A bundle freezes at publish and its docstrings are stripped before every audit, so a sentence
+    like "`G = G(ℝ)` is `G ⊤`" is a permanent, unaudited claim; Monod's bundle carried exactly that
+    until dbenbenn asked for G and H to be defined (2026-09-29). Relationships belong in the
+    natural-language statement or in a proved lemma. Heuristic: a backticked object said to be
+    another one, or "equivalent / agrees with / coincides / same as"."""
+    out = []
+    # one named object said to *be* another ("`G = G(ℝ)` is `G ⊤`"), not a defining phrase like
+    # "is `μ`-null" or "agrees with a Möbius map"
+    pat = re.compile(r'`[^`]+` is `[^`]+`(?![-\w])|\b(?:equivalent to|coincides with|the same as)\b')
+    for D in getattr(M, 'DEFINITIONS', []):
+        f = os.path.join(mdir, 'lib', 'Def_%s.lean' % D['name'])
+        if not os.path.exists(f):
+            continue
+        for doc in re.findall(r'/--(.*?)-/', open(f, encoding='utf-8').read(), re.S):
+            m = pat.search(doc)
+            if m:
+                out.append(('Def_' + D['name'], 'docstring asserts a relationship (%r): %s'
+                            % (m.group(0), ' '.join(doc.split())[:120])))
+    return out
+
+
 def title_mismatch(items, miles):
     """[(where, why)] for a milestone whose title differs from its theorem's title.
 
@@ -339,6 +363,7 @@ def main():
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
         bad += title_mismatch(its, mls)
+        bad += bundle_relation_docstrings(M, mdir)
         bad += double_backslash(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
         bad += deprecated_refs(M, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         import decisions

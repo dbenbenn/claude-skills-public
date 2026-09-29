@@ -51,6 +51,13 @@ def _items(mdir):
     items, miles, order, _ = draft.desired(M, mdir)
     keys = [k for k in order if k in miles or k == M.GOAL]
     out, n = [], 0
+    # definitions bundles first: their source audit (source_audit.py on `Def_<name>`) inventories
+    # what the source defines and checks each object has a literal definition (2026-09-29)
+    for D in getattr(M, 'DEFINITIONS', []):
+        if D.get('source_pages'):
+            key = 'Def_' + D['name']
+            out.append((key, os.path.join(mdir, 'readbacks', key + '.coverage.md'), True,
+                        'Definitions — %s' % (D.get('title') or D['name'])))
     for k in keys:
         if k.startswith('ref:'):
             name = k[4:]
@@ -79,14 +86,14 @@ def _findings(cov):
     rows = []
     v = re.search(r'^VERDICT:\s*(.+)$', txt, re.M)
     verdict = v.group(1).strip() if v else '(no VERDICT line)'
-    if not verdict.lower().startswith('faithful'):
+    if not verdict.lower().startswith(('faithful', 'literal')):
         ids = []
         # IDs outside parentheses only: the auditor's asides name faithful claims too
         # ("gaps: C1, C5 (... ball case C5a and alpha_0 clause C6 are faithful)", QFS Lemma A.1)
         bare = verdict
         while re.search(r'\([^()]*\)', bare):
             bare = re.sub(r'\([^()]*\)', '', bare)
-        for i in re.findall(r'\b([CH]\d+[a-z]?)\b', bare):
+        for i in re.findall(r'\b([CHD]\d+[a-z]?)\b', bare):
             if i not in ids:
                 ids.append(i)
         lines = txt.split('\n')
@@ -96,7 +103,7 @@ def _findings(cov):
                 # the claim's own bullet: its ID leads the line, or sits in the leading bold span
                 # ("- **C3, C4, C5** MISSING", Monod) -- not a later mention in someone else's row
                 b = re.match(r'^\s*[-*]\s*(?:\*\*([^*]+)\*\*|(\S+))', l)
-                if b and i in re.findall(r'\b([CH]\d+[a-z]?)\b', b.group(1) or b.group(2) or ''):
+                if b and i in re.findall(r'\b([CHD]\d+[a-z]?)\b', b.group(1) or b.group(2) or ''):
                     # the whole bullet, not its first line: auditors wrap a bullet over several
                     # lines, and the human decides from this text ("The read-back uses C1 only in
                     # the single instance where the relation is the" -- cut off, Monod M6)
@@ -126,7 +133,7 @@ def _claims(path):
         return {}
     lines, out = open(path, encoding='utf-8').read().split('\n'), {}
     for n, l in enumerate(lines):
-        m = re.match(r'^\s*[-*]\s*(?:\*\*)?([CH]\d+[a-z]?)\.?(?:\*\*)?[.:]?\s+(.*)$', l)  # bold or not
+        m = re.match(r'^\s*[-*]\s*(?:\*\*)?([CHD]\d+[a-z]?)\.?(?:\*\*)?[.:]?\s+(.*)$', l)  # bold or not
         if not m:
             continue
         body = [m.group(2)]

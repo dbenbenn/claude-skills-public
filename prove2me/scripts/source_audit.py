@@ -43,6 +43,15 @@ import draft
 
 
 def item(M, name):
+    # a definitions bundle is audited too, under the key of its read-back (`Def_<name>`): its
+    # `source_pages` are where the source sets up its objects (Monod 2026-09-29: G, H and amenable
+    # relations were never defined, and nothing compared the bundle with the source)
+    if name.startswith('Def_'):
+        for D in getattr(M, 'DEFINITIONS', []):
+            if 'Def_' + D['name'] == name:
+                if not D.get('source_pages'):
+                    sys.exit('%s: give the bundle `source_pages` in mission.py' % name)
+                return dict(D, name=name, page=D['source_pages'], bundle=True)
     for T in M.THEOREMS:
         if T['name'] == name:
             return T
@@ -87,13 +96,14 @@ def stage(mdir, name, page_spec=None):
     quote = re.findall(r'[“"](.+?)[”"]', opening, re.S)
     if not quote and T.get('source_quote'):
         quote = [T['source_quote']]
-    if not quote:
+    if not quote and not T.get('bundle'):
         sys.exit('%s: no quoted sentence (milestone description or source_quote)' % name)
     d = os.path.join(ROOT, slug(mdir, name))
     if os.path.exists(d):
         sys.exit('REFUSING: %s exists -- collect/teardown it first' % d)
     os.makedirs(os.path.join(d, 'scratch'))
-    shutil.copy(os.path.join(HERE, 'source-audit-brief.md'), os.path.join(d, 'brief.md'))
+    shutil.copy(os.path.join(HERE, 'source-audit-bundle-brief.md' if T.get('bundle') else 'source-audit-brief.md'),
+                os.path.join(d, 'brief.md'))
     # the item's own page, the mission's context pages, and the item's own context pages -- where
     # the notions its sentence uses are defined (Γ ∉ EG's auditor could not see EG's definition)
     want = (pages(page_spec or T['page']) + ([] if own else pages(getattr(M, 'CONTEXT_PAGES', '')))
@@ -105,10 +115,14 @@ def stage(mdir, name, page_spec=None):
         subprocess.run(['pdftoppm', '-f', str(p + off), '-l', str(p + off), '-r', '130', '-png',
                         pdf, os.path.join(d, 'page-%03d' % p)], check=True)
     with open(os.path.join(d, 'source.md'), 'w', encoding='utf-8') as f:
-        f.write('# Sentence under audit\n\nSource: %s, p. %s (%s)\n\n' % (
-            os.path.basename(pdf), T['page'], T.get('result', '')))
-        for q in quote:
-            f.write('> %s\n\n' % ' '.join(q.split()))
+        if T.get('bundle'):
+            f.write('# Definitions under audit\n\nSource: %s, pp. %s: where the source sets up the objects '
+                    'its results are about.\n\n' % (os.path.basename(pdf), T['page']))
+        else:
+            f.write('# Sentence under audit\n\nSource: %s, p. %s (%s)\n\n' % (
+                os.path.basename(pdf), T['page'], T.get('result', '')))
+            for q in quote:
+                f.write('> %s\n\n' % ' '.join(q.split()))
         f.write('Page images of pp. %s are in this directory.\n' % ', '.join(map(str, sorted(set(want)))))
     print('Work only inside %s. Everything below is relative to it.\n\n'
           'Read brief.md and do PHASE 1 only: read source.md and the page images, write claims.md,\n'
@@ -151,7 +165,7 @@ def collect(mdir, name):
         print('DIRECTNESS', direct.group(1).strip(), '  <- consider restating to name the source object')
     if ok:
         teardown(slug(mdir, name), force=True)
-    return ok and verdict and verdict.group(1).strip().lower().startswith('faithful')
+    return ok and verdict and verdict.group(1).strip().lower().startswith(('faithful', 'literal'))
 
 
 if __name__ == '__main__':
