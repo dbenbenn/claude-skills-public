@@ -348,6 +348,16 @@ cut the same way before formalizing the source's version.
 
 ## Expansion 4 — the definitions bundle
 
+**Formalize the source's own definition, and try hard before replacing it.** When a notion
+looks "delicate" to formalize, that is a reason to work out what the source means precisely, not
+to substitute a friendlier equivalent. Read the definition as its cited references make it
+precise, formalize that as literally as Lean allows, and move to an alternative only when the
+literal one demonstrably cannot be made to work. Say what failed. Avoiding a definition this way
+has cost us before: Monod's amenable measured equivalence relations were at first not defined at
+all, "because pointwise-measurable means are delicate", and the external milestone was restated
+for groups. The source audit then flagged every step of the argument, and dbenbenn asked for the
+definition itself (2026-09-29).
+
 **A sentence that introduces notation gets a bundle definition whose type carries the sentence's
 assumptions, and the statements use it wherever the source does.** Notation packs claims: Garrido
 writes "any element $u \in St(1)$ as $u = (u_0, u_1)$", so the later "$aua = (u_1, u_0)$" asserts
