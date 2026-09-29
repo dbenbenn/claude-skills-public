@@ -50,17 +50,26 @@ def _items(mdir):
     M = draft.load(mdir)
     items, miles, order, _ = draft.desired(M, mdir)
     keys = [k for k in order if k in miles or k == M.GOAL]
-    out = []
+    out, n = [], 0
     for k in keys:
         if k.startswith('ref:'):
             name = k[4:]
             R = [R for R in M.REFERENCES if R['theorem_name'] == name][0]
             has_src = bool(R.get('page'))
+            title = R.get('milestone_title') or R.get('title') or name
         else:
             name = k
             T = [T for T in M.THEOREMS if T['name'] == k][0]
             has_src = T.get('page') is not None
-        out.append((k, os.path.join(mdir, 'readbacks', name + '.coverage.md'), has_src))
+            title = T.get('milestone_title') or T.get('title') or name
+        # the human reviews on the platform, where milestones are M1, M2, ... in item order and
+        # the goal has no number; a Lean name alone does not say which one (dbenbenn, 2026-09-29)
+        if k in miles and k != M.GOAL:
+            n += 1
+            label = 'M%d — %s' % (n, title)
+        else:
+            label = 'Goal — %s' % title
+        out.append((k, os.path.join(mdir, 'readbacks', name + '.coverage.md'), has_src, label))
     return out
 
 
@@ -124,7 +133,7 @@ def build(mdir):
     path = os.path.join(mdir, 'DECISIONS.md')
     old, old_fp = _parse(path)
     out, n_open, n_rows, clean = [HEAD], 0, 0, []
-    for key, cov, has_src in _items(mdir):
+    for key, cov, has_src, label in _items(mdir):
         fp = _fp(cov)
         if not os.path.exists(cov):
             if not has_src:
@@ -135,7 +144,7 @@ def build(mdir):
         if not finds:
             clean.append(key)
             continue
-        out.append('## %s — audit %s\n\n' % (key, fp))
+        out.append('## %s — audit %s\n\n**%s**\n\n' % (key, fp, label))
         for rid, text in finds:
             prev = old.get((key, rid), {})
             same = old_fp.get(key) == fp
@@ -162,7 +171,7 @@ def check(mdir):
     rows, fps = _parse(path)
     bad = []
     listed = set(fps)
-    for key, cov, has_src in _items(mdir):
+    for key, cov, has_src, _label in _items(mdir):
         fp = _fp(cov)
         if key in fps and fps[key] != fp:
             bad.append((key, 'stale: its source audit changed after DECISIONS.md was generated; re-run decisions'))
