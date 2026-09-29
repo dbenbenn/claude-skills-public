@@ -117,6 +117,27 @@ def _findings(cov):
     return rows
 
 
+def _claims(path):
+    """{id: text} from a phase-1 claims.md: what each C<n> / H<n> of the source says.
+
+    The auditor's verdict names claims by number only ("C3, C4 MISSING"); the human reviewing
+    the table should not have to open another file to learn what C3 is (dbenbenn, 2026-09-29)."""
+    if not os.path.exists(path):
+        return {}
+    lines, out = open(path, encoding='utf-8').read().split('\n'), {}
+    for n, l in enumerate(lines):
+        m = re.match(r'^\s*[-*]\s*(?:\*\*)?([CH]\d+[a-z]?)\.?(?:\*\*)?[.:]?\s+(.*)$', l)  # bold or not
+        if not m:
+            continue
+        body = [m.group(2)]
+        for c in lines[n + 1:]:
+            if not c.strip() or re.match(r'^\s*[-*]\s', c) or c.startswith('#'):
+                break
+            body.append(c)
+        out[m.group(1)] = ' '.join(' '.join(body).split())
+    return out
+
+
 def _parse(path):
     """{(key, row): {'proposed':..., 'decided':..., 'previously':...}} and {key: fingerprint}."""
     rows, fps, key, rid = {}, {}, None, None
@@ -155,13 +176,17 @@ def build(mdir):
             clean.append(key)
             continue
         out.append('## %s — audit %s\n\n**%s**\n\n' % (key, fp, label))
+        claims = _claims(cov.replace('.coverage.md', '.claims.md'))
         for rid, text in finds:
             prev = old.get((key, rid), {})
             same = old_fp.get(key) == fp
             decided = prev.get('decided', '') if same else ''
             previously = prev.get('previously', '') if same else (prev.get('decided') or prev.get('previously') or '')
-            out.append('### %s\n- auditor: %s\n- proposed: %s\n- decided: %s\n' % (
-                rid, text, prev.get('proposed', ''), decided))
+            out.append('### %s\n' % rid)
+            if rid in claims:
+                out.append('- claim: %s\n' % claims[rid])
+            out.append('- auditor: %s\n- proposed: %s\n- decided: %s\n' % (
+                text, prev.get('proposed', ''), decided))
             if previously:
                 out.append('- previously: %s\n' % previously)
             out.append('\n')
