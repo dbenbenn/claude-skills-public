@@ -261,6 +261,24 @@ def deprecated_refs(M, items, miles, desc, call):
     return out
 
 
+def title_mismatch(items, miles):
+    """[(where, why)] for a milestone whose title differs from its theorem's title.
+
+    They are different fields on different endpoints, written at different times, and they drift:
+    on Monod (2026-09-29) all 18 differed, and several milestone titles dropped content the
+    statement proves (M16 dropped C¹, Proposition 7 dropped its second alternative). The theorem
+    title is the one checked against the Lean; the milestone title should repeat it. References
+    are skipped: their theorem titles belong to already-published theorems."""
+    out = []
+    for k, (t, _) in miles.items():
+        if k.startswith('ref:') or k not in items:
+            continue
+        tt = items[k].get('theorem_title')
+        if tt and t != tt:
+            out.append((k + ' milestone', 'milestone title differs from the theorem title (%r vs %r)' % (t, tt)))
+    return out
+
+
 def double_backslash(items, miles, desc):
     """[(where, why)] for uploaded prose with `\\\\` before a letter inside math.
 
@@ -320,6 +338,7 @@ def main():
         its, mls, _, _ = desired(M, mdir)
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
+        bad += title_mismatch(its, mls)
         bad += double_backslash(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
         bad += deprecated_refs(M, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         import decisions
