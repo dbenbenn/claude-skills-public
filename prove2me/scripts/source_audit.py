@@ -78,7 +78,11 @@ def stage(mdir, name, page_spec=None):
         sys.exit('set SOURCE_PDF in mission.py, or source_pdf on the item (path to the source PDF)')
     # the goal is a milestone for auditing purposes; an older mission's goal may carry no
     # milestone description, so an item may give its sentence directly as `source_quote`
-    quote = re.findall(r'[“"](.+?)[”"]', T.get('milestone_description') or '', re.S)
+    # the opening paragraph only: that is where the source's sentence is quoted; quotations in a
+    # later *Route* or *External* paragraph explain how the source gets there and are not claims of
+    # this statement (Monod M7 handed its auditor two Route quotes as "the sentence under audit")
+    opening = (T.get('milestone_description') or '').split('\n\n')[0]
+    quote = re.findall(r'[“"](.+?)[”"]', opening, re.S)
     if not quote and T.get('source_quote'):
         quote = [T['source_quote']]
     if not quote:
