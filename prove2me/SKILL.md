@@ -47,7 +47,15 @@ the measurements behind the audit rules in `references/audit-evidence.md`.
    `IMPORTS` lines; re-run whenever the Lean changes. **Then a source-side audit on every
    statement** with `scripts/source_audit.py`: it lists what the source sentence claims before it
    sees the read-back, and a verdict that is not `faithful` blocks the hand-over until each gap
-   has a written disposition. → *Expansion 6.*
+   has a written disposition. **The definitions bundle gets a source audit too**: give it
+   `source_pages` in `mission.py` and run `source_audit.py stage MISSION_DIR Def_<name>`. Phase 1
+   inventories every object the source defines on those pages (with the implicit claims a
+   definition carries, "the subgroup … given by" asserting a subgroup); phase 2 marks each one
+   LITERAL, ENCODED, STAND-IN or MISSING against the bundle's read-back. Run it before the
+   statement audits: statement audits skip bundle-level encodings, so without it nobody compares
+   the bundle with the source. Monod's G, H and amenable relations were missing or stood in for
+   until the gap review (2026-09-29). `draft.py verify` also flags bundle docstrings that assert
+   a relationship ("`H = H(ℝ)` is `H ⊤`"). → *Expansion 6.*
 6b. **Gap review with the human** -- the second approval step, after the item list. Run
    `scripts/source_audit.py decisions MISSION_DIR`: it writes `DECISIONS.md`, one row per finding
    on the goal and every milestone (each MISSING / WEAKER claim, each EXTRA hypothesis, each
