@@ -54,7 +54,15 @@ def lean_prose_only(text):
 def scan_local(dirs):
     hits = []
     for root in dirs:
-        for dirpath, dirnames, filenames in os.walk(root):
+        # a file argument used to be walked as a directory and silently scanned nothing, reporting
+        # 0 hits over prose that said "his" twice (F-amenability, 2026-09-30)
+        if os.path.isfile(root):
+            walk = [(os.path.dirname(root) or '.', [], [os.path.basename(root)])]
+        elif os.path.isdir(root):
+            walk = os.walk(root)
+        else:
+            raise SystemExit('no such file or directory: %s' % root)
+        for dirpath, dirnames, filenames in walk:
             dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
             for fn in filenames:
                 if not fn.endswith(('.md', '.py', '.lean')):
@@ -91,9 +99,18 @@ def scan_live(substr, mine):
         if not me:
             raise SystemExit('could not determine your user id; pass a name substring instead')
 
-    m = call('GET', '/missions?limit=200')
+    # GET /missions pages at most 100 (missions.md); reading one page found none of mine among
+    # 955 and reported "missions scanned: 0" (2026-09-30). Page through with offset.
+    allm, off = [], 0
+    while True:
+        m = call('GET', '/missions?limit=100&offset=%d' % off)
+        page = m.get('missions') or []
+        allm += page
+        off += len(page)
+        if not page or off >= (m.get('total') or 0):
+            break
     missions = []
-    for x in (m.get('missions') or []):
+    for x in allm:
         if mine:
             if (x.get('creator') or {}).get('id') == me:
                 missions.append(x)

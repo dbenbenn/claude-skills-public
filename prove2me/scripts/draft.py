@@ -396,6 +396,34 @@ def dead_lean_refs(M, mdir, its, mls, desc, call):
     return out
 
 
+PRONOUN = re.compile(r'(?<![\w-])(he|him|his|she|her|hers)(?![\w-])', re.I)
+QUOTED = re.compile(r'“[^”]*”|"[^"\n]*"|`[^`]*`')
+
+
+def author_pronouns(its, mls, desc):
+    """[(where, why)] for a pronoun in the published prose, outside quotations and code.
+
+    Authors are *they* unless the source says otherwise. check_pronouns.py covers files, but was
+    only as good as its arguments: handed file names it scanned nothing and reported 0 hits while a
+    natural-language statement said "his right translate" of Moore (F-amenability, 2026-09-30).
+    This runs on exactly what publishes. A quotation is the source's own wording (CFP's "he
+    conjectured" of Geoghegan) and is skipped."""
+    texts = [('description', desc)]
+    for k, it in its.items():
+        for f in ('natural_language_statement', 'theorem_title', 'definition_title'):
+            if it.get(f):
+                texts.append((k, it[f]))
+    for k, (t, d) in mls.items():
+        texts.append(('milestone ' + k, (t or '') + '\n' + (d or '')))
+    out = []
+    for where, t in texts:
+        hay = QUOTED.sub(lambda m: ' ' * len(m.group(0)), t)
+        for m in PRONOUN.finditer(hay):
+            a = max(0, m.start() - 50)
+            out.append((where, 'pronoun %r: …%s…' % (m.group(0), ' '.join(t[a:m.end() + 40].split()))))
+    return out
+
+
 def title_mismatch(items, miles):
     """[(where, why)] for a milestone whose title differs from its theorem's title.
 
@@ -474,6 +502,7 @@ def main():
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
         bad += title_mismatch(its, mls)
+        bad += author_pronouns(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
         bad += dead_lean_refs(M, mdir, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         bad += bundle_relation_docstrings(M, mdir)
         bad += double_backslash(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
