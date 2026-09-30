@@ -8,6 +8,9 @@ usage: source_audit.py stage   MISSION_DIR NAME [--pages 12-14]   -> phase 1 pro
                                                                   decisions.py)
        source_audit.py reveal  MISSION_DIR NAME                   -> phase 2 message
        source_audit.py collect MISSION_DIR NAME                   -> claims/coverage into readbacks/
+       source_audit.py rephase2 MISSION_DIR NAME                  -> phase 2 again, for a fresh agent,
+                                                                  after the Lean (or a bundle it
+                                                                  uses) changed and was read back
 
 The blind read-back (stage_auditor.py) says what the Lean says, and by design never sees the
 source, so it cannot notice that the Lean says less than the source. Garrido III's M3 showed the
@@ -166,6 +169,44 @@ def reveal(mdir, name):
           'most five lines. Do not change claims.md.')
 
 
+def rephase2(mdir, name):
+    """Phase 2 again after the formalization changed and was read back anew.
+
+    The claims were written from the source alone, so phase 1 stands; only the comparison is
+    stale. Moore 2026-09-30: the partial-action bundle was strengthened after seven audits had
+    been collected against read-backs of the old axiom. This stages the item afresh, restores its
+    collected claims.md, moves the old coverage.md to readbacks/superseded/, reveals the current
+    read-back and prints the prompt for a NEW agent (the phase-1 agent is gone)."""
+    import contextlib, io
+    mdir = os.path.abspath(mdir)
+    rdir = os.path.join(mdir, 'readbacks')
+    claims = os.path.join(rdir, name + '.claims.md')
+    if not (os.path.exists(claims) and 'END OF CLAIMS' in open(claims, encoding='utf-8').read()):
+        sys.exit('REFUSING: %s is missing or incomplete -- run phase 1 (stage) instead' % claims)
+    cov = os.path.join(rdir, name + '.coverage.md')
+    if os.path.exists(cov):
+        sup = os.path.join(rdir, 'superseded')
+        os.makedirs(sup, exist_ok=True)
+        k, dst = 1, os.path.join(sup, name + '.coverage.md')
+        while os.path.exists(dst):
+            k += 1
+            dst = os.path.join(sup, '%s.coverage.%d.md' % (name, k))
+        shutil.move(cov, dst)
+    with contextlib.redirect_stdout(io.StringIO()):
+        stage(mdir, name)
+    d = os.path.join(ROOT, slug(mdir, name))
+    shutil.copy(claims, os.path.join(d, 'claims.md'))
+    with contextlib.redirect_stdout(io.StringIO()):
+        reveal(mdir, name)
+    extra = ' and context.md' if name.startswith('Def_') else ''
+    print('Work only inside %s. Everything below is relative to it.\n\n'
+          'Read brief.md. PHASE 1 is already done: claims.md in this directory is the complete claims\n'
+          'list, written from the source alone; do not change it. Do PHASE 2 only: readback.md%s %s now\n'
+          'in your directory. Compare with claims.md, write coverage.md (with near-misses and the VERDICT\n'
+          'line) exactly as Phase 2 specifies, and reply in at most five lines. Do not read or write\n'
+          'anything outside this directory.' % (d, extra, 'are' if extra else 'is'))
+
+
 def write_bundle_context(mdir, name, dst):
     """context.md for phase 2 of a bundle audit: what else the formalization has.
 
@@ -233,11 +274,13 @@ if __name__ == '__main__':
         import decisions
         decisions.build(os.path.abspath(a[1]))
         sys.exit(0)
-    if len(a) < 3 or a[0] not in ('stage', 'reveal', 'collect'):
+    if len(a) < 3 or a[0] not in ('stage', 'reveal', 'collect', 'rephase2'):
         sys.exit(__doc__)
     if a[0] == 'stage':
         stage(a[1], a[2], a[a.index('--pages') + 1] if '--pages' in a else None)
     elif a[0] == 'reveal':
         reveal(a[1], a[2])
+    elif a[0] == 'rephase2':
+        rephase2(a[1], a[2])
     else:
         sys.exit(0 if collect(a[1], a[2]) else 1)
