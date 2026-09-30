@@ -94,7 +94,14 @@ def main():
                     continue
                 seen[name] = decl
             kept.append(chunk)
-        pieces.append('\n'.join(kept).strip() + '\n')
+        # Each module keeps its own scope: its `open` lines were file-scoped in the module, and
+        # at top level of the merged file they leaked into every later module (Monod
+        # 2026-09-30: an `open ... Matrix` in one module made `zpow_add` ambiguous in the next).
+        # A block the module leaves open at end of file (a trailing `noncomputable section`) is
+        # closed here, before the wrapper's own `end`.
+        closers = ['end' if k == 'sec' else 'end ' + n for k, n in reversed(scope)]
+        pieces.append('section\n' + '\n'.join(kept).strip() + '\n' + ''.join(c + '\n' for c in closers)
+                      + 'end\n')
     merged = '\n'.join(pieces)
     # `universe` lines are not declarations, so the name dedup above never sees them, and Lean
     # refuses a level declared twice. Two modules writing `universe u v` and `universe u` collide
@@ -102,6 +109,17 @@ def main():
     # A scoped `universe u in` declares its levels for the next command only: drop the levels
     # already in scope (dropping the whole line if none remain, never leaving a bare
     # `universe in`), and do not record the scoped levels as declared for the rest of the file.
+    # With every module inside a section, a `universe` line would be scoped to its module and a
+    # later duplicate dropped below would leave the later module without it: declare every
+    # (unscoped) level once, right after the header.
+    lvls = []
+    for ln in merged.split('\n'):
+        m = re.match(r'^universe\s+(.+?)\s*$', ln)
+        if m and not m.group(1).endswith(' in') and m.group(1) != 'in':
+            lvls += [u for u in m.group(1).split() if u not in lvls]
+    if lvls:
+        hdr = header(mods)
+        merged = hdr + 'universe ' + ' '.join(lvls) + '\n' + merged[len(hdr):]
     seen_lvl, out_lines = [], []
     for ln in merged.split('\n'):
         m = re.match(r'^universe\s+(.+?)(\s+in)?\s*$', ln)

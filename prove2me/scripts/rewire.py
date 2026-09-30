@@ -30,6 +30,20 @@ from prune_solution import parse, _workspace
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+
+def qualified(lines, start, name):
+    """`name` declared at line `start`, prefixed by the namespaces open there."""
+    if name.startswith('_root_.'):
+        return name[len('_root_.'):]
+    stack = []
+    for l in lines[:start]:
+        m = re.match(r'(namespace|end)\s+([\w.]+)\s*$', l)
+        if m and m.group(1) == 'namespace':
+            stack.append(m.group(2))
+        elif m and stack and stack[-1] == m.group(2):
+            stack.pop()
+    return '.'.join(stack + [name])
+
 def explicit_binders(header):
     """Names of the explicit `(a b : T)` binders of a declaration header, in order.
 
@@ -170,17 +184,24 @@ def main():
     # a copy declared under the published theorem's own full name cannot be rewired (the import
     # would clash: "has already been declared"); delete it and import the theorem instead.
     # CFP §6's Lemma 6.1 carried §2's `represents_mul` this way.
+    # Only the FULL name clashes: a copy in another namespace (Monod's `Monod.Dev.Alg.BS.supp_conj`
+    # beside `BrinSquier.supp_conj`, about a different `supp`) is rewired or left, never deleted.
     lines = text.split('\n')
     same = [d for d in parse(lines) if d[0].split('.')[-1] in cands
-            and d[0].split('.')[-1] == pub[d[0].split('.')[-1].rstrip("'")][0].split('.')[-1]]
+            and qualified(lines, d[2], d[0]) == pub[d[0].split('.')[-1].rstrip("'")][0]]
+    imps = []
     for d in sorted(same, key=lambda d: -d[2]):
         name = d[0].split('.')[-1]
         del lines[d[2]:d[3]]
         imp = 'import ' + pub[name][1]
-        if imp not in lines:
-            lines.insert(0, imp)
+        if imp not in lines and imp not in imps:
+            imps.append(imp)
         cands.remove(name)
         print('   %s had the published name; deleted and imported %s' % (name, pub[name][1]))
+    # insert the imports only after every deletion: inserting at line 0 inside the loop shifted
+    # the later (higher) spans by one line each, and each deletion then left its last line behind
+    # (Monod 2026-09-30: three orphaned proof lines, "unexpected token 'show'; expected command")
+    lines[0:0] = imps
     text = '\n'.join(lines)
     if not cands:
         open(a.out, 'w', encoding='utf-8').write(text)

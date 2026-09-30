@@ -168,6 +168,23 @@ def prune(text, verbose=True):
     for _, _, s, e, _ in doomed:
         for i in range(s, e):
             keep_mask[i] = False
+    # a `variable` command naming a pruned declaration no longer elaborates: Monod's
+    # `variable {l : Filter ℝ} (hl : GoodL l)` outlived `GoodL` when every declaration of its
+    # section was pruned (2026-09-30). Drop the command with its indented continuation lines.
+    gone = {d[0].split('.')[-1] for d in doomed}
+    i = 0
+    while i < len(lines):
+        if keep_mask[i] and re.match(r'^variable\b', lines[i]) and not lines[i].rstrip().endswith(' in'):
+            j = i + 1
+            while j < len(lines) and lines[j].startswith((' ', '\t')) and lines[j].strip():
+                j += 1
+            span = '\n'.join(lines[i:j])
+            if any(re.search(r'(?<![\w.\'])%s(?![\w\'])' % re.escape(n), span) for n in gone):
+                for k in range(i, j):
+                    keep_mask[k] = False
+            i = j
+        else:
+            i += 1
     # diagnostic commands (#print axioms, #check, #eval, #reduce) are no part of a solution, and one
     # naming a declaration just pruned would no longer compile (Grigorchuk-Pak, 2026-09-25)
     for i, l in enumerate(lines):
