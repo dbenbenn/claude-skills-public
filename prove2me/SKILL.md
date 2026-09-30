@@ -213,6 +213,14 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   line does not wrap (a sentence set in `$$…$$` ran off the page on the Chou draft); identifiers in
   backticks;
   no citation paragraph duplicating References; the process kept out.
+- Setting (rulebook §2, "define the object operationally, from scratch … introduce every symbol")
+  is read as: define the *goal's* objects operationally, and introduce every symbol the
+  description itself uses before using it; it is not a restatement of the definitions bundle.
+  Milestone-only notions get a sentence each; their precise definitions live in the bundle's and
+  the milestones' natural-language statements (dbenbenn, 2026-09-30).
+- Backticked Lean names in the prose must be live: `draft.py verify` resolves every backticked
+  head name (`Monod.H ⊥` -> `Monod.H`) against the mission's declarations, `#check` with its
+  imports, and the platform, and reports a renamed or removed name as BAD.
 - No pronoun for an author whose pronouns the paper does not establish: the surname or "the
   paper".
 - No phrase lifted from the platform's rulebook ("the shape of the truth", "who cares and why"):

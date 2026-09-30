@@ -39,7 +39,7 @@ that has not changed is never touched and cannot lose a confirmation to a no-op 
 the proposal on the first run. `verify` compares every field the upload sets, flags live items
 and milestones the repo does not have, and ends with `BAD <n>`; its exit status is n != 0.
 """
-import importlib.util, json, os, re, sys
+import glob, importlib.util, json, os, re, subprocess, sys, urllib.parse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 READBACK_MODEL = 'claude-opus-5-5'
@@ -285,29 +285,102 @@ def bundle_relation_docstrings(M, mdir):
     return out
 
 
-def description_misses_definitions(M, mdir):
-    """[(where, why)] for a bundle definition some statement uses that the description never names.
+LEAN_WORDS = {'fun', 'by', 'theorem', 'lemma', 'def', 'let', 'have', 'show', 'Type', 'Prop', 'Sort',
+              'sorry', 'rfl', 'at', 'with', 'in', 'if', 'then', 'else', 'do', 'match'}
 
-    The description's Setting section explains the objects the statements are about; when the
-    bundle changes, nothing else keeps it in step. Monod's description (2026-09-30) still lacked
-    `IsAmenableRel` and `volP1` after the statements C1 and C9 began to use them. A definition
-    counts as named when it appears in backticks, e.g. `G A` or `IsAmenableRel μ R`."""
-    desc = os.path.join(mdir, 'description.md')
-    if not os.path.exists(desc):
-        return []
-    named = set(re.findall(r'`([^`]+)`', open(desc, encoding='utf-8').read()))
-    named_words = {w for n in named for w in re.findall(r"[\w']+", n)}
-    stm = open(os.path.join(mdir, 'lib', 'Thm_%s.lean' % M.NAMESPACE), encoding='utf-8').read() \
-        if os.path.exists(os.path.join(mdir, 'lib', 'Thm_%s.lean' % M.NAMESPACE)) else ''
+
+def _decls(path, seen):
+    """Qualified names declared in a Lean file and in the Definitions/Theorems it imports, plus the
+    namespaces it opens; `seen` guards the recursion."""
+    names, spaces = set(), set()
+    if path in seen or not os.path.exists(path):
+        return names, spaces
+    seen.add(path)
+    text = open(path, encoding='utf-8').read()
+    stack = []
+    for ln in text.split('\n'):
+        m = re.match(r'(namespace|end)\s+([\w.]+)\s*$', ln)
+        if m and m.group(1) == 'namespace':
+            stack.append(m.group(2)); spaces.add(m.group(2)); continue
+        if m and stack and stack[-1] == m.group(2):
+            stack.pop(); continue
+        m = re.match(r"(?:@\[[^\]]*\]\s*)?(?:private |protected |noncomputable )*"
+                     r"(?:def|theorem|lemma|abbrev|structure|class|inductive|instance)\s+([\w'.]+)", ln)
+        if m:
+            names.add('.'.join(stack + [m.group(1)]))
+    from prune_solution import _workspace
+    ws = _workspace()
+    for mod in re.findall(r'^import ((?:Definitions|Theorems)\.\S+)', text, re.M):
+        n, sp = _decls(os.path.join(ws, *mod.split('.')) + '.lean', seen)
+        names |= n; spaces |= sp
+    return names, spaces
+
+
+def dead_lean_refs(M, mdir, its, mls, desc, call):
+    """[(where, why)] for a backticked Lean name in the prose that no longer resolves.
+
+    What goes stale when Lean is renamed is the prose that names it: a description or a
+    natural-language statement still saying `mem_G_iff'` after the statement became
+    `mem_G_iff_isPiecewiseProj`. This replaces a check that demanded the description name every
+    bundle definition a statement uses (it pushed milestone-only definitions into the Setting;
+    dbenbenn, 2026-09-30: what was wanted is catching *dead* references). Each backticked span's
+    head name is resolved against the mission's own declarations and imported bundles, then by
+    `#check` in the workspace (Mathlib, open namespaces), then on the platform by exact name
+    (a published theorem not fetched locally). Bound variables (`f`, `E₀`) are skipped: only names
+    with a dot, an underscore, or an upper-case letter and three or more characters are checked."""
+    texts = [('description', desc)]
+    for k, it in its.items():
+        for f in ('natural_language_statement', 'theorem_title', 'definition_title'):
+            if it.get(f):
+                texts.append((k, it[f]))
+    for k, (t, d) in mls.items():
+        texts.append(('milestone ' + k, (t or '') + '\n' + (d or '')))
+    refs = {}
+    for where, t in texts:
+        for span in re.findall(r'`([^`\n]+)`', t):
+            m = re.match(r"[(]*([^\s()]+)", span.strip())
+            if not m:
+                continue
+            head = m.group(1).rstrip(',.;:')
+            if not re.fullmatch(r"[^\W\d][\w'.]*", head) or head in LEAN_WORDS:
+                continue
+            if not ('.' in head or '_' in head or (len(head) >= 3 and re.search(r'[A-Z]', head))):
+                continue
+            refs.setdefault(head, where)
+    names, spaces, seen = set(), set(), set()
+    for f in sorted(glob.glob(os.path.join(mdir, 'lib', '*.lean'))):
+        n, sp = _decls(f, seen)
+        names |= n; spaces |= sp
+    short = {q.split('.')[-1] for q in names}
+    left = [h for h in refs if h not in names and h not in short
+            and not any(q.endswith('.' + h) for q in names)]
+    if left:
+        from prune_solution import _workspace
+        ws = _workspace()
+        imps = sorted({l for f in glob.glob(os.path.join(mdir, 'lib', '*.lean'))
+                       for l in open(f, encoding='utf-8').read().split('\n') if l.startswith('import ')})
+        imps = [l for l in imps if os.path.exists(os.path.join(ws, *l.split()[1].split('.')) + '.lean')
+                or l == 'import Mathlib']
+        body = '\n'.join(imps) + '\n' + ''.join('open %s\n' % sp for sp in sorted(spaces)) + '\n'
+        start = body.count('\n') + 1
+        body += ''.join('#check @%s\n' % h for h in left)
+        probe = os.path.join(ws, '.draft_refs_probe.lean')
+        open(probe, 'w', encoding='utf-8').write(body)
+        out = subprocess.run(['lake', 'env', 'lean', probe], cwd=ws, capture_output=True, text=True)
+        os.remove(probe)
+        badlines = {int(n) for n in re.findall(r'\.lean:(\d+):\d+: error', out.stdout + out.stderr)}
+        left = [h for i, h in enumerate(left) if start + i in badlines]
     out = []
-    for D in getattr(M, 'DEFINITIONS', []):
-        f = os.path.join(mdir, 'lib', 'Def_%s.lean' % D['name'])
-        if not os.path.exists(f):
-            continue
-        decls = re.findall(r'^(?:noncomputable )?(?:def|structure|abbrev) (\w+)', open(f, encoding='utf-8').read(), re.M)
-        for d in decls:
-            if re.search(r'(?<![\w.])%s\b' % re.escape(d), stm) and d not in named_words:
-                out.append(('description', 'never names `%s`, which a statement uses' % d))
+    for h in left:
+        if '.' in h:
+            try:
+                r = call('GET', '/theorems?q=' + urllib.parse.quote(h.split('.')[-1]) + '&limit=20')
+                items = r.get('theorems', r.get('items', r.get('data', []))) if isinstance(r, dict) else r
+                if any(t.get('theorem_name') == h for t in items or []):
+                    continue
+            except Exception:  # noqa: BLE001 -- an unreachable platform is not a dead name
+                continue
+        out.append((refs[h], 'names `%s`, which no longer resolves (renamed or removed?)' % h))
     return out
 
 
@@ -389,7 +462,7 @@ def main():
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
         bad += title_mismatch(its, mls)
-        bad += description_misses_definitions(M, mdir)
+        bad += dead_lean_refs(M, mdir, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         bad += bundle_relation_docstrings(M, mdir)
         bad += double_backslash(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
         bad += deprecated_refs(M, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
