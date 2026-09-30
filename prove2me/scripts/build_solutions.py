@@ -85,6 +85,20 @@ def build(mdir, checks, name, out):
     body = open(merged, encoding='utf-8').read()
     have = set(re.findall(r'^(import \S+)$', body, re.M))
     body = ''.join(l + '\n' for l in extra if l not in have) + body
+    # A check block that names a published sibling statement directly (`Gpp_eq_G_top_and_Hpp_eq_H_top.2`)
+    # needs its import, and the import is what draws the graph edge (Monod 2026-09-30).
+    thm = os.path.join(ws, 'Theorems')
+    for tok in sorted(set(re.findall(r"(?<![\w'])([A-Za-z_][\w']*(?:\.[A-Za-z_][\w']*)*)", block))):
+        short = tok.split('.')[-1] if not ns or not tok.startswith(ns + '.') else tok[len(ns) + 1:]
+        short = short.split('.')[0] if '.' in short else short
+        if short == name:
+            continue
+        for cand in ([ns.split('.')[0] + '_' + short] if ns else []) + [tok.replace('.', '_')]:
+            if os.path.exists(os.path.join(thm, 'Thm_%s.lean' % cand)):
+                imp = 'import Theorems.Thm_%s' % cand
+                if imp not in body:
+                    body = imp + '\n' + body
+                break
     prefix = ''.join('open %s in\n' % o for o in ([ns] if ns else []) + opens)
     body += '\n%s%s\n' % (prefix, block)
     open(merged, 'w', encoding='utf-8').write(body)
@@ -94,7 +108,12 @@ def build(mdir, checks, name, out):
     open(os.path.join(out, 'Sol_%s.log' % name), 'w').write(p.stdout + p.stderr)
     os.remove(merged)
     imps = re.findall(r'^import Theorems\.(\S+)', open(dst).read(), re.M) if os.path.exists(dst) else []
-    return name, 'OK' if p.returncode == 0 else 'RC%d' % p.returncode, imps
+    # rewire exits 1 when it left a copy it could not prove from the published theorem (a genuinely
+    # different statement sharing a name); the file itself still compiles: report OK*, read the log
+    st = 'OK' if p.returncode == 0 else \
+        'OK*' if 'compiles clean' in p.stdout + p.stderr and 'could not prove' in p.stdout + p.stderr \
+        else 'RC%d' % p.returncode
+    return name, st, imps
 
 
 def main():
