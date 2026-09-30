@@ -430,15 +430,27 @@ def short_bundle_names(M, mdir):
     The payload builder imports a bundle when a statement mentions one of its names, and a name
     like `s` matches every bound variable `s`: the Moore bundle's string helper `s` made every §3
     statement import `Def_MooreTrees` for nothing (2026-09-30), and a preamble freezes at publish."""
+    # only a name some statement actually binds is a problem: Moore's own `x0`, `L_f` are short
+    # but bound nowhere, while `s` was bound in every §3 sum (2026-09-30)
+    texts = []
+    for f in glob.glob(os.path.join(mdir, 'lib', 'Thm_*.lean')):
+        texts.append(open(f, encoding='utf-8').read())
     out = []
     for D in getattr(M, 'DEFINITIONS', []):
         f = os.path.join(mdir, 'lib', 'Def_%s.lean' % D['name'])
         if os.path.exists(f):
             for n in re.findall(r"^(?:noncomputable )?(?:def|abbrev|structure|inductive|instance) ([\w']+)",
                                 open(f, encoding='utf-8').read(), re.M):
-                if len(n) <= 2:
-                    out.append(('Def_' + D['name'], 'declaration `%s` has a short name that bound variables '
-                                'will match (false imports in preambles); rename it' % n))
+                if len(n) > 2:
+                    continue
+                N = re.escape(n)
+                binder = re.compile(  # `(a n : T)`, `{n : T}`; `∀ n,`, `∑ n ∈`, `fun n =>`; `{n | …}`
+                    r"[(\{⦃]\s*(?:[\w'₀-₉]+\s+)*?%s(?:\s+[\w'₀-₉]+)*\s*:(?!=)" % N
+                    + r"|(?:[∀∃∑∏⋃⋂λ]|\bfun\b|\blet\b|\bhave\b)ᶠ?\s*(?:[\w'₀-₉]+\s+)*?%s(?=[\s:,])" % N
+                    + r"|\{\s*%s\s*\|" % N)
+                if any(binder.search(t) for t in texts):
+                    out.append(('Def_' + D['name'], 'declaration `%s` has a short name that a statement binds as '
+                                'a variable (false imports in preambles); rename it' % n))
     return out
 
 
