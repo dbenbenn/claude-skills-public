@@ -77,7 +77,16 @@ def main():
     print('%d theorems in %s' % (len(thms), ', '.join(m['name'][:40] for m in missions)))
 
     # GET /submissions ignores theorem_id and returns the whole history: fetch once, filter here
-    subs = call('GET', '/submissions?limit=100000').get('submissions') or []
+    # paginated at 100 per page since platform 0.11.5 (2026-09-30); a single call silently
+    # returned only the newest 100 of ~1000 submissions
+    subs, page = [], 1
+    while True:
+        d = call('GET', '/submissions?page=%d' % page)
+        batch = d.get('submissions') or []
+        subs += batch
+        if not batch or len(subs) >= (d.get('total') or 0):
+            break
+        page += 1
     # os.walk, not glob('**'): glob skips hidden directories, and mission worktrees live under
     # .claude/worktrees (CFP §7's 16 solutions all came back UNMATCHED). Skip only .lake and .git.
     files = []
