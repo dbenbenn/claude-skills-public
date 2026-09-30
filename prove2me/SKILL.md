@@ -153,7 +153,7 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   `<name>.reply.md` beside it.
 - A source-side audit per statement, and every finding decided **by the human** in the gap review
   (`DECISIONS.md`, step 6b): **fixed** (the statement now says it), **carried** (another milestone
-  states it, named), **out of scope** (named in *What is left out*), or **dismissed** (with the
+  states it, named), **out of scope** (named in the description's *Formalization scope*), or **dismissed** (with the
   reason, e.g. true by definition). A "faithful but indirect" result is a finding too. On QFS
   (2026-09-27) two findings -- Theorem 1.4's unstated norm comparability and the goal's kernel
   diagonal -- were dismissed by the captain in a running log and summarised away by verdict
@@ -205,7 +205,8 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   uses ("unparadoxical"); Corollary 2.5's theorem title claimed the non-existence of a paradox,
   which the Lean does not assert.
 - The description opens "This mission formalizes <citation with DOI link>"; has Setting,
-  Target, What is left out, References. **Run `scripts/check_description.py` on it** — the
+  the seven sections of the platform's `mission_description.md` (Motivation, Setting, Target,
+  Significance, Difficulty, Formalization scope with what is left out, Selected references). **Run `scripts/check_description.py` on it** — the
   opening sentence, the required sections, display-line length, author pronouns, rulebook
   phrases, first person and word count are all mechanical, and I have shipped a description
   that never named its source while this very rule sat here unread; display math only for a formula short enough to fit on one line, since a display
@@ -342,7 +343,7 @@ Design questions that recur, with the answers we have settled on:
 - **A lemma the paper uses in a special form** (extension of finitely presented by finite) is
   stated in that form; the general textbook form is a separate library contribution.
 - **The structure a source builds with ordinals or Lie groups** is replaced by an inductive
-  predicate or omitted; say so in "What is left out" and give the Lie-free route in the milestone.
+  predicate or omitted; say so in the description's Formalization scope and give the Lie-free route in the milestone.
 - **Fidelity is about statements, not just truth**: match the paper's constants (`π²/(2θ²) + …`,
   not a convenient weaker bound), generality (the three-variable definition, with the
   specialisation derived), and naming (every numbered result gets a Lean theorem named for it).
@@ -589,7 +590,7 @@ the papers' own sentences about their context: quote "we will show that…", "ra
 of whether…"; never paraphrase a cited problem or credit an answer from memory. Then **Setting**
 (each definition with its Lean name in backticks and the reading chosen for any ambiguous term,
 "normal series" say), **Target** (the goal quoted with page, how it is stated, the milestone
-plan), **What is left out** (with reasons), **References**. Display math renders but does not wrap, so use `$$…$$` only for a formula that fits on one
+plan), **Formalization scope** (conventions, and what is left out with reasons), **Selected references**. Display math renders but does not wrap, so use `$$…$$` only for a formula that fits on one
 line; a whole sentence set as display math ran off the page on the Chou draft and reads fine as a
 quoted sentence with inline math. The References never repeated as a paragraph; nothing about the process ("an
 independent audit verified…"). Keep every statement about what the mission does and does not

@@ -198,7 +198,7 @@ def write_bundle_context(mdir, name, dst):
         out.append('### %s\n\n%s\n' % (T.get('title') or T['name'], T.get('nls') or ''))
     desc = os.path.join(mdir, 'description.md')
     if os.path.exists(desc):
-        m = re.search(r'^## What is left out\s*\n(.*?)(?=^## |\Z)', open(desc, encoding='utf-8').read(), re.M | re.S)
+        m = re.search(r'^## (?:Formalization scope|What is left out)\s*\n(.*?)(?=^## |\Z)', open(desc, encoding='utf-8').read(), re.M | re.S)
         if m:
             out.append('## What the formalization leaves out\n\n' + m.group(1).strip() + '\n')
     open(dst, 'w', encoding='utf-8').write('\n'.join(out))

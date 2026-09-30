@@ -23,12 +23,25 @@ if not first.startswith('This mission formalizes'):
 elif not re.search(r'\]\(https?://', first + s.split('\n\n')[0]):
     fail.append('the opening citation carries no resolvable link')
 
-# 2. required sections
-for want in ('Setting', 'What is left out', 'references'):
-    if not re.search(r'^##\s+.*' + want, s, re.M | re.I):
-        fail.append('no section matching %r' % want)
-if not re.search(r'^##\s+.*(target|goal)', s, re.M | re.I):
-    fail.append('no Target/Goal section')
+# 2. required sections: the seven of the platform's mission_description.md, in its order. This
+# checker once demanded a 'What is left out' section the rulebook does not have, and a description
+# was renamed away from the rulebook's 'Formalization scope' to satisfy it (F-amenability,
+# 2026-09-30); the rulebook wins, and what is left out belongs inside Formalization scope.
+SECTIONS = [('Motivation', r'motivation'), ('Setting', r'setting'), ('Target', r'target|goal'),
+            ('Significance', r'significance'), ('Difficulty', r'difficulty'),
+            ('Formalization scope', r'formalization scope'), ('Selected references', r'references')]
+heads = [h.strip() for h in re.findall(r'^##\s+(.+)$', s, re.M)]
+pos = []
+for label, rx in SECTIONS:
+    i = next((k for k, h in enumerate(heads) if re.search(rx, h, re.I)), None)
+    if i is None:
+        fail.append('no section matching %r (mission_description.md)' % label)
+    else:
+        pos.append(i)
+if pos != sorted(pos):
+    warn.append('sections out of the rulebook order: ' + ', '.join(heads))
+if any(re.search(r'what is left out', h, re.I) for h in heads):
+    fail.append("'What is left out' is not a rulebook section: put it inside Formalization scope")
 
 # 3. a display line does not wrap
 for m in re.finditer(r'\$\$(.+?)\$\$', s, re.S):
