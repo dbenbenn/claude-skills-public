@@ -151,6 +151,10 @@ def scan_live(substr, mine):
 
 def main():
     a = sys.argv[1:]
+    # bare paths mean `local`: printing usage and exiting on `check_pronouns.py prose.py` looked
+    # like a clean run and let four "his" through on Moore (2026-09-30)
+    if a and a[0] not in ('local', 'live') and all(os.path.exists(x) for x in a):
+        a = ['local'] + a
     if not a or a[0] not in ('local', 'live'):
         print(__doc__)
         sys.exit(2)
