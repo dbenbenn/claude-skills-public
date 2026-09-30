@@ -424,6 +424,24 @@ def author_pronouns(its, mls, desc):
     return out
 
 
+def short_bundle_names(M, mdir):
+    """[(where, why)] for a bundle declaration named with at most two characters.
+
+    The payload builder imports a bundle when a statement mentions one of its names, and a name
+    like `s` matches every bound variable `s`: the Moore bundle's string helper `s` made every §3
+    statement import `Def_MooreTrees` for nothing (2026-09-30), and a preamble freezes at publish."""
+    out = []
+    for D in getattr(M, 'DEFINITIONS', []):
+        f = os.path.join(mdir, 'lib', 'Def_%s.lean' % D['name'])
+        if os.path.exists(f):
+            for n in re.findall(r"^(?:noncomputable )?(?:def|abbrev|structure|inductive|instance) ([\w']+)",
+                                open(f, encoding='utf-8').read(), re.M):
+                if len(n) <= 2:
+                    out.append(('Def_' + D['name'], 'declaration `%s` has a short name that bound variables '
+                                'will match (false imports in preambles); rename it' % n))
+    return out
+
+
 def title_mismatch(items, miles):
     """[(where, why)] for a milestone whose title differs from its theorem's title.
 
@@ -502,6 +520,7 @@ def main():
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
         bad += title_mismatch(its, mls)
+        bad += short_bundle_names(M, mdir)
         bad += author_pronouns(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
         bad += dead_lean_refs(M, mdir, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         bad += bundle_relation_docstrings(M, mdir)
