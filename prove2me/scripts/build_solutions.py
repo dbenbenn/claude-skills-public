@@ -76,9 +76,20 @@ def build(mdir, checks, name, out):
     text = open(os.path.join(sol, mod + '.lean'), encoding='utf-8').read()
     for m in re.findall(r'^import Solutions\.([\w.]+)', text, re.M):
         deps(sol, m.replace('.', '/'), seen)
+    files = [os.path.join(sol, s + '.lean') for s in seen]
+    # the check file's own helpers (definitions and lemmas above its check blocks) are merged too,
+    # minus every check block: the Moore weak-reading counterexamples kept `wAct`, `mu`, ... in the
+    # check file itself, and the solution came out naming undefined helpers (2026-10-01)
+    from merge import blocks
+    last = lambda n: (n or '').split('.')[-1]
+    helpers = '\n'.join(t for n, t in blocks(text) if not (n and (last(n).startswith('chk_') or last(n) == name)))
+    if re.search(r'^(?:@\[[^\n]*\]\s*)?(?:private |protected )?(?:noncomputable )?(?:theorem|lemma|def|abbrev|instance|structure|inductive)\b',
+                 helpers, re.M):
+        hf = os.path.join(out, '.checkhelpers_%s.lean' % name)
+        open(hf, 'w', encoding='utf-8').write(helpers)
+        files.append(hf)
     merged = os.path.join(out, '.merged_%s.lean' % name)
-    p = subprocess.run([sys.executable, os.path.join(SK, 'merge.py'), merged]
-                       + [os.path.join(sol, s + '.lean') for s in seen], capture_output=True, text=True)
+    p = subprocess.run([sys.executable, os.path.join(SK, 'merge.py'), merged] + files, capture_output=True, text=True)
     if p.returncode:
         open(os.path.join(out, 'Sol_%s.log' % name), 'w').write(p.stdout + p.stderr)
         return name, 'MERGE-FAIL', []
@@ -109,6 +120,9 @@ def build(mdir, checks, name, out):
                        capture_output=True, text=True, cwd=ws)
     open(os.path.join(out, 'Sol_%s.log' % name), 'w').write(p.stdout + p.stderr)
     os.remove(merged)
+    for f in files:
+        if os.path.basename(f).startswith('.checkhelpers_'):
+            os.remove(f)
     imps = re.findall(r'^import Theorems\.(\S+)', open(dst).read(), re.M) if os.path.exists(dst) else []
     # rewire exits 1 when it left a copy it could not prove from the published theorem (a genuinely
     # different statement sharing a name); the file itself still compiles: report OK*, read the log

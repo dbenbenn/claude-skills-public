@@ -150,4 +150,5 @@ def main():
     print('lines:', merged.count('\n'))
 
 
-main()
+if __name__ == '__main__':
+    main()
