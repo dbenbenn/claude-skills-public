@@ -48,7 +48,9 @@ def find_block(sol, checks, name):
                       % re.escape(name), text, re.M | re.S)
         if not m:
             continue
-        before = text[:m.start()]
+        # scan commands only: a docstring line beginning with "open" was once copied into a
+        # solution as an `open` command (F-amenability Cor 3, 2026-09-30)
+        before = re.sub(r'--[^\n]*', '', re.sub(r'/-.*?-/', '', text[:m.start()], flags=re.S))
         # the namespaces still open at the block: push on `namespace`, pop on a matching `end`
         stack = []
         for kw, ns in re.findall(r'^(namespace|end)\s+([\w.]+)', before, re.M):
