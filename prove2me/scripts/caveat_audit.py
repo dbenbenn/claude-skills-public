@@ -88,9 +88,21 @@ def stage(mdir, name, cites):
     off = T.get('pdf_page_offset', 0) if own else getattr(M, 'PDF_PAGE_OFFSET', 0)
     want = SA.pages(T['page']) + ([] if own else SA.pages(getattr(M, 'CONTEXT_PAGES', ''))) \
         + SA.pages(T.get('context_pages', ''))
-    for p in sorted(set(want)):
-        subprocess.run(['pdftoppm', '-f', str(p + off), '-l', str(p + off), '-r', '130', '-png',
-                        pdf, os.path.join(d, 'page-%03d' % p)], check=True)
+    # a bundle drawing on several papers renders every part, as source_audit does: with only the
+    # first paper's pages the F-amenability bundle's caveat auditor could not check the Kaimanovich,
+    # JMMS or Monod quotations (2026-09-30)
+    parts = T.get('source_parts')
+    if parts:
+        for part_pdf, part_pages, part_off in parts:
+            tag = os.path.splitext(os.path.basename(part_pdf))[0]
+            for p in SA.pages(part_pages):
+                subprocess.run(['pdftoppm', '-f', str(p + part_off), '-l', str(p + part_off), '-r', '130', '-png',
+                                os.path.join(mdir, part_pdf), os.path.join(d, '%s-page-%03d' % (tag, p))],
+                               check=True)
+    else:
+        for p in sorted(set(want)):
+            subprocess.run(['pdftoppm', '-f', str(p + off), '-l', str(p + off), '-r', '130', '-png',
+                            pdf, os.path.join(d, 'page-%03d' % p)], check=True)
     for c in cites:
         shutil.copy(c, os.path.join(d, 'cite-' + os.path.basename(c)))
     print('Work only inside %s. Everything below is relative to it.\n\nRead brief.md and follow it '
