@@ -111,19 +111,34 @@ def stage(mdir, name, page_spec=None):
     # pages are the source's own numbers (what `source` cites); a journal reprint's PDF starts
     # elsewhere, so mission.py sets PDF_PAGE_OFFSET = PDF page - printed page (CFP: -213)
     off = T.get('pdf_page_offset', 0) if own else getattr(M, 'PDF_PAGE_OFFSET', 0)
-    for p in sorted(set(want)):
-        subprocess.run(['pdftoppm', '-f', str(p + off), '-l', str(p + off), '-r', '130', '-png',
-                        pdf, os.path.join(d, 'page-%03d' % p)], check=True)
+    # a bundle may draw on several papers: `source_parts` = [(pdf, pages, pdf_page_offset), ...],
+    # each rendered as `<tag>-page-NNN` so the auditor can tell them apart (F-amenability, 2026-09-30)
+    parts = T.get('source_parts')
+    if parts:
+        want = []
+        for part_pdf, part_pages, part_off in parts:
+            tag = os.path.splitext(os.path.basename(part_pdf))[0]
+            for p in pages(part_pages):
+                subprocess.run(['pdftoppm', '-f', str(p + part_off), '-l', str(p + part_off), '-r', '130',
+                                '-png', os.path.join(mdir, part_pdf), os.path.join(d, '%s-page-%03d' % (tag, p))],
+                               check=True)
+                want.append('%s p. %d' % (tag, p))
+    else:
+        for p in sorted(set(want)):
+            subprocess.run(['pdftoppm', '-f', str(p + off), '-l', str(p + off), '-r', '130', '-png',
+                            pdf, os.path.join(d, 'page-%03d' % p)], check=True)
     with open(os.path.join(d, 'source.md'), 'w', encoding='utf-8') as f:
         if T.get('bundle'):
-            f.write('# Definitions under audit\n\nSource: %s, pp. %s: where the source sets up the objects '
-                    'its results are about.\n\n' % (os.path.basename(pdf), T['page']))
+            where = ('; '.join('%s pp. %s' % (os.path.basename(pp), pg) for pp, pg, _ in parts) if parts
+                     else '%s, pp. %s' % (os.path.basename(pdf), T['page']))
+            f.write('# Definitions under audit\n\nSources: %s: where the sources set up the objects '
+                    'the results are about.\n\n' % where)
         else:
             f.write('# Sentence under audit\n\nSource: %s, p. %s (%s)\n\n' % (
                 os.path.basename(pdf), T['page'], T.get('result', '')))
             for q in quote:
                 f.write('> %s\n\n' % ' '.join(q.split()))
-        f.write('Page images of pp. %s are in this directory.\n' % ', '.join(map(str, sorted(set(want)))))
+        f.write('Page images of %s are in this directory.\n' % ', '.join(map(str, want if parts else sorted(set(want)))))
     print('Work only inside %s. Everything below is relative to it.\n\n'
           'Read brief.md and do PHASE 1 only: read source.md and the page images, write claims.md,\n'
           'then reply in at most five lines. There is no formalization in your directory yet, and\n'
