@@ -373,12 +373,24 @@ def dead_lean_refs(M, mdir, its, mls, desc, call):
     out = []
     for h in left:
         if '.' in h:
-            try:
-                r = call('GET', '/theorems?q=' + urllib.parse.quote(h.split('.')[-1]) + '&limit=20')
-                items = r.get('theorems', r.get('items', r.get('data', []))) if isinstance(r, dict) else r
-                if any(t.get('theorem_name') == h for t in items or []):
-                    continue
-            except Exception:  # noqa: BLE001 -- an unreachable platform is not a dead name
+            # the platform's search is flaky: the same query has answered with the theorem at
+            # limit=20 and with nothing at limit=100 (2026-09-30). Try the short and the full
+            # name, three rounds, and call a name dead only when every answer misses it.
+            found, errored = False, False
+            for _ in range(3):
+                for q in (h.split('.')[-1], h):
+                    try:
+                        r = call('GET', '/theorems?q=' + urllib.parse.quote(q) + '&limit=20')
+                    except Exception:  # noqa: BLE001 -- an unreachable platform is not a dead name
+                        errored = True
+                        continue
+                    items = r.get('theorems', r.get('items', r.get('data', []))) if isinstance(r, dict) else r
+                    if any(t.get('theorem_name') == h for t in items or []):
+                        found = True
+                        break
+                if found:
+                    break
+            if found or errored:
                 continue
         out.append((refs[h], 'names `%s`, which no longer resolves (renamed or removed?)' % h))
     return out
