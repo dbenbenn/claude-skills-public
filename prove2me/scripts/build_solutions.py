@@ -113,6 +113,10 @@ def build(mdir, checks, name, out):
     st = 'OK' if p.returncode == 0 else \
         'OK*' if 'compiles clean' in p.stdout + p.stderr and 'could not prove' in p.stdout + p.stderr \
         else 'RC%d' % p.returncode
+    # a proof may never import its own target (the verifier answers FAILED); this happens when a
+    # development lemma was re-derived from the published statement and the check block still uses it
+    if any(i.endswith('_' + name) and i.startswith((ns.split('.')[0] if ns else '') + '_') for i in imps):
+        st = 'SELF-IMPORT'
     return name, st, imps
 
 
