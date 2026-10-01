@@ -24,7 +24,11 @@ def snapshot(pid):
     p = p.get('proposal', p) if isinstance(p, dict) else {}
     if '__error' in p:
         return None
-    names = {it.get('theorem_name') or it.get('definition_name') for it in (p.get('items') or [])}
+    # a reference item is already published and is never republished; its old publish job (the
+    # F-amenability mission's goal and bundle, matched by name) made an unsubmitted Moore Draft
+    # read as "PUBLISHED: 2" and then as a stall (2026-10-01)
+    names = {it.get('theorem_name') or it.get('definition_name') for it in (p.get('items') or [])
+             if it.get('kind') != 'reference'}
     j = call('GET', '/publish-jobs?limit=200')
     jobs = [x for x in ((j.get('publish_jobs') or j.get('jobs') or []) if isinstance(j, dict) else [])
             if (x.get('proposal_id') or x.get('mission_proposal_id')) == pid
@@ -55,7 +59,7 @@ def main():
             last, quiet = s, 0
         else:
             quiet += 1
-            if quiet == 20:      # ~10 minutes without movement
+            if quiet == 20 and last and last[3]:   # ~10 minutes without movement, once jobs exist
                 print(time.strftime('%H:%M:%S'), 'no change for ~10 min: likely the publish stall;'
                       ' a re-click of Submit resumes it', flush=True)
         if not watch:
