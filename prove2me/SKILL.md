@@ -706,6 +706,17 @@ the proof; `watch_targets.py watch …` under a Monitor turns a status flip duri
 an event, and you decide whether to stop the prover. Do not automate the kill: the event is rare
 and a half-written proof of a now-closed statement is still evidence of an approach.
 
+**An external milestone is a target too, and the paper's case may be elementary.** Monod's C9 (the
+orbit relation of SL₂(A) on P¹ is not amenable, Carrière–Ghys) was scoped as "needs Zimmer
+amenability and CFW; probably its own mission". The special case Monod applies has a five-step
+ping-pong proof using only conservativity of one elliptic map, and it was proved in an afternoon
+(2026-10-01). Before writing an external milestone off, look for a proof of the *applied* case
+rather than of the cited theorem. To parallelize it, write the interfaces first: one file with each
+step stated exactly, ending `:= by sorry`, plus the assembled proof of the target from them. Compile
+it, so the steps provably fit together. Then give each prover its own file and its statement
+verbatim as `chk_<name>`, with helpers in a per-step namespace. Four opus provers closed C9's steps
+in under eight minutes each, and the assembly compiled on the first try.
+
 **Published statements in the workspace.** After Submit, `scripts/fetch_theorems.py MISSION…`
 writes every published theorem and bundle of the missions into `Theorems/` and `Definitions/` in
 server shape and builds them, so solutions import exactly what the verifier compiles against; it
