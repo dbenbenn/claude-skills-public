@@ -168,9 +168,13 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 
 **Prose**
 - Each milestone description opens with the source's sentence in quotation marks and its page,
-  then a marked *Route* or *External* paragraph if one earns its place. The paper's words appear
-  only inside quotation marks; quotes checked against the page image, including the subject
-  they predicate.
+  then a marked *Route*, *External* or *Correction* paragraph if one earns its place. The label
+  says what the paragraph does: *Route* is how to prove it, *External* is a cited result, and
+  *Correction* is a slip in the source's proof and its fix ("The proof on p. 18 misprints …; the
+  evident intent is …"). A Route that only lists the source's mistakes reads as a route that
+  explains nothing (dbenbenn, Moore M28 and M1). Nothing about our own formal proof's choices goes
+  here; that lives in the repo's proof notes. The paper's words appear only inside quotation
+  marks; quotes checked against the page image, including the subject they predicate.
 - **Recheck all the quotes, as the platform holds them.** Every quotation in every field — milestone
   descriptions, natural-language statements, `source`, the mission description — read from the
   live Draft and compared word for word, punctuation included, with the rendered page. Do it
