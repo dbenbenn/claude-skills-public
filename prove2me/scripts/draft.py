@@ -490,6 +490,11 @@ def double_backslash(items, miles, desc):
     for where, t in texts:
         for m in re.finditer(r'\$[^$]*?(\\\\[A-Za-z]+)[^$]*?\$', t):
             out.append((where, 'doubled backslash `%s` in math (renders as a line break)' % m.group(1)))
+        # a quote escaped inside a raw string keeps its backslash: Moore's §2(e) milestone shipped
+        # `$\Gamma\'$` (KaTeX reads `\'` as an accent), and two patch scripts left `\"` in prose
+        # (2026-10-01). Our prose never wants either.
+        for m in re.finditer(r'.{0,20}\\[\'"]', t):
+            out.append((where, 'escaped quote `%s` (a raw-string backslash leaked into prose)' % m.group(0)))
     return out
 
 
