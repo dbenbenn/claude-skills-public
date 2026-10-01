@@ -43,6 +43,10 @@ Files:
 - `nls.md`: the title and the natural-language statement shown to readers beside the Lean,
   including any *Formalization Note*.
 - `cite-*`: texts the prose cites, if any.
+- `bundle-*.md`: the natural-language notes of the mission's definition bundles. A definition's
+  reading, any ambiguity in the source and any counterexample are explained ONCE there, and the
+  statement prose deliberately does not repeat them (the human reviewer's rule). A gap that comes
+  from a shared definition is accounted for when the bundle note explains it.
 
 Answer, each in its own section of `verdict.md`:
 1. For each gap in `coverage.md`, is it named in the prose and explained accurately? Would a
@@ -105,6 +109,13 @@ def stage(mdir, name, cites):
                             pdf, os.path.join(d, 'page-%03d' % p)], check=True)
     for c in cites:
         shutil.copy(c, os.path.join(d, 'cite-' + os.path.basename(c)))
+    # the bundle notes: statements do not relitigate a shared definition (dbenbenn, 2026-10-01),
+    # so without them the auditor flags every statement that uses a corrected definition, as it
+    # did on Moore's Lemma 3.10 (Exel's composition law, explained only in the §3 bundle note)
+    for D in getattr(M, 'DEFINITIONS', []):
+        if D.get('nls'):
+            open(os.path.join(d, 'bundle-%s.md' % D['name']), 'w', encoding='utf-8').write(
+                '# %s\n\n%s\n' % (D.get('title', D['name']), D['nls']))
     print('Work only inside %s. Everything below is relative to it.\n\nRead brief.md and follow it '
           'exactly. Do not read or write anything outside this directory.' % d)
 
