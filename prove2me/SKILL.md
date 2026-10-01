@@ -118,7 +118,10 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   `scripts/prune_solution.py FILE --check` before submitting. Assembled-by-concatenation files
   routinely carry two thirds dead code, and a dead copy of a published theorem is the thing that
   later gets "reconnected" into a dependency that never existed.
-- Every statement compiles in server shape, `preamble` + `formal_statement`, with `:= by sorry`.
+- Every statement compiles in server shape, `preamble` + `formal_statement`, with `:= by sorry`. Run
+  `scripts/check_server_shape.py MISSION_DIR`: it compiles each statement alone, and a statements
+  file compiled as a whole hides a file-level `open` that no extracted statement carries (Lodha–Moore,
+  2026-10-01: bare `op`/`unop` failed in three statements, found only by a read-back).
 - Names are accurate labels (Mathlib style, `_of_` for hypotheses in binder order), ASCII, and a
   name that would need a caution is the wrong name.
 - **A published statement carries no docstring.** It is the only prose on the platform that both
