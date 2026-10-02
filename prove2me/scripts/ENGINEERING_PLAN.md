@@ -147,12 +147,28 @@ Each migration lands with its tests.
 Estimate: 5–7 sessions, interleaved with mission work. Scripts are never left half-migrated,
 because each phase leaves everything working.
 
-## Decisions for dbenbenn
+## Decisions (dbenbenn, 2026-10-02)
 
-1. **Lean-side extraction** (recommended) vs a better Python tokenizer for Lean. Lean is the only
-   parser that agrees with Lean. The cost is a small Lean program to maintain across toolchain
-   bumps, kept in check by tests.
-2. **Prose layout:** Markdown files for new missions only (recommended), or also migrate live and
-   finished missions.
-3. **Fixtures:** synthetic only (recommended), since the repo is public.
-4. **Where to start:** Phases 0–1 first (recommended), so every later change runs under tests.
+1. **Lean-side extraction: yes** ("Lean parses Lean!").
+2. **Prose as Markdown files** for mission drafting (Phase 5).
+3. **Fixtures may reuse real cases**, with care.
+   - Mission drafts like Moore become public soon, so excerpts from public or soon-public missions
+     are fine.
+   - Nothing from private missions (QFS's private repo).
+4. **Tests first**: Phases 0–1 come before any refactor.
+5. **Open:** a private sandbox on the platform for write-path tests (layer 5 below).
+
+## Test layers
+
+| Layer | What | Speed | When it runs |
+|---|---|---|---|
+| 1. Unit | pure functions: names, range edits, prose loading, JSON building | seconds | every change |
+| 2. Lean integration | LeanInfo on fixture `.lean` files, checking the reported commands, declarations, dependencies and types | seconds each | every change |
+| 3. Pipeline regression | rebuild a public mission's solutions and compare them with the accepted submissions, fetched by `GET /submissions/:id/solution`; `draft.py verify` on a recorded proposal | minutes | before merging a migration |
+| 4. Live read-only contract | the platform behaves as `p2mlib.api` assumes: page size and `total`, the solution endpoint, graph node and edge shapes, proposal statuses, a known submission's final status; recorded responses for layer 1 come from here | about a minute | on demand and after a platform release |
+| 5. Live write path | submit / poll / retry / deprecate / publish / definitions against a **private sandbox** (a private trivial statement; proofs built to be ACCEPTED, rejected, SKETCH_ACCEPTED) | minutes | rarely, on demand; needs dbenbenn's OK |
+
+Layer 4 would have caught three real failures:
+- the list endpoint paging at 50 when we asked for 100;
+- the poll timeout misread as a rejection;
+- "the platform never serves submitted code".
