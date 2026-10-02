@@ -164,6 +164,20 @@ def main():
     text = open(a.file, encoding='utf-8').read()
     if not re.search(r'^theorem solution\b', text, re.M):
         sys.exit('no `theorem solution` in %s' % a.file)
+    # The target's own statement may sit in the merged file as a `sorry` stub under its published
+    # full name (a development that imports a Statements module with the exact names, as Moore's
+    # did, 2026-10-02): `theorem solution` proves it, and the stub would make the file a sorry.
+    tgt = a.target.split('.')[-1]
+    if tgt in pub:
+        lines0 = text.split('\n')
+        for d in sorted(parse(lines0), key=lambda d: -d[2]):
+            if d[0].split('.')[-1] != tgt or qualified(lines0, d[2], d[0]) != pub[tgt][0]:
+                continue
+            decl = '\n'.join(lines0[d[2]:d[3]])
+            if re.fullmatch(r'\s*(by\s+)?sorry\s*', decl[decl.find(':=') + 2:]):
+                del lines0[d[2]:d[3]]
+                print('   the target %s was a sorry stub under its published name; deleted' % tgt)
+        text = '\n'.join(lines0)
     cands = []
     for d in parse(text.split('\n')):
         name = d[0].split('.')[-1]
