@@ -161,6 +161,9 @@ def main():
         sys.exit('SUBMIT FAILED: %s' % r)
     v = poll(sid)
     print('   verdict %s %s' % (v.get('status'), sid))
+    if v.get('status') == 'PENDING':
+        sys.exit('still PENDING (%s): check later with GET /submissions/%s; nothing deprecated'
+                 % (v.get('__error'), sid))
     if v.get('status') not in ('ACCEPTED', 'SKETCH_ACCEPTED'):
         sys.exit('not accepted: %s' % str(v.get('error_message'))[:500])
     present, got = sketch_edges(tid, sid)
