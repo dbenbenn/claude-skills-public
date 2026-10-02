@@ -58,7 +58,21 @@ def find_block(sol, checks, name):
                 stack.append(ns)
             elif stack and stack[-1] == ns:
                 stack.pop()
-        opens = re.findall(r'^open ([^\n]+)$', before, re.M)
+        # `open X in` scopes only the next command: keep it (without its `in`) when it sits
+        # directly above the block, drop it otherwise. Copying it verbatim gave `open X in in`
+        # and broke 20 of Moore's 31 solutions (2026-10-02).
+        opens = []
+        lines = [l for l in before.rstrip().split('\n')]
+        tail = len(lines)
+        while tail and re.match(r'^open .* in\s*$', lines[tail - 1]):
+            tail -= 1
+        for i, l in enumerate(lines):
+            mo = re.match(r'^open ([^\n]+?)(\s+in)?\s*$', l)
+            if not mo:
+                continue
+            if mo.group(2) and i < tail:
+                continue
+            opens.append(mo.group(1))
         block = re.sub(r'^theorem (?:chk_)?%s\b' % re.escape(name), 'theorem solution', m.group(0).rstrip(),
                        count=1, flags=re.M)
         return mod, '.'.join(stack), opens, block
