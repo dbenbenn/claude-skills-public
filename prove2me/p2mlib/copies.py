@@ -53,19 +53,20 @@ def reachable_definitions(ws, mods):
     return out
 
 
-def candidates(ws, text, declared=()):
-    """Published theorem modules a file with source `text` could have copied, as a sorted list."""
+def candidates(ws, text, declared=(), with_drafts=False):
+    """Published theorem modules a file with source `text` could have copied, as a sorted list
+    (with `with_drafts`, the mission's draft stubs too: workspace.published_by_full)."""
     visible = reachable_definitions(ws, imports_of(text))
     declared = set(declared)
-    return sorted(p.module for full, p in published_by_full(ws).items()
+    return sorted(p.module for full, p in published_by_full(ws, with_drafts).items()
                   if full not in declared and reachable_definitions(ws, [p.module]) <= visible)
 
 
-def find(path, ws=None):
+def find(path, ws=None, with_drafts=False):
     """(info, {local full name: [published full names]}) for the theorems of `path` that state a
     published theorem. `info` is LeanInfo's elaboration with the candidates imported."""
     ws = ws or workspace()
     text = open(path, encoding='utf-8').read()
     declared = {n for c in leaninfo.run(path, parse_only=True, ws=ws).commands for n in c.names}
-    info = leaninfo.run(path, ws=ws, candidates=candidates(ws, text, declared))
+    info = leaninfo.run(path, ws=ws, candidates=candidates(ws, text, declared, with_drafts))
     return info, {d.name: list(d.same_statement_as) for d in info.decls if d.same_statement_as}

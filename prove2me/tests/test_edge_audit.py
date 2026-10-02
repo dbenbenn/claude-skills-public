@@ -70,15 +70,35 @@ class Fake:
 def test_live_audit_on_second_page(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(E, 'call', Fake().call)
     monkeypatch.setattr(E, 'CACHE', str(tmp_path))
-    monkeypatch.setattr(E, 'published_by_full', lambda ws: BYFULL)
+    monkeypatch.setattr(E, 'published_by_full', lambda ws, with_drafts=False: BYFULL)
     seen = []
-    monkeypatch.setattr(E, 'analyze', lambda path, ws: (seen.append(open(path).read()), (recorded(), SAME))[1])
+    monkeypatch.setattr(E, 'analyze', lambda path, ws, with_drafts=False: (seen.append(open(path).read()), (recorded(), SAME))[1])
     assert E.live(['M1'], str(tmp_path)) == 1
     out = capsys.readouterr().out
     assert seen == [CODE]                                   # judged from the platform's copy
     assert 'INCORRECT edges (imports the proof never uses): 1' in out and 'gcd_min_eq' in out
     assert 'MISSING edges' in out and 'Dev.moves <- HomeoLine.zpow_moves_of_moves  (by statement)' in out
     assert 'UNCHECKED proofs: 0' in out
+
+
+def test_local_audit_treats_draft_siblings_as_published(monkeypatch, tmp_path, capsys):
+    # LM, 2026-10-02: under the stubs flow a proof imports its siblings' draft stubs, and a sibling
+    # it re-derives is unpublished too; before submitting, both are about to be graph nodes
+    d = tmp_path / 'sol'
+    d.mkdir()
+    (d / 'Sol_target.lean').write_text('import Theorems.Thm_HomeoLine_zpow_moves_of_moves\n' + CODE)
+    calls = []
+
+    def byfull(ws, with_drafts=False):
+        calls.append(('byfull', with_drafts))
+        return BYFULL
+    monkeypatch.setattr(E, 'published_by_full', byfull)
+    monkeypatch.setattr(E, 'analyze', lambda path, ws, with_drafts=False:
+                        (calls.append(('analyze', with_drafts)), (recorded(), SAME))[1])
+    E.local(str(d), str(tmp_path))
+    out = capsys.readouterr().out
+    assert calls == [('byfull', True), ('analyze', True)]
+    assert 'MISSING edges (a published theorem re-derived, not reached by the graph): 0' in out
 
 
 def test_shared_top_steps_reported_between_unrelated_proofs(capsys):

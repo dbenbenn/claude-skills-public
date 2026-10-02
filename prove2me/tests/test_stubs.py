@@ -25,6 +25,8 @@ def test_install_writes_published_shape_and_records_drafts(env):
     assert text.startswith('import Mathlib\nimport Definitions.Def_Mini\n\nnamespace Mini\n\ntheorem t1')
     assert W.drafts(ws) == {'Theorems.Thm_Mini_goal': mdir, 'Theorems.Thm_Mini_t1': mdir}
     assert W.published_by_full(ws) == {}                      # drafts are not published
+    # ... except to a pre-submission audit, for which they are the siblings about to be published
+    assert sorted(W.published_by_full(ws, with_drafts=True)) == ['Mini.goal', 'Mini.t1']
     assert stubs.sync(mdir, ws, check=True) == ([], [])       # current
 
 

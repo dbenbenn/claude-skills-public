@@ -48,6 +48,14 @@ def test_a_theorem_the_file_declares_is_not_a_candidate(ws):
     assert copies.candidates(ws, 'import Definitions.Def_A\n', declared={'X.a'}) == ['Theorems.Thm_M_d']
 
 
+def test_draft_stubs_are_candidates_only_when_asked(ws):
+    from p2mlib import workspace as W
+    W.set_drafts({'Theorems.Thm_X_a': 'mission'}, ws)
+    text = 'import Mathlib\nimport Definitions.Def_A\n'
+    assert copies.candidates(ws, text) == ['Theorems.Thm_M_d']
+    assert copies.candidates(ws, text, with_drafts=True) == ['Theorems.Thm_M_d', 'Theorems.Thm_X_a']
+
+
 @pytest.mark.lean
 def test_find_by_statement_not_name():
     _, found = copies.find(os.path.join(FIX, 'Copies.lean'))

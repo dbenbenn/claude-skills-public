@@ -3,6 +3,7 @@
 
 usage: edge_audit.py MISSION_ID_OR_PREFIX [...]      the live proofs of missions (from the platform)
        edge_audit.py --local SOLUTIONS_DIR           Sol_<name>.lean files, before submitting them
+                                                     (the mission's draft stubs count as published)
 
 A proof's graph edges are exactly its `import Theorems.*` lines. Each proof is elaborated (LeanInfo,
 cached by content; up to four at a time, fewer when memory is short) and judged on what Lean says its declarations use:
@@ -57,12 +58,12 @@ def workers():
     return max(1, min(4, kb // (GB_PER_WORKER * 1024 * 1024)))
 
 
-def analyze(path, ws):
+def analyze(path, ws, with_drafts=False):
     """(info, {decl: [published]}) for one proof; info.errors when it does not elaborate here."""
     info = leaninfo.run(path, ws=ws)
     if info.errors:
         return info, {}
-    _, same = copies.find(path, ws)
+    _, same = copies.find(path, ws, with_drafts)
     return info, same
 
 
@@ -125,14 +126,14 @@ def report(proofs, results):
     return 1 if incorrect or missing else 0
 
 
-def run_all(jobs, ws, byfull, is_deprecated):
+def run_all(jobs, ws, byfull, is_deprecated, with_drafts=False):
     """jobs: [(theorem, sid, reach, path or reason)] -> results for report()."""
     def one(job):
         thm, sid, reach, path = job
         if not os.path.exists(path):
             return path, None
         try:
-            info, same = analyze(path, ws)
+            info, same = analyze(path, ws, with_drafts)
         except RuntimeError as e:
             return 'LeanInfo failed: %s' % str(e).splitlines()[0], None
         if info.errors:
@@ -143,7 +144,9 @@ def run_all(jobs, ws, byfull, is_deprecated):
 
 
 def local(d, ws):
-    byfull = published_by_full(ws)
+    # before submitting, the mission's draft stubs count as published: a proof imports the siblings
+    # it uses (stubs.py), and one it re-derives instead is a MISSING edge to fix now (LM, 2026-10-02)
+    byfull = published_by_full(ws, with_drafts=True)
     byshort = {names.short(f): f for f in byfull}
     jobs = []
     for f in sorted(os.listdir(d)):
@@ -153,7 +156,7 @@ def local(d, ws):
             imps = copies.imports_of(open(path, encoding='utf-8').read())
             reach = {p.full for p in byfull.values() if p.module in imps}
             jobs.append((byshort.get(m.group(1), m.group(1)), f, reach, path))
-    results = run_all(jobs, ws, byfull, lambda full: False)
+    results = run_all(jobs, ws, byfull, lambda full: False, with_drafts=True)
     return report([(t, s, r) for t, s, r, _ in jobs], results)
 
 

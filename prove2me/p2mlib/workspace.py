@@ -68,12 +68,13 @@ def statement_decl(text):
     return full, code[m.start():j if j >= 0 else len(code)]
 
 
-def published_by_full(ws=None):
+def published_by_full(ws=None, with_drafts=False):
     """{full name: Published} for every published statement in Theorems/ (draft stubs excluded:
-    a submission importing one fails, since the platform has no such module yet)."""
+    a submission importing one fails, since the platform has no such module yet). `with_drafts=True`
+    includes them: a pre-submission audit treats the siblings about to be published as published."""
     ws = ws or workspace()
     tdir = os.path.join(ws, 'Theorems')
-    draft = drafts(ws)
+    draft = {} if with_drafts else drafts(ws)
     out = {}
     for f in sorted(os.listdir(tdir)) if os.path.isdir(tdir) else []:
         if not (f.startswith('Thm_') and f.endswith('.lean')) or 'Theorems.' + f[:-5] in draft:
