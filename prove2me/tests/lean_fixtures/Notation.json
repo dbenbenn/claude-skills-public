@@ -52,6 +52,11 @@
     "byte": 66,
     "col": 0,
     "line": 7
+   },
+   "value_start": {
+    "byte": 99,
+    "col": 27,
+    "line": 7
    }
   },
   {
@@ -72,6 +77,11 @@
     "byte": 105,
     "col": 0,
     "line": 9
+   },
+   "value_start": {
+    "byte": 128,
+    "col": 21,
+    "line": 9
    }
   },
   {
@@ -91,6 +101,11 @@
    "start": {
     "byte": 142,
     "col": 0,
+    "line": 11
+   },
+   "value_start": {
+    "byte": 176,
+    "col": 32,
     "line": 11
    }
   },

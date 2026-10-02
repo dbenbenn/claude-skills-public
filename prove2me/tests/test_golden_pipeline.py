@@ -4,10 +4,14 @@ tests/golden/<case>/expected.lean; never refetched).
 
 Each case directory holds src/*.lean (the check module and its Solutions dependencies, imports
 renamed to Solutions.Golden.<case>.*), expected.lean and meta.json (target, check module, the
-accepted submission id, why the case is tricky, and `status`: exact | xfail).
+accepted submission id, why the case is tricky, and `status`: exact | partial | xfail).
+
+`partial` is for a solution finished by hand beyond what any pipeline can do: the rebuild must
+compile and import exactly `theorem_imports` (its graph edges), and is not compared further.
 
 `exact` means: the rebuild equals the accepted file, ignoring whitespace-only lines (blank lines
-mean nothing to Lean and the pruner's spacing is not under test), after deleting from the accepted
+mean nothing to Lean and the pruner's spacing is not under test) and the order of the `import`
+lines (a set: they are the graph edges), after deleting from the accepted
 file the declarations listed in `dropped_since_accepted` -- dead code the pruner of the day kept and
 a better one removes (each with the reason). An unlisted difference fails: a new deletion is either
 a regression or a pruning gain, and the case says which.
@@ -60,6 +64,10 @@ def test_rebuild_matches_accepted(case, tmp_path):
         got = f.read_text()
     finally:
         shutil.rmtree(dst)
+    if meta['status'] == 'partial':
+        from p2mlib.copies import imports_of
+        assert sorted(m for m in imports_of(got) if m.startswith('Theorems.')) == sorted(meta['theorem_imports'])
+        return
     want_path = os.path.join(GOLDEN, case, 'expected.lean')
     want = open(want_path).read()
     dropped = meta.get('dropped_since_accepted', {})
@@ -69,7 +77,10 @@ def test_rebuild_matches_accepted(case, tmp_path):
         idx = [leanedit.command_of(winfo, n) for n in dropped]
         assert None not in idx, 'a dropped_since_accepted name is not in expected.lean: %s' % dropped
         want = leanedit.remove_commands(winfo, idx)
-    norm = lambda t: ''.join(line for line in t.splitlines(True) if line.strip())
+    def norm(t):
+        lines = [line for line in t.splitlines(True) if line.strip()]
+        return ''.join(sorted(l for l in lines if l.startswith('import ')) +
+                       [l for l in lines if not l.startswith('import ')])
     got, want = norm(got), norm(want)
     if got != want:
         diff = ''.join(list(difflib.unified_diff(want.splitlines(True), got.splitlines(True), 'accepted', 'rebuilt', n=1))[:80])

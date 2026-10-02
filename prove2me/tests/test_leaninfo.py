@@ -70,6 +70,14 @@ def test_dependencies_include_names_the_source_resolves(info):
     assert info.decl('viaSimp').uses_local == ['f', 'f_one']
 
 
+def test_value_start_is_the_assignment(info):
+    # rewire keeps a copy's header up to here and replaces the rest
+    for name in ("A.foo'", 'viaLemma', 'A.viaIn', 'f'):
+        c = info.commands[info.decl(name).command]
+        assert info.slice(c.value_start.byte, c.value_start.byte + 2) == ':='
+    assert info.commands[info.decl('P').command].value_start is None
+
+
 def test_generated_constants_flagged(info):
     gen = {d.name for d in info.decls if d.generated}
     assert {'P.rec', 'P.casesOn', 'P.mk', 'P.a'} <= gen and 'P' not in gen
@@ -95,7 +103,7 @@ def test_parse_only_agrees_on_commands():
 
 
 @pytest.mark.lean
-@pytest.mark.parametrize('name,parse_only', [(n, p) for n in ('Structure', 'Broken', 'Notation') for p in (False, True)])
+@pytest.mark.parametrize('name,parse_only', [(n, p) for n in ('Structure', 'Broken', 'Notation', 'Rewire') for p in (False, True)])
 def test_tool_reproduces_recording(name, parse_only):
     info = LI.run(os.path.join(FIX, name + '.lean'), parse_only=parse_only, use_cache=False)
     want = recorded(name, '.parse' if parse_only else '')

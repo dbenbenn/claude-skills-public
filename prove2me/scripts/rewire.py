@@ -4,6 +4,8 @@
 usage: rewire.py FILE --target NAME -o OUT [--only NAME ...] [--dry]
 
   --target  the short name of the theorem FILE proves; its own copy is never rewired
+  --only    rewire only copies of these published theorems (short names)
+  --dry     list the copies and stop
 
 A proof assembled from a mission's shared modules carries its own copies of theorems that are
 published on their own (`closure_mapA_mapB_eq_F'` beside `CannonFloydParry.closure_mapA_mapB_eq_F`).
@@ -11,39 +13,42 @@ The proof then depends on them without saying so: the platform draws an edge onl
 `import Theorems.*`, so the dependency the source argument has is missing from the graph. The
 2026-09-24 sweep found eleven such proofs across Chou, CFP, Brin-Squier and Rosenblatt.
 
-For each declaration whose name, with any trailing primes dropped, is the short name of a theorem
-in $P2M_WORKSPACE/Theorems/, this replaces its proof with a call to the published theorem and adds
-the import; prune_solution --check then deletes what only the old proof used and compiles the
-result. The copy's own statement is kept, so the rewire is sound whatever the two statements look
-like: if the call proves the copy's statement, the dependency is real. A copy the call cannot
-prove (a genuinely different statement that happens to share a name) is restored and reported,
-and the file is recompiled without it. Explicit hypotheses the published theorem takes as
+A copy is a theorem of FILE that
+  * states a published theorem, under any name: Lean decides (p2mlib.copies -- equal statements
+    after renaming universes, unfolding FILE's own predicates and erasing proofs; Moore's
+    `reduced_iff`, stated through a local `CommonCaret`, was rewired by hand before this); or
+  * is named after one (its short name, primes dropped), whatever it states: a variant that the
+    published theorem still proves is a dependency too, and one it does not prove is restored.
+A copy declared under the published theorem's own full name would clash with the import, so it is
+deleted and the theorem imported; so is the target's own `sorry` stub under its published name.
+
+Every other copy keeps its statement and gets a call to the published theorem as its proof, and
+the import is added; prune_solution --check then deletes what only the old proof used and
+compiles the result. The rewire is sound whatever the two statements look like: if the call
+proves the copy's statement, the dependency is real. A copy the call cannot prove is restored and
+reported, and the file recompiled without it. Explicit hypotheses the published theorem takes as
 instances are handled by installing every hypothesis as an instance first.
 
-Name matching finds copies named after the published theorem; one renamed to something unrelated
-is not found. `edge_audit.py` reports which copies are left.
+Every edit goes by the command ranges LeanInfo reports (p2mlib.leanedit), never by regex over the
+text. A copy that only re-derives part of a published theorem (Moore's `reduced_unique`, the
+uniqueness half of an `∃!`) is not a copy of anything; `edge_audit.py` reports which copies of
+published theorems a proof keeps.
 """
-import argparse, os, re, shutil, subprocess, sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # p2mlib
-from prune_solution import parse, _workspace
+import argparse
+import os
+import re
+import shutil
+import subprocess
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(HERE))  # p2mlib
+from p2mlib import copies, leanedit, leaninfo, names  # noqa: E402
+from p2mlib.workspace import workspace, published as _published, published_by_full  # noqa: E402
 
+_workspace = workspace
 
-
-def qualified(lines, start, name):
-    """`name` declared at line `start`, prefixed by the namespaces open there."""
-    if name.startswith('_root_.'):
-        return name[len('_root_.'):]
-    stack = []
-    for l in lines[:start]:
-        m = re.match(r'(namespace|end)\s+([\w.]+)\s*$', l)
-        if m and m.group(1) == 'namespace':
-            stack.append(m.group(2))
-        elif m and stack and stack[-1] == m.group(2):
-            stack.pop()
-    return '.'.join(stack + [name])
 
 def explicit_binders(header):
     from p2mlib.leantext import explicit_binders as eb
@@ -54,8 +59,7 @@ def published(ws):
     """{short name: (full name, module, explicit binder names)} -- p2mlib.workspace.published,
     which reads statements comment-aware (a comment line beginning "theorem" once named the
     wrong declaration here)."""
-    from p2mlib.workspace import published as pub
-    return pub(ws)
+    return _published(ws)
 
 
 def body_for(full, header, pub_args):
@@ -73,38 +77,55 @@ def body_for(full, header, pub_args):
     return 'by\n  %sfirst\n%s' % (inst, ''.join('    | %s\n' % x for x in alts))
 
 
-def rewrite(text, targets, pub):
-    lines = text.split('\n')
-    for d in sorted(parse(lines), key=lambda d: -d[2]):          # bottom-up keeps spans valid
-        base = d[0].split('.')[-1].rstrip("'")
-        if d[0].split('.')[-1] not in targets:
-            continue
-        full, mod, pub_args = pub[base]
-        decl = '\n'.join(lines[d[2]:d[3]])
-        i = decl.find(':=')
-        header = decl[:i].rstrip()
-        lines[d[2]:d[3]] = (header + ' :=\n  ' + body_for(full, header, pub_args)).split('\n')
-    text = '\n'.join(lines)
-    for t in targets:
-        mod = pub[t.rstrip("'")][1]
-        if not re.search(r'^import %s\s*$' % re.escape(mod), text, re.M):
-            text = 'import %s\n' % mod + text
-    return text
+def add_imports(text, modules):
+    """`text` with `import M` added at the top for each module it does not import yet."""
+    have = set(copies.imports_of(text))
+    new = [m for m in dict.fromkeys(modules) if m not in have]
+    return ''.join('import %s\n' % m for m in new) + text
+
+
+def _value(info, c):
+    """The text of command `c` from its `:=` on ('' when it has none)."""
+    return info.slice(c.value_start.byte, c.end.byte) if c.value_start else ''
+
+
+def rewrite(info, cands):
+    """The source of `info` with each copy's proof replaced by a call to its published theorem
+    (cands: {local full name: Published}) and the imports added."""
+    reps = {}
+    for name, p in cands.items():
+        c = info.commands[leanedit.command_of(info, name)]
+        header = info.slice(c.start.byte, c.value_start.byte).rstrip()
+        reps[c.index] = header + ' :=\n  ' + body_for(p.full, header, p.binders).rstrip('\n')
+    return add_imports(leanedit.replace_commands(info, reps), [p.module for p in cands.values()])
 
 
 def check(path):
     """Prune `path` in place, then compile the pruned file itself, so error line numbers refer to
-    the file whose declaration spans we attribute them to."""
+    the file whose command ranges we attribute them to."""
     p = subprocess.run([sys.executable, os.path.join(HERE, 'prune_solution.py'), path],
                        capture_output=True, text=True)
     if p.returncode:
         return False, p.stdout + p.stderr
-    ws = _workspace()
+    ws = workspace()
     c = subprocess.run(['lake', 'env', 'lean', '-DautoImplicit=false', os.path.relpath(os.path.abspath(path), ws)],
                        cwd=ws, capture_output=True, text=True)
     out = c.stdout + c.stderr
     bad = c.returncode != 0 or re.search(r': error\b', out) or re.search(r'declaration uses .sorry.', out)
     return not bad, out
+
+
+def blame(path, out, kept):
+    """The rewired copy whose command holds the first compile error in `out`, or None."""
+    info = leaninfo.run(path, parse_only=True)
+    for line in (int(n) for n in re.findall(r'\.lean:(\d+):\d+: error', out)):
+        for c in info.commands:
+            nxt = info.commands[c.index + 1].start.line if c.index + 1 < len(info.commands) else 1 << 30
+            if c.start.line <= line < nxt:
+                hit = [n for n in c.names if n in kept]
+                if hit:
+                    return hit[0]
+    return None
 
 
 def main():
@@ -113,98 +134,83 @@ def main():
     ap.add_argument('--target', required=True)
     ap.add_argument('--only', nargs='*'); ap.add_argument('--dry', action='store_true')
     a = ap.parse_args()
-    ws = _workspace()
-    pub = published(ws)
-    text = open(a.file, encoding='utf-8').read()
-    if not re.search(r'^theorem solution\b', text, re.M):
-        sys.exit('no `theorem solution` in %s' % a.file)
-    # The target's own statement may sit in the merged file as a `sorry` stub under its published
-    # full name (a development that imports a Statements module with the exact names, as Moore's
-    # did, 2026-10-02): `theorem solution` proves it, and the stub would make the file a sorry.
+    ws = workspace()
+    pub, byfull = published(ws), published_by_full(ws)
     tgt = a.target.split('.')[-1]
-    if tgt in pub:
-        lines0 = text.split('\n')
-        for d in sorted(parse(lines0), key=lambda d: -d[2]):
-            if d[0].split('.')[-1] != tgt or qualified(lines0, d[2], d[0]) != pub[tgt][0]:
-                continue
-            decl = '\n'.join(lines0[d[2]:d[3]])
-            if re.fullmatch(r'\s*(by\s+)?sorry\s*', decl[decl.find(':=') + 2:]):
-                del lines0[d[2]:d[3]]
+    tgt_full = pub[tgt].full if tgt in pub else None
+
+    # 1. by declared full name (one parse): the target's own `sorry` stub (a development that
+    # imports a Statements module with the exact names, as Moore's did, 2026-10-02: `theorem
+    # solution` proves it, and the stub would make the file a sorry), and copies under a published
+    # theorem's full name (the import would clash: CFP §6 carried §2's `represents_mul` this way).
+    # Only the FULL name clashes: Monod's `Monod.Dev.Alg.BS.supp_conj` beside
+    # `BrinSquier.supp_conj`, about a different `supp`, is rewired or left, never deleted.
+    info0 = leaninfo.run(a.file, parse_only=True, ws=ws)
+    if not any('solution' in c.names for c in info0.commands):
+        sys.exit('no `solution` declaration in %s' % a.file)
+    drop, imps = [], []
+    for c in info0.commands:
+        for n in c.names:
+            if n == tgt_full and re.fullmatch(r'\s*:=\s*(by\s+)?sorry\s*', _value(info0, c)):
+                drop.append(c.index)
                 print('   the target %s was a sorry stub under its published name; deleted' % tgt)
-        text = '\n'.join(lines0)
-    cands = []
-    for d in parse(text.split('\n')):
-        name = d[0].split('.')[-1]
-        base = name.rstrip("'")
-        if name == 'solution' or base not in pub or base == a.target.split('.')[-1]:
+            elif n in byfull and n != tgt_full:
+                drop.append(c.index); imps.append(byfull[n].module)
+                print('   %s had the published name; deleted and imported %s' % (n, byfull[n].module))
+    text = add_imports(leanedit.remove_commands(info0, drop), imps) if drop else open(a.file, encoding='utf-8').read()
+    open(a.out, 'w', encoding='utf-8').write(text)
+
+    # 2. copies: by statement (Lean), else by name
+    info, same = copies.find(a.out, ws)
+    if info.errors:
+        sys.exit('%s does not elaborate:\n%s' % (a.out, '\n'.join(m.text[:200] for m in info.errors[:5])))
+    cands = {}
+    for d in info.decls:
+        base = d.short.rstrip("'")
+        if d.generated or d.name == 'solution' or base == tgt or d.kind != 'theorem':
             continue
-        if a.only and base not in a.only:
+        hits = [h for h in same.get(d.name, []) if h != tgt_full]
+        p = byfull[hits[0]] if hits else pub.get(base)
+        if p is None or p.full == tgt_full or (a.only and p.full.rsplit('.', 1)[-1] not in a.only):
             continue
-        # already a thin call to the published theorem (an earlier wiring): nothing to do
-        body = '\n'.join(text.split('\n')[d[2]:d[3]])
-        if re.search(r'(?<![\w.])%s(?![\w\'])' % re.escape(pub[base][0]), body[body.find(':='):]):
-            continue
-        cands.append(name)
-    print('copies of published theorems: %s' % (', '.join(
-        '%s -> %s' % (c, pub[c.rstrip("'")][0]) for c in cands) or 'none'))
+        c = info.commands[d.command]
+        if c.value_start is None or names.mentions(_value(info, c), p.full):
+            continue                       # no proof to replace, or already a call (an earlier wiring)
+        cands[d.name] = p
+        print('   %s %s -> %s' % ('states' if hits else 'is named after', d.name, p.full))
+    print('copies of published theorems: %d' % len(cands))
     if a.dry:
         return
-    # a copy declared under the published theorem's own full name cannot be rewired (the import
-    # would clash: "has already been declared"); delete it and import the theorem instead.
-    # CFP §6's Lemma 6.1 carried §2's `represents_mul` this way.
-    # Only the FULL name clashes: a copy in another namespace (Monod's `Monod.Dev.Alg.BS.supp_conj`
-    # beside `BrinSquier.supp_conj`, about a different `supp`) is rewired or left, never deleted.
-    lines = text.split('\n')
-    same = [d for d in parse(lines) if d[0].split('.')[-1] in cands
-            and qualified(lines, d[2], d[0]) == pub[d[0].split('.')[-1].rstrip("'")][0]]
-    imps = []
-    for d in sorted(same, key=lambda d: -d[2]):
-        name = d[0].split('.')[-1]
-        del lines[d[2]:d[3]]
-        imp = 'import ' + pub[name][1]
-        if imp not in lines and imp not in imps:
-            imps.append(imp)
-        cands.remove(name)
-        print('   %s had the published name; deleted and imported %s' % (name, pub[name][1]))
-    # insert the imports only after every deletion: inserting at line 0 inside the loop shifted
-    # the later (higher) spans by one line each, and each deletion then left its last line behind
-    # (Monod 2026-09-30: three orphaned proof lines, "unexpected token 'show'; expected command")
-    lines[0:0] = imps
-    text = '\n'.join(lines)
     if not cands:
-        open(a.out, 'w', encoding='utf-8').write(text)
         ok, out = check(a.out)
         print(('compiles clean: %s' if ok else 'DOES NOT COMPILE: %s') % a.out)
         if not ok:
             print(out[-800:])
         sys.exit(0 if ok else 1)
-    kept, failed = list(cands), []
+
+    # 3. rewire, compile, and restore any copy the call cannot prove
+    kept, failed = dict(cands), []
     while kept:
-        open(a.out, 'w', encoding='utf-8').write(rewrite(text, kept, pub))
+        open(a.out, 'w', encoding='utf-8').write(rewrite(info, kept))
         ok, out = check(a.out)
         if ok:
             break
-        # the copy whose span holds the first error line is the one the call could not prove;
-        # restore it and try again without it
-        spans = {d[0].split('.')[-1]: (d[2] + 1, d[3]) for d in parse(open(a.out).read().split('\n'))}
-        errl = [int(n) for n in re.findall(r'\.lean:(\d+):\d+: error', out)]
-        # a copy the prune deleted has no span any more (it was unused): it cannot hold the error
-        bad = next((c for c in kept for n in errl if c in spans and spans[c][0] <= n <= spans[c][1]), None)
+        bad = blame(a.out, out, kept)
         if bad is None:
             sys.exit('compile failed outside every rewired copy -- the input itself may not compile:\n'
                      + out[-800:])
-        print('   could not prove %s from %s; left as it was. Lean said:' % (bad, pub[bad.rstrip("'")][0]))
+        print('   could not prove %s from %s; left as it was. Lean said:' % (bad, kept[bad].full))
         for l in [l for l in out.split('\n') if ': error' in l][:4]:
             print('      ' + l[:220])
-        kept.remove(bad); failed.append(bad)
+        del kept[bad]; failed.append(bad)
     if not kept:
-        shutil.copy(a.file, a.out)
+        open(a.out, 'w', encoding='utf-8').write(text)
         ok, out = check(a.out)
-        print('no copy could be rewired; %s is %s pruned' % (a.out, 'the original,' if ok else 'the original (NOT compiling),'))
+        print('no copy could be rewired; %s is %s pruned' % (a.out, 'the input,' if ok else 'the input (NOT compiling),'))
         sys.exit(1)
-    imps = re.findall(r'^import (Theorems\.\S+)', open(a.out).read(), re.M)
+    imps = copies.imports_of(open(a.out, encoding='utf-8').read())
     print('rewired %d: %s' % (len(kept), ', '.join(kept)))
-    print('theorem imports now: %s' % ', '.join(i.split('Thm_', 1)[-1] for i in imps))
+    print('theorem imports now: %s' % ', '.join(i.split('Thm_', 1)[-1] for i in imps if i.startswith('Theorems.')))
     print('compiles clean: %s' % a.out)
     sys.exit(1 if failed else 0)
 

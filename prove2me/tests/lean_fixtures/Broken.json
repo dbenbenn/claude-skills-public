@@ -18,6 +18,11 @@
     "byte": 16,
     "col": 0,
     "line": 3
+   },
+   "value_start": {
+    "byte": 34,
+    "col": 18,
+    "line": 3
    }
   },
   {
@@ -37,6 +42,11 @@
    "start": {
     "byte": 46,
     "col": 0,
+    "line": 5
+   },
+   "value_start": {
+    "byte": 65,
+    "col": 19,
     "line": 5
    }
   },

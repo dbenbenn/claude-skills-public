@@ -324,3 +324,32 @@ uses it, and the regex pruner remains only as the fallback for a file that does 
 The golden criterion changed accordingly: the rebuild must equal the accepted file minus the
 declarations the case pins as dead (`dropped_since_accepted`, each with its reason), ignoring
 blank lines. An unpinned difference still fails.
+
+**Phase 4.2 (2026-10-02): done.** `rewire.py` finds copies by statement and edits by ranges.
+- **LeanInfo `--candidates M1,M2,…`** imports published modules beside the file's own and gives
+  each theorem `same_statement_as`. Two statements are the same when they are equal after
+  renaming universes by position, unfolding the file's own Prop-valued definitions, and replacing
+  every proof inside them by one constant (`get ⟨i, by omega⟩` differs as a term between files).
+  `Expr` equality already ignores binder names and brackets. It is deliberately not `isDefEq`,
+  which would equate `2 + 2 = 4` with `4 = 2 + 2` and invent an edge.
+- **`p2mlib/copies.py`** picks the candidates: published theorems whose `Definitions` modules the
+  file reaches (Mathlib-only ones always qualify), except one whose full name the file declares.
+  It runs LeanInfo and returns the copies.
+- **`rewire.py`** takes the declared full names from one parse (no `qualified()`): it deletes the
+  target's `sorry` stub and copies under a published full name. Copies are then found by
+  statement, else by name, since a variant under the published name may still follow from it.
+  Each proof is replaced from its command's `:=` (new `value_start`), and a compile error is
+  blamed by command ranges. `leanedit.replace_commands` does the multi-edit.
+- **Golden `bijOn`: strict xfail → `partial`.**
+  - The pipeline now finds `reduced_iff` (stated with the local `CommonCaret`) and adds the
+    `isReducedDiagram_iff` edge.
+  - The other two hand edits cannot be automated: `reduced_unique` and `exists_reduced_equiv` are
+    the halves of a published `∃!`, derived by a person.
+  - `partial` pins the `Theorems` imports exactly.
+- **`isMarginal_EBad` golden** compares imports as a set: the new rewire adds them top-down.
+
+**Follow-up for 4.4 (the edge auditor).** The dev module of `bijOn` proves the published `∃!`
+(`chk_existsUnique_…`) *from* `exists_reduced_equiv` and `reduced_unique`, which the solution uses
+directly. "A published theorem is proved here from lemmas the solution uses" is detectable from
+LeanInfo (a `same_statement_as` hit whose `uses_local` meets the solution's closure) and would
+have flagged the case for a person.

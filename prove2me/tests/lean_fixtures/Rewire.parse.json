@@ -1,0 +1,160 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "end": {
+    "byte": 27,
+    "col": 11,
+    "line": 3
+   },
+   "kind": "Lean.Parser.Command.namespace",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 16,
+    "col": 0,
+    "line": 3
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 98,
+    "col": 6,
+    "line": 7
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "M.dep'"
+   ],
+   "namespace": "M",
+   "opens": [],
+   "start": {
+    "byte": 29,
+    "col": 0,
+    "line": 5
+   },
+   "value_start": {
+    "byte": 86,
+    "col": 33,
+    "line": 6
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 165,
+    "col": 51,
+    "line": 10
+   },
+   "inner_kind": "Lean.Parser.Command.declaration",
+   "kind": "Lean.Parser.Command.in",
+   "names": [
+    "M.dep''"
+   ],
+   "namespace": "M",
+   "opens": [],
+   "start": {
+    "byte": 100,
+    "col": 0,
+    "line": 9
+   },
+   "value_start": {
+    "byte": 148,
+    "col": 34,
+    "line": 10
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 199,
+    "col": 32,
+    "line": 12
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "M.stub"
+   ],
+   "namespace": "M",
+   "opens": [],
+   "start": {
+    "byte": 167,
+    "col": 0,
+    "line": 12
+   },
+   "value_start": {
+    "byte": 188,
+    "col": 21,
+    "line": 12
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 235,
+    "col": 34,
+    "line": 14
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "M.solution"
+   ],
+   "namespace": "M",
+   "opens": [],
+   "start": {
+    "byte": 201,
+    "col": 0,
+    "line": 14
+   },
+   "value_start": {
+    "byte": 225,
+    "col": 24,
+    "line": 14
+   }
+  },
+  {
+   "attrs": [],
+   "end": {
+    "byte": 242,
+    "col": 5,
+    "line": 16
+   },
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "M",
+   "opens": [],
+   "start": {
+    "byte": 237,
+    "col": 0,
+    "line": 16
+   }
+  },
+  {
+   "attrs": [],
+   "end": {
+    "byte": 243,
+    "col": 0,
+    "line": 17
+   },
+   "kind": "Lean.Parser.Command.eoi",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 243,
+    "col": 0,
+    "line": 17
+   }
+  }
+ ],
+ "decls": [],
+ "file": "Rewire.lean",
+ "messages": [],
+ "mode": "parse"
+}

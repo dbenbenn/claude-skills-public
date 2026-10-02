@@ -1,40 +1,48 @@
 """rewire.py: a copy of a published theorem gets the published theorem as its proof, and the import."""
+import json
+import os
+
 import pytest
 
 import rewire as R
 
-PUB = {'dep': ('N.dep', 'Theorems.Thm_N_dep', [])}
+from p2mlib import leaninfo as LI
+from p2mlib.workspace import Published
 
-SRC = '''import Mathlib
-
-namespace N
-
-theorem dep' (n : Nat) : n = n := by
-  induction n <;> rfl
-
-end N
-
-theorem solution : (3 : Nat) = 3 := N.dep' 3
-'''
+FIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lean_fixtures')
+DEP = Published('N.dep', 'Theorems.Thm_N_dep', ['n'])
 
 
-def test_copy_proof_replaced_by_published_call():
-    out = R.rewrite(SRC, {"dep'"}, PUB)
-    assert 'induction n' not in out
-    assert "theorem dep' (n : Nat) : n = n :=" in out          # the copy's own statement is kept
-    assert 'exact N.dep' in out
+@pytest.fixture
+def info():
+    # parse-only is all rewrite() needs: command ranges, names and `:=` positions
+    data = json.load(open(os.path.join(FIX, 'Rewire.parse.json')))
+    return LI.parse(data, open(os.path.join(FIX, 'Rewire.lean'), 'rb').read())
+
+
+def test_copy_proof_replaced_by_published_call(info):
+    out = R.rewrite(info, {"M.dep'": DEP})
+    assert ':= by\n  simp\n' not in out                         # the old proof is gone
+    # the copy's own statement and doc comment are kept
+    assert "/-- a copy, primed -/\ntheorem dep' (n : ℕ) : n + 0 = n :=\n  by\n" in out
+    assert 'exact N.dep n' in out
     assert out.count('import Theorems.Thm_N_dep') == 1 and out.startswith('import Theorems.Thm_N_dep')
 
 
-def test_import_added_once_for_two_copies():
-    src = SRC.replace("end N", "theorem dep'' (n : Nat) : n = n := rfl\n\nend N")
-    out = R.rewrite(src, {"dep'", "dep''"}, PUB)
+def test_open_in_prefix_kept_and_import_added_once(info):
+    out = R.rewrite(info, {"M.dep'": DEP, "M.dep''": DEP})
     assert out.count('import Theorems.Thm_N_dep') == 1
+    assert "open Nat in\ntheorem dep'' (n : ℕ) : 0 + n = n :=\n  by" in out
 
 
-def test_solution_itself_untouched():
-    out = R.rewrite(SRC, {"dep'"}, PUB)
-    assert "theorem solution : (3 : Nat) = 3 := N.dep' 3" in out
+def test_solution_and_others_untouched(info):
+    out = R.rewrite(info, {"M.dep'": DEP})
+    assert 'theorem solution : True := trivial' in out and 'theorem stub : 1 = 1 := by sorry' in out
+    assert "theorem dep'' (n : ℕ) : 0 + n = n := Nat.zero_add n" in out
+
+
+def test_add_imports_skips_present_ones():
+    assert R.add_imports('import Mathlib\nimport A\n', ['A', 'B', 'B']) == 'import B\nimport Mathlib\nimport A\n'
 
 
 def test_published_index(tmp_path):

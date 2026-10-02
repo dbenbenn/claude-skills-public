@@ -6,6 +6,11 @@
   "Statements",
   "Diagrams"
  ],
- "status": "xfail",
- "why": "the accepted solution was rewired BY HAND after edge_overlap.py: it re-derived isReducedDiagram_iff and existsUnique_isReducedDiagram_diagramEquiv under other names (reduced_iff, reduced_unique, exists_reduced_equiv); the pipeline should find those copies by type (Phase 4.2) and produce this file itself"
+ "status": "partial",
+ "theorem_imports": [
+  "Theorems.Thm_CannonFloydParry_exists_isReduced_represents",
+  "Theorems.Thm_CannonFloydParry_exists_represents",
+  "Theorems.Thm_MooreFoelner_isReducedDiagram_iff"
+ ],
+ "why": "the accepted solution was rewired BY HAND after edge_overlap.py. Of its three re-derived lemmas, reduced_iff states MooreFoelner.isReducedDiagram_iff (through the local predicate CommonCaret, implicit binders): since Phase 4.2 the pipeline finds it by statement and rewires it. reduced_unique and exists_reduced_equiv are the two halves of the published existsUnique_isReducedDiagram_diagramEquiv (an ∃!), each derived from it in a few lines by a person; they state no published theorem, so no copy-finder produces the accepted file. 'partial' pins what the pipeline must reach: these Theorems imports exactly, compiling."
 }

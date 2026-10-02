@@ -834,9 +834,13 @@ rewired copy, whose proof calls the imported theorem, passes); `--allow-copy NAM
 name clash. The guard only knows names in `Theorems/`, so fetch first. The 2026-09-24 audit found 36 false edges on 19 theorems,
 missing edges on 11, and two false edges on sketches submitted from test files.
 
-**Rewiring by name is not enough.** A development can pass through a sibling's statement under
-other names, and neither `rewire.py` nor the edge audit sees it. CFP §7 shipped five such
-solutions, all accepted:
+**Rewiring finds copies by statement, but not parts of one.** Since 2026-10-02 `rewire.py` asks
+Lean which theorems of the file state a published theorem under any name: equal statements after
+renaming universes, unfolding the file's own predicates and erasing proofs (Moore's `reduced_iff`,
+written with a local `CommonCaret`, is now found; it had been rewired by hand). It cannot see a
+lemma that is a *part* or a *consequence* of a sibling's statement, nor a definition rebuilt
+inline: Moore's `reduced_unique` and `exists_reduced_equiv` are the two halves of a published
+`∃!`. The edge audit matches by name only. CFP §7 shipped five such solutions, all accepted:
 - Theorem 7.2 was `mulEquivF.trans psiEquiv`, with `psiEquiv` the published Δ₁ conjugation
   rebuilt inline.
 - Two Farey lemmas re-proved one direction of the published criterion as `subsimplex_of_farey`.
@@ -858,7 +862,9 @@ solution` stated verbatim; **then prune what the proof does not use**, with
 file carries lemmas its target never touches — one Chou submission was 684 lines of which 205
 were reachable. That is not only untidy: an unused copy of a *published* theorem reads as a
 missing graph edge, and importing it to "fix" that asserts a dependency the proof does not have.
-The script keeps what is reachable from `solution`, treats every attributed declaration and every
+The script keeps what is reachable from `solution` by Lean's own dependencies (LeanInfo: the
+constants in each proof term, plus every name the elaborator resolved in its source, since an
+`rfl` lemma used by `simp only` leaves no trace in the term), treats every attributed declaration and every
 `instance` as a root — `@[simp]` and typeclass resolution use a declaration without naming it, so
 unused-by-name is not unused — and `--check` re-elaborates the result, which is not optional; re-elaborate the published statement locally and discharge it with
 `solution <binders>` before submitting, which is the type check the server runs. A solution may

@@ -1,0 +1,308 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "end": {
+    "byte": 27,
+    "col": 11,
+    "line": 3
+   },
+   "kind": "Lean.Parser.Command.namespace",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 16,
+    "col": 0,
+    "line": 3
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 98,
+    "col": 6,
+    "line": 7
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "M.dep'"
+   ],
+   "namespace": "M",
+   "opens": [],
+   "start": {
+    "byte": 29,
+    "col": 0,
+    "line": 5
+   },
+   "value_start": {
+    "byte": 86,
+    "col": 33,
+    "line": 6
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 165,
+    "col": 51,
+    "line": 10
+   },
+   "inner_kind": "Lean.Parser.Command.declaration",
+   "kind": "Lean.Parser.Command.in",
+   "names": [
+    "M.dep''"
+   ],
+   "namespace": "M",
+   "opens": [],
+   "start": {
+    "byte": 100,
+    "col": 0,
+    "line": 9
+   },
+   "value_start": {
+    "byte": 148,
+    "col": 34,
+    "line": 10
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 199,
+    "col": 32,
+    "line": 12
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "M.stub"
+   ],
+   "namespace": "M",
+   "opens": [],
+   "start": {
+    "byte": 167,
+    "col": 0,
+    "line": 12
+   },
+   "value_start": {
+    "byte": 188,
+    "col": 21,
+    "line": 12
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 235,
+    "col": 34,
+    "line": 14
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "M.solution"
+   ],
+   "namespace": "M",
+   "opens": [],
+   "start": {
+    "byte": 201,
+    "col": 0,
+    "line": 14
+   },
+   "value_start": {
+    "byte": 225,
+    "col": 24,
+    "line": 14
+   }
+  },
+  {
+   "attrs": [],
+   "end": {
+    "byte": 242,
+    "col": 5,
+    "line": 16
+   },
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "M",
+   "opens": [],
+   "start": {
+    "byte": 237,
+    "col": 0,
+    "line": 16
+   }
+  },
+  {
+   "attrs": [],
+   "end": {
+    "byte": 243,
+    "col": 0,
+    "line": 17
+   },
+   "kind": "Lean.Parser.Command.eoi",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 243,
+    "col": 0,
+    "line": 17
+   }
+  }
+ ],
+ "decls": [
+  {
+   "kind": "theorem",
+   "name": "M.dep'",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 98,
+     "col": 6,
+     "line": 7
+    },
+    "start": {
+     "byte": 29,
+     "col": 0,
+     "line": 5
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 63,
+     "col": 12,
+     "line": 6
+    },
+    "start": {
+     "byte": 59,
+     "col": 8,
+     "line": 6
+    }
+   },
+   "type": "∀ (n : ℕ), n + 0 = n",
+   "type_hash": 720014397,
+   "uses_imported": [],
+   "uses_local": []
+  },
+  {
+   "kind": "theorem",
+   "name": "M.dep''",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 165,
+     "col": 51,
+     "line": 10
+    },
+    "start": {
+     "byte": 112,
+     "col": 0,
+     "line": 10
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 125,
+     "col": 13,
+     "line": 10
+    },
+    "start": {
+     "byte": 120,
+     "col": 8,
+     "line": 10
+    }
+   },
+   "type": "∀ (n : ℕ), 0 + n = n",
+   "type_hash": 307762279,
+   "uses_imported": [],
+   "uses_local": []
+  },
+  {
+   "kind": "theorem",
+   "name": "M.stub",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 199,
+     "col": 32,
+     "line": 12
+    },
+    "start": {
+     "byte": 167,
+     "col": 0,
+     "line": 12
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 179,
+     "col": 12,
+     "line": 12
+    },
+    "start": {
+     "byte": 175,
+     "col": 8,
+     "line": 12
+    }
+   },
+   "type": "1 = 1",
+   "type_hash": 1326858781,
+   "uses_imported": [],
+   "uses_local": []
+  },
+  {
+   "kind": "theorem",
+   "name": "M.solution",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 235,
+     "col": 34,
+     "line": 14
+    },
+    "start": {
+     "byte": 201,
+     "col": 0,
+     "line": 14
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 217,
+     "col": 16,
+     "line": 14
+    },
+    "start": {
+     "byte": 209,
+     "col": 8,
+     "line": 14
+    }
+   },
+   "type": "True",
+   "type_hash": 3270818714,
+   "uses_imported": [],
+   "uses_local": []
+  }
+ ],
+ "file": "Rewire.lean",
+ "messages": [
+  {
+   "end": {
+    "byte": 179,
+    "col": 12,
+    "line": 12
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 175,
+    "col": 8,
+    "line": 12
+   },
+   "text": "declaration uses `sorry`"
+  }
+ ],
+ "mode": "elaborate"
+}

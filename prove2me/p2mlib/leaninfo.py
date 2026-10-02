@@ -54,6 +54,7 @@ class Command:
     names: list                   # declared names, from syntax
     inner_kind: str = None        # for `open … in` / `set_option … in`: the wrapped command's kind
     decl_kind: str = None         # for a declaration: theorem, definition, instance, structure, …
+    value_start: Pos = None       # for a declaration with a value: where its `:=` (or `|`, `where`) starts
 
     @property
     def short_kind(self):
@@ -72,6 +73,7 @@ class Decl:
     type_hash: int
     uses_local: list
     uses_imported: list           # [{'name', 'module'}], our modules only
+    same_statement_as: list = field(default_factory=list)   # with run(candidates=...): published copies
     command: int = None           # index into Info.commands
     generated: bool = False       # made by Lean for another declaration (P.rec, P.casesOn, ...)
 
@@ -131,13 +133,14 @@ def _pos(j):
 def parse(data, text_bytes=b''):
     """An Info from LeanInfo's JSON (a dict)."""
     cmds = [Command(i, c['kind'], _pos(c['start']), _pos(c['end']), c['namespace'], c['opens'],
-                    c['attrs'], c['names'], c.get('inner_kind'), (c.get('decl_kind') or '').rsplit('.', 1)[-1] or None)
+                    c['attrs'], c['names'], c.get('inner_kind'), (c.get('decl_kind') or '').rsplit('.', 1)[-1] or None,
+                    _pos(c['value_start']) if c.get('value_start') else None)
             for i, c in enumerate(data['commands'])]
     decls = []
     for d in data.get('decls') or []:
         x = Decl(d['name'], d['private'], d['kind'], _pos(d['range']['start']), _pos(d['range']['end']),
                  (_pos(d['selection']['start']), _pos(d['selection']['end'])), d['type'], d['type_hash'],
-                 d['uses_local'], d['uses_imported'])
+                 d['uses_local'], d['uses_imported'], d.get('same_statement_as') or [])
         for c in cmds:
             if c.start.byte <= x.start.byte <= c.end.byte:
                 x.command = c.index
@@ -148,8 +151,10 @@ def parse(data, text_bytes=b''):
     return Info(data['file'], data['mode'], cmds, decls, msgs, text_bytes)
 
 
-def _key(path, parse_only, ws):
+def _key(path, parse_only, ws, candidates=()):
     h = hashlib.sha256()
+    if candidates:
+        h.update(('candidates:' + ','.join(candidates)).encode())
     h.update(open(TOOL, 'rb').read())
     h.update(open(path, 'rb').read())
     h.update(b'parse' if parse_only else b'elaborate')
@@ -166,15 +171,19 @@ def _key(path, parse_only, ws):
     return h.hexdigest()
 
 
-def run(path, parse_only=False, ws=None, use_cache=True, timeout=3000):
+def run(path, parse_only=False, ws=None, use_cache=True, timeout=3000, candidates=()):
+    """LeanInfo on `path`. `candidates`: published modules to import beside the file's own, so each
+    theorem reports `same_statement_as` (elaborate mode; see lean/LeanInfo.lean)."""
     path = os.path.abspath(path)
     ws = ws or workspace()
     text = open(path, 'rb').read()
-    key = _key(path, parse_only, ws)
+    candidates = list(candidates)
+    key = _key(path, parse_only, ws, candidates)
     cf = os.path.join(CACHE, key + '.json')
     if use_cache and os.path.exists(cf):
         return parse(json.load(open(cf)), text)
-    args = ['lake', 'env', 'lean', '--run', TOOL, path] + (['--parse-only'] if parse_only else [])
+    args = ['lake', 'env', 'lean', '--run', TOOL, path] + (['--parse-only'] if parse_only else []) + \
+        (['--candidates', ','.join(candidates)] if candidates else [])
     r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout)
     out = r.stdout.strip().split('\n')[-1] if r.stdout.strip() else ''
     try:

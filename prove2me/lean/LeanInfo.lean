@@ -117,6 +117,12 @@ partial def declKind (stx : Syntax) : Option Name :=
   else if stx.getKind == `lemma then some ``Lean.Parser.Command.theorem
   else none
 
+/-- Where a declaration's value starts: its `:=`, its equations' first `|`, or its `where`. -/
+partial def valueStart? (stx : Syntax) : Option String.Pos.Raw :=
+  if stx.getKind == ``Lean.Parser.Command.declValSimple || stx.getKind == ``Lean.Parser.Command.declValEqns ||
+     stx.getKind == ``Lean.Parser.Command.whereStructInst then stx.getPos?
+  else stx.getArgs.findSome? valueStart?
+
 def innerKind (stx : Syntax) : Option Name :=
   if stx.getKind == ``Lean.Parser.Command.in then some stx[2].getKind else none
 
@@ -134,7 +140,10 @@ def commandJ (fm : FileMap) (stx : Syntax) (scope : Name × List OpenDecl) : Opt
     | some k => [("inner_kind", toJson (toString k))]
     | none => []) ++
     (match declKind stx with
-    | some k => [("decl_kind", toJson (toString k))]
+    | some k => [("decl_kind", toJson (toString k))] ++
+      (match valueStart? stx with
+      | some p => [("value_start", posJ fm p)]
+      | none => [])
     | none => []))
 
 /-- Commands elaborated even in parse-only mode: they change how later text parses (notation,

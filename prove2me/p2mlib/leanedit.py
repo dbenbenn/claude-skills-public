@@ -65,6 +65,18 @@ def replace_command(info, i, text):
     return (t[:c.start.byte] + text.encode('utf-8') + t[c.end.byte:]).decode('utf-8')
 
 
+def replace_commands(info, reps):
+    """The source with each command i in `reps` ({i: text}) replaced, trailing trivia kept."""
+    t = info.text_bytes
+    out, cur = [], 0
+    for i in sorted(reps):
+        c = info.commands[i]
+        out += [t[cur:c.start.byte], reps[i].encode('utf-8')]
+        cur = c.end.byte
+    out.append(t[cur:])
+    return b''.join(out).decode('utf-8')
+
+
 def insert_before(info, i, text):
     """The source with `text` inserted just before command i."""
     a = info.commands[i].start.byte

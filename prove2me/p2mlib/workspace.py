@@ -36,8 +36,8 @@ def statement_decl(text):
     return full, code[m.start():j if j >= 0 else len(code)]
 
 
-def published(ws=None):
-    """{short name: Published} for every statement in Theorems/ (first file wins on a clash)."""
+def published_by_full(ws=None):
+    """{full name: Published} for every statement in Theorems/."""
     ws = ws or workspace()
     tdir = os.path.join(ws, 'Theorems')
     out = {}
@@ -46,5 +46,14 @@ def published(ws=None):
             continue
         full, hdr = statement_decl(open(os.path.join(tdir, f), encoding='utf-8').read())
         if full:
-            out.setdefault(full.rsplit('.', 1)[-1], Published(full, 'Theorems.' + f[:-5], explicit_binders(hdr)))
+            out.setdefault(full, Published(full, 'Theorems.' + f[:-5], explicit_binders(hdr)))
+    return out
+
+
+def published(ws=None):
+    """{short name: Published} for every statement in Theorems/ (first file wins when two share a
+    short name; published_by_full has them all)."""
+    out = {}
+    for full, p in published_by_full(ws).items():
+        out.setdefault(full.rsplit('.', 1)[-1], p)
     return out
