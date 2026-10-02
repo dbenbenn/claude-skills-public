@@ -1,0 +1,13 @@
+{
+ "top": "FAmenChild.isAmenable_F_of_isExtensivelyAmenableOn",
+ "axioms": [
+  "propext",
+  "Classical.choice",
+  "Quot.sound",
+  "Garrido.isAmenable_of_commGroup",
+  "CannonFloydParry.mem_F_iff_isThompson",
+  "CannonFloydParry.bijOn_dyadic"
+ ],
+ "status": "xfail",
+ "why": "PartB2 wraps several targets in `section B2 ... variable {X} ... end B2`; assemble_blueprint splits Parts at declarations, so the section lines land in the wrong chunks (\"Invalid name after end: Expected B2, but found PartB2\"). Fixed by LeanInfo command ranges (Phase 4.3). The accepted solution (4e34b886) came from the mission-specific assemble_child.py."
+}

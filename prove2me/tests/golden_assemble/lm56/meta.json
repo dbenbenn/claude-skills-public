@@ -1,0 +1,10 @@
+{
+ "top": "LM56.lemma56_fails",
+ "axioms": [
+  "propext",
+  "Classical.choice",
+  "Quot.sound"
+ ],
+ "status": "exact",
+ "why": "Lemma 5.6 counterexample: five parts whose helpers mention Blueprint definitions given after earlier stubs (S1 decomp2, S2 psi_D_apply) -- the cases that forced the dependency sort"
+}

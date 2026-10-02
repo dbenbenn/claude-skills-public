@@ -178,3 +178,33 @@ Layer 4 would have caught three real failures:
 - the list endpoint paging at 50 when we asked for 100;
 - the poll timeout misread as a rejection;
 - "the platform never serves submitted code".
+
+## Status
+
+**Phase 0 (2026-10-02): done.** The inventory is in `scripts/README.md`.
+
+**Phase 1 (2026-10-02): in progress.** `tests/`: 26 offline tests, plus the Lean and live layers.
+
+| Area | Tests |
+|---|---|
+| build_solutions | `open … in`, prime-aware matching, docstring "open", block boundaries |
+| submit_all | parallel, retries, PENDING, FAILED, DUPLICATE |
+| check_description | unlinked platform objects, Roman numerals, first person |
+| prune_solution | `open … in` prefix, attributed roots, no solution |
+| merge | namespace-qualified clash, duplicates, `@[simp]` survival, per-module sections, universes, existing solution |
+| extract_payloads | bare vs qualified names, unused bundles, universes |
+| Golden pipeline | Moore `isMarginal_EBad`, byte-identical to the accepted solution; Moore `bijOn` (hand-rewired), strict xfail until Phase 4.2 |
+| Golden assemble | Lemma 5.6, pinned and compiling with standard axioms; Chornyi child, strict xfail (bug below) |
+| Live contract | paging, solution endpoint, sketch shape, `deprecated_at`, verify |
+
+Each regression test fails on the pre-fix version of its script.
+
+**Bug found by the tests.** `assemble_blueprint.py` mis-splits a Part whose `section … variable … end`
+block spans several targets: the FAmenChild B2 case. Fix it in Phase 4.3 with LeanInfo ranges.
+
+**Still to cover in Phase 1:**
+- the API scripts (`deprecate`, `publish_standalone`, `publish_status`, `fetch_theorems`,
+  `submit_solution` guards), on recorded responses;
+- the audit cluster (`draft` upload/verify, `stage_auditor`, `source_audit`, `decisions`,
+  `caveat_audit`), as characterization tests on a recorded proposal;
+- `rewire`, `resolve_imports`, `edge_audit`.
