@@ -157,3 +157,27 @@ def test_replace_and_insert():
     i = leanedit.command_of(info, 'f_zero')
     assert 'theorem f_zero : f 0 = 1 := by rfl' in leanedit.replace_command(info, i, 'theorem f_zero : f 0 = 1 := by rfl')
     assert '-- inserted\ntheorem f_zero' in leanedit.insert_before(info, i, '-- inserted\n')
+
+
+def scope_fixture():
+    import json, os
+    fix = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lean_fixtures')
+    return leaninfo.parse(json.load(open(os.path.join(fix, "Scope.json"))), open(os.path.join(fix, "Scope.lean"), "rb").read())
+
+
+def test_scope_wrap_carries_local_attributes_after_their_namespace():
+    # Lodha-Moore S2 (2026-10-02): `attribute [local instance] polishSpace_P1` was not context, and at
+    # the top level the namespace was opened only after the context commands, so neither resolved
+    info = scope_fixture()
+    i = leanedit.command_of(info, 'Sc.uses')
+    assert leanedit.scope_wrap(info, i, top_level=True) == ('section\nopen Sc\nattribute [local simp] helper_eq\n', 'end\n')
+    assert leanedit.scope_wrap(info, i) == ('section\nnamespace Sc\nattribute [local simp] helper_eq\n', 'end Sc\nend\n')
+
+
+def test_prune_drops_the_include_of_a_dropped_variable():
+    # Lodha-Moore S3a (2026-10-02): `variable (hb : HB)` went with HB, `include hb` stayed
+    from p2mlib import prune
+    info = scope_fixture()
+    drop, imports, rep = prune.plan(info)
+    out = prune.apply(info, drop, imports)
+    assert 'variable (hb : HB)' not in out and 'include hb' not in out and 'theorem solution' in out

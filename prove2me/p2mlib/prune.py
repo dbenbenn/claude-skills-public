@@ -17,6 +17,14 @@ from . import leanedit, names
 DIAGNOSTIC = {'check', 'eval', 'print', 'printAxioms', 'reduce', 'check_failure', 'synth', 'evalBang'}
 
 
+def _binder_names(variable_cmd):
+    """The names a `variable` command binds: `variable (hb : HB) {x y : S} [inst : C]` -> hb, x, y, inst."""
+    out = []
+    for group in re.findall(r'[(\[{⦃]([^:()\[\]{}⦃⦄]*):', variable_cmd):
+        out += group.split()
+    return out
+
+
 def plan(info):
     """(drop: set of command indices, drop_imports: [module], report: dict)."""
     by_name = {d.name: d for d in info.decls}
@@ -53,9 +61,20 @@ def plan(info):
             gone += [d.name for d in info.decls if d.command == c.index and not d.generated]
         elif c.short_kind in DIAGNOSTIC:
             drop.add(c.index)
+    dropped_vars = set()
     for c in info.commands:
         if c.short_kind in ('variable', 'attribute') and c.index not in drop:
-            if any(names.mentions(info.slice(c.start.byte, c.end.byte), g) for g in gone):
+            t = info.slice(c.start.byte, c.end.byte)
+            if any(names.mentions(t, g) for g in gone):
+                drop.add(c.index)
+                if c.short_kind == 'variable':
+                    dropped_vars |= set(_binder_names(t))
+    # an `include hb` / `omit hb` naming a dropped variable's binder goes too ("invalid 'include',
+    # variable `hb` has not been declared", Lodha-Moore S3a 2026-10-02)
+    for c in info.commands:
+        if c.short_kind in ('include', 'omit') and c.index not in drop:
+            t = info.slice(c.start.byte, c.end.byte)
+            if any(names.mentions(t, v) for v in dropped_vars):
                 drop.add(c.index)
     used_modules = {u['module'] for d in info.decls if d.command not in drop for u in d.uses_imported}
     header = info.slice(0, info.commands[0].start.byte) if info.commands else ''

@@ -109,19 +109,26 @@ def scope_wrap(info, i, top_level=False):
     `open scoped`).
 
     `top_level`: declare at the top level instead (a `theorem solution` must not be namespaced:
-    the verifier answers "Unknown identifier solution"). The enclosing namespaces are not
-    re-opened; the namespace in force is `open`ed after the context, as names inside it resolved."""
-    pre, post = ['section'], ['end']
+    the verifier answers "Unknown identifier solution"). Each enclosing namespace is `open`ed where
+    it was entered, so the context commands after it resolve their names as they did."""
+    pre, post, ns = ['section'], ['end'], ''
     for opener, cmds in info.commands[i].context:
         # a plain `section` adds nothing but its context commands, which come anyway; a namespace
         # names what is declared in it, a `noncomputable section` changes elaboration
         o = text(info, opener) if opener is not None else ''
-        if (o.startswith('namespace') and not top_level) or o.startswith('noncomputable'):
+        if o.startswith('namespace'):
+            ns = (ns + '.' if ns else '') + o.split()[1]
+            if top_level:
+                # opened where the namespace was entered, so the context commands after it (an
+                # `attribute [local instance] polishSpace_P1`) resolve their names as they did
+                pre.append('open %s' % ns)
+            else:
+                pre.append(o)
+                post.insert(0, closer(info, opener))
+        elif o.startswith('noncomputable'):
             pre.append(o)
             post.insert(0, closer(info, opener))
         pre += [text(info, k) for k in cmds]
-    if top_level and info.commands[i].namespace:
-        pre.append('open %s' % info.commands[i].namespace)
     return '\n'.join(pre) + '\n', '\n'.join(post) + '\n'
 
 

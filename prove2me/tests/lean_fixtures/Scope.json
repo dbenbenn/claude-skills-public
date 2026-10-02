@@ -1,0 +1,756 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 28,
+    "col": 12,
+    "line": 3
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 16,
+    "col": 0,
+    "line": 3
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 76,
+    "col": 44,
+    "line": 5
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 47,
+      "col": 17,
+      "line": 5
+     },
+     "start": {
+      "byte": 38,
+      "col": 8,
+      "line": 5
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "Sc.helper_eq"
+   ],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 30,
+    "col": 0,
+    "line": 5
+   },
+   "value_start": {
+    "byte": 70,
+    "col": 38,
+    "line": 5
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "end": {
+    "byte": 85,
+    "col": 7,
+    "line": 7
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.section",
+   "names": [],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 78,
+    "col": 0,
+    "line": 7
+   }
+  },
+  {
+   "attrs": [
+    "local simp"
+   ],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    },
+    {
+     "cmds": [],
+     "opener": 2
+    }
+   ],
+   "end": {
+    "byte": 118,
+    "col": 32,
+    "line": 8
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.attribute",
+   "names": [],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 86,
+    "col": 0,
+    "line": 8
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    },
+    {
+     "cmds": [
+      3
+     ],
+     "opener": 2
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 165,
+    "col": 43,
+    "line": 10
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 132,
+      "col": 12,
+      "line": 10
+     },
+     "start": {
+      "byte": 128,
+      "col": 8,
+      "line": 10
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "Sc.uses"
+   ],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 120,
+    "col": 0,
+    "line": 10
+   },
+   "value_start": {
+    "byte": 155,
+    "col": 33,
+    "line": 10
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    },
+    {
+     "cmds": [
+      3
+     ],
+     "opener": 2
+    }
+   ],
+   "end": {
+    "byte": 170,
+    "col": 3,
+    "line": 12
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 167,
+    "col": 0,
+    "line": 12
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "end": {
+    "byte": 193,
+    "col": 21,
+    "line": 14
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 178,
+      "col": 6,
+      "line": 14
+     },
+     "start": {
+      "byte": 176,
+      "col": 4,
+      "line": 14
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "Sc.HB"
+   ],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 172,
+    "col": 0,
+    "line": 14
+   },
+   "value_start": {
+    "byte": 186,
+    "col": 14,
+    "line": 14
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "end": {
+    "byte": 202,
+    "col": 7,
+    "line": 16
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.section",
+   "names": [],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 195,
+    "col": 0,
+    "line": 16
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "end": {
+    "byte": 221,
+    "col": 18,
+    "line": 17
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.variable",
+   "names": [],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 203,
+    "col": 0,
+    "line": 17
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    },
+    {
+     "cmds": [
+      8
+     ],
+     "opener": 7
+    }
+   ],
+   "end": {
+    "byte": 232,
+    "col": 10,
+    "line": 18
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.include",
+   "names": [],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 222,
+    "col": 0,
+    "line": 18
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    },
+    {
+     "cmds": [
+      8,
+      9
+     ],
+     "opener": 7
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 268,
+    "col": 34,
+    "line": 20
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 250,
+      "col": 16,
+      "line": 20
+     },
+     "start": {
+      "byte": 242,
+      "col": 8,
+      "line": 20
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "Sc.needs_hb"
+   ],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 234,
+    "col": 0,
+    "line": 20
+   },
+   "value_start": {
+    "byte": 258,
+    "col": 24,
+    "line": 20
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    },
+    {
+     "cmds": [
+      8,
+      9
+     ],
+     "opener": 7
+    }
+   ],
+   "end": {
+    "byte": 273,
+    "col": 3,
+    "line": 22
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 270,
+    "col": 0,
+    "line": 22
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "end": {
+    "byte": 281,
+    "col": 6,
+    "line": 24
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "Sc",
+   "opens": [],
+   "start": {
+    "byte": 275,
+    "col": 0,
+    "line": 24
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 317,
+    "col": 34,
+    "line": 26
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 299,
+      "col": 16,
+      "line": 26
+     },
+     "start": {
+      "byte": 291,
+      "col": 8,
+      "line": 26
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "solution"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 283,
+    "col": 0,
+    "line": 26
+   },
+   "value_start": {
+    "byte": 307,
+    "col": 24,
+    "line": 26
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 318,
+    "col": 0,
+    "line": 27
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 318,
+    "col": 0,
+    "line": 27
+   }
+  }
+ ],
+ "decls": [
+  {
+   "kind": "theorem",
+   "name": "Sc.helper_eq",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 76,
+     "col": 44,
+     "line": 5
+    },
+    "start": {
+     "byte": 30,
+     "col": 0,
+     "line": 5
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 47,
+     "col": 17,
+     "line": 5
+    },
+    "start": {
+     "byte": 38,
+     "col": 8,
+     "line": 5
+    }
+   },
+   "type": "∀ (n : ℕ), n + 0 = n",
+   "type_hash": 720014397,
+   "uses_imported": [],
+   "uses_local": [],
+   "uses_sorry": false
+  },
+  {
+   "kind": "theorem",
+   "name": "Sc.uses",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 165,
+     "col": 43,
+     "line": 10
+    },
+    "start": {
+     "byte": 120,
+     "col": 0,
+     "line": 10
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 132,
+     "col": 12,
+     "line": 10
+    },
+    "start": {
+     "byte": 128,
+     "col": 8,
+     "line": 10
+    }
+   },
+   "type": "∀ (n : ℕ), n + 0 = n",
+   "type_hash": 720014397,
+   "uses_imported": [],
+   "uses_local": [],
+   "uses_sorry": false
+  },
+  {
+   "kind": "def",
+   "name": "Sc.HB",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 193,
+     "col": 21,
+     "line": 14
+    },
+    "start": {
+     "byte": 172,
+     "col": 0,
+     "line": 14
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 178,
+     "col": 6,
+     "line": 14
+    },
+    "start": {
+     "byte": 176,
+     "col": 4,
+     "line": 14
+    }
+   },
+   "type": "Prop",
+   "type_hash": 3944470172,
+   "uses_imported": [],
+   "uses_local": [],
+   "uses_sorry": false
+  },
+  {
+   "kind": "theorem",
+   "name": "Sc.needs_hb",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 268,
+     "col": 34,
+     "line": 20
+    },
+    "start": {
+     "byte": 234,
+     "col": 0,
+     "line": 20
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 250,
+     "col": 16,
+     "line": 20
+    },
+    "start": {
+     "byte": 242,
+     "col": 8,
+     "line": 20
+    }
+   },
+   "type": "Sc.HB → True",
+   "type_hash": 1013792546,
+   "uses_imported": [],
+   "uses_local": [
+    "Sc.HB"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "theorem",
+   "name": "solution",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 317,
+     "col": 34,
+     "line": 26
+    },
+    "start": {
+     "byte": 283,
+     "col": 0,
+     "line": 26
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 299,
+     "col": 16,
+     "line": 26
+    },
+    "start": {
+     "byte": 291,
+     "col": 8,
+     "line": 26
+    }
+   },
+   "type": "True",
+   "type_hash": 3270818714,
+   "uses_imported": [],
+   "uses_local": [],
+   "uses_sorry": false
+  }
+ ],
+ "file": "Scope.lean",
+ "messages": [
+  {
+   "end": {
+    "byte": 268,
+    "col": 34,
+    "line": 20
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 234,
+    "col": 0,
+    "line": 20
+   },
+   "text": "automatically included section variable(s) unused in theorem `Sc.needs_hb`:\n  hb\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hb in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  }
+ ],
+ "mode": "elaborate"
+}

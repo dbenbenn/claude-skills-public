@@ -170,6 +170,15 @@ def contextKind (k : Name) : Bool :=
   k ∈ [``Lean.Parser.Command.open, ``Lean.Parser.Command.variable, ``Lean.Parser.Command.universe,
        ``Lean.Parser.Command.include, ``Lean.Parser.Command.omit, ``Lean.Parser.Command.set_option]
 
+/-- A context command: one of the kinds above, or an `attribute [local …]` command (`attribute
+[local instance] polishSpace_P1` lasts to the end of its scope, like an `open`; a block moved out of
+that scope lost the instance, Lodha–Moore 2026-10-02). A global `attribute` is a permanent change,
+not context. -/
+def isContextCmd (stx : Syntax) : Bool :=
+  contextKind stx.getKind ||
+  (stx.getKind == ``Lean.Parser.Command.attribute &&
+    ((stx.reprint.getD "").splitOn "[local ").length > 1)
+
 /-- Commands elaborated even in parse-only mode: they change how later text parses (notation,
 syntax, scoped opens) or which namespace and options are in force. Declarations are not. -/
 def shapesParsing (k : Name) : Bool :=
@@ -279,7 +288,7 @@ unsafe def main (args : List String) : IO UInt32 := do
       while d > d1 && stack.size > 1 do
         d := d - stack.back!.2.1
         stack := stack.pop
-    else if contextKind cmd.getKind then
+    else if isContextCmd cmd then
       stack := stack.modify (stack.size - 1) fun (o, k, cs) => (o, k, cs.push i)
     if Parser.isTerminalCommand cmd then return (acc, got, refs, ctxs) else loop acc got refs stack ctxs
   let ((scopes, got, cmdRefs, ctxs), s) ← (loop #[] #[] #[] #[(none, 1, #[])] #[]).run { inputCtx } |>.run
