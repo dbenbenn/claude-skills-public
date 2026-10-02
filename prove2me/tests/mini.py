@@ -23,6 +23,7 @@ def payloads():
 
 
 def make_mission(tmp_path):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     (tmp_path / 'lib').mkdir()
     (tmp_path / 'readbacks').mkdir()
     (tmp_path / 'mission.py').write_text(MISSION)
