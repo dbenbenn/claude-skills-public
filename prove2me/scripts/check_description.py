@@ -94,6 +94,20 @@ for m in re.finditer(r'(?i)\b(to date|as of|not yet|still open|remains? open|no 
     a, b = max(0, m.start() - 50), m.end() + 50
     warn.append('status claim, check it against the platform today: …%s…' % ' '.join(s[a:b].split()))
 
+# 6d. a platform object named without a link. dbenbenn (2026-10-02): "the Monod mission on this
+# platform" should be a link -- "I often notice text like that that ought to be a link, but don't
+# always bother to mention it." Each sentence that names another mission, "this platform", or
+# something published, and carries no prove2.me link, is surfaced.
+for sent in re.split(r'(?<=[.;:])\s+|\n+', s):
+    if re.search(r'(?i)^this mission formalizes', sent.strip()):
+        continue
+    if re.search(r"(?i)\b(?:[A-Z][\w–'-]*(?:\s+[A-Z§][\w–'-]*)*\s+missions?\b|"
+                 r'missions? on |this platform|on the platform|published (?:on|by|in|as|there)|'
+                 r'(?:is|are) published|the published\b)', sent) \
+            and not re.search(r'\]\(https://prove2\.me/', sent) \
+            and not re.search(r'(?i)\bthis mission\b', sent):
+        warn.append('names a platform object without a prove2.me link: …%s…' % ' '.join(sent.split())[:110])
+
 # 7. length
 words = len(re.sub(r'\$[^$]*\$', ' X ', s).split())
 if not 800 <= words <= 1500:
