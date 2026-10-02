@@ -260,6 +260,35 @@ commands, 284 declarations). FAmenChild PartB2 parses with no errors.
   definition hashes differently (the `bijOn` / `CommonCaret` case), so Phase 4.2 needs a
   Lean-side defeq comparison.
 
-**Next: Phase 3.** The `p2mlib` core: `api` (pagination, polling, retries), `workspace`, `names`,
-`leanedit` (cut and insert by LeanInfo ranges), and `mission` (loading without
-`import mission`).
+**Phase 3 (2026-10-02): done.** The `p2mlib` core, with 16 unit tests.
+
+| Module | Contents |
+|---|---|
+| `api` | the client: lazy credentials, retries, 401 refresh, the frozen-field comment guard; `paginate`, `paginate_numbered`, `poll_verdict` (PENDING is not rejection), `submission_source`, `live_sketch_edges`, `theorem_id` |
+| `workspace` | one `workspace()`; one comment-aware `published()` (a NamedTuple, compatible with tuple indexing) |
+| `names` | `short`, `base`, `qualify`, prime-aware `name_re`, comment-aware `mentions` |
+| `leantext` | the comment stripper and `explicit_binders`, moved here |
+| `leanedit` | remove, replace and insert by LeanInfo command spans |
+| `mission` | `load()`, never through `import mission` |
+| `staging` | the guarded `fresh_dir`, `remove` (never follows links), `render_pages` |
+
+**Migrated to it.**
+- `p2m.py` is now a re-export of the client.
+- The three `_workspace()` copies go through `p2mlib`, as do the stripper and `rewire.published` /
+  `explicit_binders`.
+- Both `paged()` copies use `api.paginate`; edge_audit's submissions loop uses
+  `api.paginate_numbered`, and `submit_verify.poll` uses `api.poll_verdict`.
+- `submit_all`, `build_solutions` and `publish_standalone` load missions through
+  `mission.load`, so the test-isolation fixture for the module cache is gone.
+- `caveat_audit` and `source_audit` stage and render through `staging`; caveat_audit gained
+  `--force`.
+
+**Two strict xfails fixed and now regular tests:** `rewire.published` reading a comment line, and
+`caveat_audit` restaging over a live auditor.
+
+**Next: Phase 4.** Migrate the scripts onto LeanInfo, in order:
+1. `prune_solution`: reachability over `uses_local`.
+2. `rewire`: copies found by type equality, then defeq (fixes xfail #1).
+3. `merge`, `build_solutions`, `assemble_blueprint`: command ranges (fixes #2, #4, #5).
+4. One edge auditor.
+5. `extract_payloads`: names from LeanInfo (fixes #6).

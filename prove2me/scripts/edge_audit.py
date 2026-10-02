@@ -46,14 +46,8 @@ def sig(text, name):
 
 
 def paged(path, key):
-    out, off = [], 0
-    while True:
-        r = call('GET', '%s%slimit=100&offset=%d' % (path, '&' if '?' in path else '?', off))
-        b = r.get(key) or []
-        out += b
-        if len(b) < 100:
-            return out
-        off += 100
+    from p2mlib.api import paginate
+    return paginate(path, key, call=call)
 
 
 def main():
@@ -81,14 +75,8 @@ def main():
     # GET /submissions ignores theorem_id and returns the whole history: fetch once, filter here
     # paginated at 100 per page since platform 0.11.5 (2026-09-30); a single call silently
     # returned only the newest 100 of ~1000 submissions
-    subs, page = [], 1
-    while True:
-        d = call('GET', '/submissions?page=%d' % page)
-        batch = d.get('submissions') or []
-        subs += batch
-        if not batch or len(subs) >= (d.get('total') or 0):
-            break
-        page += 1
+    from p2mlib.api import paginate_numbered
+    subs = paginate_numbered('/submissions', 'submissions', call=call)
     solsig, imps = {}, {}
 
     def index_local_files():

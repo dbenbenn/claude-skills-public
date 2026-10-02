@@ -25,6 +25,7 @@ is not found. `edge_audit.py` reports which copies are left.
 """
 import argparse, os, re, shutil, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # p2mlib
 from prune_solution import parse, _workspace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -45,63 +46,16 @@ def qualified(lines, start, name):
     return '.'.join(stack + [name])
 
 def explicit_binders(header):
-    """Names of the explicit `(a b : T)` binders of a declaration header, in order.
-
-    Only TOP-LEVEL binder groups count, and only before the header's top-level `:`. A conclusion
-    like `(∃ m : …) ∧ …` looks like a binder group (it once produced `haveI := ∃`), and so does a
-    parenthesised term inside a binder's type: Lemma 4.8's `(hh : ∀ v, (h v : BinaryTreeAut) = …)`
-    once contributed two phantom arguments `h v`."""
-    names, depth, i, n = [], 0, 0, len(header)
-    while i < n:
-        ch = header[i]
-        if depth == 0 and ch == ':' and header[i:i + 2] != ':=':
-            break                                   # the conclusion starts here
-        if ch in '([{⦃':
-            if depth == 0 and ch == '(':
-                d, j = 0, i                         # scan to the matching `)`
-                while j < n:
-                    if header[j] in '([{⦃':
-                        d += 1
-                    elif header[j] in ')]}⦄':
-                        d -= 1
-                        if d == 0:
-                            break
-                    j += 1
-                grp = header[i + 1:j]
-                k, dd = 0, 0                        # the group's own top-level `:`
-                while k < len(grp):
-                    if grp[k] in '([{⦃':
-                        dd += 1
-                    elif grp[k] in ')]}⦄':
-                        dd -= 1
-                    elif grp[k] == ':' and dd == 0:
-                        names += [x for x in grp[:k].split() if re.fullmatch(r"[^\W\d][\w'₀-₉]*", x)]
-                        break
-                    k += 1
-                i = j + 1
-                continue
-            depth += 1
-        elif ch in ')]}⦄':
-            depth -= 1
-        i += 1
-    return names
+    from p2mlib.leantext import explicit_binders as eb
+    return eb(header)
 
 
 def published(ws):
-    """{short name: (full name, module, explicit binder names)} for every theorem in the workspace."""
-    out = {}
-    tdir = os.path.join(ws, 'Theorems')
-    for f in sorted(os.listdir(tdir)):
-        if not (f.startswith('Thm_') and f.endswith('.lean')):
-            continue
-        t = open(os.path.join(tdir, f), encoding='utf-8').read()
-        ns = re.search(r'^namespace (\S+)', t, re.M)
-        m = re.search(r'^\s*theorem\s+(\S+)', t, re.M)
-        if m:
-            full = (ns.group(1) + '.' if ns else '') + m.group(1)
-            hdr = t[m.start():t.find(':=', m.start())]
-            out.setdefault(full.split('.')[-1], (full, 'Theorems.' + f[:-5], explicit_binders(hdr)))
-    return out
+    """{short name: (full name, module, explicit binder names)} -- p2mlib.workspace.published,
+    which reads statements comment-aware (a comment line beginning "theorem" once named the
+    wrong declaration here)."""
+    from p2mlib.workspace import published as pub
+    return pub(ws)
 
 
 def body_for(full, header, pub_args):

@@ -23,7 +23,8 @@ def main():
     here = os.path.abspath(args[0])
     sys.path[:0] = [here, SK]
     from p2m import call
-    import mission as M
+    from p2mlib.mission import load
+    M = load(here)
     payloads = []
     for T in M.THEOREMS:
         src = open(os.path.join(here, 'lib', 'Thm_%s.lean' % T['name']), encoding='utf-8').read().split('\n')

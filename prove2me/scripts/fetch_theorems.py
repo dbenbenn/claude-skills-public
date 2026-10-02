@@ -25,14 +25,8 @@ from prune_solution import _workspace
 
 
 def paged(path, key):
-    out, off = [], 0
-    while True:
-        r = call('GET', '%s%slimit=100&offset=%d' % (path, '&' if '?' in path else '?', off))
-        b = r.get(key) or []
-        out += b
-        if len(b) < 100:
-            return out
-        off += 100
+    from p2mlib.api import paginate
+    return paginate(path, key, call=call)
 
 
 def main():

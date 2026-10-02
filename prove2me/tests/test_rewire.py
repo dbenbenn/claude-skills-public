@@ -44,10 +44,8 @@ def test_published_index(tmp_path):
     assert pub['dep'][0] == 'N.dep' and pub['dep'][1] == 'Theorems.Thm_N_dep'
 
 
-@pytest.mark.xfail(strict=True, reason="published() takes the first line matching ^theorem, so a "
-                   "comment line beginning 'theorem' names the wrong declaration (fixed in submit_solution's "
-                   "import_names, not here); Phase 3: one published() index over LeanInfo")
 def test_published_index_ignores_comments(tmp_path):
+    # was a strict xfail until Phase 3: one comment-aware published() (p2mlib.workspace)
     (tmp_path / 'Theorems').mkdir()
     (tmp_path / 'Theorems' / 'Thm_N_dep.lean').write_text(
         '/-!\ntheorem for balls: a module docstring\n-/\nnamespace N\n\ntheorem dep : True := by\n  sorry\n\nend N\n')

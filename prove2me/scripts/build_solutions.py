@@ -167,7 +167,8 @@ def main():
     names = a.names
     if not names:
         sys.path.insert(0, mdir)
-        import mission  # noqa: E402
+        from p2mlib.mission import load
+        mission = load(mdir)
         names = [T['name'] for T in mission.THEOREMS]
     for n in names:
         name, st, imps = build(mdir, a.checks, n, out)

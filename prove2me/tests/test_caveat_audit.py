@@ -51,10 +51,8 @@ def test_collect(mdir, line, code):
     assert e.value.code == code and (mdir / 'readbacks' / 't1.caveats.md').read_text().endswith(line + '\n')
 
 
-@pytest.mark.xfail(strict=True, reason="caveat_audit.stage deletes an existing staging directory, so "
-                   "re-staging wipes a live auditor's files -- the hazard stage_auditor.stage refuses "
-                   "(four auditors lost their work that way)")
 def test_restage_refuses_a_live_directory(mdir):
+    # was a strict xfail until Phase 3: caveat_audit stages through p2mlib.staging.fresh_dir
     CA.stage(str(mdir), 't1', [])
     open(os.path.join(staged(mdir), 'verdict.md'), 'w').write('half written')
     with pytest.raises(SystemExit):

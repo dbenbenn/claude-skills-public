@@ -74,7 +74,8 @@ def main():
     a = ap.parse_intermixed_args()
     mdir = os.path.abspath(a.mission_dir)
     sys.path.insert(0, mdir)
-    import mission  # noqa: E402
+    from p2mlib.mission import load
+    mission = load(mdir)
     ns, names = mission.NAMESPACE, [T['name'] for T in mission.THEOREMS]
     out = os.path.join(mdir, 'solutions')
     os.makedirs(out, exist_ok=True)

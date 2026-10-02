@@ -36,6 +36,7 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # p2mlib
 
 KINDS = r'(?:lemma|theorem|def|abbrev|instance|structure|inductive|class|alias)'
 # an attribute may sit on the declaration's own line (`@[simp] theorem foo …`); such a
@@ -196,10 +197,9 @@ def prune(text, verbose=True):
 
 
 def _workspace():
-    for p in (os.environ.get('P2M_WORKSPACE'), '~/claude/prove2me_workspace', '~/prove2me_workspace'):
-        if p and os.path.isdir(os.path.expanduser(p)):
-            return os.path.expanduser(p)
-    return os.path.expanduser('~/claude/prove2me_workspace')
+    """The workspace (p2mlib.workspace; kept under this name for the scripts that import it)."""
+    from p2mlib.workspace import workspace
+    return workspace()
 
 
 def prune_theorem_imports(text, verbose=True):
@@ -210,8 +210,7 @@ def prune_theorem_imports(text, verbose=True):
     imports. Five live edges came from this (2026-09-24 audit): a rewire cut a helper and imported
     it, then cut its only user too, and the first import stayed. A theorem is "named" by its full
     name or its last component, comments excluded; --check then proves the import was unused."""
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from stage_auditor import strip
+    from p2mlib.leantext import strip
     ws = _workspace()
     code = '\n'.join(l for l in strip(text).split('\n') if not l.startswith('import '))
     keep, dropped = [], []

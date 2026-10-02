@@ -45,15 +45,9 @@ def post_verify(theorem_id, path, explanation=None, proof_type=None):
 
 
 def poll(sid, tries=240, delay=15):
-    # an hour: a 1,559-line solution took the server 21 minutes (F-amenability child, 2026-10-02),
-    # past the old 20-minute limit, and the timeout was then misreported as a rejection
-    for _ in range(tries):
-        r = call('GET', '/verify?submission_id=' + sid)
-        st = r.get('status')
-        if st and st != 'PENDING':
-            return r
-        time.sleep(delay)
-    return {'status': 'PENDING', '__error': 'no verdict after %d minutes' % (tries * delay // 60)}
+    """The verdict, or {'status': 'PENDING', ...} after tries*delay seconds (p2mlib.api.poll_verdict)."""
+    from p2mlib.api import poll_verdict
+    return poll_verdict(sid, minutes=max(1, tries * delay // 60), every=delay, call=call)
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 """Audit the prose that explains a source-audit gap: does the natural-language statement's note
 account for each gap accurately, and does it claim anything the Lean or a citation does not back?
 
-usage: caveat_audit.py stage   MISSION_DIR NAME [--cite FILE ...]   -> prints the auditor prompt
+usage: caveat_audit.py stage   MISSION_DIR NAME [--cite FILE ...] [--force]   -> prints the auditor prompt
        caveat_audit.py collect MISSION_DIR NAME                     -> verdict into readbacks/, exit 1
                                                                        unless `CAVEATS: adequate`
 
@@ -23,6 +23,7 @@ never says).
 import os, re, shutil, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # p2mlib
 from stage_auditor import ROOT
 import draft
 import source_audit as SA
@@ -69,7 +70,7 @@ def slug(mdir, name):
     return ('cav-%s-%s' % (os.path.basename(os.path.abspath(mdir)), name))[:150]
 
 
-def stage(mdir, name, cites):
+def stage(mdir, name, cites, force=False):
     mdir = os.path.abspath(mdir)
     M = draft.load(mdir)
     T = SA.item(M, name)
@@ -77,10 +78,10 @@ def stage(mdir, name, cites):
     for ext in ('readback', 'claims', 'coverage'):
         if not os.path.exists(rb + '.%s.md' % ext):
             sys.exit('missing readbacks/%s.%s.md -- run the read-back and source audit first' % (name, ext))
-    d = os.path.join(ROOT, slug(mdir, name))
-    if os.path.exists(d):
-        shutil.rmtree(d)
-    os.makedirs(d)
+    # refuse to restage over a live auditor (it deleted the directory before 2026-10-02; the guard
+    # stage_auditor has had since four auditors lost their work)
+    from p2mlib.staging import fresh_dir, render_pages
+    d = fresh_dir(ROOT, slug(mdir, name), force=force)
     open(os.path.join(d, 'brief.md'), 'w', encoding='utf-8').write(BRIEF)
     for ext in ('readback', 'claims', 'coverage'):
         shutil.copy(rb + '.%s.md' % ext, os.path.join(d, ext + '.md'))
@@ -98,15 +99,10 @@ def stage(mdir, name, cites):
     parts = T.get('source_parts')
     if parts:
         for part_pdf, part_pages, part_off in parts:
-            tag = os.path.splitext(os.path.basename(part_pdf))[0]
-            for p in SA.pages(part_pages):
-                subprocess.run(['pdftoppm', '-f', str(p + part_off), '-l', str(p + part_off), '-r', '130', '-png',
-                                os.path.join(mdir, part_pdf), os.path.join(d, '%s-page-%03d' % (tag, p))],
-                               check=True)
+            render_pages(os.path.join(mdir, part_pdf), SA.pages(part_pages), part_off, d,
+                         tag=os.path.splitext(os.path.basename(part_pdf))[0])
     else:
-        for p in sorted(set(want)):
-            subprocess.run(['pdftoppm', '-f', str(p + off), '-l', str(p + off), '-r', '130', '-png',
-                            pdf, os.path.join(d, 'page-%03d' % p)], check=True)
+        render_pages(pdf, sorted(set(want)), off, d)
     for c in cites:
         shutil.copy(c, os.path.join(d, 'cite-' + os.path.basename(c)))
     # the bundle notes: statements do not relitigate a shared definition (dbenbenn, 2026-10-01),
@@ -138,8 +134,10 @@ def collect(mdir, name):
 if __name__ == '__main__':
     a = sys.argv[1:]
     if len(a) >= 3 and a[0] == 'stage':
+        force = '--force' in a
+        a = [x for x in a if x != '--force']
         cites = a[a.index('--cite') + 1:] if '--cite' in a else []
-        stage(a[1], a[2], cites)
+        stage(a[1], a[2], cites, force)
     elif len(a) == 3 and a[0] == 'collect':
         collect(a[1], a[2])
     else:

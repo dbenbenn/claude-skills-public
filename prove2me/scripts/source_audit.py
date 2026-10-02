@@ -41,6 +41,7 @@ in the mission data even though draft.py never posts it as a milestone.
 import os, re, shutil, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # p2mlib
 from stage_auditor import ROOT, teardown  # same staging root as the read-back auditors
 import draft
 
@@ -101,10 +102,8 @@ def stage(mdir, name, page_spec=None):
         quote = [T['source_quote']]
     if not quote and not T.get('bundle'):
         sys.exit('%s: no quoted sentence (milestone description or source_quote)' % name)
-    d = os.path.join(ROOT, slug(mdir, name))
-    if os.path.exists(d):
-        sys.exit('REFUSING: %s exists -- collect/teardown it first' % d)
-    os.makedirs(os.path.join(d, 'scratch'))
+    from p2mlib.staging import fresh_dir, render_pages
+    d = fresh_dir(ROOT, slug(mdir, name))
     shutil.copy(os.path.join(HERE, 'source-audit-bundle-brief.md' if T.get('bundle') else 'source-audit-brief.md'),
                 os.path.join(d, 'brief.md'))
     # the item's own page, the mission's context pages, and the item's own context pages -- where
@@ -121,15 +120,10 @@ def stage(mdir, name, page_spec=None):
         want = []
         for part_pdf, part_pages, part_off in parts:
             tag = os.path.splitext(os.path.basename(part_pdf))[0]
-            for p in pages(part_pages):
-                subprocess.run(['pdftoppm', '-f', str(p + part_off), '-l', str(p + part_off), '-r', '130',
-                                '-png', os.path.join(mdir, part_pdf), os.path.join(d, '%s-page-%03d' % (tag, p))],
-                               check=True)
-                want.append('%s p. %d' % (tag, p))
+            render_pages(os.path.join(mdir, part_pdf), pages(part_pages), part_off, d, tag=tag)
+            want += ['%s p. %d' % (tag, p) for p in pages(part_pages)]
     else:
-        for p in sorted(set(want)):
-            subprocess.run(['pdftoppm', '-f', str(p + off), '-l', str(p + off), '-r', '130', '-png',
-                            pdf, os.path.join(d, 'page-%03d' % p)], check=True)
+        render_pages(pdf, sorted(set(want)), off, d)
     with open(os.path.join(d, 'source.md'), 'w', encoding='utf-8') as f:
         if T.get('bundle'):
             where = ('; '.join('%s pp. %s' % (os.path.basename(pp), pg) for pp, pg, _ in parts) if parts

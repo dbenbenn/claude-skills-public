@@ -44,72 +44,8 @@ import os, shutil, sys, subprocess
 import re
 
 
-_IDCHAR = re.compile(r"[\w'.!?\u2080-\u209c]")
-_CHARLIT = re.compile(r"'(?:\\(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|.)|[^\\'\n])'")
-_RAW = re.compile(r'r(#*)"')
-
-
-def strip(text):
-    """Lean source with every comment removed: block comments (nested), docstrings and line
-    comments. Blind staging depends on this — a docstring handed to an auditor is the intended
-    reading leaking into a reading that is supposed to be independent.
-
-    Literals are copied verbatim, so a comment marker inside one is not a comment: `"/-"`,
-    `"a--b"`, `r#"-- x"#`, `«foo--bar»` and `'-'`. An unclosed block comment is an error rather
-    than a silent truncation of the rest of the file. Runs of blank lines left by deleted
-    comments are collapsed, outside literals only."""
-    code, lits, i, n = [''], [], 0, len(text)
-    buf = []
-
-    def lit(j):                       # text[i:j] is a literal: keep it out of the collapse
-        buf.append(('c', ''.join(code_acc)))
-        code_acc.clear()
-        buf.append(('l', text[i:j]))
-
-    code_acc = []
-    while i < n:
-        prev = text[i - 1] if i else ''
-        ident_before = bool(prev) and bool(_IDCHAR.match(prev))
-        if text.startswith('/-', i):
-            depth, j = 0, i
-            while j < n:
-                if text.startswith('/-', j):
-                    depth += 1; j += 2
-                elif text.startswith('-/', j):
-                    depth -= 1; j += 2
-                    if depth == 0:
-                        break
-                else:
-                    j += 1
-            if depth:
-                line = text.count('\n', 0, i) + 1
-                raise ValueError('unclosed block comment starting at line %d' % line)
-            i = j
-        elif text.startswith('--', i):
-            j = text.find('\n', i)
-            i = n if j == -1 else j
-        elif text[i] == '"':
-            j = i + 1
-            while j < n and text[j] != '"':
-                j += 2 if text[j] == '\\' else 1
-            lit(min(j + 1, n)); i = min(j + 1, n)
-        elif text[i] == '«':
-            j = text.find('»', i)
-            j = n if j == -1 else j + 1
-            lit(j); i = j
-        elif text[i] == 'r' and not ident_before and _RAW.match(text, i):
-            close = '"' + _RAW.match(text, i).group(1)
-            j = text.find(close, _RAW.match(text, i).end())
-            j = n if j == -1 else j + len(close)
-            lit(j); i = j
-        elif text[i] == "'" and not ident_before and _CHARLIT.match(text, i):
-            j = _CHARLIT.match(text, i).end()
-            lit(j); i = j
-        else:
-            code_acc.append(text[i]); i += 1
-    buf.append(('c', ''.join(code_acc)))
-    out = ''.join(re.sub(r'\n{3,}', '\n\n', t) if k == 'c' else t for k, t in buf)
-    return out.strip() + '\n'
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # p2mlib
+from p2mlib.leantext import strip  # noqa: E402  -- the one comment stripper (moved from here)
 
 
 def write_stripped(dst, src):
@@ -122,11 +58,10 @@ BRIEF = os.path.join(HERE, 'readback-brief.md')
 ROOT = os.environ.get('AUDITOR_STAGE_ROOT') or os.path.join(
     os.environ.get('CLAUDE_JOB_DIR', '/tmp'), 'auditors')
 def _workspace():
-    """The prove2.me Lean workspace: $P2M_WORKSPACE, else the first of the known locations."""
-    for p in [os.environ.get('P2M_WORKSPACE'), '~/claude/prove2me_workspace', '~/prove2me_workspace']:
-        if p and os.path.isdir(os.path.expanduser(p)):
-            return os.path.expanduser(p)
-    raise SystemExit('prove2.me workspace not found; set P2M_WORKSPACE')
+    from p2mlib.workspace import workspace
+    return workspace()
+
+
 WS = _workspace()
 LIBS = os.path.join(WS, '.lake', 'packages')
 
