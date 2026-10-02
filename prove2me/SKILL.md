@@ -70,8 +70,10 @@ the measurements behind the audit rules in `references/audit-evidence.md`.
    each self-contained**: the quote, what the Lean says, what the auditor is unhappy about in
    plain words, what the research found, the options, and the recommended answer with reasons,
    naming the file rows it covers (section heading + id; never invented labels or merged
-   counts); (3) list the rest (carried by a named sibling, unformalizable history, rule-decided)
-   for skimming. **Only the human's answer, or a standing rule they set, goes on the `decided:`
+   counts); (3) give the human a **summary list of the findings fixed directly** under (1) -- each with
+   the finding, what changed, and the rule -- and list the rest (carried by a named sibling,
+   unformalizable history) for skimming (dbenbenn, 2026-10-02: "I like the idea of seeing a
+   summary list of the cases you decided to fix directly"). **Only the human's answer, or a standing rule they set, goes on the `decided:`
    line**, and never a disposition of your own, however obvious. `draft.py verify` counts every
    undecided row as BAD, and reopens an item's rows when its audit is re-run; re-record an
    unchanged finding with the human's earlier words.
