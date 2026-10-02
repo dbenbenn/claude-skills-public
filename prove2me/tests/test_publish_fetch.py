@@ -53,22 +53,28 @@ def src(page, result, extra=None, ref=None):
 
 
 class FakePublisher:
-    def __init__(self):
-        self.posted, self.store = [], {}
+    def __init__(self, queued=None):
+        self.posted, self.store, self.queued = [], {}, dict(queued or {})   # queued: {name: job id}
 
     def call(self, m, p, b=None):
+        if m == 'GET' and p.startswith('/theorems?theorem_name='):
+            return {'theorems': []}                                          # nothing published yet
+        if m == 'GET' and p.startswith('/publish-jobs?status=PENDING'):
+            return {'publish_jobs': [{'id': j, 'theorem_name': n} for n, j in self.queued.items()]}
+        if m == 'GET' and p.startswith('/publish-jobs?status='):
+            return {'publish_jobs': []}
         if m == 'POST' and p == '/submit-definition':
             self.posted.append(('def', b['definition_name']))
-            self.store['D1'] = {'status': 'Definition', 'theorem_title': b['definition_title'],
-                                'natural_language_statement': b['natural_language_statement'], 'source': b['source']}
             return {'job_id': 'jd'}
         if m == 'POST' and p == '/submit-problem':
-            assert ('def', 'Bun') in self.posted, 'statements published before their bundle'
+            assert 'D1' in self.store, 'statements published before their bundle'
             self.posted += [('thm', x['theorem_name']) for x in b['problems']]
             for x in b['problems']:
                 self.store['T1'] = dict(x, status='Open')
             return {'jobs': [{'job_id': 'j1'}]}
-        if p == '/publish-jobs/jd':
+        if p in ('/publish-jobs/jd', '/publish-jobs/queued-def'):
+            self.store.setdefault('D1', {'status': 'Definition', 'theorem_title': 'A bundle',
+                                         'natural_language_statement': 'The bundle.', 'source': 'Paper, p. 1, Def 1'})
             return {'status': 'PUBLISHED', 'theorem_id': 'D1'}
         if p == '/publish-jobs/j1':
             return {'status': 'PUBLISHED', 'theorem_id': 'T1'}
@@ -91,3 +97,16 @@ def test_publish_bundle_first_then_statement_and_verify(folder, monkeypatch, cap
     fake.posted.clear()
     PS.main()                                   # a rerun only verifies
     assert fake.posted == []
+
+
+def test_rerun_waits_on_a_queued_job_instead_of_publishing_twice(folder, monkeypatch, capsys):
+    # Lodha-Moore 2026-10-02: the run was killed while the platform sat on the bundle's job for an
+    # hour; published_ids.json had nothing, and a rerun would have submitted the bundle again
+    import p2m
+    import publish_standalone as P
+    fake = FakePublisher(queued={'Bun': 'queued-def'})
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    monkeypatch.setattr(P.time, 'sleep', lambda s: None)
+    monkeypatch.setattr(P.sys, 'argv', ['publish_standalone.py', str(folder)])
+    P.main()
+    assert ('def', 'Bun') not in fake.posted and ('thm', 'Q.t') in fake.posted

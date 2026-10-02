@@ -51,19 +51,46 @@ def main():
         return
     ids_path = os.path.join(here, 'published_ids.json')
     ids = json.load(open(ids_path)) if os.path.exists(ids_path) else {}
+
+    def wait(job_id):
+        while True:
+            j = call('GET', '/publish-jobs/' + job_id)
+            if j.get('status') in ('PUBLISHED', 'FAILED', 'ERROR'):
+                return j
+            time.sleep(8)
+
+    def existing(name):
+        """(theorem id, None) if the platform has `name` published, (None, job id) if a job of ours for it
+        is still queued or compiling, else (None, None). A rerun after an interrupted one (killed while
+        the platform's queue sat for an hour, Lodha-Moore 2026-10-02) must neither publish twice nor
+        lose a published id that published_ids.json never recorded."""
+        hit = [t for t in (call('GET', '/theorems?theorem_name=' + name).get('theorems') or [])
+               if t.get('theorem_name') == name]
+        if hit:
+            return hit[0].get('theorem_id') or hit[0].get('id'), None
+        for st in ('PENDING', 'COMPILING'):
+            for j in call('GET', '/publish-jobs?status=%s&limit=100' % st).get('publish_jobs') or []:
+                if j.get('theorem_name') == name:
+                    return None, j['id']
+        return None, None
     # definitions bundles first (POST /submit-definition, one per call): the statements import them
     # (Lodha–Moore positive-commutation bundle, 2026-10-02); recorded as Def_<name>
     for d in defs:
         key = 'Def_' + d['definition_name']
         if key in ids:
             continue
-        r = call('POST', '/submit-definition', d)
-        assert isinstance(r, dict) and '__error' not in r and r.get('job_id'), r
-        while True:
-            j = call('GET', '/publish-jobs/' + r['job_id'])
-            if j.get('status') in ('PUBLISHED', 'FAILED', 'ERROR'):
-                break
-            time.sleep(8)
+        tid, job = existing(d['definition_name'])
+        if tid:
+            ids[key] = tid
+            json.dump(ids, open(ids_path, 'w'), indent=1)
+            continue
+        if not job:
+            r = call('POST', '/submit-definition', d)
+            assert isinstance(r, dict) and '__error' not in r and r.get('job_id'), r
+            job = r['job_id']
+        else:
+            print('   waiting on the queued job %s for %s' % (job, key))
+        j = wait(job)
         assert j.get('status') == 'PUBLISHED', (key, j.get('status'), j.get('error_message'))
         ids[key] = j.get('theorem_id') or j.get('definition_id')
         json.dump(ids, open(ids_path, 'w'), indent=1)
@@ -75,16 +102,26 @@ def main():
                                ('definition_title', 'theorem_title')) if nm(t.get(tk)) != nm(d[k])]
         print('PUBLISHED %s %s %s  %s' % (key, ids[key], t.get('status'),
                                           'title/prose/source match' if not bad else 'MISMATCH: %s' % bad))
-    todo = [p for p in payloads if p['theorem_name'] not in ids]
+    jobs, todo = {}, []
+    for p in payloads:
+        if p['theorem_name'] in ids:
+            continue
+        tid, job = existing(p['theorem_name'])
+        if tid:
+            ids[p['theorem_name']] = tid
+            json.dump(ids, open(ids_path, 'w'), indent=1)
+        elif job:
+            jobs[p['theorem_name']] = job
+        else:
+            todo.append(p)
     if todo:
         r = call('POST', '/submit-problem', {'problems': todo})
         assert isinstance(r, dict) and '__error' not in r and r.get('jobs'), r
-        for p, job in zip(todo, r['jobs']):
-            while True:
-                j = call('GET', '/publish-jobs/' + job['job_id'])
-                if j.get('status') in ('PUBLISHED', 'FAILED', 'ERROR'):
-                    break
-                time.sleep(8)
+        jobs.update({p['theorem_name']: job['job_id'] for p, job in zip(todo, r['jobs'])})
+    for name, job in jobs.items():
+        if True:
+            p = next(x for x in payloads if x['theorem_name'] == name)
+            j = wait(job)
             assert j.get('status') == 'PUBLISHED', (p['theorem_name'], j.get('status'), j.get('error_message'))
             ids[p['theorem_name']] = j['theorem_id']
             json.dump(ids, open(ids_path, 'w'), indent=1)
