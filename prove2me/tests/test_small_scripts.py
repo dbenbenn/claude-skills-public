@@ -29,6 +29,35 @@ def test_publish_status_ignores_reference_jobs_and_lists_failures(monkeypatch):
     assert PS.snapshot('P') is None                       # a failed fetch is retried, never fatal
 
 
+def test_publish_status_until_click_waits_out_a_pending_job(monkeypatch, capsys):
+    import publish_status as PS
+    # LM, 2026-10-02: each published item needs a Submit re-click before the next job exists.
+    # A watcher read a `publish_status` field that items do not carry, and never fired. A
+    # published item turns into a reference, so its job drops out and the job dict goes empty.
+    idle = ('Draft', None, 2, {}, [])
+    snaps = iter([('Draft', None, 3, {'PENDING': 1}, [])] * 3 + [idle] * 20)
+    clock = iter(range(0, 10 ** 6, 60))
+    monkeypatch.setattr(PS, 'snapshot', lambda pid: next(snaps))
+    monkeypatch.setattr(PS.time, 'time', lambda: next(clock))
+    monkeypatch.setattr(PS.time, 'sleep', lambda s: None)
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_status.py', 'P', '--until-click'])
+    PS.main()
+    out = capsys.readouterr().out
+    assert 'CLICK NEEDED' in out and out.count('PENDING') == 1
+    assert len(list(snaps)) >= 10                         # it stopped after ~4 idle minutes
+
+
+def test_publish_status_until_click_exits_when_the_proposal_leaves_draft(monkeypatch, capsys):
+    import publish_status as PS
+    snaps = iter([('Draft', None, 1, {'PENDING': 1}, []), ('In review', '2026', 0, {}, [])])
+    monkeypatch.setattr(PS, 'snapshot', lambda pid: next(snaps))
+    monkeypatch.setattr(PS.time, 'sleep', lambda s: None)
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_status.py', 'P', '--until-click'])
+    PS.main()
+    out = capsys.readouterr().out
+    assert 'In review' in out and 'CLICK NEEDED' not in out
+
+
 def test_watch_proposal_exits_on_change(monkeypatch, capsys):
     import watch_proposal as W
     states = iter([('In review', None), ('In review', None), ('Approved', 'M1')])
