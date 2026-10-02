@@ -740,7 +740,14 @@ lives only as long as the session, so restart it in a new session while a propos
 review.
 
 **"Compile failed" with a "Retry submit" button is the human's to click.** The retry re-runs
-Submit, which `mission_captain.md` reserves for the human, and no agent endpoint exists for it.
+Submit, which `mission_captain.md` reserves for the human. What the button does, read from the
+site's JavaScript (2026-10-02): `POST /mission-proposals/:id/launch` with `{"dry_run": true}`; then,
+in the browser, for each non-reference item in the listed order, `POST
+/mission-proposals/:id/items/:item_id/publish`, re-posted every 2 s while the reply says
+`compiling` and abandoned after 20 minutes; then `POST /mission-proposals/:id/launch`. A job
+PENDING longer than 20 minutes (Lodha–Moore: 20–50) therefore shows "Compile failed" or "Failed to
+fetch" while the server job carries on, and each item needs a re-click; published items turn into
+references and are skipped. Tell the human this rather than reading the failure as a compile error.
 The failed attempt need not stay visible in `/publish-jobs` (Moore M24, 2026-10-02: only the
 re-queued PENDING job was listed). What the captain can do is tell transient from real: run
 `scripts/check_server_shape.py MISSION_DIR NAME` on the failed item. It compiled in 3 s locally, so
