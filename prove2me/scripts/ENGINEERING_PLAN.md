@@ -12,7 +12,7 @@ commits touching `scripts/` are bug fixes, and the same bug classes recur:
 | Namespace and `open` tracking | `end` matching, scoped opens, `solution` inside a namespace |
 | Comments and docstrings | a docstring line beginning "open" became an `open` command; `/-! -/` attachment; `--` inside strings |
 | Escaping | `\"` leaking into raw-string prose; LaTeX backslashes in Python literals; JSON |
-| Platform API | pagination at 50 vs 100 (silently truncated lists); a poll timeout reported as a rejection; the false belief that the platform never serves submitted code |
+| Platform API | an unpaginated GET /submissions (100 of 981, 9e59d0c); a poll timeout reported as a rejection; the false belief that the platform never serves submitted code |
 
 **Root cause: duplicated reimplementation.**
 
@@ -175,7 +175,7 @@ because each phase leaves everything working.
 | 4. Live read-only contract | the platform behaves as `p2mlib.api` assumes: page size and `total`, the solution endpoint, graph node and edge shapes, a known submission's final status, `deprecated_at` on the detail endpoint | 5 s | at every session-start docs sync, and whenever it brings a platform release |
 
 Layer 4 would have caught three real failures:
-- the list endpoint paging at 50 when we asked for 100;
+- an unpaginated list read (`GET /submissions` returned 100 of 981, 9e59d0c);
 - the poll timeout misread as a rejection;
 - "the platform never serves submitted code".
 

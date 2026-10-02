@@ -1,8 +1,10 @@
 """Live, read-only contract tests: prove2.me behaves the way our scripts assume.
 
 Run with P2M_LIVE=1. Every assumption here once broke a script:
-  * list pages are capped (a single /missions call returned 50 of ~1200; /submissions returned
-    100 of 981) -- callers must paginate;
+  * lists are paged: GET /submissions returned 100 of 981 to an unpaginated read (9e59d0c), and
+    fetch_theorems/edge_audit stop at the first short page, which is right only if `limit=100`
+    really returns 100 while more exist (pinned below; a claim on 2026-10-02 that /missions pages
+    at 50 was wrong -- the loop making it stopped at offset 400);
   * GET /submissions/:id/solution serves any submission's source (we wrongly believed it did not,
     2026-09-24 to 2026-10-02);
   * graph sketch nodes carry submission_id / parent_theorem_id / status / deprecated_at, and
@@ -26,7 +28,7 @@ def call():
 
 def test_missions_list_is_paged(call):
     first = call('GET', '/missions?limit=100&offset=0')['missions']
-    assert 0 < len(first) <= 100
+    assert len(first) == 100        # paged() stops at a short page: a cap below 100 would truncate
     second = call('GET', '/missions?limit=100&offset=%d' % len(first))['missions']
     assert second and {m['id'] for m in first}.isdisjoint(m['id'] for m in second)
 
