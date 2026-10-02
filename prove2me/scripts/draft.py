@@ -51,16 +51,23 @@ def extract_payloads(path, namespace, bundles, opens=None):
     `namespace <namespace>`. Each preamble imports Mathlib plus exactly the bundles whose
     identifiers its statement uses (bundles: {module: [identifier, ...]}) -- never a template,
     since a preamble freezes at publish and an unused import is a permanent false dependency."""
-    text = open(path, encoding='utf-8').read()
-    text = '\n'.join(l for l in text.split('\n') if not l.lstrip().startswith('--'))
+    # Names and identifiers go by p2mlib.names' one identifier grammar: `theorem (\\w+)` stopped at
+    # a prime, and `K\\b` matched inside `K'`. Comments go by the comment-aware stripper (only `--`
+    # lines were dropped, so a module doc line beginning "theorem" read as a statement). Not
+    # LeanInfo: a mission's statements are extracted while drafting, before its bundles need be built.
+    from p2mlib.leantext import strip
+    from p2mlib.names import IDENT_START, IDENT_END
+    ident = r"[^\W\d][\w'!?₀-ₜ]*(?:\.[^\W\d][\w'!?₀-ₜ]*)*"
+    text = strip(open(path, encoding='utf-8').read())
     out = {}
-    for part in re.split(r'^(?=theorem )', text, flags=re.M):
-        m = re.match(r'theorem (\w+)', part)
+    for part in re.split(r'^(?=theorem\s)', text, flags=re.M):
+        m = re.match(r'theorem\s+(%s)' % ident, part)
         if not m:
             continue
         body = re.split(r'^end %s\s*$' % re.escape(namespace), part, flags=re.M)[0].strip()
         imports = ['import Mathlib'] + ['import ' + mod for mod, ids in bundles.items()
-                                         if any(re.search(r'(?<![\w.])' + re.escape(i) + r'\b', body)
+                                         # an id ending in `.` is a namespace prefix ('MooreFoelner.')
+                                         if any(re.search(IDENT_START + re.escape(i) + ('' if i.endswith('.') else IDENT_END), body)
                                                 for i in ids)]
         pre = '\n'.join(imports)
         used = sorted(o for o, toks in (opens or {}).items() if any(t in body for t in toks))

@@ -122,9 +122,23 @@ def test_short_bundle_name_bound_as_variable_flagged_but_not_K_ascription(mdir):
     assert D.short_bundle_names(M, str(mdir)) == []
 
 
-@pytest.mark.xfail(strict=True, reason="extract_payloads reads the name with `theorem (\\w+)`, which "
-                   "stops at a prime (the recurring prime class); Phase 4 takes names from LeanInfo")
 def test_extract_payloads_keeps_primed_name(tmp_path):
+    # was a strict xfail: `theorem (\\w+)` stopped at the prime
     p = tmp_path / 'T.lean'
     p.write_text("namespace Q\n\ntheorem foo' : True := by\n  sorry\n\nend Q\n")
     assert "foo'" in D.extract_payloads(str(p), 'Q', {})
+
+
+def test_extract_payloads_ignores_doc_text_and_primed_identifiers(tmp_path):
+    p = tmp_path / 'T.lean'
+    p.write_text("/-!\ntheorem for balls -/\nnamespace Q\n\ntheorem t (h : K' = 1) : True := by\n  sorry\n\nend Q\n")
+    pay = D.extract_payloads(str(p), 'Q', {'Definitions.Def_K': ['K']})
+    assert list(pay) == ['t'] and 'Def_K' not in pay['t'][0]       # `K'` is not `K`
+
+
+def test_extract_payloads_namespace_prefix_id(tmp_path):
+    # moore-literal-readings passes 'MooreFoelner.' for a whole bundle: a prefix, not a name
+    p = tmp_path / 'T.lean'
+    p.write_text("namespace Q\n\ntheorem t : MooreFoelner.rightMul 1 1 = none := by\n  sorry\n\nend Q\n")
+    assert 'import Definitions.Def_MooreFoelner' in \
+        D.extract_payloads(str(p), 'Q', {'Definitions.Def_MooreFoelner': ['MooreFoelner.']})['t'][0]

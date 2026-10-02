@@ -213,7 +213,7 @@ fixed.
 | 3 | A comment line beginning `theorem` is taken as the declaration | `rewire.published` | Phase 3, one `published()` |
 | 4 | A one-line `@[simp] theorem` is not found | `resolve_imports.extract` | **fixed** Phase 4.3 (textual: the source is another project) |
 | 5 | An attribute line above the declaration is not carried | `resolve_imports.extract` | **fixed** Phase 4.3 |
-| 6 | A primed statement name is truncated | `draft.extract_payloads` | Phase 4, LeanInfo names |
+| 6 | A primed statement name is truncated | `draft.extract_payloads` | **fixed** Phase 4.5, `p2mlib.names` grammar |
 | 7 | Re-staging deletes a live auditor's directory | `caveat_audit.stage` | Phase 3, shared staging with `stage_auditor`'s guard |
 
 **Duplication made visible by the tests.**
@@ -387,3 +387,15 @@ have flagged the case for a person.
     `published`.
 - **`tests/record_fixtures.py`** re-records the LeanInfo fixtures. It was a hand loop, done four
   times in this phase.
+
+**Phase 4.5 (2026-10-02): done.** `draft.extract_payloads` reads statement names with
+`p2mlib.names`' identifier grammar (primes included) and drops comments with the comment-aware
+stripper. Bundle identifiers are matched with `IDENT_START`/`IDENT_END`; an identifier ending in
+`.` is a namespace prefix. It does not use LeanInfo: statements are extracted while drafting,
+before their bundles need be built.
+- **Corpus check.** Old and new extraction were run on every mission repo under `~/claude`: 27
+  statements files and 7 missions' `payloads()`.
+  - The first run found one regression. `moore-literal-readings` passes the prefix
+    `'MooreFoelner.'` for a whole bundle, and the strict end guard dropped its import from five
+    published preambles.
+  - After the fix, all are identical.
