@@ -18,6 +18,38 @@ def workspace():
     raise SystemExit('prove2.me workspace not found; set P2M_WORKSPACE')
 
 
+def statement_module(full):
+    """`LodhaMoore.foo` -> (module `Theorems.Thm_LodhaMoore_foo`, path relative to the workspace)."""
+    stem = 'Thm_' + full.replace('.', '_')
+    return 'Theorems.' + stem, os.path.join('Theorems', stem + '.lean')
+
+
+def statement_text(preamble, formal_statement):
+    """A statement module's text: exactly what the platform publishes and the verifier imports
+    (fetch_theorems writes published ones, stubs.py draft ones, with this one function)."""
+    return (preamble or '').strip() + '\n\n' + (formal_statement or '').strip() + '\n'
+
+
+DRAFTS = os.path.join('Theorems', '.drafts.json')
+
+
+def drafts(ws=None):
+    """{module: mission dir} of the statement modules in Theorems/ that are local draft stubs, not
+    published statements (stubs.py records them; fetch_theorems retires each one it publishes)."""
+    import json
+    p = os.path.join(ws or workspace(), DRAFTS)
+    return json.load(open(p)) if os.path.exists(p) else {}
+
+
+def set_drafts(d, ws=None):
+    import json
+    p = os.path.join(ws or workspace(), DRAFTS)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, 'w', encoding='utf-8') as f:
+        json.dump(dict(sorted(d.items())), f, indent=1)
+        f.write('\n')
+
+
 class Published(NamedTuple):
     full: str          # e.g. MooreFoelner.isTree_iff
     module: str        # e.g. Theorems.Thm_MooreFoelner_isTree_iff
@@ -37,12 +69,14 @@ def statement_decl(text):
 
 
 def published_by_full(ws=None):
-    """{full name: Published} for every statement in Theorems/."""
+    """{full name: Published} for every published statement in Theorems/ (draft stubs excluded:
+    a submission importing one fails, since the platform has no such module yet)."""
     ws = ws or workspace()
     tdir = os.path.join(ws, 'Theorems')
+    draft = drafts(ws)
     out = {}
     for f in sorted(os.listdir(tdir)) if os.path.isdir(tdir) else []:
-        if not (f.startswith('Thm_') and f.endswith('.lean')):
+        if not (f.startswith('Thm_') and f.endswith('.lean')) or 'Theorems.' + f[:-5] in draft:
             continue
         full, hdr = statement_decl(open(os.path.join(tdir, f), encoding='utf-8').read())
         if full:

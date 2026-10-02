@@ -563,6 +563,10 @@ def main():
         bad += deprecated_refs(M, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         import decisions
         bad += decisions.check(mdir)
+        # the workspace's statement modules are the plan: a proof compiled against a stale stub
+        # proves a statement the Draft no longer has (stubs.py)
+        import stubs
+        bad += [('stubs', p) for p in stubs.sync(mdir, check=True)[0]]
         for k, what in bad:
             print('BAD', k, what)
         print('items %d  milestones %d  status %s | BAD %d'
@@ -647,6 +651,11 @@ def main():
         print('   NOTE %s: %s -- not deleted; remove it deliberately if it should go' % (k, w))
     print('%s: %d difference(s)%s' % ('uploaded' if go else 'dry run', len(bad) - len(strays),
                                        '' if go else ' -- pass --go to apply'))
+    if go:
+        # keep the workspace's statement stubs equal to what was just uploaded (stubs.py)
+        import stubs
+        problems, written = stubs.sync(mdir)
+        print('stubs: %d written%s' % (len(written), ''.join('\n   ' + p for p in problems)))
 
 
 if __name__ == '__main__':

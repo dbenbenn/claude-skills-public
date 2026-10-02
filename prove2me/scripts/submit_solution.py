@@ -82,6 +82,17 @@ def check_solution_top_level(path):
         sys.exit('REFUSED: no top-level `theorem solution` in %s' % path)
 
 
+def check_no_draft_imports(path):
+    """Refuse a file importing a draft statement stub (stubs.py): the platform has no such module
+    until that statement is published, so the verifier would fail on the import."""
+    from p2mlib.workspace import drafts
+    from p2mlib.copies import imports_of
+    bad = sorted(set(imports_of(open(path, encoding='utf-8').read())) & set(drafts()))
+    if bad:
+        sys.exit('REFUSED: imports draft statements not yet published (fetch_theorems.py retires a stub '
+                 'once its statement is published):\n  ' + '\n  '.join(bad))
+
+
 def check_no_metaprogramming(path):
     """The platform's soundness guard rejects custom syntax/elaborator registration ("line N: `macro`
     ... metaprogramming is not supported in submissions"); CFP §6's Lemma 6.1 was refused for a
@@ -145,6 +156,7 @@ def main():
         sys.exit(__doc__)
     tid, path = theorem_id(args[0]), args[1]
     check_solution_top_level(path)
+    check_no_draft_imports(path)
     check_no_metaprogramming(path)
     target = args[0] if not re.fullmatch(r'[0-9a-f-]{36}', args[0]) \
         else call('GET', '/theorems/%s' % tid).get('theorem_name', '')

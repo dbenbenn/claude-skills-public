@@ -466,6 +466,21 @@ explains it.
 
 ## Expansion 5 — the statements
 
+**Each statement is a workspace module from the start** (dbenbenn, 2026-10-02). A new mission keeps
+every statement as `statements/Thm_<NS>_<name>.lean`, byte for byte the module the platform will
+publish: imports and opens, a blank line, the statement with proof `sorry`. `scripts/stubs.py
+MISSION_DIR` installs them in the workspace at `Theorems/Thm_<NS>_<name>.lean`, so the local state
+is always the current plan:
+- **Proving:** a milestone's proof imports its siblings exactly as its submission will.
+- **Changing or adding a milestone:** edit or add its file, run `stubs.py`, recompile what
+  imports it, and re-run its read-back. `draft.py upload --go` installs the stubs, and `verify`
+  reports a stale one as BAD.
+- **At Submit:** `fetch_theorems.py` finds the published text identical and retires the stub.
+
+Draft stubs are listed in `Theorems/.drafts.json`, which `published()` ignores, and
+`submit_solution.py` refuses a file importing one. A mission with one combined statements file
+(everything through Lodha–Moore) gets its stubs generated from its payloads instead.
+
 **Shape each statement like the source's sentence.** The theorem a development proves is chosen
 for what the proof needs; the theorem the source states is chosen for what reads well; they
 differ more often than not, and the milestone will be linked to the wrong one. This is the most
@@ -825,6 +840,16 @@ statement as well as its name. Run the audit after a mission's solutions land;
 (discover.md, since 0.6.3). Use it to compare proofs, to audit edges, and to read how someone else
 proved a lemma. Do not infer a proof from local files. Until 2026-10-02 the edge audit and a memory
 note claimed the platform never serves code; the claim was wrong.
+
+**Write each milestone's proof against its siblings' stubs.** A proof that needs a sibling
+imports `Theorems.Thm_<NS>_<sibling>` (installed by `stubs.py`), not a copy of it. The edge is
+then written deliberately, following the source, instead of recovered afterwards. A proof
+importing an unproved sibling is a reduction, as on the platform. The development is complete
+when every milestone's proof compiles, its only `sorry`s come through sibling imports, every
+imported sibling has a proof, and the imports among milestones are acyclic. Developments before
+Lodha–Moore cited primed copies (`isMarginal_EBad'`) to keep every check `sorry`-free, and rewire
+had to recover the edges, missing some (the 2026-09-24 sweep, Moore's `bijOn`). Rewire remains for
+a development lemma that turns out to restate a milestone.
 
 **Build order for a mission's solutions: merge → `rewire.py` → `prune_solution.py --check` →
 `submit_solution.py`.** When the development is an ordinary Lean project rather than `Solutions/` modules (QFS,
@@ -1233,6 +1258,7 @@ script prints its usage when run with no arguments.
 | `rewire.py` | Make a solution import the published theorems it re-derives, so each is a graph edge. |
 | `source_audit.py` | Source-side audit: what does the source sentence claim, and does the formalization say it? |
 | `stage_auditor.py` | Stage a sealed working directory for one blind auditor, and tear it down after. |
+| `stubs.py` | Install a mission's draft statements in the workspace as the modules the platform will publish. |
 | `submit_all.py` | Build and submit each of a mission's statements as it is published, once each, until all are done. |
 | `submit_solution.py` | Submit a solution, check the graph shows exactly its imports, then retire what it replaces. |
 | `submit_verify.py` | Submit a solution file to POST /verify (multipart) and poll for the verdict. |

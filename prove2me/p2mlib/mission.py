@@ -89,6 +89,41 @@ def merge_prose(m, mdir):
             items[name][k] = v
 
 
+STATEMENT_START = re.compile(r'^(?:namespace|theorem|open\s.*\bin\s*$)', re.M)
+
+
+def statement_payload(path):
+    """(preamble, formal_statement) of one statements/Thm_<NS>_<name>.lean file: the preamble is
+    everything before its first `namespace` or `theorem` line (imports, `open`s, `universe`s), and
+    the two must rejoin to the file exactly (workspace.statement_text), or the file is refused."""
+    from .workspace import statement_text
+    text = open(path, encoding='utf-8').read()
+    m = STATEMENT_START.search(text)
+    if not m:
+        raise SystemExit('%s: no `namespace` or `theorem` line' % path)
+    pre, fs = text[:m.start()], text[m.start():]
+    if statement_text(pre, fs) != text:
+        raise SystemExit('%s is not in published shape: imports and opens, one blank line, the statement, '
+                         'one final newline' % path)
+    return pre.strip(), fs.strip()
+
+
+def statement_payloads(mdir):
+    """{short name: (preamble, formal_statement)} from MISSION_DIR/statements/, the source of truth
+    of a mission drafted with one file per statement: each file is byte for byte the module the
+    platform publishes, so stubs.py installs it unchanged."""
+    out = {}
+    sdir = os.path.join(mdir, 'statements')
+    for f in sorted(os.listdir(sdir)):
+        if f.startswith('Thm_') and f.endswith('.lean'):
+            pre, fs = statement_payload(os.path.join(sdir, f))
+            m = re.search(r'^theorem\s+(\S+)', fs, re.M)
+            if not m:
+                raise SystemExit('statements/%s has no theorem' % f)
+            out[m.group(1).rsplit('.', 1)[-1]] = (pre, fs)
+    return out
+
+
 def load(mdir):
     mdir = os.path.abspath(mdir)
     name = '_p2m_mission_%d' % next(_n)
@@ -98,4 +133,6 @@ def load(mdir):
         sys.path.insert(0, mdir)
     spec.loader.exec_module(m)
     merge_prose(m, mdir)
+    if not hasattr(m, 'payloads') and os.path.isdir(os.path.join(mdir, 'statements')):
+        m.payloads = lambda: statement_payloads(mdir)
     return m

@@ -55,3 +55,25 @@ def test_front_matter_errors():
     with pytest.raises(ValueError):
         mission.front_matter('---\njust text\n---\nbody')
     assert mission.front_matter('no front matter') == ({}, 'no front matter')
+
+
+def test_statement_files_are_the_payloads(tmp_path):
+    (tmp_path / 'mission.py').write_text("NAME = 'S'\nNAMESPACE = 'S'\nTHEOREMS = [dict(name=\"foo'\")]\n")
+    (tmp_path / 'statements').mkdir()
+    text = "import Mathlib\nimport Definitions.Def_S\nopen scoped ENNReal\n\nnamespace S\n\ntheorem foo' : True := by\n  sorry\n\nend S\n"
+    (tmp_path / 'statements' / "Thm_S_foo'.lean").write_text(text)
+    M = mission.load(str(tmp_path))
+    pre, fs = M.payloads()["foo'"]
+    assert pre == 'import Mathlib\nimport Definitions.Def_S\nopen scoped ENNReal'
+    assert fs.startswith('namespace S') and fs.endswith('end S')
+    from p2mlib.workspace import statement_text
+    assert statement_text(pre, fs) == text                  # round trip: the file is the published module
+
+
+def test_statement_file_not_in_published_shape_is_refused(tmp_path):
+    (tmp_path / 'mission.py').write_text("NAME = 'S'\nNAMESPACE = 'S'\nTHEOREMS = []\n")
+    (tmp_path / 'statements').mkdir()
+    (tmp_path / 'statements' / 'Thm_S_x.lean').write_text('import Mathlib\ntheorem x : True := by\n  sorry\n')
+    M = mission.load(str(tmp_path))
+    with pytest.raises(SystemExit, match='not in published shape'):
+        M.payloads()

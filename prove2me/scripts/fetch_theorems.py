@@ -22,6 +22,8 @@ import os, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from p2m import call
 from prune_solution import _workspace
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # p2mlib
+from p2mlib.workspace import statement_module, statement_text, drafts, set_drafts  # noqa: E402
 
 
 def paged(path, key):
@@ -61,7 +63,8 @@ def main():
             sys.exit('no mission matches %s' % args)
         for m in missions:
             ids += [t.get('id') or t.get('theorem_id') for t in paged('/theorems?mission_id=%s' % m['id'], 'theorems')]
-    written, same, mods = [], 0, []
+    written, same, mods, retired = [], 0, [], []
+    dr = drafts(ws) if root == ws else {}
     for tid in ids:
         if True:
             d = call('GET', '/theorems/' + tid)
@@ -73,9 +76,17 @@ def main():
                     print('   no code served for definition %s; skipped' % name); continue
                 rel, text = os.path.join('Definitions', 'Def_%s.lean' % name), code.rstrip() + '\n'
             else:
-                rel = os.path.join('Theorems', 'Thm_%s.lean' % name.replace('.', '_'))
-                text = (d.get('preamble') or '').strip() + '\n\n' + (d.get('formal_statement') or '').strip() + '\n'
+                rel = statement_module(name)[1]
+                text = statement_text(d.get('preamble'), d.get('formal_statement'))
             p = os.path.join(root, rel)
+            mod = rel[:-5].replace(os.sep, '.')
+            if mod in dr:
+                # the platform has published a statement we had as a draft stub (stubs.py): it should
+                # be byte-identical; the published one wins either way
+                if os.path.exists(p) and open(p, encoding='utf-8').read().rstrip() != text.rstrip():
+                    print('   PUBLISHED DIFFERS from its draft stub: %s (the published text is written)' % rel)
+                del dr[mod]
+                retired.append(mod)
             os.makedirs(os.path.dirname(p), exist_ok=True)
             if os.path.exists(p) and open(p, encoding='utf-8').read().rstrip() == text.rstrip():
                 same += 1
@@ -84,6 +95,9 @@ def main():
                 written.append(rel)
                 print('   wrote %-8s %s' % (d.get('status'), rel))
             mods.append(rel[:-5].replace(os.sep, '.'))
+    if retired:
+        set_drafts(dr, ws)
+        print('%d draft stub(s) now published' % len(retired))
     print('%d files: %d written, %d already current' % (len(mods), len(written), same))
     if build and written:
         r = subprocess.run(['lake', 'build'] + sorted(set(mods)), cwd=ws, capture_output=True, text=True)
