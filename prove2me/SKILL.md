@@ -708,6 +708,13 @@ click is not one, a second click does not duplicate jobs, and a run that goes qu
 still lacking ids resumes on another click. When the last item publishes the status becomes `In
 review`; approval makes it a live mission.
 
+**Watch for the approval yourself.** Once a proposal reads `In review`, start
+`scripts/watch_proposal.py PROPOSAL_ID --every 600` as a background command. It exits when the
+status changes, and that exit wakes the session. Without it, approval is noticed only when the
+human happens to see it on the site and says so, which was the pattern until 2026-10-02. The watch
+lives only as long as the session, so restart it in a new session while a proposal is still in
+review.
+
 **"Compile failed" with a "Retry submit" button is the human's to click.** The retry re-runs
 Submit, which `mission_captain.md` reserves for the human, and no agent endpoint exists for it.
 The failed attempt need not stay visible in `/publish-jobs` (Moore M24, 2026-10-02: only the
