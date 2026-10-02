@@ -17,7 +17,8 @@ uses is still unpublished keeps that sibling's proof inline (rewire.py only sees
 which is a missing graph edge. Use it whenever an early milestone's proof uses later ones (Moore's
 Theorem 1.1 is milestone 1 and uses nearly everything). --build-only builds and prunes every
 statement but submits none (entries `held`), so edge_overlap.py can run first; a later run without
-it submits the held ones.
+it submits the held ones exactly as they stand in solutions/ (not rebuilt), so fixes made by hand
+after edge_overlap.py survive.
 
 Generalised 2026-09-30 from the per-mission submit_all.py of CFP §6 and §7.
 """
@@ -64,9 +65,14 @@ def main():
         for n in here:
             if n in done and not (done[n] == 'held' and n not in held):
                 continue
-            p = subprocess.run([sys.executable, os.path.join(SK, 'build_solutions.py'), mdir] + checks + [n],
-                               capture_output=True, text=True)
-            st = (p.stdout.split() or ['ERROR'])[0]
+            # a held solution is submitted as built: the edge_overlap.py fixes made by hand between the
+            # --build-only run and this one were being overwritten by a rebuild (Moore, 2026-10-02)
+            if done.get(n) == 'held' and os.path.exists(os.path.join(out, 'Sol_%s.lean' % n)):
+                st = 'OK'
+            else:
+                p = subprocess.run([sys.executable, os.path.join(SK, 'build_solutions.py'), mdir] + checks + [n],
+                                   capture_output=True, text=True)
+                st = (p.stdout.split() or ['ERROR'])[0]
             if st == 'NO-CHECK':
                 done[n] = 'no-check'
             elif st not in ('OK', 'OK*'):
