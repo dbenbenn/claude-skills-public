@@ -132,6 +132,7 @@
      "line": 3
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 26,
@@ -147,7 +148,8 @@
    "type": "True",
    "type_hash": 3270818714,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -165,6 +167,7 @@
      "line": 5
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 57,
@@ -180,7 +183,8 @@
    "type": "True",
    "type_hash": 3270818714,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": true
   }
  ],
  "file": "Broken.lean",

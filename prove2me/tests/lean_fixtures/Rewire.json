@@ -291,6 +291,7 @@
      "line": 5
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 63,
@@ -306,7 +307,8 @@
    "type": "∀ (n : ℕ), n + 0 = n",
    "type_hash": 720014397,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -324,6 +326,7 @@
      "line": 10
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 125,
@@ -339,7 +342,8 @@
    "type": "∀ (n : ℕ), 0 + n = n",
    "type_hash": 307762279,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -357,6 +361,7 @@
      "line": 12
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 179,
@@ -372,7 +377,8 @@
    "type": "1 = 1",
    "type_hash": 1326858781,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": true
   },
   {
    "kind": "theorem",
@@ -390,6 +396,7 @@
      "line": 14
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 217,
@@ -405,7 +412,8 @@
    "type": "True",
    "type_hash": 3270818714,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   }
  ],
  "file": "Rewire.lean",

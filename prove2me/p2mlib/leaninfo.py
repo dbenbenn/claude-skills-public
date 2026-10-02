@@ -79,6 +79,8 @@ class Decl:
     uses_local: list
     uses_imported: list           # [{'name', 'module'}], our modules only
     same_statement_as: list = field(default_factory=list)   # with run(candidates=...): published copies
+    rests_on: list = field(default_factory=list)   # Theorems.* statements reached (stopping there)
+    uses_sorry: bool = False                        # sorryAx reachable without passing through one
     command: int = None           # index into Info.commands
     generated: bool = False       # made by Lean for another declaration (P.rec, P.casesOn, ...)
 
@@ -147,7 +149,8 @@ def parse(data, text_bytes=b''):
     for d in data.get('decls') or []:
         x = Decl(d['name'], d['private'], d['kind'], _pos(d['range']['start']), _pos(d['range']['end']),
                  (_pos(d['selection']['start']), _pos(d['selection']['end'])), d['type'], d['type_hash'],
-                 d['uses_local'], d['uses_imported'], d.get('same_statement_as') or [])
+                 d['uses_local'], d['uses_imported'], d.get('same_statement_as') or [],
+                 d.get('rests_on') or [], bool(d.get('uses_sorry')))
         for c in cmds:
             if c.start.byte <= x.start.byte <= c.end.byte:
                 x.command = c.index

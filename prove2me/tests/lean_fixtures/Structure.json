@@ -1101,6 +1101,7 @@
      "line": 5
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 52,
@@ -1116,7 +1117,8 @@
    "type": "∀ (n : ℕ), n = n",
    "type_hash": 3181628533,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1134,6 +1136,7 @@
      "line": 8
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 97,
@@ -1149,7 +1152,8 @@
    "type": "∀ (n : ℕ), n + 0 = n",
    "type_hash": 720014397,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1167,6 +1171,7 @@
      "line": 10
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 157,
@@ -1182,7 +1187,8 @@
    "type": "∀ (n : ℕ), 0 + n = n",
    "type_hash": 307762279,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1200,6 +1206,7 @@
      "line": 14
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 224,
@@ -1217,7 +1224,8 @@
    "uses_imported": [],
    "uses_local": [
     "A.foo'"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1235,6 +1243,7 @@
      "line": 16
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 274,
@@ -1250,7 +1259,8 @@
    "type": "True",
    "type_hash": 3270818714,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1268,6 +1278,7 @@
      "line": 18
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 312,
@@ -1285,7 +1296,8 @@
    "uses_imported": [],
    "uses_local": [
     "A.hidden"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1303,6 +1315,7 @@
      "line": 29
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 467,
@@ -1318,7 +1331,8 @@
    "type": "∀ {X : Type} (x : X), x = x",
    "type_hash": 1657361996,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1336,6 +1350,7 @@
      "line": 31
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 498,
@@ -1353,7 +1368,8 @@
    "uses_imported": [],
    "uses_local": [
     "inSec1"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "def",
@@ -1371,6 +1387,7 @@
      "line": 34
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 531,
@@ -1386,7 +1403,8 @@
    "type": "ℕ → ℕ",
    "type_hash": 2546708756,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1404,6 +1422,7 @@
      "line": 38
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 605,
@@ -1421,7 +1440,8 @@
    "uses_imported": [],
    "uses_local": [
     "f"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1439,6 +1459,7 @@
      "line": 42
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 778,
@@ -1456,7 +1477,8 @@
    "uses_imported": [],
    "uses_local": [
     "f"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1474,6 +1496,7 @@
      "line": 44
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 812,
@@ -1492,7 +1515,8 @@
    "uses_local": [
     "f",
     "f_one"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1510,6 +1534,7 @@
      "line": 47
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 937,
@@ -1528,7 +1553,8 @@
    "uses_local": [
     "f",
     "f_zero"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1546,6 +1572,7 @@
      "line": 50
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 986,
@@ -1563,7 +1590,8 @@
    "uses_imported": [],
    "uses_local": [
     "A.foo'"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "def",
@@ -1581,6 +1609,7 @@
      "line": 52
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1019,
@@ -1596,7 +1625,8 @@
    "type": "ℕ",
    "type_hash": 421340980,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "def",
@@ -1614,6 +1644,7 @@
      "line": 53
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1037,
@@ -1629,7 +1660,8 @@
    "type": "ℕ",
    "type_hash": 421340980,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "def",
@@ -1647,6 +1679,7 @@
      "line": 57
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1084,
@@ -1667,7 +1700,8 @@
     "P.a",
     "P.mk",
     "P.rec"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "structure",
@@ -1685,6 +1719,7 @@
      "line": 57
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1084,
@@ -1703,7 +1738,8 @@
    "uses_local": [
     "P.a",
     "P.mk"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "recursor",
@@ -1721,6 +1757,7 @@
      "line": 57
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1084,
@@ -1740,7 +1777,8 @@
     "P",
     "P.a",
     "P.mk"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "def",
@@ -1758,6 +1796,7 @@
      "line": 57
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1084,
@@ -1777,7 +1816,8 @@
     "P",
     "P.a",
     "P.casesOn"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "def",
@@ -1795,6 +1835,7 @@
      "line": 57
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1084,
@@ -1815,7 +1856,8 @@
     "P.a",
     "P.mk",
     "P.rec"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "constructor",
@@ -1833,6 +1875,7 @@
      "line": 57
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1084,
@@ -1851,7 +1894,8 @@
    "uses_local": [
     "P",
     "P.a"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "def",
@@ -1869,6 +1913,7 @@
      "line": 57
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1084,
@@ -1889,7 +1934,8 @@
     "P.a",
     "P.mk",
     "P.noConfusion"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "def",
@@ -1907,6 +1953,7 @@
      "line": 58
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1094,
@@ -1924,7 +1971,8 @@
    "uses_imported": [],
    "uses_local": [
     "P"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "def",
@@ -1942,6 +1990,7 @@
      "line": 60
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1110,
@@ -1960,7 +2009,8 @@
    "uses_local": [
     "P",
     "P.mk"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -1978,6 +2028,7 @@
      "line": 62
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 1159,
@@ -1997,7 +2048,8 @@
     "A.foo'",
     "f",
     "f_zero"
-   ]
+   ],
+   "uses_sorry": false
   }
  ],
  "file": "Structure.lean",

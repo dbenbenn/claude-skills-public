@@ -22,7 +22,9 @@ Prints one JSON object:
   type's `Expr.hash`: equal for statements differing only in binder names or binder brackets;
   NOT equal when one hides its statement behind a local definition -- that needs a defeq check), and
   `uses_local` (declarations of this file it depends on, through auxiliaries) and `uses_imported`
-  (constants from our own modules -- not Mathlib or core -- with their `module`). A dependency is a
+  (constants from our own modules -- not Mathlib or core -- with their `module`); `rests_on` (the
+  `Theorems.*` statements it reaches, stopping there) and `uses_sorry` (whether `sorryAx` is reachable
+  without passing through one), for the completeness check. A dependency is a
   constant in the declaration's value OR one its command names in source (every constant the
   elaborator resolved there, from the info trees): `simp only [h]` with an `rfl` lemma `h` rewrites
   by `dsimp` and leaves no trace in the term, yet deleting `h` breaks the proof. A name tried in a
@@ -188,6 +190,28 @@ def kindOf (env : Environment) (n : Name) : ConstantInfo → String
 def ourModule (m : Name) : Bool :=
   !(m.getRoot ∈ [`Mathlib, `Init, `Lean, `Std, `Batteries, `Aesop, `Qq, `ProofWidgets, `Plausible,
                  `ImportGraph, `LeanSearchClient, `Lake, `Cli])
+
+/-- What a declaration rests on, stopping at statements: the `Theorems.*` constants (published
+statements or draft stubs) reached through this file and our own other modules, and whether
+`sorryAx` is reachable WITHOUT passing through one. A milestone's proof is complete when it is
+`sorry`-free in this sense; the statements it rests on are its graph edges. Mathlib and core are
+not entered. -/
+partial def restsOn (env : Environment) (todo : List Name) (seen stmts : NameSet) (hasSorry : Bool) :
+    NameSet × Bool :=
+  match todo with
+  | [] => (stmts, hasSorry)
+  | c :: rest =>
+    if seen.contains c then restsOn env rest seen stmts hasSorry else
+    let seen := seen.insert c
+    if c == ``sorryAx then restsOn env rest seen stmts true else
+    let next := ((env.find? c).map (·.getUsedConstantsAsSet.toList)).getD []
+    match env.getModuleIdxFor? c with
+    | none => restsOn env (next ++ rest) seen stmts hasSorry
+    | some idx =>
+      let m := env.header.moduleNames[idx.toNat]!
+      if m.getRoot == `Theorems then restsOn env rest seen (stmts.insert c) hasSorry
+      else if ourModule m then restsOn env (next ++ rest) seen stmts hasSorry
+      else restsOn env rest seen stmts hasSorry
 
 unsafe def main (args : List String) : IO UInt32 := do
   let some path := args.head? | IO.eprintln "usage: LeanInfo FILE.lean [--parse-only]"; return 2
@@ -355,7 +379,9 @@ unsafe def main (args : List String) : IO UInt32 := do
       ("selection", Json.mkObj [("start", positionJ fm rg.selectionRange.pos), ("end", positionJ fm rg.selectionRange.endPos)]),
       ("type", toJson ty), ("type_hash", toJson ci.type.hash.toNat),
       ("uses_local", toJson ((usesLocal.map fun c => toString ((privateToUserName? c).getD c)).toArray.qsort (· < ·))),
-      ("uses_imported", toJson usesImported.toArray)] |>.mergeObj
+      ("uses_imported", toJson usesImported.toArray),
+      ("rests_on", toJson (((restsOn env [n] {} {} false).1.toList.map toString).toArray.qsort (· < ·))),
+      ("uses_sorry", toJson (restsOn env [n] {} {} false).2)] |>.mergeObj
       (if candidates.isEmpty then Json.mkObj [] else Json.mkObj [("same_statement_as", toJson same)])
   let declsSorted := declsJ.qsort fun a b =>
     (a.getObjValD "range" |>.getObjValD "start" |>.getObjValD "byte" |>.getNat?.toOption.getD 0) <

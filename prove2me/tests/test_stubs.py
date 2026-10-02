@@ -75,3 +75,40 @@ def test_submit_refuses_a_draft_import(env, monkeypatch, tmp_path):
         submit_solution.check_no_draft_imports(str(f))
     f.write_text('import Mathlib\n\ntheorem solution : True := trivial\n')
     submit_solution.check_no_draft_imports(str(f))           # fine
+
+
+def statements_layout(mdir):
+    """Convert the mini mission to one statements/ file per statement (the new layout)."""
+    from p2mlib.mission import load
+    from p2mlib.workspace import statement_text
+    M = load(mdir)
+    pay = M.payloads()
+    os.makedirs(os.path.join(mdir, 'statements'))
+    for T in M.THEOREMS:
+        open(os.path.join(mdir, 'statements', 'Thm_Mini_%s.lean' % T['name']), 'w').write(statement_text(*pay[T['name']]))
+    os.remove(os.path.join(mdir, 'lib', 'Thm_Mini.lean'))
+    mp = os.path.join(mdir, 'mission.py')
+    s = open(mp).read()
+    open(mp, 'w').write(s[:s.index('def payloads():')])
+    return pay
+
+
+def test_statements_layout_gives_the_same_payloads_and_stubs(env):
+    mdir, ws = env
+    pay = statements_layout(mdir)
+    from p2mlib.mission import load
+    assert load(mdir).payloads() == pay                      # the restructure changes nothing on p2m
+    assert stubs.sync(mdir, ws)[0] == []
+
+
+def test_verify_resolves_statement_names_in_the_statements_layout(env):
+    # draft.dead_lean_refs read only lib/*.lean: after Lodha-Moore moved to statements/, every
+    # statement name in the prose looked dead (BAD 12, 2026-10-02)
+    import draft
+    mdir, ws = env
+    statements_layout(mdir)
+    M = draft.load(mdir)
+    its, mls, _, _ = draft.desired(M, mdir)
+    its['goal']['natural_language_statement'] += ' Compare `Mini.t1`.'
+    bad = draft.dead_lean_refs(M, mdir, its, mls, 'This mission formalizes a paper.', lambda *a, **k: {})
+    assert not [b for b in bad if 'Mini.t1' in b[1]], bad

@@ -237,6 +237,7 @@
      "line": 8
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 222,
@@ -252,7 +253,8 @@
    "type": "∀ (g : ℝ ≃o ℝ) (y : ℝ), g y ≠ y → ∀ (n : ℤ), n ≠ 0 → (g ^ n) y ≠ y",
    "type_hash": 844309895,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": true
   },
   {
    "kind": "theorem",
@@ -270,6 +272,7 @@
      "line": 11
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 348,
@@ -285,7 +288,8 @@
    "type": "True",
    "type_hash": 3270818714,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -303,6 +307,9 @@
      "line": 15
     }
    },
+   "rests_on": [
+    "BlockCycleRotation.fib_two_le"
+   ],
    "selection": {
     "end": {
      "byte": 393,
@@ -325,7 +332,8 @@
    ],
    "uses_local": [
     "Dev.moves"
-   ]
+   ],
+   "uses_sorry": true
   }
  ],
  "file": "Audit.lean",

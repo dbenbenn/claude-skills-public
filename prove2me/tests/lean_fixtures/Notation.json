@@ -235,6 +235,7 @@
      "line": 5
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 64,
@@ -250,7 +251,8 @@
    "type": "Lean.ParserDescr",
    "type_hash": 1560175301,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "def",
@@ -268,6 +270,7 @@
      "line": 7
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 85,
@@ -283,7 +286,8 @@
    "type": "ℝ≥0∞",
    "type_hash": 1163087261,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -301,6 +305,7 @@
      "line": 9
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 117,
@@ -318,7 +323,8 @@
    "uses_imported": [],
    "uses_local": [
     "g"
-   ]
+   ],
+   "uses_sorry": false
   },
   {
    "kind": "theorem",
@@ -336,6 +342,7 @@
      "line": 11
     }
    },
+   "rests_on": [],
    "selection": {
     "end": {
      "byte": 152,
@@ -351,7 +358,8 @@
    "type": "1 + 1 = 2",
    "type_hash": 1213423398,
    "uses_imported": [],
-   "uses_local": []
+   "uses_local": [],
+   "uses_sorry": false
   }
  ],
  "file": "Notation.lean",

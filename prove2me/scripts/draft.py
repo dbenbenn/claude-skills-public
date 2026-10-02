@@ -355,7 +355,8 @@ def dead_lean_refs(M, mdir, its, mls, desc, call):
                 continue
             refs.setdefault(head, where)
     names, spaces, seen = set(), set(), set()
-    for f in sorted(glob.glob(os.path.join(mdir, 'lib', '*.lean'))):
+    # lib/ holds the bundles (and, in older missions, the statements); statements/ the statements
+    for f in sorted(glob.glob(os.path.join(mdir, 'lib', '*.lean')) + glob.glob(os.path.join(mdir, 'statements', '*.lean'))):
         n, sp = _decls(f, seen)
         names |= n; spaces |= sp
     short = {q.split('.')[-1] for q in names}
@@ -364,7 +365,7 @@ def dead_lean_refs(M, mdir, its, mls, desc, call):
     if left:
         from prune_solution import _workspace
         ws = _workspace()
-        imps = sorted({l for f in glob.glob(os.path.join(mdir, 'lib', '*.lean'))
+        imps = sorted({l for f in glob.glob(os.path.join(mdir, 'lib', '*.lean')) + glob.glob(os.path.join(mdir, 'statements', '*.lean'))
                        for l in open(f, encoding='utf-8').read().split('\n') if l.startswith('import ')})
         imps = [l for l in imps if os.path.exists(os.path.join(ws, *l.split()[1].split('.')) + '.lean')
                 or l == 'import Mathlib']
@@ -439,9 +440,8 @@ def short_bundle_names(M, mdir):
     statement import `Def_MooreTrees` for nothing (2026-09-30), and a preamble freezes at publish."""
     # only a name some statement actually binds is a problem: Moore's own `x0`, `L_f` are short
     # but bound nowhere, while `s` was bound in every §3 sum (2026-09-30)
-    texts = []
-    for f in glob.glob(os.path.join(mdir, 'lib', 'Thm_*.lean')):
-        texts.append(open(f, encoding='utf-8').read())
+    # the statements as the platform will publish them, whichever layout the mission keeps
+    texts = [fs for _pre, fs in M.payloads().values()]
     out = []
     # split the statements files into single declarations, so a statement that also uses a longer
     # name of the bundle (and so imports it genuinely) is not flagged: Lodha-Moore's `K` appears as

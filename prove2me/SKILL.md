@@ -846,7 +846,10 @@ imports `Theorems.Thm_<NS>_<sibling>` (installed by `stubs.py`), not a copy of i
 then written deliberately, following the source, instead of recovered afterwards. A proof
 importing an unproved sibling is a reduction, as on the platform. The development is complete
 when every milestone's proof compiles, its only `sorry`s come through sibling imports, every
-imported sibling has a proof, and the imports among milestones are acyclic. Developments before
+imported sibling has a proof, and the imports among milestones are acyclic:
+`scripts/check_complete.py MISSION_DIR CHECK_MODULE…` checks exactly that, from LeanInfo's
+`rests_on`/`uses_sorry`, and also catches a `chk_` proof that states something other than its
+milestone (Lodha–Moore's torsion proof took milestone 1 as a hypothesis). Developments before
 Lodha–Moore cited primed copies (`isMarginal_EBad'`) to keep every check `sorry`-free, and rewire
 had to recover the edges, missing some (the 2026-09-24 sweep, Moore's `bijOn`). Rewire remains for
 a development lemma that turns out to restate a milestone.
@@ -1239,6 +1242,7 @@ script prints its usage when run with no arguments.
 | `build_solution.py` | Build the solution file for one published theorem from a Lean development, ready to submit. |
 | `build_solutions.py` | Build a mission's solutions from its development's check files: one file per statement. |
 | `caveat_audit.py` | Audit the prose that explains a source-audit gap: does the natural-language statement's note account for each gap accurately, and does it claim anything the Lean or a citation does not back? |
+| `check_complete.py` | Is a mission's development complete? |
 | `check_description.py` | Run the prove2me skill's description checklist mechanically. |
 | `check_pronouns.py` | Find gendered pronouns used for an author, in local mission prose or in live platform prose. |
 | `check_server_shape.py` | Compile every statement of a mission in server shape: its preamble + formal_statement, alone. |
