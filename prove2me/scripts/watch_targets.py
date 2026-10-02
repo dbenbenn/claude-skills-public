@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Watch published theorems you are about to prove, or are proving, and report status changes.
 
+usage:
     watch_targets.py check  ID [ID ...]        one line per target, then exit
     watch_targets.py watch  ID [ID ...]        poll every 60s; emit a line when a target's status
                                                changes; exit when none is Open any more

@@ -43,7 +43,7 @@ In parse-only mode the commands that change how later text parses (`namespace`, 
 and in-file notation parse; declarations are not, and `decls` is empty.
 
 The prove2me scripts ask this instead of matching Lean with regular expressions
-(scripts/ENGINEERING_PLAN.md, Phase 2).
+(scripts/README.md, "What LeanInfo reports").
 -/
 
 open Lean Elab Frontend

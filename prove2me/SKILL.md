@@ -670,7 +670,12 @@ carries a pronoun nobody could justify.
 
 `scripts/draft.py MISSION_DIR upload [--go]` and `draft.py MISSION_DIR verify`; the mission
 supplies only data, in `MISSION_DIR/mission.py` (the docstring lists what it defines, and
-`extract_payloads()` builds each preamble from the bundles its statement uses). Every mission
+`extract_payloads()` builds each preamble from the bundles its statement uses). A new mission
+keeps its prose out of Python: `prose/<name>.md` per item, a front matter of `title:` and
+`milestone_title:` lines, the natural-language statement as the body, and an optional
+`## Milestone` section for the milestone description. `p2mlib.mission.load` merges the files
+into `mission.py`'s items by name and refuses a field set in both places or a file naming no
+item. Raw Python strings let a stray `\'` reach a live Draft. Older missions keep their layout. Every mission
 through Garrido III copied its own uploader and verifier instead, and most of those verifiers
 only checked that a read-back was non-empty. The upload creates the proposal once, posts
 definitions with their read-backs, reference items, draft theorems, `main_item_id`,
@@ -735,8 +740,8 @@ together all had verdicts within 15 minutes, against about 13 minutes per verdic
 - A rejected proof is retried, twice by default, then recorded as `FAILED` and flagged `!!`.
 - A late verdict is polled, never resubmitted.
 - The run ends by listing everything that needs attention.
-- `--build-only` (then `edge_overlap.py`, then a plain run) is the order when the proofs use one
-  another.
+- `--build-only` (then `edge_audit.py --local`, then a plain run) is the order when the proofs use
+  one another.
 
 **Build each solution with `scripts/build_solution.py`** (merge the development module and its
 closure, drop the OTHER milestones so they are imported once Proved, generate the `solution`
@@ -809,9 +814,11 @@ the checker wants it at top level and answers WA "Unknown identifier `solution`"
 the file's imports, and retires the old proof through `deprecate.py`. It also refuses a
 submission whose edges equal those of a live proof of the same theorem (DUPLICATE), unless
 `--replaces` names that proof. `scripts/edge_audit.py MISSION…` checks every live proof of a
-mission and reports INCORRECT, MISSING and UNMATCHED. It reads each proof's own source from
-`GET /submissions/:id/solution`, falling back to a local file only if the fetch fails. Run the audit
-after a mission's solutions land.
+mission and reports INCORRECT, MISSING, SHARED and UNCHECKED. It reads each proof's own source from
+`GET /submissions/:id/solution` and has Lean elaborate it (cached by content), so an import is
+judged by what the declarations reachable from `solution` actually use, and a copy is found by its
+statement as well as its name. Run the audit after a mission's solutions land;
+`edge_audit.py --local SOLUTIONS_DIR` runs the same checks on built files before submitting.
 
 **The platform serves every submission's Lean source.** `GET /submissions/:id/solution` returns
 `content`, the exact `solution.lean`, for any submission, including other users' and failed ones
@@ -847,8 +854,9 @@ inline: Moore's `reduced_unique` and `exists_reduced_equiv` are the two halves o
 - restrict/glue re-proved the published unique-map lemma as `mob_unique`.
 - index two rebuilt "PIP is a group" as `pipSubgroup`.
 
-After the build, run `scripts/edge_overlap.py SOLUTIONS_DIR`. It lists each pair of solutions whose
-top proofs name a common declaration of their own, where one does not import the other. Read each
+After the build, run `scripts/edge_audit.py --local SOLUTIONS_DIR` (`edge_overlap.py` is now this). Its
+SHARED section lists each pair of solutions whose top proofs name a common declaration of their own,
+where neither reaches the other. Read each
 listed pair. A shared basic lemma is fine. When the step *is* the sibling's statement, take it from
 the published theorem, prune, and resubmit with `--replaces`. Counting shared declarations instead
 was tried and does not work: a common lemma library puts every pair above 60%.
@@ -1193,3 +1201,42 @@ captain in the mission discussion to relink, which takes about a week; and infra
 published but entangled in a heavy bundle. A scan of every proved mission's solutions found 5,794
 helper lemmas inside solution files, almost no cross-mission duplication, and one real gap
 (Farey), so the pattern to look for is entangled infrastructure, not missing infrastructure.
+
+## Scripts index
+
+Generated from each script's docstring by `scripts/gen_index.py`; never edit by hand. Every runnable
+script prints its usage when run with no arguments.
+
+<!-- scripts-index:begin -->
+| Script | What it does |
+|---|---|
+| `assemble_blueprint.py` | Assemble one Lean file from a Blueprint (definitions + `sorry` lemmas) and Part files proving them. |
+| `build_solution.py` | Build the solution file for one published theorem from a Lean development, ready to submit. |
+| `build_solutions.py` | Build a mission's solutions from its development's check files: one file per statement. |
+| `caveat_audit.py` | Audit the prose that explains a source-audit gap: does the natural-language statement's note account for each gap accurately, and does it claim anything the Lean or a citation does not back? |
+| `check_description.py` | Run the prove2me skill's description checklist mechanically. |
+| `check_pronouns.py` | Find gendered pronouns used for an author, in local mission prose or in live platform prose. |
+| `check_server_shape.py` | Compile every statement of a mission in server shape: its preamble + formal_statement, alone. |
+| `decisions.py` | The gap review: every source-audit finding on the goal and the milestones, decided by the human. *(library; used by `draft.py`, `source_audit.py`)* |
+| `deprecate.py` | Deprecate superseded submissions, naming the one that keeps the theorem proved. |
+| `draft.py` | Upload a mission proposal Draft from a repo, and verify the live Draft against it. |
+| `edge_audit.py` | Audit graph edges against the proofs that produce them: one auditor, judged by Lean. |
+| `edge_overlap.py` | Folded into edge_audit.py (Phase 4.4): its SHARED section is this check, judged by Lean. |
+| `fetch_theorems.py` | Write a mission's published statements into the workspace, so solutions can import them. |
+| `gen_index.py` | Regenerate the scripts index in SKILL.md from the scripts' own docstrings. |
+| `merge.py` | Concatenate a mission's shared modules into one self-contained prove2.me solution file. |
+| `p2m.py` | The prove2.me API client -- now p2mlib.api; this module re-exports it for the scripts. |
+| `prune_solution.py` | Delete the declarations an assembled solution never uses, before submitting it. |
+| `publish_standalone.py` | Publish a folder's standalone statements (POST /submit-problem), wait for the jobs, record ids in published_ids.json, and verify every published field against the folder. |
+| `publish_status.py` | Where has a Submit got to? |
+| `resolve_imports.py` | Make a merged solution file self-contained: import what is published, inline what is not. |
+| `rewire.py` | Make a solution import the published theorems it re-derives, so each is a graph edge. |
+| `source_audit.py` | Source-side audit: what does the source sentence claim, and does the formalization say it? |
+| `stage_auditor.py` | Stage a sealed working directory for one blind auditor, and tear it down after. |
+| `submit_all.py` | Build and submit each of a mission's statements as it is published, once each, until all are done. |
+| `submit_solution.py` | Submit a solution, check the graph shows exactly its imports, then retire what it replaces. |
+| `submit_verify.py` | Submit a solution file to POST /verify (multipart) and poll for the verdict. |
+| `sync_workspace.py` | Session start: sync the platform's rulebook and workspace to upstream head, then check that the live platform still behaves as our scripts assume. |
+| `watch_proposal.py` | Watch mission proposals until their status changes (e.g. `In review` -> approved). |
+| `watch_targets.py` | Watch published theorems you are about to prove, or are proving, and report status changes. |
+<!-- scripts-index:end -->

@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 from p2mlib import leaninfo  # noqa: E402
 
 FIX = os.path.join(HERE, 'lean_fixtures')
-REPLAYED = ['Structure', 'Broken', 'Notation', 'Rewire']
+REPLAYED = ['Structure', 'Broken', 'Notation', 'Rewire', 'Audit']
 
 
 def record(name):

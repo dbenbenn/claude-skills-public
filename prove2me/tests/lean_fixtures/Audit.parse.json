@@ -1,0 +1,227 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 129,
+    "col": 13,
+    "line": 5
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 116,
+    "col": 0,
+    "line": 5
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 325,
+    "col": 7,
+    "line": 9
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 222,
+      "col": 13,
+      "line": 8
+     },
+     "start": {
+      "byte": 217,
+      "col": 8,
+      "line": 8
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "Dev.moves"
+   ],
+   "namespace": "Dev",
+   "opens": [],
+   "start": {
+    "byte": 209,
+    "col": 0,
+    "line": 8
+   },
+   "value_start": {
+    "byte": 312,
+    "col": 83,
+    "line": 8
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 366,
+    "col": 39,
+    "line": 11
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 348,
+      "col": 21,
+      "line": 11
+     },
+     "start": {
+      "byte": 335,
+      "col": 8,
+      "line": 11
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "Dev.unused_helper"
+   ],
+   "namespace": "Dev",
+   "opens": [],
+   "start": {
+    "byte": 327,
+    "col": 0,
+    "line": 11
+   },
+   "value_start": {
+    "byte": 356,
+    "col": 29,
+    "line": 11
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "end": {
+    "byte": 375,
+    "col": 7,
+    "line": 13
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "Dev",
+   "opens": [],
+   "start": {
+    "byte": 368,
+    "col": 0,
+    "line": 13
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 575,
+    "col": 77,
+    "line": 16
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 393,
+      "col": 16,
+      "line": 15
+     },
+     "start": {
+      "byte": 385,
+      "col": 8,
+      "line": 15
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "solution"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 377,
+    "col": 0,
+    "line": 15
+   },
+   "value_start": {
+    "byte": 491,
+    "col": 92,
+    "line": 15
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 576,
+    "col": 0,
+    "line": 17
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 576,
+    "col": 0,
+    "line": 17
+   }
+  }
+ ],
+ "decls": [],
+ "file": "Audit.lean",
+ "messages": [],
+ "mode": "parse"
+}

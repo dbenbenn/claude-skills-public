@@ -1,17 +1,42 @@
-"""edge_audit.py on a fake platform: INCORRECT and MISSING edges, read from the submitted source."""
+"""edge_audit.py: INCORRECT, MISSING and SHARED, judged by Lean on the submitted source.
+
+Offline: judge/report and the live flow on a fake platform, with the analysis of
+lean_fixtures/Audit.lean replayed from its recording. With P2M_LEAN=1: the analysis itself."""
+import json
+import os
+
 import pytest
 
 import edge_audit as E
+from p2mlib import leaninfo as LI
+from p2mlib.workspace import Published
 
-CODE = '''import Theorems.Thm_N_dep
-import Theorems.Thm_N_unused
+FIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lean_fixtures')
+CODE = open(os.path.join(FIX, 'Audit.lean')).read()
+BYFULL = {f: Published(f, 'Theorems.Thm_' + f.replace('.', '_'), [])
+          for f in ('BlockCycleRotation.fib_two_le', 'BlockCycleRotation.gcd_min_eq',
+                    'HomeoLine.zpow_moves_of_moves', 'N.target', 'N.other')}
+SAME = {'Dev.moves': ['HomeoLine.zpow_moves_of_moves']}
 
-theorem other' : True := trivial
 
-theorem solution : True := by
-  have := other'
-  exact N.dep
-'''
+def recorded():
+    return LI.parse(json.load(open(os.path.join(FIX, 'Audit.json'))), CODE.encode())
+
+
+def test_judge_incorrect_missing_and_top():
+    inc, mis, top = E.judge(recorded(), SAME, 'N.target', {'BlockCycleRotation.fib_two_le'}, BYFULL,
+                            lambda f: False)
+    assert inc == ['Theorems.Thm_BlockCycleRotation_gcd_min_eq']      # imported, never used
+    assert mis == [('Dev.moves', 'HomeoLine.zpow_moves_of_moves', 'statement')]
+    assert top == {'moves'}                                            # unused_helper is pruned away
+
+
+def test_reached_or_deprecated_copies_are_not_missing():
+    info = recorded()
+    _, mis, _ = E.judge(info, SAME, 'N.target', {'HomeoLine.zpow_moves_of_moves'}, BYFULL, lambda f: False)
+    assert mis == []
+    _, mis, _ = E.judge(info, SAME, 'N.target', set(), BYFULL, lambda f: True)
+    assert mis == []
 
 
 class Fake:
@@ -23,8 +48,7 @@ class Fake:
         if path.startswith('/missions?'):
             return {'missions': [{'id': 'M1', 'name': 'Test mission'}] if 'offset=0' in path else []}
         if path.startswith('/theorems?mission_id='):
-            return {'theorems': [{'id': 'T', 'theorem_name': 'N.target', 'status': 'Proved',
-                                  'formal_statement': 'theorem target : True := by\n  sorry'}] if 'offset=0' in path else []}
+            return {'theorems': [{'id': 'T', 'theorem_name': 'N.target', 'status': 'Proved'}] if 'offset=0' in path else []}
         if path.startswith('/submissions?page='):
             return {'submissions': self.pages.get(int(path.split('=')[1]), []), 'total': 101}
         if path == '/submissions/s1':
@@ -33,8 +57,9 @@ class Fake:
             return {'content': CODE}
         if path == '/theorems/T/graph':
             nodes = [{'node_type': 'theorem', 'theorem_id': i, 'theorem_name': n}
-                     for i, n in (('T', 'N.target'), ('D', 'N.dep'), ('U', 'N.unused'))]
-            edges = [{'source': 'D', 'target': 'sketch-s1'}, {'source': 'U', 'target': 'sketch-s1'},
+                     for i, n in (('T', 'N.target'), ('F', 'BlockCycleRotation.fib_two_le'),
+                                  ('G', 'BlockCycleRotation.gcd_min_eq'))]
+            edges = [{'source': 'F', 'target': 'sketch-s1'}, {'source': 'G', 'target': 'sketch-s1'},
                      {'source': 'sketch-s1', 'target': 'T'}]
             return {'root_id': 'T', 'nodes': nodes, 'edges': edges}
         if path.startswith('/theorems?theorem_name='):
@@ -42,27 +67,32 @@ class Fake:
         raise AssertionError(path)
 
 
-@pytest.fixture
-def ws(tmp_path, monkeypatch):
-    t = tmp_path / 'Theorems'
-    t.mkdir()
-    for n in ('dep', 'unused', 'other', 'target'):
-        (t / ('Thm_N_%s.lean' % n)).write_text('namespace N\n\ntheorem %s : True := by\n  sorry\n\nend N\n' % n)
-    # two copies of the workspace lookup (edge_audit's and prune_solution's): Phase 3 makes one
-    import prune_solution
-    monkeypatch.setattr(E, '_workspace', lambda: str(tmp_path))
-    monkeypatch.setattr(prune_solution, '_workspace', lambda: str(tmp_path))
-    return tmp_path
-
-
-def test_incorrect_and_missing_edges_found_on_second_page(ws, monkeypatch, capsys):
+def test_live_audit_on_second_page(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(E, 'call', Fake().call)
-    monkeypatch.setattr(E.sys, 'argv', ['edge_audit.py', 'M1'])
-    with pytest.raises(SystemExit) as e:
-        E.main()
+    monkeypatch.setattr(E, 'CACHE', str(tmp_path))
+    monkeypatch.setattr(E, 'published_by_full', lambda ws: BYFULL)
+    seen = []
+    monkeypatch.setattr(E, 'analyze', lambda path, ws: (seen.append(open(path).read()), (recorded(), SAME))[1])
+    assert E.live(['M1'], str(tmp_path)) == 1
     out = capsys.readouterr().out
-    assert e.value.code == 1
-    assert 'INCORRECT edges (imports the proof never uses): 1' in out and 'Theorems.Thm_N_unused' in out
-    assert 'MISSING edges (copied published theorem the graph does not reach): 1' in out and 'N.other' in out
-    assert 'submitted s1' in out                       # judged from the platform's copy of the source
-    assert 'UNMATCHED live proofs (source not fetched, no local file; not checked): 0' in out
+    assert seen == [CODE]                                   # judged from the platform's copy
+    assert 'INCORRECT edges (imports the proof never uses): 1' in out and 'gcd_min_eq' in out
+    assert 'MISSING edges' in out and 'Dev.moves <- HomeoLine.zpow_moves_of_moves  (by statement)' in out
+    assert 'UNCHECKED proofs: 0' in out
+
+
+def test_shared_top_steps_reported_between_unrelated_proofs(capsys):
+    proofs = [('N.a', 's1', set()), ('N.b', 's2', set()), ('N.c', 's3', {'N.a'}), ('N.b', 's4', set())]
+    results = [(None, ([], [], {'lemma1', 'basic'})), (None, ([], [], {'lemma1'})), (None, ([], [], {'lemma1'})),
+               (None, ([], [], {'lemma1'}))]
+    assert E.report(proofs, results) == 0
+    out = capsys.readouterr().out
+    assert 'N.a  and  N.b:  lemma1' in out and 'N.b  and  N.c:  lemma1' in out
+    assert out.count('N.a  and  N.b:  lemma1') == 1          # N.b's second live proof: one line
+    assert 'N.a  and  N.c' not in out                       # c reaches a
+
+
+@pytest.mark.lean
+def test_analysis_by_lean():
+    info, same = E.analyze(os.path.join(FIX, 'Audit.lean'), None or E._workspace())
+    assert not info.errors and same == SAME

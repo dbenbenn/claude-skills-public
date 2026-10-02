@@ -18,8 +18,8 @@ p2mlib.leanedit.scope_wrap), then runs rewire.py, which turns each copy of a pub
 into a call to it plus an import, prunes and compiles.
 
 Run `fetch_theorems.py` first, so every published name is in $P2M_WORKSPACE/Theorems; rewire only
-sees names there. Afterwards run edge_overlap.py on the output: a helper that re-derives a sibling
-under another name is invisible to rewire.
+sees names there. Afterwards run `edge_audit.py --local` on the output: rewire finds a copy of a sibling
+by its statement, under any name, but a helper that re-derives only part of one is invisible to it.
 
 Generalised 2026-09-30 from the per-mission builders of CFP §5, §6 and §7.
 """

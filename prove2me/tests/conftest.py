@@ -1,4 +1,4 @@
-"""Shared test setup for the prove2me scripts (see scripts/ENGINEERING_PLAN.md, "Test layers").
+"""Shared test setup for the prove2me scripts (see scripts/README.md, "Tests").
 
 Markers:
   live  -- talks to prove2.me (read-only); skipped unless P2M_LIVE=1

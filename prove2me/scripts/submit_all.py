@@ -24,9 +24,9 @@ every statement has an entry.
 uses is still unpublished keeps that sibling's proof inline (rewire.py only sees published names),
 which is a missing graph edge. Use it whenever an early milestone's proof uses later ones (Moore's
 Theorem 1.1 is milestone 1 and uses nearly everything). --build-only builds and prunes every
-statement but submits none (entries `held`), so edge_overlap.py can run first; a later run without
+statement but submits none (entries `held`), so `edge_audit.py --local` can run first; a later run without
 it submits the held ones exactly as they stand in solutions/ (not rebuilt), so fixes made by hand
-after edge_overlap.py survive.
+after the audit survive.
 
 Generalised 2026-09-30 from the per-mission submit_all.py of CFP §6 and §7.
 """
@@ -117,7 +117,7 @@ def main():
             if n in done and not (v == 'held' and n not in held) and not v.startswith('retry '):
                 continue
             f = os.path.join(out, 'Sol_%s.lean' % n)
-            # a held solution is submitted as built: the edge_overlap.py fixes made by hand between the
+            # a held solution is submitted as built: the audit fixes made by hand between the
             # --build-only run and this one were being overwritten by a rebuild (Moore, 2026-10-02)
             if (v == 'held' or v.startswith('retry ')) and os.path.exists(f):
                 st = 'OK'
