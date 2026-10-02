@@ -183,31 +183,47 @@ Layer 4 would have caught three real failures:
 
 **Phase 0 (2026-10-02): done.** The inventory is in `scripts/README.md`.
 
-**Phase 1 (2026-10-02): in progress.** `tests/`: 26 offline tests, plus the Lean and live layers.
+**Phase 1 (2026-10-02): done.** `tests/`: 103 passed + 7 strict xfails, 49 s with every layer, in three groups:
+- offline unit and regression tests, under a second;
+- Lean tests (`P2M_LEAN=1`), about a minute;
+- live read-only checks (`P2M_LIVE=1`), seconds.
 
-| Area | Tests |
-|---|---|
-| build_solutions | `open … in`, prime-aware matching, docstring "open", block boundaries |
-| submit_all | parallel, retries, PENDING, FAILED, DUPLICATE |
-| check_description | unlinked platform objects, Roman numerals, first person |
-| prune_solution | `open … in` prefix, attributed roots, no solution |
-| merge | namespace-qualified clash, duplicates, `@[simp]` survival, per-module sections, universes, existing solution |
-| extract_payloads | bare vs qualified names, unused bundles, universes |
-| Golden pipeline | Moore `isMarginal_EBad`, byte-identical to the accepted solution; Moore `bijOn` (hand-rewired), strict xfail until Phase 4.2 |
-| Golden assemble | Lemma 5.6, pinned and compiling with standard axioms; Chornyi child, strict xfail (bug below) |
-| Live contract | paging, solution endpoint, sketch shape, `deprecated_at`, verify |
+Every regression test fails on the pre-fix version of its script (checked with `git show <fix>^`).
 
-Each regression test fails on the pre-fix version of its script.
+**Coverage, by script.**
+- **Solution pipeline:** `build_solutions`, `merge`, `prune_solution`, `rewire`, `resolve_imports`,
+  `assemble_blueprint`, `extract_payloads`.
+- **Platform API:** `submit_all`, `submit_solution`, `deprecate`, `edge_audit`, `fetch_theorems`,
+  `publish_standalone`, `publish_status`, `watch_proposal`, `p2m`'s comment guard.
+- **Audits and checkers:** `draft` upload/verify plus its prose checks, `stage_auditor`,
+  `source_audit`, `decisions`, `caveat_audit`, `check_description`, `check_pronouns`,
+  `check_server_shape` (Lean).
+- **Golden files:** Moore `isMarginal_EBad` (byte-identical to the accepted solution); Lemma 5.6
+  assembly (pinned, compiles).
+- **Not covered:** `build_solution.py`, slated to merge into `build_solutions`, and `watch_targets`.
 
-**Bug found by the tests.** `assemble_blueprint.py` mis-splits a Part whose `section … variable … end`
-block spans several targets: the FAmenChild B2 case. Fix it in Phase 4.3 with LeanInfo ranges.
+**Strict xfails: known bugs, each to be fixed by a later phase.** The test flips when the bug is
+fixed.
 
-- `deprecate` (keeper checks, other theorem, already deprecated, undo when unproved) and
-  `submit_solution` (namespace, metaprogramming, docstring-proof `import_names`, DUPLICATE,
-  `--replaces`, PENDING), both on a fake platform.
+| # | Bug | Where | Fixed by |
+|---|---|---|---|
+| 1 | The pipeline cannot produce a hand-rewired solution: it misses copies under other names | Moore `bijOn` golden | Phase 4.2, type equality |
+| 2 | Parts with a `section`/`variable` block spanning targets are mis-split | `assemble_blueprint`, FAmenChild | Phase 4.3, LeanInfo ranges |
+| 3 | A comment line beginning `theorem` is taken as the declaration | `rewire.published` | Phase 3, one `published()` |
+| 4 | A one-line `@[simp] theorem` is not found | `resolve_imports.extract` | Phase 4, LeanInfo ranges |
+| 5 | An attribute line above the declaration is not carried | `resolve_imports.extract` | Phase 4, LeanInfo ranges |
+| 6 | A primed statement name is truncated | `draft.extract_payloads` | Phase 4, LeanInfo names |
+| 7 | Re-staging deletes a live auditor's directory | `caveat_audit.stage` | Phase 3, shared staging with `stage_auditor`'s guard |
 
-**Still to cover in Phase 1:**
-- `publish_standalone`, `publish_status`, `fetch_theorems`, on recorded responses;
-- the audit cluster (`draft` upload/verify, `stage_auditor`, `source_audit`, `decisions`,
-  `caveat_audit`), as characterization tests on a recorded proposal;
-- `rewire`, `resolve_imports`, `edge_audit`.
+**Duplication made visible by the tests.**
+- The workspace lookup exists in 3 copies, so a fake workspace must be patched into `edge_audit`
+  and `prune_solution` separately.
+- `ROOT` is imported by value from `stage_auditor` into `source_audit` and `caveat_audit`.
+- `caveat_audit` copies `source_audit`'s page rendering.
+- `paged()` exists in 2 copies.
+
+**A wrong claim corrected.** "/missions pages at 50" was false; my loop stopped at offset 400. The
+live contract now pins full 100-item pages.
+
+**Next: Phase 2.** LeanInfo becomes a real tool: JSON output, elaborate and parse-only modes,
+declaration types, caching, and tests on Lean fixtures.
