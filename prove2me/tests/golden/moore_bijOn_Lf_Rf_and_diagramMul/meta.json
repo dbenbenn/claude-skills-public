@@ -1,0 +1,11 @@
+{
+ "target": "bijOn_Lf_Rf_and_diagramMul",
+ "check": "Diagrams",
+ "submission": "7778b0c7-ce18-402d-86a9-166b7071520e",
+ "src": [
+  "Statements",
+  "Diagrams"
+ ],
+ "status": "xfail",
+ "why": "the accepted solution was rewired BY HAND after edge_overlap.py: it re-derived isReducedDiagram_iff and existsUnique_isReducedDiagram_diagramEquiv under other names (reduced_iff, reduced_unique, exists_reduced_equiv); the pipeline should find those copies by type (Phase 4.2) and produce this file itself"
+}

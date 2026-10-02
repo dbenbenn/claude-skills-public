@@ -1,0 +1,60 @@
+"""Pipeline regression on golden files (layer 3): rebuild a real, tricky solution from its
+development modules and compare with the solution the platform ACCEPTED (fetched once into
+tests/golden/<case>/expected.lean; never refetched).
+
+Each case directory holds src/*.lean (the check module and its Solutions dependencies, imports
+renamed to Solutions.Golden.<case>.*), expected.lean and meta.json (target, check module, the
+accepted submission id, why the case is tricky, and `status`: exact | xfail).
+
+The pipeline is what submit_all.py runs: build_solutions.build (merge, rewire, prune), then
+prune_solution.py --check. Needs the Lean workspace (published Theorems/Definitions are immutable,
+so relying on them is stable): run with P2M_LEAN=1."""
+import difflib
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+import pytest
+
+from conftest import SCRIPTS
+
+GOLDEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'golden')
+CASES = sorted(d for d in os.listdir(GOLDEN) if os.path.isfile(os.path.join(GOLDEN, d, 'meta.json')))
+
+
+def params():
+    for c in CASES:
+        meta = json.load(open(os.path.join(GOLDEN, c, 'meta.json')))
+        marks = [pytest.mark.lean]
+        if meta.get('status') == 'xfail':
+            marks.append(pytest.mark.xfail(reason=meta['why'], strict=True))
+        yield pytest.param(c, marks=marks, id=c)
+
+
+@pytest.mark.parametrize('case', params())
+def test_rebuild_matches_accepted(case, tmp_path):
+    import build_solutions as B
+    from prune_solution import _workspace
+    meta = json.load(open(os.path.join(GOLDEN, case, 'meta.json')))
+    ws = _workspace()
+    dst = os.path.join(ws, 'Solutions', 'Golden', case)
+    assert dst.startswith(os.path.join(ws, 'Solutions', 'Golden') + os.sep)
+    if os.path.isdir(dst):
+        shutil.rmtree(dst)
+    shutil.copytree(os.path.join(GOLDEN, case, 'src'), dst)
+    try:
+        name, st, _ = B.build(str(tmp_path), ['Golden/%s/%s' % (case, meta['check'])], meta['target'], str(tmp_path))
+        assert st in ('OK', 'OK*'), st
+        f = tmp_path / ('Sol_%s.lean' % meta['target'])
+        r = subprocess.run([sys.executable, os.path.join(SCRIPTS, 'prune_solution.py'), str(f), '--check'],
+                           capture_output=True, text=True, cwd=ws)
+        assert r.returncode == 0, r.stdout[-2000:] + r.stderr[-2000:]
+        got = f.read_text()
+    finally:
+        shutil.rmtree(dst)
+    want = open(os.path.join(GOLDEN, case, 'expected.lean')).read()
+    if got != want:
+        diff = ''.join(list(difflib.unified_diff(want.splitlines(True), got.splitlines(True), 'accepted', 'rebuilt', n=1))[:80])
+        pytest.fail('rebuilt solution differs from the accepted one:\n' + diff)

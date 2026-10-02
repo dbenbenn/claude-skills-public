@@ -1,0 +1,11 @@
+{
+ "target": "isMarginal_EBad",
+ "check": "Sec5Marg",
+ "submission": "8bfa6505-7daf-4c6e-a65a-3d3ec8d36f27",
+ "src": [
+  "Statements",
+  "Sec5Marg"
+ ],
+ "status": "exact",
+ "why": "primed dev lemma isMarginal_EBad' beside chk_isMarginal_EBad; a one-line check block; the merged Statements stubs rewired to imports and pruned"
+}
