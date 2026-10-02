@@ -70,6 +70,9 @@ for phrase in ('shape of the truth', 'who cares and why', 'wasted day',
 for m in re.finditer(r'(?<![\w-])(we|our|I|my)(?![\w-])', s):
     if m.group(0) == 'I' and re.match(r'\.\s*[A-Z]', s[m.end():m.end() + 3]):
         continue
+    # a Roman numeral after a capitalized word or abbreviation ("Garrido I", "Sér. I")
+    if m.group(0) == 'I' and re.search(r'[A-Z][\w.]*\s$', s[max(0, m.start() - 20):m.start()]):
+        continue
     a, b = max(0, m.start() - 40), m.end() + 40
     warn.append('first person %r near: …%s…' % (m.group(0), ' '.join(s[a:b].split())))
 
