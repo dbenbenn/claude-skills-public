@@ -35,3 +35,34 @@ def test_roman_numeral_is_not_first_person(tmp_path):
 
 def test_real_first_person_still_warns(tmp_path):
     assert "first person 'we'" in check(tmp_path, 'Here we prove it.\n')
+
+
+def test_roman_numeral_in_parentheses_is_not_first_person(tmp_path):
+    # Chou's description, 2026-10-02: "four processes: (I) subgroups, (II) quotients"
+    out = check(tmp_path, 'It is closed under four processes: (I) subgroups, (II) quotients.\n')
+    assert "first person 'I'" not in out
+
+
+def test_a_link_on_a_wrapped_line_counts_for_its_sentence(tmp_path):
+    # Chou's description wraps its lines; the link sat one line below "published" (2026-10-02)
+    out = check(tmp_path, 'On this platform the definition is already published\n'
+                          '(the bundle [`B`](https://prove2.me/theorems/x)), with more.\n')
+    assert 'without a prove2.me link' not in out
+
+
+def test_each_list_item_is_its_own_sentence(tmp_path):
+    out = check(tmp_path, '- Reused from the Garrido missions\n- See [x](https://prove2.me/theorems/y).\n')
+    assert 'without a prove2.me link: …- Reused from the Garrido missions' in out \
+        or 'without a prove2.me link: …Reused from the Garrido missions' in out
+
+
+def test_the_mission_is_this_mission(tmp_path):
+    # Monod's description, 2026-10-02: "The mission defines amenability of a relation as ..."
+    out = check(tmp_path, 'The mission defines amenability of a relation as Connes–Feldman–Weiss do.\n')
+    assert 'without a prove2.me link' not in out
+
+
+def test_a_link_in_another_clause_of_the_sentence_counts(tmp_path):
+    # Chou: "... ([Brin–Squier](…)); both are published and proved, ..." (2026-10-02)
+    out = check(tmp_path, 'It has no free subgroup ([B](https://prove2.me/theorems/z)); both are published.\n')
+    assert 'without a prove2.me link' not in out

@@ -75,6 +75,9 @@ def main():
         # a Roman numeral after a capitalized word or abbreviation ("Garrido I", "Sér. I")
         if m.group(0) == 'I' and re.search(r'[A-Z][\w.]*\s$', s[max(0, m.start() - 20):m.start()]):
             continue
+        # an enumeration "(I) subgroups, (II) quotients" (Chou, 2026-10-02)
+        if m.group(0) == 'I' and s[m.start() - 1:m.start()] == '(' and s[m.end():m.end() + 1] == ')':
+            continue
         a, b = max(0, m.start() - 40), m.end() + 40
         warn.append('first person %r near: …%s…' % (m.group(0), ' '.join(s[a:b].split())))
 
@@ -103,10 +106,14 @@ def main():
     # platform" should be a link -- "I often notice text like that that ought to be a link, but don't
     # always bother to mention it." Each sentence that names another mission, "this platform", or
     # something published, and carries no prove2.me link, is surfaced.
-    for sent in re.split(r'(?<=[.;:])\s+|\n+', s):
+    # Sentences run across wrapped lines (Chou's description puts a link one line below the word
+    # "published"); paragraphs, list items and headings end them.
+    blocks = re.split(r'\n\s*\n|\n(?=\s*(?:[-*+]\s|\d+\.\s|#))', s)
+    for sent in (x for b in blocks for x in re.split(r'(?<=[.?!])\s+', ' '.join(b.split()))):
         if re.search(r'(?i)^this mission formalizes', sent.strip()):
             continue
-        if re.search(r"(?i)\b(?:[A-Z][\w–'-]*(?:\s+[A-Z§][\w–'-]*)*\s+missions?\b|"
+        # "The mission ..." is this one (Monod, 2026-10-02), not a named other mission
+        if re.search(r"(?i)\b(?!(?:the|this|a|an|each|every|that)\s+missions?\b)(?:[A-Z][\w–'-]*(?:\s+[A-Z§][\w–'-]*)*\s+missions?\b|"
                      r'missions? on |this platform|on the platform|published (?:on|by|in|as|there)|'
                      r'(?:is|are) published|the published\b)', sent) \
                 and not re.search(r'\]\(https://prove2\.me/', sent) \
