@@ -152,6 +152,23 @@ def main():
     want = import_names(path)
     print('%s\n   file %s\n   edges it should create: %s\n   replaces: %s'
           % (args[0], path, sorted(want) or 'none (a full proof)', replaces or 'nothing'))
+    # a live proof with exactly these edges already exists: resubmitting only duplicates the
+    # sketch node and every edge in the graph (Chornyi Cor 3 was resubmitted verbatim after a
+    # context summary lost track of the first submission, 2026-10-02)
+    g = call('GET', '/theorems/%s/graph' % tid)
+    names = {n.get('theorem_id'): n.get('theorem_name') for n in g['nodes'] if n.get('node_type') == 'theorem'}
+    for n in g['nodes']:
+        if n.get('node_type') != 'sketch' or n.get('parent_theorem_id') != tid \
+                or n.get('status') not in ('ACCEPTED', 'SKETCH_ACCEPTED') \
+                or n.get('deprecated_at') not in (None, 'None') or n.get('submission_id') in replaces:
+            continue
+        node = 'sketch-' + n['submission_id']
+        have = {names[e['source']] for e in g['edges']
+                if e['target'] == node and '.' in (names.get(e['source']) or '')}
+        if have == want:
+            sys.exit('DUPLICATE: live submission %s (%s) already proves this with the same edges %s; '
+                     'pass --replaces %s to supersede it' % (n['submission_id'], n['status'],
+                                                             sorted(want) or 'none', n['submission_id']))
     if not go:
         print('dry run -- pass --go to submit'); return
     from submit_verify import post_verify, poll
