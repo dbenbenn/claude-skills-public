@@ -44,8 +44,11 @@ def find_block(sol, checks, name):
     """(check module, namespace, opens, block) for the check theorem proving `name`, else None."""
     for mod in checks:
         text = open(os.path.join(sol, mod + '.lean'), encoding='utf-8').read()
-        m = re.search(r'^theorem (?:chk_)?%s\b.*?(?=^(?:theorem|lemma|end|namespace|section|#|/-)\b)'
-                      % re.escape(name), text, re.M | re.S)
+        # the block ends at the next command; `open` included, or the `open X in` heading the
+        # next check block was swallowed and left dangling at the end of the solution (Moore, 2026-10-02)
+        m = re.search(r'^theorem (?:chk_)?%s(?![\w\']).*?(?=^(?:(?:theorem|lemma|end|namespace|section|open|def|'
+                      r'noncomputable|private|protected|example|variable|set_option|instance|abbrev|'
+                      r'attribute)\b|#|/-|@\[)|\Z)' % re.escape(name), text, re.M | re.S)
         if not m:
             continue
         # scan commands only: a docstring line beginning with "open" was once copied into a
@@ -73,7 +76,7 @@ def find_block(sol, checks, name):
             if mo.group(2) and i < tail:
                 continue
             opens.append(mo.group(1))
-        block = re.sub(r'^theorem (?:chk_)?%s\b' % re.escape(name), 'theorem solution', m.group(0).rstrip(),
+        block = re.sub(r'^theorem (?:chk_)?%s(?![\w\'])' % re.escape(name), 'theorem solution', m.group(0).rstrip(),
                        count=1, flags=re.M)
         return mod, '.'.join(stack), opens, block
     return None
