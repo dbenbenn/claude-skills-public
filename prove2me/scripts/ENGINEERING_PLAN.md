@@ -198,7 +198,8 @@ Every regression test fails on the pre-fix version of its script (checked with `
 - **Audits and checkers:** `draft` upload/verify plus its prose checks, `stage_auditor`,
   `source_audit`, `decisions`, `caveat_audit`, `check_description`, `check_pronouns`,
   `check_server_shape` (Lean).
-- **Golden files:** Moore `isMarginal_EBad` (byte-identical to the accepted solution); Lemma 5.6
+- **Golden files:** Moore `isMarginal_EBad` (identical to the accepted solution up to blank lines and
+  the dead declarations its case pins, since Phase 4.1); Lemma 5.6
   assembly (pinned, compiles).
 - **Not covered:** `build_solution.py`, slated to merge into `build_solutions`, and `watch_targets`.
 
@@ -207,7 +208,7 @@ fixed.
 
 | # | Bug | Where | Fixed by |
 |---|---|---|---|
-| 1 | The pipeline cannot produce a hand-rewired solution: it misses copies under other names | Moore `bijOn` golden | Phase 4.2, type equality |
+| 1 | The pipeline cannot produce a hand-rewired solution: it misses copies under other names | Moore `bijOn` golden | Phase 4.2 finds `reduced_iff` by statement; `reduced_unique` and `exists_reduced_equiv` are *halves* of the published `∃!`, derived from it by a person, so no matcher produces the accepted file (see Phase 4.2) |
 | 2 | Parts with a `section`/`variable` block spanning targets are mis-split | `assemble_blueprint`, FAmenChild | Phase 4.3, LeanInfo ranges |
 | 3 | A comment line beginning `theorem` is taken as the declaration | `rewire.published` | Phase 3, one `published()` |
 | 4 | A one-line `@[simp] theorem` is not found | `resolve_imports.extract` | Phase 4, LeanInfo ranges |
@@ -286,9 +287,40 @@ commands, 284 declarations). FAmenChild PartB2 parses with no errors.
 **Two strict xfails fixed and now regular tests:** `rewire.published` reading a comment line, and
 `caveat_audit` restaging over a live auditor.
 
-**Next: Phase 4.** Migrate the scripts onto LeanInfo, in order:
+**Phase 4: migrate the scripts onto LeanInfo**, in order:
 1. `prune_solution`: reachability over `uses_local`.
-2. `rewire`: copies found by type equality, then defeq (fixes xfail #1).
+2. `rewire`: copies found by statement (fixes xfail #1 in part).
 3. `merge`, `build_solutions`, `assemble_blueprint`: command ranges (fixes #2, #4, #5).
 4. One edge auditor.
 5. `extract_payloads`: names from LeanInfo (fixes #6).
+
+**Phase 4.1 (2026-10-02): done.** `p2mlib/prune.py` plans the prune from LeanInfo; `prune_solution.py`
+uses it, and the regex pruner remains only as the fallback for a file that does not elaborate.
+- **Roots:** `solution`, every `instance` command, every declaration written with attributes, and
+  the targets of `attribute [...]` commands. Reachability is over `uses_local`.
+- **What goes:** every command that declares names (a `declId`) none of which is reached, the
+  `variable`/`attribute` commands mentioning what went, diagnostic commands, and every
+  `import Theorems.X` that no kept declaration uses (`uses_imported`).
+- **Edits** go by command ranges. A `--` comment block directly above a command now goes with it
+  (Lean attaches it to the previous token), and a removed run keeps the wider of its two
+  separators.
+
+**Two gaps in LeanInfo, found by the tests:**
+- **A dependency invisible in the proof term.** `simp only [h]` with an `rfl` lemma `h` rewrites
+  by `dsimp` and leaves no constant in the term, so the golden rebuild deleted Moore's
+  `bits_001`/`bits_01`/`bits_10` and stopped compiling. Dependencies now also include every
+  constant the elaborator resolved in the declaration's command, read from the info trees. The
+  info state is per command, like the message log.
+- **`lemma` was not a declaration.** Mathlib's `lemma` is its own command kind, so the pruner
+  never deleted one (all 71 in one Moore solution). LeanInfo now reports it as a `theorem`, and
+  the pruner treats any command that declares names as removable.
+
+**Corpus check, on real files.** Re-pruning all 31 accepted Moore solutions:
+- every one still compiles;
+- 11 shed 1–3 dead declarations the regex pruner had kept;
+- no `import` changed in any of them, an independent Lean confirmation that the 31 carry no false
+  graph edge.
+
+The golden criterion changed accordingly: the rebuild must equal the accepted file minus the
+declarations the case pins as dead (`dropped_since_accepted`, each with its reason), ignoring
+blank lines. An unpinned difference still fails.

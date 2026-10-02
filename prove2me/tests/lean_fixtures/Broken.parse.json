@@ -2,6 +2,7 @@
  "commands": [
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 44,
     "col": 28,
@@ -21,6 +22,7 @@
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 85,
     "col": 39,

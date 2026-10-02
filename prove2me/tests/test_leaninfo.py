@@ -43,7 +43,8 @@ def test_open_in_is_one_command(info):
 
 
 def test_comment_line_starting_theorem_is_not_a_declaration(info):
-    docs = [c for c in info.commands if c.short_kind == 'moduleDoc']
+    docs = [c for c in info.commands if c.short_kind == 'moduleDoc'
+            and 'theorem for balls' in info.slice(c.start.byte, c.end.byte)]
     assert len(docs) == 1 and docs[0].names == []
     assert not any(d.name in ('for', 'balls') for d in info.decls)
 
@@ -63,10 +64,17 @@ def test_dependencies_fold_auxiliaries(info):
     assert info.decl('solution').uses_local == ["A.foo'", 'f', 'f_zero']
 
 
+def test_dependencies_include_names_the_source_resolves(info):
+    # simp rewrites by an rfl lemma through dsimp, leaving no trace in the term; the pruner deleted
+    # Moore's bits_001 / bits_01 / bits_10 that way (2026-10-02) and the solution stopped compiling
+    assert info.decl('viaSimp').uses_local == ['f', 'f_one']
+
+
 def test_generated_constants_flagged(info):
     gen = {d.name for d in info.decls if d.generated}
     assert {'P.rec', 'P.casesOn', 'P.mk', 'P.a'} <= gen and 'P' not in gen
-    assert info.decl('instInhabitedP').command == [c.index for c in info.commands if c.start.line == 43][0]
+    assert info.decl('instInhabitedP').command == \
+        [c.index for c in info.commands if info.slice(c.start.byte, c.end.byte).startswith('instance')][0]
 
 
 def test_command_spans_tile_the_file(info):

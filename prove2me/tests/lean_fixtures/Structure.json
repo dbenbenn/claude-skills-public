@@ -19,6 +19,7 @@
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 77,
     "col": 35,
@@ -40,6 +41,7 @@
    "attrs": [
     "simp"
    ],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 137,
     "col": 56,
@@ -61,6 +63,7 @@
    "attrs": [
     "simp"
    ],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 197,
     "col": 48,
@@ -80,6 +83,7 @@
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 250,
     "col": 37,
@@ -100,6 +104,7 @@
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 292,
     "col": 40,
@@ -119,6 +124,7 @@
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 329,
     "col": 35,
@@ -206,6 +212,7 @@
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 482,
     "col": 29,
@@ -225,6 +232,7 @@
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 518,
     "col": 34,
@@ -261,6 +269,7 @@
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.definition",
    "end": {
     "byte": 589,
     "col": 14,
@@ -280,6 +289,7 @@
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 622,
     "col": 31,
@@ -299,10 +309,149 @@
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 651,
+    "byte": 795,
+    "col": 30,
+    "line": 42
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "f_one"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 765,
+    "col": 0,
+    "line": 42
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 850,
+    "col": 53,
+    "line": 44
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "viaSimp"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 797,
+    "col": 0,
+    "line": 44
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 957,
+    "col": 34,
+    "line": 47
+   },
+   "kind": "lemma",
+   "names": [
+    "viaLemma"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 923,
+    "col": 0,
+    "line": 47
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 1011,
+    "col": 42,
+    "line": 50
+   },
+   "inner_kind": "lemma",
+   "kind": "Lean.Parser.Command.in",
+   "names": [
+    "unusedLemma"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 959,
+    "col": 0,
+    "line": 49
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "end": {
+    "byte": 1030,
+    "col": 15,
+    "line": 52
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "g1"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 1013,
+    "col": 0,
+    "line": 52
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "end": {
+    "byte": 1048,
+    "col": 15,
+    "line": 53
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "g2"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 1031,
+    "col": 0,
+    "line": 53
+   }
+  },
+  {
+   "attrs": [],
+   "end": {
+    "byte": 1071,
+    "col": 21,
+    "line": 55
+   },
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 1050,
+    "col": 0,
+    "line": 55
+   }
+  },
+  {
+   "attrs": [],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "end": {
+    "byte": 1100,
     "col": 7,
-    "line": 41
+    "line": 58
    },
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -311,34 +460,36 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 624,
+    "byte": 1073,
     "col": 0,
-    "line": 40
+    "line": 57
    }
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.instance",
    "end": {
-    "byte": 692,
+    "byte": 1141,
     "col": 31,
-    "line": 43
+    "line": 60
    },
    "kind": "Lean.Parser.Command.declaration",
    "names": [],
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 653,
+    "byte": 1102,
     "col": 0,
-    "line": 43
+    "line": 60
    }
   },
   {
    "attrs": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 765,
+    "byte": 1214,
     "col": 65,
-    "line": 45
+    "line": 62
    },
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -347,26 +498,26 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 694,
+    "byte": 1143,
     "col": 0,
-    "line": 45
+    "line": 62
    }
   },
   {
    "attrs": [],
    "end": {
-    "byte": 766,
+    "byte": 1215,
     "col": 0,
-    "line": 46
+    "line": 63
    },
    "kind": "Lean.Parser.Command.eoi",
    "names": [],
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 766,
+    "byte": 1215,
     "col": 0,
-    "line": 46
+    "line": 63
    }
   }
  ],
@@ -710,37 +861,321 @@
    ]
   },
   {
+   "kind": "theorem",
+   "name": "f_one",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 795,
+     "col": 30,
+     "line": 42
+    },
+    "start": {
+     "byte": 765,
+     "col": 0,
+     "line": 42
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 778,
+     "col": 13,
+     "line": 42
+    },
+    "start": {
+     "byte": 773,
+     "col": 8,
+     "line": 42
+    }
+   },
+   "type": "f 1 = 0",
+   "type_hash": 757245277,
+   "uses_imported": [],
+   "uses_local": [
+    "f"
+   ]
+  },
+  {
+   "kind": "theorem",
+   "name": "viaSimp",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 850,
+     "col": 53,
+     "line": 44
+    },
+    "start": {
+     "byte": 797,
+     "col": 0,
+     "line": 44
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 812,
+     "col": 15,
+     "line": 44
+    },
+    "start": {
+     "byte": 805,
+     "col": 8,
+     "line": 44
+    }
+   },
+   "type": "f 1 + 1 = 1",
+   "type_hash": 364933473,
+   "uses_imported": [],
+   "uses_local": [
+    "f",
+    "f_one"
+   ]
+  },
+  {
+   "kind": "theorem",
+   "name": "viaLemma",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 957,
+     "col": 34,
+     "line": 47
+    },
+    "start": {
+     "byte": 923,
+     "col": 0,
+     "line": 47
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 937,
+     "col": 14,
+     "line": 47
+    },
+    "start": {
+     "byte": 929,
+     "col": 6,
+     "line": 47
+    }
+   },
+   "type": "f 0 = 1",
+   "type_hash": 4039276139,
+   "uses_imported": [],
+   "uses_local": [
+    "f",
+    "f_zero"
+   ]
+  },
+  {
+   "kind": "theorem",
+   "name": "unusedLemma",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 1011,
+     "col": 42,
+     "line": 50
+    },
+    "start": {
+     "byte": 969,
+     "col": 0,
+     "line": 50
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 986,
+     "col": 17,
+     "line": 50
+    },
+    "start": {
+     "byte": 975,
+     "col": 6,
+     "line": 50
+    }
+   },
+   "type": "⋯ = ⋯",
+   "type_hash": 2627920993,
+   "uses_imported": [],
+   "uses_local": [
+    "A.foo'"
+   ]
+  },
+  {
+   "kind": "def",
+   "name": "g1",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 1030,
+     "col": 15,
+     "line": 52
+    },
+    "start": {
+     "byte": 1013,
+     "col": 0,
+     "line": 52
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 1019,
+     "col": 6,
+     "line": 52
+    },
+    "start": {
+     "byte": 1017,
+     "col": 4,
+     "line": 52
+    }
+   },
+   "type": "ℕ",
+   "type_hash": 421340980,
+   "uses_imported": [],
+   "uses_local": []
+  },
+  {
+   "kind": "def",
+   "name": "g2",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 1048,
+     "col": 15,
+     "line": 53
+    },
+    "start": {
+     "byte": 1031,
+     "col": 0,
+     "line": 53
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 1037,
+     "col": 6,
+     "line": 53
+    },
+    "start": {
+     "byte": 1035,
+     "col": 4,
+     "line": 53
+    }
+   },
+   "type": "ℕ",
+   "type_hash": 421340980,
+   "uses_imported": [],
+   "uses_local": []
+  },
+  {
+   "kind": "def",
+   "name": "P.recOn",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 1100,
+     "col": 7,
+     "line": 58
+    },
+    "start": {
+     "byte": 1073,
+     "col": 0,
+     "line": 57
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 1084,
+     "col": 11,
+     "line": 57
+    },
+    "start": {
+     "byte": 1083,
+     "col": 10,
+     "line": 57
+    }
+   },
+   "type": "{motive : P → Sort u} → (t : P) → ((a : ℕ) → motive { a := a }) → motive t",
+   "type_hash": 484136741,
+   "uses_imported": [],
+   "uses_local": [
+    "P",
+    "P.a",
+    "P.mk",
+    "P.rec"
+   ]
+  },
+  {
    "kind": "structure",
    "name": "P",
    "private": false,
    "range": {
     "end": {
-     "byte": 651,
+     "byte": 1100,
      "col": 7,
-     "line": 41
+     "line": 58
     },
     "start": {
-     "byte": 624,
+     "byte": 1073,
      "col": 0,
-     "line": 40
+     "line": 57
     }
    },
    "selection": {
     "end": {
-     "byte": 635,
+     "byte": 1084,
      "col": 11,
-     "line": 40
+     "line": 57
     },
     "start": {
-     "byte": 634,
+     "byte": 1083,
      "col": 10,
-     "line": 40
+     "line": 57
     }
    },
    "type": "Type",
    "type_hash": 3931117990,
    "uses_imported": [],
    "uses_local": [
+    "P.a",
+    "P.mk"
+   ]
+  },
+  {
+   "kind": "recursor",
+   "name": "P.rec",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 1100,
+     "col": 7,
+     "line": 58
+    },
+    "start": {
+     "byte": 1073,
+     "col": 0,
+     "line": 57
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 1084,
+     "col": 11,
+     "line": 57
+    },
+    "start": {
+     "byte": 1083,
+     "col": 10,
+     "line": 57
+    }
+   },
+   "type": "{motive : P → Sort u} → ((a : ℕ) → motive { a := a }) → (t : P) → motive t",
+   "type_hash": 3014735113,
+   "uses_imported": [],
+   "uses_local": [
+    "P",
+    "P.a",
     "P.mk"
    ]
   },
@@ -750,26 +1185,26 @@
    "private": false,
    "range": {
     "end": {
-     "byte": 651,
+     "byte": 1100,
      "col": 7,
-     "line": 41
+     "line": 58
     },
     "start": {
-     "byte": 624,
+     "byte": 1073,
      "col": 0,
-     "line": 40
+     "line": 57
     }
    },
    "selection": {
     "end": {
-     "byte": 635,
+     "byte": 1084,
      "col": 11,
-     "line": 40
+     "line": 57
     },
     "start": {
-     "byte": 634,
+     "byte": 1083,
      "col": 10,
-     "line": 40
+     "line": 57
     }
    },
    "type": "{P : Sort u} → {t t' : _root_.P} → t = t' → _root_.P.noConfusionType P t t'",
@@ -777,80 +1212,8 @@
    "uses_imported": [],
    "uses_local": [
     "P",
+    "P.a",
     "P.casesOn"
-   ]
-  },
-  {
-   "kind": "def",
-   "name": "P.recOn",
-   "private": false,
-   "range": {
-    "end": {
-     "byte": 651,
-     "col": 7,
-     "line": 41
-    },
-    "start": {
-     "byte": 624,
-     "col": 0,
-     "line": 40
-    }
-   },
-   "selection": {
-    "end": {
-     "byte": 635,
-     "col": 11,
-     "line": 40
-    },
-    "start": {
-     "byte": 634,
-     "col": 10,
-     "line": 40
-    }
-   },
-   "type": "{motive : P → Sort u} → (t : P) → ((a : ℕ) → motive { a := a }) → motive t",
-   "type_hash": 484136741,
-   "uses_imported": [],
-   "uses_local": [
-    "P",
-    "P.mk",
-    "P.rec"
-   ]
-  },
-  {
-   "kind": "recursor",
-   "name": "P.rec",
-   "private": false,
-   "range": {
-    "end": {
-     "byte": 651,
-     "col": 7,
-     "line": 41
-    },
-    "start": {
-     "byte": 624,
-     "col": 0,
-     "line": 40
-    }
-   },
-   "selection": {
-    "end": {
-     "byte": 635,
-     "col": 11,
-     "line": 40
-    },
-    "start": {
-     "byte": 634,
-     "col": 10,
-     "line": 40
-    }
-   },
-   "type": "{motive : P → Sort u} → ((a : ℕ) → motive { a := a }) → (t : P) → motive t",
-   "type_hash": 3014735113,
-   "uses_imported": [],
-   "uses_local": [
-    "P",
-    "P.mk"
    ]
   },
   {
@@ -859,26 +1222,26 @@
    "private": false,
    "range": {
     "end": {
-     "byte": 651,
+     "byte": 1100,
      "col": 7,
-     "line": 41
+     "line": 58
     },
     "start": {
-     "byte": 624,
+     "byte": 1073,
      "col": 0,
-     "line": 40
+     "line": 57
     }
    },
    "selection": {
     "end": {
-     "byte": 635,
+     "byte": 1084,
      "col": 11,
-     "line": 40
+     "line": 57
     },
     "start": {
-     "byte": 634,
+     "byte": 1083,
      "col": 10,
-     "line": 40
+     "line": 57
     }
    },
    "type": "{motive : P → Sort u} → (t : P) → ((a : ℕ) → motive { a := a }) → motive t",
@@ -886,45 +1249,9 @@
    "uses_imported": [],
    "uses_local": [
     "P",
+    "P.a",
     "P.mk",
     "P.rec"
-   ]
-  },
-  {
-   "kind": "def",
-   "name": "P.mk.noConfusion",
-   "private": false,
-   "range": {
-    "end": {
-     "byte": 635,
-     "col": 11,
-     "line": 40
-    },
-    "start": {
-     "byte": 634,
-     "col": 10,
-     "line": 40
-    }
-   },
-   "selection": {
-    "end": {
-     "byte": 635,
-     "col": 11,
-     "line": 40
-    },
-    "start": {
-     "byte": 634,
-     "col": 10,
-     "line": 40
-    }
-   },
-   "type": "{P : Sort u} → {a a' : ℕ} → { a := a } = { a := a' } → (a = a' → P) → P",
-   "type_hash": 1388403725,
-   "uses_imported": [],
-   "uses_local": [
-    "P",
-    "P.mk",
-    "P.noConfusion"
    ]
   },
   {
@@ -933,33 +1260,72 @@
    "private": false,
    "range": {
     "end": {
-     "byte": 635,
+     "byte": 1084,
      "col": 11,
-     "line": 40
+     "line": 57
     },
     "start": {
-     "byte": 634,
+     "byte": 1083,
      "col": 10,
-     "line": 40
+     "line": 57
     }
    },
    "selection": {
     "end": {
-     "byte": 635,
+     "byte": 1084,
      "col": 11,
-     "line": 40
+     "line": 57
     },
     "start": {
-     "byte": 634,
+     "byte": 1083,
      "col": 10,
-     "line": 40
+     "line": 57
     }
    },
    "type": "ℕ → P",
    "type_hash": 796622641,
    "uses_imported": [],
    "uses_local": [
-    "P"
+    "P",
+    "P.a"
+   ]
+  },
+  {
+   "kind": "def",
+   "name": "P.mk.noConfusion",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 1084,
+     "col": 11,
+     "line": 57
+    },
+    "start": {
+     "byte": 1083,
+     "col": 10,
+     "line": 57
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 1084,
+     "col": 11,
+     "line": 57
+    },
+    "start": {
+     "byte": 1083,
+     "col": 10,
+     "line": 57
+    }
+   },
+   "type": "{P : Sort u} → {a a' : ℕ} → { a := a } = { a := a' } → (a = a' → P) → P",
+   "type_hash": 1388403725,
+   "uses_imported": [],
+   "uses_local": [
+    "P",
+    "P.a",
+    "P.mk",
+    "P.noConfusion"
    ]
   },
   {
@@ -968,26 +1334,26 @@
    "private": false,
    "range": {
     "end": {
-     "byte": 645,
+     "byte": 1094,
      "col": 3,
-     "line": 41
+     "line": 58
     },
     "start": {
-     "byte": 644,
+     "byte": 1093,
      "col": 2,
-     "line": 41
+     "line": 58
     }
    },
    "selection": {
     "end": {
-     "byte": 645,
+     "byte": 1094,
      "col": 3,
-     "line": 41
+     "line": 58
     },
     "start": {
-     "byte": 644,
+     "byte": 1093,
      "col": 2,
-     "line": 41
+     "line": 58
     }
    },
    "type": "P → ℕ",
@@ -1003,26 +1369,26 @@
    "private": false,
    "range": {
     "end": {
-     "byte": 692,
+     "byte": 1141,
      "col": 31,
-     "line": 43
+     "line": 60
     },
     "start": {
-     "byte": 653,
+     "byte": 1102,
      "col": 0,
-     "line": 43
+     "line": 60
     }
    },
    "selection": {
     "end": {
-     "byte": 661,
+     "byte": 1110,
      "col": 8,
-     "line": 43
+     "line": 60
     },
     "start": {
-     "byte": 653,
+     "byte": 1102,
      "col": 0,
-     "line": 43
+     "line": 60
     }
    },
    "type": "Inhabited P",
@@ -1039,26 +1405,26 @@
    "private": false,
    "range": {
     "end": {
-     "byte": 765,
+     "byte": 1214,
      "col": 65,
-     "line": 45
+     "line": 62
     },
     "start": {
-     "byte": 694,
+     "byte": 1143,
      "col": 0,
-     "line": 45
+     "line": 62
     }
    },
    "selection": {
     "end": {
-     "byte": 710,
+     "byte": 1159,
      "col": 16,
-     "line": 45
+     "line": 62
     },
     "start": {
-     "byte": 702,
+     "byte": 1151,
      "col": 8,
-     "line": 45
+     "line": 62
     }
    },
    "type": "⋯ = ⋯ ∧ f 0 = 1",

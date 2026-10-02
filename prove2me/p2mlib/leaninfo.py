@@ -53,6 +53,7 @@ class Command:
     attrs: list
     names: list                   # declared names, from syntax
     inner_kind: str = None        # for `open … in` / `set_option … in`: the wrapped command's kind
+    decl_kind: str = None         # for a declaration: theorem, definition, instance, structure, …
 
     @property
     def short_kind(self):
@@ -130,7 +131,8 @@ def _pos(j):
 def parse(data, text_bytes=b''):
     """An Info from LeanInfo's JSON (a dict)."""
     cmds = [Command(i, c['kind'], _pos(c['start']), _pos(c['end']), c['namespace'], c['opens'],
-                    c['attrs'], c['names'], c.get('inner_kind')) for i, c in enumerate(data['commands'])]
+                    c['attrs'], c['names'], c.get('inner_kind'), (c.get('decl_kind') or '').rsplit('.', 1)[-1] or None)
+            for i, c in enumerate(data['commands'])]
     decls = []
     for d in data.get('decls') or []:
         x = Decl(d['name'], d['private'], d['kind'], _pos(d['range']['start']), _pos(d['range']['end']),

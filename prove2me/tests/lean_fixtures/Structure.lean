@@ -37,6 +37,23 @@ def f (n : ℕ) : ℕ := match n with
 
 theorem f_zero : f 0 = 1 := rfl
 
+-- an rfl lemma used only through `simp only`: simp rewrites by dsimp, so the proof term never
+-- mentions it (Moore's bits_001, 2026-10-02)
+theorem f_one : f 1 = 0 := rfl
+
+theorem viaSimp : f 1 + 1 = 1 := by simp only [f_one]
+
+-- Mathlib's `lemma` is its own command kind, not core's `declaration`
+lemma viaLemma : f 0 = 1 := f_zero
+
+open A in
+lemma unusedLemma : foo' 1 = foo' 1 := rfl
+
+def g1 : ℕ := 1
+def g2 : ℕ := 2
+
+/-! ### Structures -/
+
 structure P where
   a : ℕ
 

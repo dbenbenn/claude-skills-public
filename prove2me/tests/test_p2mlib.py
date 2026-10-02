@@ -117,6 +117,41 @@ def test_remove_section_keeps_balance():
     assert 'section B\nvariable {X : Type} (x : X)\n\nend B' in out
 
 
+def test_remove_takes_the_comment_above_and_leaves_the_next_one():
+    # Lean attaches a `--` comment to the token before it; by command ranges alone, removing f_one
+    # left its comment behind and removing viaSimp took the comment introducing viaLemma
+    info = structure()
+    out = leanedit.remove_commands(info, [leanedit.command_of(info, 'f_one')])
+    assert 'an rfl lemma used only through' not in out
+    assert 'theorem f_zero : f 0 = 1 := rfl\n\ntheorem viaSimp' in out
+    out = leanedit.remove_commands(info, [leanedit.command_of(info, 'viaSimp')])
+    assert "theorem f_one : f 1 = 0 := rfl\n\n-- Mathlib's `lemma` is its own command kind" in out
+
+
+def test_remove_keeps_the_wider_separator():
+    # `def g1` / `def g2` / blank / `/-! -/`: removing g2 must not glue g1 to the doc comment
+    # (the Moore golden's `def lf` and `/-! #### x0 -/`)
+    info = structure()
+    out = leanedit.remove_commands(info, [leanedit.command_of(info, 'g2')])
+    assert 'def g1 : ℕ := 1\n\n/-! ### Structures -/' in out
+
+
+def test_prune_plan_on_structure():
+    # Lean-dependency pruning: solution's closure, attribute and instance roots stay; unused
+    # theorems, Mathlib `lemma`s (no core `declaration` kind) and an `open ... in` prefix go;
+    # section/variable/end stay
+    from p2mlib import prune
+    info = structure()
+    drop, imports, rep = prune.plan(info)
+    assert rep['removed'] == ['A.hidden', 'A.usesHidden', 'A.viaIn', 'f_one', 'g1', 'g2', 'inSec1',
+                              'inSec2', 'unusedLemma', 'viaLemma', 'viaSimp']
+    out = prune.apply(info, drop, imports)
+    for kept in ("theorem foo'", '@[simp] theorem s1', 'theorem s2', 'section B\nvariable {X : Type} (x : X)',
+                 'def f (n', 'theorem f_zero', 'structure P', 'instance : Inhabited P', 'theorem solution'):
+        assert kept in out, kept
+    assert 'open Nat in' not in out and 'lemma' not in out.replace("Mathlib's `lemma`", '')
+
+
 def test_replace_and_insert():
     info = structure()
     i = leanedit.command_of(info, 'f_zero')

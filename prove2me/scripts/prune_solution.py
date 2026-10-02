@@ -236,6 +236,22 @@ def prune_theorem_imports(text, verbose=True):
     return '\n'.join(keep), dropped
 
 
+def prune_by_lean(path):
+    """The pruned text by Lean's own dependencies (p2mlib.prune), or None when the file has errors
+    (its dependencies are then incomplete and the name-based pruner is the fallback)."""
+    from p2mlib import leaninfo, prune as P
+    info = leaninfo.run(path)
+    if info.errors:
+        return None
+    drop, drop_imports, rep = P.plan(info)
+    print('declarations: %d   unused: %d   (by Lean dependencies)' % (rep['declarations'], len(rep['removed'])))
+    for n in rep['removed']:
+        print('   - %s' % n)
+    for m in drop_imports:
+        print('   - import %s (no kept declaration uses it: a false graph edge)' % m)
+    return P.apply(info, drop, drop_imports)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('file')
@@ -248,7 +264,11 @@ def main():
 
     text = open(a.file, encoding='utf-8').read()
     n0 = len(text.split('\n'))
-    out, doomed = prune(text)
+    out = prune_by_lean(a.file)
+    if out is None:
+        print('the file does not elaborate cleanly, so Lean cannot report its dependencies: '
+              'falling back to the name-based pruner')
+        out, doomed = prune(text)
     n1 = len(out.split('\n'))
     print('%d -> %d lines (%d removed)' % (n0, n1, n0 - n1))
     if a.dry:

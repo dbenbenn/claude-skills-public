@@ -7,5 +7,8 @@
   "Sec5Marg"
  ],
  "status": "exact",
- "why": "primed dev lemma isMarginal_EBad' beside chk_isMarginal_EBad; a one-line check block; the merged Statements stubs rewired to imports and pruned"
+ "why": "primed dev lemma isMarginal_EBad' beside chk_isMarginal_EBad; a one-line check block; the merged Statements stubs rewired to imports and pruned",
+ "dropped_since_accepted": {
+  "MooreFoelner.Dev.Sec5Marg.ActsBy.def": "used nowhere (the rebuilt file compiles without it); the regex pruner of 2026-10-01 kept it, the Lean-dependency pruner (Phase 4.1) removes it"
+ }
 }

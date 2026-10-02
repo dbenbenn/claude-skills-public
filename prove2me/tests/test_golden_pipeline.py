@@ -6,6 +6,12 @@ Each case directory holds src/*.lean (the check module and its Solutions depende
 renamed to Solutions.Golden.<case>.*), expected.lean and meta.json (target, check module, the
 accepted submission id, why the case is tricky, and `status`: exact | xfail).
 
+`exact` means: the rebuild equals the accepted file, ignoring whitespace-only lines (blank lines
+mean nothing to Lean and the pruner's spacing is not under test), after deleting from the accepted
+file the declarations listed in `dropped_since_accepted` -- dead code the pruner of the day kept and
+a better one removes (each with the reason). An unlisted difference fails: a new deletion is either
+a regression or a pruning gain, and the case says which.
+
 The pipeline is what submit_all.py runs: build_solutions.build (merge, rewire, prune), then
 prune_solution.py --check. Needs the Lean workspace (published Theorems/Definitions are immutable,
 so relying on them is stable): run with P2M_LEAN=1."""
@@ -54,7 +60,17 @@ def test_rebuild_matches_accepted(case, tmp_path):
         got = f.read_text()
     finally:
         shutil.rmtree(dst)
-    want = open(os.path.join(GOLDEN, case, 'expected.lean')).read()
+    want_path = os.path.join(GOLDEN, case, 'expected.lean')
+    want = open(want_path).read()
+    dropped = meta.get('dropped_since_accepted', {})
+    if dropped:
+        from p2mlib import leaninfo, leanedit
+        winfo = leaninfo.run(want_path, parse_only=True)
+        idx = [leanedit.command_of(winfo, n) for n in dropped]
+        assert None not in idx, 'a dropped_since_accepted name is not in expected.lean: %s' % dropped
+        want = leanedit.remove_commands(winfo, idx)
+    norm = lambda t: ''.join(line for line in t.splitlines(True) if line.strip())
+    got, want = norm(got), norm(want)
     if got != want:
         diff = ''.join(list(difflib.unified_diff(want.splitlines(True), got.splitlines(True), 'accepted', 'rebuilt', n=1))[:80])
         pytest.fail('rebuilt solution differs from the accepted one:\n' + diff)
