@@ -1,0 +1,156 @@
+"""draft.py: diff-based upload and verify against a fake proposal, plus its prose checks."""
+import copy
+import json
+
+import pytest
+
+import draft as D
+
+MISSION = r'''import os
+from draft import extract_payloads
+HERE = os.path.dirname(os.path.abspath(__file__))
+NAME = 'Mini'; FIELDS = ['f']; MISSION_TYPE = 'ResearchPaper'; NAMESPACE = 'Mini'
+DEFINITIONS = [dict(name='Mini', title='The bundle', nls='Defines $k$.', tags=['x'], page='1', result='Def 1')]
+REFERENCES = []
+THEOREMS = [
+    dict(name='t1', title='Lemma 1 — one', nls='One holds.', tags=['x'], page='2', result='Lemma 1',
+         milestone_title='Lemma 1 — one', milestone_description='p. 2: “One holds.”'),
+    dict(name='goal', title='Theorem 2 — two', nls='As the paper says, “Two holds.”', tags=['x'], page='3',
+         result='Theorem 2', milestone_title='Theorem 2 — two', milestone_description='p. 3: “Two holds.”'),
+]
+GOAL = 'goal'
+def src(page, result, extra=None, ref=None):
+    return 'Paper, p. %s, %s' % (page, result)
+def payloads():
+    return extract_payloads(os.path.join(HERE, 'lib', 'Thm_Mini.lean'), 'Mini', {'Definitions.Def_Mini': ['Mini.k']})
+'''
+
+
+@pytest.fixture
+def mdir(tmp_path):
+    (tmp_path / 'lib').mkdir()
+    (tmp_path / 'readbacks').mkdir()
+    (tmp_path / 'mission.py').write_text(MISSION)
+    (tmp_path / 'lib' / 'Def_Mini.lean').write_text('import Mathlib\n\nnamespace Mini\n\ndef k : Nat := 1\n\nend Mini\n')
+    (tmp_path / 'lib' / 'Thm_Mini.lean').write_text(
+        'namespace Mini\n\ntheorem t1 : Mini.k = 1 := by\n  sorry\n\ntheorem goal : 1 + 1 = 2 := by\n  sorry\n\nend Mini\n')
+    for n in ('Def_Mini', 't1', 'goal'):
+        (tmp_path / 'readbacks' / (n + '.readback.md')).write_text('Read-back of %s.' % n)
+    (tmp_path / 'description.md').write_text('This mission formalizes a paper.\n')
+    return tmp_path
+
+
+class FakeProposal:
+    """A Draft that stores what is posted; editing an item clears its confirmation, as live."""
+    def __init__(self, items, miles, desc, order, goal):
+        self.items, self.miles = items, miles
+        self.prop = {'id': 'P', 'status': 'Draft', 'description': desc, 'item_order': order, 'main_item_id': goal}
+        self.writes = []
+
+    def call(self, m, p, b=None):
+        if m == 'GET' and p == '/mission-proposals/P':
+            return dict(self.prop, items=list(copy.deepcopy(self.items).values()))
+        if m == 'GET' and p == '/mission-proposals/P/milestones':
+            return {'milestones': [dict(item_id=k, milestone_title=t, milestone_description=d)
+                                   for k, (t, d) in self.miles.items()]}
+        self.writes.append((m, p))
+        if m == 'POST' and p == '/mission-proposals/P/items':
+            key = b.get('theorem_name') or b.get('definition_name')
+            iid = next((i for i, it in self.items.items() if (it.get('theorem_name') or it.get('definition_name')) == key), 'new')
+            self.items[iid] = dict(b, id=iid, confirmed_at=None)
+            return {'id': iid}
+        if m == 'POST' and p == '/mission-proposals/P/milestones':
+            self.miles[b['item_id']] = (b['milestone_title'], b['milestone_description'])
+            return {}
+        if m == 'PATCH' and p == '/mission-proposals/P':
+            self.prop.update(b)
+            return {}
+        raise AssertionError((m, p))
+
+
+def live_from_repo(mdir):
+    """A fake Draft identical to the repo, every item confirmed."""
+    M = D.load(str(mdir))
+    items, miles, order, desc = D.desired(M, str(mdir))
+    ids = {k: 'i_' + k.replace(':', '_') for k in items}
+    live = {ids[k]: dict(v, id=ids[k], confirmed_at='2026-10-02') for k, v in items.items()}
+    lm = {ids[k]: v for k, v in miles.items()}
+    (mdir / 'proposal.json').write_text(json.dumps({'id': 'P', 'items': ids}))
+    return FakeProposal(live, lm, desc, [ids[k] for k in order], ids[M.GOAL]), ids
+
+
+def test_identical_draft_has_no_diff(mdir):
+    fake, _ = live_from_repo(mdir)
+    bad, _, _ = D.diff(D.load(str(mdir)), str(mdir), fake.call, json.loads((mdir / 'proposal.json').read_text()))
+    assert bad == []
+
+
+def test_one_changed_field_is_exactly_one_diff(mdir):
+    fake, ids = live_from_repo(mdir)
+    fake.items[ids['t1']]['natural_language_statement'] = 'Something else.'
+    fake.prop['description'] = 'old text'
+    bad, _, _ = D.diff(D.load(str(mdir)), str(mdir), fake.call, json.loads((mdir / 'proposal.json').read_text()))
+    assert sorted(bad) == [('description', 'text'), ('t1', 'natural_language_statement')]
+
+
+def run_upload(mdir, fake, monkeypatch, *flags):
+    import p2m
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    monkeypatch.setattr(D.sys, 'argv', ['draft.py', str(mdir), 'upload'] + list(flags))
+    D.main()
+
+
+def test_dry_run_writes_nothing(mdir, monkeypatch, capsys):
+    fake, ids = live_from_repo(mdir)
+    fake.items[ids['t1']]['natural_language_statement'] = 'Something else.'
+    run_upload(mdir, fake, monkeypatch)
+    out = capsys.readouterr().out
+    assert fake.writes == [] and 'would POST /mission-proposals/P/items  (t1)' in out
+
+
+def test_upload_touches_only_the_changed_item_and_keeps_other_confirmations(mdir, monkeypatch):
+    fake, ids = live_from_repo(mdir)
+    fake.items[ids['t1']]['natural_language_statement'] = 'Something else.'
+    run_upload(mdir, fake, monkeypatch, '--go')
+    assert fake.writes == [('POST', '/mission-proposals/P/items')]
+    assert fake.items[ids['goal']]['confirmed_at'] == '2026-10-02'      # untouched item keeps its confirmation
+    bad, _, _ = D.diff(D.load(str(mdir)), str(mdir), fake.call, json.loads((mdir / 'proposal.json').read_text()))
+    assert bad == []
+
+
+def test_double_backslash_and_escaped_quote_flagged():
+    # Monod 2026-09-29 `$G(\\mathbf{Z})$`; Moore 2026-10-01 `$\Gamma\'$` and `\"` in prose
+    items = {'a': {'natural_language_statement': r'The group $G(\\mathbf{Z})$.'},
+             'b': {'natural_language_statement': r"Its $\Gamma\'$ and \"quoted\"."},
+             'c': {'natural_language_statement': r'Fine: $\mathbf{Z}$ and a $\\$ line break.'}}
+    where = [w for w, _ in D.double_backslash(items, {}, '')]
+    assert where.count('a') == 1 and where.count('b') == 2 and 'c' not in where
+
+
+def test_title_mismatch_and_goal_quote(mdir):
+    M = D.load(str(mdir))
+    items, miles, _, _ = D.desired(M, str(mdir))
+    assert D.title_mismatch(items, miles) == [] and D.goal_unquoted(M, items) == []
+    miles['t1'] = ('Lemma 1 — drifted', miles['t1'][1])
+    assert D.title_mismatch(items, miles)
+    items['goal']['natural_language_statement'] = 'A paraphrase.'
+    assert D.goal_unquoted(M, items)
+
+
+def test_short_bundle_name_bound_as_variable_flagged_but_not_K_ascription(mdir):
+    (mdir / 'lib' / 'Def_Mini.lean').write_text('def s : Nat := 1\ndef K : Set Nat := ∅\ndef Kfull : Nat := 2\n')
+    M = D.load(str(mdir))
+    M.DEFINITIONS = [dict(name='Mini')]
+    (mdir / 'lib' / 'Thm_Mini.lean').write_text('theorem a : ∑ s ∈ Finset.range 3, s = 3 := by\n  sorry\n')
+    assert any('`s`' in why for _, why in D.short_bundle_names(M, str(mdir)))
+    # e43e780: `(K : Set ℝ)` in a statement that needs the bundle anyway (uses Kfull) is fine
+    (mdir / 'lib' / 'Thm_Mini.lean').write_text('theorem b (x : ℕ) (h : x ∈ (K : Set ℕ)) : Kfull = 2 := by\n  sorry\n')
+    assert D.short_bundle_names(M, str(mdir)) == []
+
+
+@pytest.mark.xfail(strict=True, reason="extract_payloads reads the name with `theorem (\\w+)`, which "
+                   "stops at a prime (the recurring prime class); Phase 4 takes names from LeanInfo")
+def test_extract_payloads_keeps_primed_name(tmp_path):
+    p = tmp_path / 'T.lean'
+    p.write_text("namespace Q\n\ntheorem foo' : True := by\n  sorry\n\nend Q\n")
+    assert "foo'" in D.extract_payloads(str(p), 'Q', {})
