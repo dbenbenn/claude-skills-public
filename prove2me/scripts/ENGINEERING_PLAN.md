@@ -202,9 +202,12 @@ Each regression test fails on the pre-fix version of its script.
 **Bug found by the tests.** `assemble_blueprint.py` mis-splits a Part whose `section … variable … end`
 block spans several targets: the FAmenChild B2 case. Fix it in Phase 4.3 with LeanInfo ranges.
 
+- `deprecate` (keeper checks, other theorem, already deprecated, undo when unproved) and
+  `submit_solution` (namespace, metaprogramming, docstring-proof `import_names`, DUPLICATE,
+  `--replaces`, PENDING), both on a fake platform.
+
 **Still to cover in Phase 1:**
-- the API scripts (`deprecate`, `publish_standalone`, `publish_status`, `fetch_theorems`,
-  `submit_solution` guards), on recorded responses;
+- `publish_standalone`, `publish_status`, `fetch_theorems`, on recorded responses;
 - the audit cluster (`draft` upload/verify, `stage_auditor`, `source_audit`, `decisions`,
   `caveat_audit`), as characterization tests on a recorded proposal;
 - `rewire`, `resolve_imports`, `edge_audit`.
