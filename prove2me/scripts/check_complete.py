@@ -47,7 +47,9 @@ def proofs(mdir, checks, ws):
             if target not in ms:
                 continue
             problem = None
-            if target not in d.same_statement_as:
+            if not d.statement_compared:
+                problem = 'its statement could not be compared (LeanInfo failed on it; not a verdict)'
+            elif target not in d.same_statement_as:
                 problem = 'states something other than the milestone'
             elif d.uses_sorry:
                 problem = 'uses sorry other than through imported statements'

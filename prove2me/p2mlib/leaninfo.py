@@ -81,6 +81,7 @@ class Decl:
     same_statement_as: list = field(default_factory=list)   # with run(candidates=...): published copies
     rests_on: list = field(default_factory=list)   # Theorems.* statements reached (stopping there)
     uses_sorry: bool = False                        # sorryAx reachable without passing through one
+    statement_compared: bool = True                 # False: the --candidates comparison itself failed
     command: int = None           # index into Info.commands
     generated: bool = False       # made by Lean for another declaration (P.rec, P.casesOn, ...)
 
@@ -150,7 +151,7 @@ def parse(data, text_bytes=b''):
         x = Decl(d['name'], d['private'], d['kind'], _pos(d['range']['start']), _pos(d['range']['end']),
                  (_pos(d['selection']['start']), _pos(d['selection']['end'])), d['type'], d['type_hash'],
                  d['uses_local'], d['uses_imported'], d.get('same_statement_as') or [],
-                 d.get('rests_on') or [], bool(d.get('uses_sorry')))
+                 d.get('rests_on') or [], bool(d.get('uses_sorry')), d.get('statement_compared', True))
         for c in cmds:
             if c.start.byte <= x.start.byte <= c.end.byte:
                 x.command = c.index

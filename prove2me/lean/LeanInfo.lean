@@ -30,6 +30,10 @@ Prints one JSON object:
   by `dsimp` and leaves no trace in the term, yet deleting `h` breaks the proof. A name tried in a
   failed `first` alternative counts too, so the lists can over-approximate; never under.
 * `messages`: every message, with `severity`, `start`, `end` and `text`.
+* Every Meta/Core call after elaboration starts its own heartbeat count: Lean's counter is
+  process-wide, and with the default start of 0 a large file had used the whole budget before
+  its last declarations, so every comparison failed silently (a Lodha-Moore prover's report).
+  A comparison that still fails is reported (`statement_compared: false`), never read as a mismatch.
 * with `--candidates`: each theorem of the file has `same_statement_as`, the candidate modules'
   theorems that state the same thing. Two statements are the same when they are equal after
   renaming universe parameters by position, unfolding this file's Prop-valued definitions (a
@@ -300,7 +304,7 @@ unsafe def main (args : List String) : IO UInt32 := do
   let mine := env.constants.toList.filter fun (n, _) => (env.getModuleIdxFor? n).isNone
   let mut ranges : Std.HashMap Name DeclarationRanges := {}
   for (n, _) in mine do
-    if let .ok (some rg) ← ((findDeclarationRanges? n : CoreM _).run' { fileName := path, fileMap := fm } { env }).toBaseIO then
+    if let .ok (some rg) ← ((findDeclarationRanges? n : CoreM _).run' { fileName := path, fileMap := fm, initHeartbeats := (← IO.getNumHeartbeats) } { env }).toBaseIO then
       ranges := ranges.insert n rg
   let userFacing (n : Name) : Bool :=
     ranges.contains n && !(n.isInternal && (privateToUserName? n).isNone)
@@ -334,7 +338,7 @@ unsafe def main (args : List String) : IO UInt32 := do
     | some (.defnInfo d) => d.type.getForallBody.isProp
     | _ => false
   let runMeta {α : Type} (x : MetaM α) : IO (Option α) := do
-    match ← ((Meta.MetaM.run' x).run' { fileName := path, fileMap := fm } { env }).toBaseIO with
+    match ← ((Meta.MetaM.run' x).run' { fileName := path, fileMap := fm, initHeartbeats := (← IO.getNumHeartbeats) } { env }).toBaseIO with
     | .ok a => pure (some a)
     | .error _ => pure none
   let mut index : Std.HashMap UInt64 (Array (Name × Expr)) := {}
@@ -363,15 +367,18 @@ unsafe def main (args : List String) : IO UInt32 := do
       let idx ← env.getModuleIdxFor? c
       let m := env.header.moduleNames[idx.toNat]!
       if ourModule m then some (Json.mkObj [("name", toJson (toString c)), ("module", toJson (toString m))]) else none
-    let ty ← match ← ((Meta.MetaM.run' (PrettyPrinter.ppExpr ci.type)).run' { fileName := path, fileMap := fm } { env }).toBaseIO with
+    let ty ← match ← ((Meta.MetaM.run' (PrettyPrinter.ppExpr ci.type)).run' { fileName := path, fileMap := fm, initHeartbeats := (← IO.getNumHeartbeats) } { env }).toBaseIO with
       | .ok f => pure (toString f)
       | .error _ => pure ""
     let user := (privateToUserName? n).getD n
     let mut same : Array String := #[]
+    let mut compared := true
     if !candidates.isEmpty && (match ci with | .thmInfo _ => true | _ => false) then
-      if let some e ← runMeta (normStatement isLocalPred ci) then
+      match ← runMeta (normStatement isLocalPred ci) with
+      | some e =>
         same := (index.getD e.hash #[]).filterMap fun (m, e') =>
           if m != n && e' == e then some (toString m) else none
+      | none => compared := false
     declsJ := declsJ.push <| Json.mkObj [
       ("name", toJson (toString user)), ("private", toJson (privateToUserName? n).isSome),
       ("kind", toJson (kindOf env n ci)),
@@ -382,7 +389,8 @@ unsafe def main (args : List String) : IO UInt32 := do
       ("uses_imported", toJson usesImported.toArray),
       ("rests_on", toJson (((restsOn env [n] {} {} false).1.toList.map toString).toArray.qsort (· < ·))),
       ("uses_sorry", toJson (restsOn env [n] {} {} false).2)] |>.mergeObj
-      (if candidates.isEmpty then Json.mkObj [] else Json.mkObj [("same_statement_as", toJson same)])
+      (if candidates.isEmpty then Json.mkObj [] else
+        Json.mkObj [("same_statement_as", toJson same), ("statement_compared", toJson compared)])
   let declsSorted := declsJ.qsort fun a b =>
     (a.getObjValD "range" |>.getObjValD "start" |>.getObjValD "byte" |>.getNat?.toOption.getD 0) <
     (b.getObjValD "range" |>.getObjValD "start" |>.getObjValD "byte" |>.getNat?.toOption.getD 0)
