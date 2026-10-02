@@ -59,10 +59,22 @@ the measurements behind the audit rules in `references/audit-evidence.md`.
 6b. **Gap review with the human** -- the second approval step, after the item list. Run
    `scripts/source_audit.py decisions MISSION_DIR`: it writes `DECISIONS.md`, one row per finding
    on the goal and every milestone (each MISSING / WEAKER claim, each EXTRA hypothesis, each
-   DIRECTNESS other than `direct`, each paper item with no audit). Write a `proposed:` line on
-   every row, then go over the table with the human; **only the human's answer goes on the
-   `decided:` line**, and never a disposition of your own, however obvious. `draft.py verify`
-   counts every undecided row as BAD, and reopens an item's rows when its audit is re-run.
+   DIRECTNESS other than `direct`, each paper item with no audit). **That file is the auditor's
+   raw output, a starting point -- not what the human is shown** (dbenbenn, 2026-10-02: present
+   "an informed decision, including what you think the best answer is"). For every row, first
+   *research* it: the quoted sentence and its context on the page image, the auditor's full
+   coverage note (near-misses, a suggested direct form), and the cited paper when the finding
+   turns on what a citation says. Then: (1) **fix** what a standing rule already decides --
+   restating to match the source, a provable typo -- re-read-back and re-audit, and cite the rule
+   on the `decided:` line; (2) bring **only the genuine choices** to the human, **one at a time,
+   each self-contained**: the quote, what the Lean says, what the auditor is unhappy about in
+   plain words, what the research found, the options, and the recommended answer with reasons,
+   naming the file rows it covers (section heading + id; never invented labels or merged
+   counts); (3) list the rest (carried by a named sibling, unformalizable history, rule-decided)
+   for skimming. **Only the human's answer, or a standing rule they set, goes on the `decided:`
+   line**, and never a disposition of your own, however obvious. `draft.py verify` counts every
+   undecided row as BAD, and reopens an item's rows when its audit is re-run; re-record an
+   unchanged finding with the human's earlier words.
    When a row is decided **documented** (explained in the statement's Formalization Note rather
    than fixed), run `scripts/caveat_audit.py` on the item: the source audit never sees prose, so
    this is the only check that the note names the gap accurately and asserts nothing the Lean or
