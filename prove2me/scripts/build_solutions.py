@@ -107,9 +107,12 @@ def assemble(sol, checks, name, scratch):
         c = check_block(info, starts[-1], name)
         if c is None:
             continue
-        # every check block goes: each proves some statement, and only this one is the solution
-        drop = [x.index for x in info.commands if x.start.byte >= starts[-1]
-                and any(_last(n).startswith('chk_') or _last(n) == name for n in x.names)]
+        # every check block goes: each proves some statement, and only this one is the solution;
+        # so does every diagnostic command (`#print axioms LodhaMoore.chk_…` named the renamed
+        # block and the solution stopped compiling, Lodha-Moore 2026-10-02)
+        from p2mlib.prune import DIAGNOSTIC
+        drop = [x.index for x in info.commands if x.short_kind in DIAGNOSTIC or (x.start.byte >= starts[-1]
+                and any(_last(n).startswith('chk_') or _last(n) == name for n in x.names))]
         body = leanedit.remove_commands(info, drop).rstrip('\n') + '\n'
         return 'OK', body + '\n' + solution_text(info, c, name), c.namespace
     return 'NO-CHECK', '', ''

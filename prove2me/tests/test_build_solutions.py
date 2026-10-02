@@ -31,6 +31,8 @@ theorem chk_bar : True := trivial
 
 theorem chk_isMarginal_EBad : True := A.Dev.isMarginal_EBad'
 
+#print axioms A.chk_foo
+
 end A
 '''
 
@@ -95,3 +97,10 @@ def test_helpers_kept_check_blocks_dropped(tmp_path):
     text, _, _ = build(tmp_path, 'foo')
     assert 'theorem helper' in text and "theorem isMarginal_EBad'" in text and 'theorem stub' in text
     assert 'chk_' not in text
+
+
+@pytest.mark.lean
+def test_diagnostic_commands_are_dropped(tmp_path):
+    # `#print axioms A.chk_foo` named the renamed block: the solution did not compile (LM 2026-10-02)
+    text, _, _ = build(tmp_path, 'foo')
+    assert '#print' not in text
