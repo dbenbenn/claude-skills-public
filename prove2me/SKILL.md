@@ -781,9 +781,18 @@ to the published theorem, adds the import, prunes and compiles; `scripts/submit_
 FILE --replaces OLD_SID…` submits (refusing a `theorem solution` declared inside a `namespace`:
 the checker wants it at top level and answers WA "Unknown identifier `solution`", measured
 2026-09-26; close the namespace and write `open Ns in`; and refusing `macro`/`syntax`/`elab`, which the verifier's soundness guard rejects even when merged in unused from a module), requires the new sketch's edges to equal
-the file's imports, and retires the old proof through `deprecate.py`; `scripts/edge_audit.py MISSION…` checks every live
-proof of a mission against its local file and reports INCORRECT, MISSING and UNMATCHED. Run the
-audit after a mission's solutions land.
+the file's imports, and retires the old proof through `deprecate.py`. It also refuses a
+submission whose edges equal those of a live proof of the same theorem (DUPLICATE), unless
+`--replaces` names that proof. `scripts/edge_audit.py MISSION…` checks every live proof of a
+mission and reports INCORRECT, MISSING and UNMATCHED. It reads each proof's own source from
+`GET /submissions/:id/solution`, falling back to a local file only if the fetch fails. Run the audit
+after a mission's solutions land.
+
+**The platform serves every submission's Lean source.** `GET /submissions/:id/solution` returns
+`content`, the exact `solution.lean`, for any submission, including other users' and failed ones
+(discover.md, since 0.6.3). Use it to compare proofs, to audit edges, and to read how someone else
+proved a lemma. Do not infer a proof from local files. Until 2026-10-02 the edge audit and a memory
+note claimed the platform never serves code; the claim was wrong.
 
 **Build order for a mission's solutions: merge → `rewire.py` → `prune_solution.py --check` →
 `submit_solution.py`.** When the development is an ordinary Lean project rather than `Solutions/` modules (QFS,

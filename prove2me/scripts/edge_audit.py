@@ -4,19 +4,21 @@
 usage: edge_audit.py MISSION_ID_OR_PREFIX [...] [--files DIR ...]
        (default search roots: ~/claude and the workspace's Solutions/)
 
-For every theorem of the missions, every live (accepted, not deprecated) submission is paired with
-a local solution file -- the platform never serves submitted code -- by its `theorem solution`
-statement and its `import Theorems.*` set, which must equal the sketch's live edges. Then:
+For every theorem of the missions, every live (accepted, not deprecated) submission's own Lean
+source is fetched (`GET /submissions/:id/solution`, documented in discover.md since platform 0.6.3;
+an earlier version of this script wrongly said the platform never serves submitted code and matched
+local files instead). Only when that fetch fails is the proof paired with a local solution file by
+its `theorem solution` statement and its `import Theorems.*` set. Then:
 
   INCORRECT  an import the pruned proof never names: an edge the proof does not have
              (fix: prune_solution.py, then submit_solution.py --replaces the old sketch);
   MISSING    a declaration that copies a published theorem (its name, primes dropped, is that
              theorem's short name) which the theorem's live graph does not reach at all
              (fix: rewire.py, then submit_solution.py);
-  UNMATCHED  a live proof with no local file, which cannot be checked.
+  UNMATCHED  a live proof whose source could not be fetched and has no local file.
 
-Several local files can match one live proof (a test file and its clean successor with the same
-imports); each flag names the file it came from, so check that it is the one submitted.
+In the fallback, several local files can match one live proof (a test file and its clean successor
+with the same imports); each flag names the file it came from.
 
 A copy the graph already reaches through another edge is an alternative route, not a missing
 edge, and is not reported; nor is a self-contained full proof kept beside a sketch that has the
@@ -87,32 +89,35 @@ def main():
         if not batch or len(subs) >= (d.get('total') or 0):
             break
         page += 1
-    # os.walk, not glob('**'): glob skips hidden directories, and mission worktrees live under
-    # .claude/worktrees (CFP §7's 16 solutions all came back UNMATCHED). Skip only .lake and .git.
-    files = []
-    for r in roots:
-        for d, sub, fs in os.walk(r):
-            sub[:] = [s for s in sub if s not in ('.lake', '.git', '__pycache__')]
-            files += [os.path.join(d, f) for f in fs if f.endswith('.lean')]
     solsig, imps = {}, {}
-    for f in files:
-        try:
-            t = open(f, encoding='utf-8').read()
-        except Exception:
-            continue
-        if 'theorem solution' not in t:
-            continue
-        solsig[f] = sig(t, 'solution')
-        names = set()
-        for mod in re.findall(r'^import (Theorems\.\S+)', t, re.M):
-            p = os.path.join(ws, mod.replace('.', '/') + '.lean')
-            if os.path.exists(p):
-                tt = open(p, encoding='utf-8').read()
-                ns = re.search(r'^namespace (\S+)', tt, re.M)
-                mm = re.search(r'^\s*theorem\s+(\S+)', tt, re.M)
-                if mm:
-                    names.add((ns.group(1) + '.' if ns else '') + mm.group(1))
-        imps[f] = names
+
+    def index_local_files():
+        # os.walk, not glob('**'): glob skips hidden directories, and mission worktrees live under
+        # .claude/worktrees (CFP §7's 16 solutions all came back UNMATCHED). Skip only .lake and .git.
+        files = []
+        for r in roots:
+            for d, sub, fs in os.walk(r):
+                sub[:] = [s for s in sub if s not in ('.lake', '.git', '__pycache__')]
+                files += [os.path.join(d, f) for f in fs if f.endswith('.lean')]
+        for f in files:
+            try:
+                t = open(f, encoding='utf-8').read()
+            except Exception:
+                continue
+            if 'theorem solution' not in t:
+                continue
+            solsig[f] = sig(t, 'solution')
+            names = set()
+            for mod in re.findall(r'^import (Theorems\.\S+)', t, re.M):
+                p = os.path.join(ws, mod.replace('.', '/') + '.lean')
+                if os.path.exists(p):
+                    tt = open(p, encoding='utf-8').read()
+                    ns = re.search(r'^namespace (\S+)', tt, re.M)
+                    mm = re.search(r'^\s*theorem\s+(\S+)', tt, re.M)
+                    if mm:
+                        names.add((ns.group(1) + '.' if ns else '') + mm.group(1))
+            imps[f] = names
+
 
     incorrect, missing, unmatched = [], [], []
     _dep = {}
@@ -146,15 +151,22 @@ def main():
         short = t['theorem_name'].split('.')[-1]
         for sid in live:
             edges = {names[e] for e in rev.get('sketch-' + sid, []) if '.' in (names.get(e) or '')}
-            cands = [f for f in solsig if tsig and solsig[f] == tsig and imps[f] == edges]
-            if not cands:
-                unmatched.append((t['theorem_name'], sid[:8], sorted(edges))); continue
-            for f in cands[:3]:
-                text = open(f, encoding='utf-8').read()
+            r = call('GET', '/submissions/%s/solution' % sid)
+            code = r.get('content') if isinstance(r, dict) else None
+            if code:
+                srcs = [(code, 'submitted %s' % sid[:8])]
+            else:
+                if not solsig:
+                    index_local_files()
+                cands = [f for f in solsig if tsig and solsig[f] == tsig and imps[f] == edges]
+                if not cands:
+                    unmatched.append((t['theorem_name'], sid[:8], sorted(edges))); continue
+                srcs = [(open(f, encoding='utf-8').read(), os.path.relpath(f)) for f in cands[:3]]
+            for text, f in srcs:
                 pruned, doomed = prune(text, verbose=False)
                 for n, k, *_ in doomed:
                     if k == 'import':
-                        incorrect.append((t['theorem_name'], sid[:8], n, os.path.relpath(f)))
+                        incorrect.append((t['theorem_name'], sid[:8], n, f))
                 live_decls = {d[0] for d in parse(pruned.split('\n'))}
                 for d in parse(text.split('\n')):
                     base = d[0].split('.')[-1].rstrip("'")
@@ -164,7 +176,7 @@ def main():
                             # a deliberate copy: importing a retired theorem would put a hidden node
                             # on the graph (resolve_imports.py and submit_solution.py agree)
                             continue
-                        missing.append((t['theorem_name'], sid[:8], full_of[base], os.path.relpath(f)))
+                        missing.append((t['theorem_name'], sid[:8], full_of[base], f))
     dedup = lambda xs: sorted(set(xs))
     print('\nINCORRECT edges (imports the proof never uses): %d' % len(dedup(x[:3] for x in incorrect)))
     for x in dedup(incorrect):
@@ -173,7 +185,7 @@ def main():
           % len(dedup(x[:3] for x in missing)))
     for x in dedup(missing):
         print('   %s  [%s]  <- %s   (%s)' % x)
-    print('UNMATCHED live proofs (no local file; not checked): %d' % len(unmatched))
+    print('UNMATCHED live proofs (source not fetched, no local file; not checked): %d' % len(unmatched))
     for x in unmatched:
         print('   %s  [%s]  edges %s' % x)
     sys.exit(1 if incorrect or missing else 0)
