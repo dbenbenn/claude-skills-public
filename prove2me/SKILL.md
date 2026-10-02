@@ -745,6 +745,23 @@ it, so the steps provably fit together. Then give each prover its own file and i
 verbatim as `chk_<name>`, with helpers in a per-step namespace. Four opus provers closed C9's steps
 in under eight minutes each, and the assembly compiled on the first try.
 
+The same pattern scales to whole theorems. In a **Blueprint**, the definitions are concrete, every
+lemma is `sorry`, and the main theorem is proved from those lemmas. The provers write
+`Part<X>.lean` files that restate their lemmas verbatim under `namespace <NS>.Part<X>`, and they
+follow a shared brief that holds the mathematics part by part. `scripts/assemble_blueprint.py
+BLUEPRINT OUT PARTS…` merges the result into one file:
+- every stub becomes `alias foo := Part<X>.foo`;
+- every Part declaration is placed by a dependency sort, after the Blueprint items it mentions.
+
+Placing a Part's chunks by position fails in both directions. A helper defined before a
+late-stubbed target can be used by an early one, and a helper can mention a definition that the
+Blueprint gives after the stub. Two jobs show the pattern working:
+- the F-amenability Chornyi child (2026-10-02): six parts, about 1,550 lines, 90 minutes;
+- the Lodha–Moore Lemma 5.6 counterexample: four of its five parts in under ten minutes each.
+
+Each prover builds its own `.olean` of the Blueprint (`lake build <module>` builds only that
+module).
+
 **Published statements in the workspace.** After Submit, `scripts/fetch_theorems.py MISSION…`
 writes every published theorem and bundle of the missions into `Theorems/` and `Definitions/` in
 server shape and builds them, so solutions import exactly what the verifier compiles against; it
