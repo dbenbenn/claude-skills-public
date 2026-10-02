@@ -174,6 +174,20 @@ def test_scope_wrap_carries_local_attributes_after_their_namespace():
     assert leanedit.scope_wrap(info, i) == ('section\nnamespace Sc\nattribute [local simp] helper_eq\n', 'end Sc\nend\n')
 
 
+def test_scope_wrap_opens_every_prefix_of_a_dotted_namespace():
+    # F-amenability Monod 5.1 (2026-10-03): a check block in `namespace ThompsonAmenability.M51` got a
+    # top-level `open ThompsonAmenability.M51`, which does not open `ThompsonAmenability`, so the
+    # published statement's `HC1RatRat` (`ThompsonAmenability.HC1RatRat`) did not resolve
+    from types import SimpleNamespace as NS
+    src = 'namespace A.B\ntheorem t : True := trivial\nend A.B\n'
+    pos = lambda b: NS(byte=b)
+    cmds = [NS(start=pos(0), end=pos(13), context=[]),
+            NS(start=pos(14), end=pos(41), context=[(0, [])])]
+    info = NS(commands=cmds, slice=lambda a, b: src.encode()[a:b].decode())
+    assert leanedit.scope_wrap(info, 1, top_level=True) == ('section\nopen A\nopen A.B\n', 'end\n')
+    assert leanedit.scope_wrap(info, 1) == ('section\nnamespace A.B\n', 'end A.B\nend\n')
+
+
 def test_prune_drops_the_include_of_a_dropped_variable():
     # Lodha-Moore S3a (2026-10-02): `variable (hb : HB)` went with HB, `include hb` stayed
     from p2mlib import prune

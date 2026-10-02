@@ -117,11 +117,16 @@ def scope_wrap(info, i, top_level=False):
         # names what is declared in it, a `noncomputable section` changes elaboration
         o = text(info, opener) if opener is not None else ''
         if o.startswith('namespace'):
+            outer = ns
             ns = (ns + '.' if ns else '') + o.split()[1]
             if top_level:
                 # opened where the namespace was entered, so the context commands after it (an
-                # `attribute [local instance] polishSpace_P1`) resolve their names as they did
-                pre.append('open %s' % ns)
+                # `attribute [local instance] polishSpace_P1`) resolve their names as they did.
+                # Inside `namespace A.B` the names of `A` resolve too, but `open A.B` alone does
+                # not open `A`: open every new prefix (F-amenability Monod 5.1, 2026-10-03)
+                parts = ns.split('.')
+                for j in range(len(outer.split('.')) if outer else 0, len(parts)):
+                    pre.append('open %s' % '.'.join(parts[:j + 1]))
             else:
                 pre.append(o)
                 post.insert(0, closer(info, opener))
