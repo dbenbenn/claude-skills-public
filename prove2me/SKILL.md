@@ -11,7 +11,12 @@ workspace (the `prove2me_workspace` checkout; the scripts here find it through
 `discover.md`, `prove.md`, `communicate.md`, `upload_full_project.md`, `mission_auditor.md`. Read
 the relevant one *before* designing anything, and quote it when it conflicts with an instruction:
 the platform's semantics win, and the captain would rather hear the conflict named than have it
-quietly split. Check that your copy is current; the rulebook is a date-dependent claim.
+quietly split. Check that your copy is current; the rulebook is a date-dependent claim. **Before
+concluding the platform cannot do something, grep `references/` for it.** A negative claim is the
+one a quick probe cannot support. On 2026-09-24, two endpoints that happen not to embed a proof's
+source produced "the platform never serves submitted code". That claim lived for eight days in a
+script docstring, a memory note and a report to the captain, and it shaped `edge_audit.py`'s design.
+Meanwhile `discover.md` had documented `GET /submissions/:id/solution` since July.
 
 **Sync the rulebook to head at the start of every session**, before reading it:
 `git -C "$P2M_WORKSPACE" fetch -q origin && git -C "$P2M_WORKSPACE" log --oneline HEAD..origin/main`,
