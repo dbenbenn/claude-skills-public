@@ -60,6 +60,23 @@ def submit(ns, n, f):
     return 'ERROR: ' + ' '.join(o.strip().split())[-300:]
 
 
+def published_names(names, ns, ws=None):
+    """The statements of `names` (in namespace `ns`) that the platform has published: their module is
+    in the workspace's Theorems/ and is NOT a draft stub. Counting the file alone took every draft
+    stub (stubs.py) for published, and five solutions were sent for statements still in the publish
+    queue (Lodha-Moore, 2026-10-02; refused before submission by the name lookup)."""
+    sys.path.insert(0, os.path.dirname(SK))
+    from p2mlib.workspace import drafts
+    ws = ws or _workspace()
+    dr = drafts(ws)
+    out = []
+    for n in names:
+        mod = 'Theorems.Thm_%s_%s' % (ns.replace('.', '_'), n)
+        if os.path.exists(os.path.join(ws, *mod.split('.')) + '.lean') and mod not in dr:
+            out.append(n)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('mission_dir')
@@ -90,7 +107,7 @@ def main():
     while True:
         subprocess.run([sys.executable, os.path.join(SK, 'fetch_theorems.py'), '--proposal', a.proposal],
                        capture_output=True)
-        here = [n for n in names if os.path.exists(os.path.join(thm, 'Thm_%s_%s.lean' % (ns.replace('.', '_'), n)))]
+        here = published_names(names, ns)
         if a.wait_all and len(here) < len(names):
             if len(here) != last:
                 print(time.strftime('%H:%M'), 'published %d of %d; waiting for all' % (len(here), len(names)),

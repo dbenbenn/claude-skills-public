@@ -59,3 +59,15 @@ def test_failed_after_retries_and_duplicate_not_retried(mission, monkeypatch):
     assert code == 1
     assert done['b'] == 'FAILED WA sX (after 3 tries)' and calls.count('b') == 3
     assert done['c'].startswith('DUPLICATE') and calls.count('c') == 1
+
+
+def test_a_draft_stub_is_not_published(tmp_path):
+    # Lodha-Moore 2026-10-02: the stubs made every statement look published, and five solutions were
+    # sent while the publish queue had not reached them
+    import submit_all as S
+    from p2mlib.workspace import set_drafts
+    (tmp_path / 'Theorems').mkdir()
+    for n in ('a', 'b'):
+        (tmp_path / 'Theorems' / ('Thm_N_%s.lean' % n)).write_text('theorem N.%s : True := by sorry\n' % n)
+    set_drafts({'Theorems.Thm_N_b': '/m'}, str(tmp_path))
+    assert S.published_names(['a', 'b', 'c'], 'N', str(tmp_path)) == ['a']

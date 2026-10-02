@@ -32,7 +32,7 @@ from merge import merge  # noqa: E402
 from p2mlib import leanedit, leaninfo  # noqa: E402
 from p2mlib.copies import imports_of  # noqa: E402
 from p2mlib.leantext import header_end  # noqa: E402
-from p2mlib.workspace import workspace as _workspace  # noqa: E402
+from p2mlib.workspace import workspace as _workspace, drafts  # noqa: E402
 
 
 def deps(sol, mod, seen):
@@ -137,7 +137,7 @@ def build(mdir, checks, name, out):
         if short == name:
             continue
         for cand in ([ns.split('.')[0] + '_' + short] if ns else []) + [tok.replace('.', '_')]:
-            if os.path.exists(os.path.join(thm, 'Thm_%s.lean' % cand)):
+            if os.path.exists(os.path.join(thm, 'Thm_%s.lean' % cand)) and 'Theorems.Thm_%s' % cand not in drafts(ws):
                 imp = 'import Theorems.Thm_%s' % cand
                 if imp not in body:
                     body = imp + '\n' + body
