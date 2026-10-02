@@ -19,9 +19,13 @@ script docstring, a memory note and a report to the captain, and it shaped `edge
 Meanwhile `discover.md` had documented `GET /submissions/:id/solution` since July.
 
 **Sync the rulebook to head at the start of every session**, before reading it:
-`git -C "$P2M_WORKSPACE" fetch -q origin && git -C "$P2M_WORKSPACE" log --oneline HEAD..origin/main`,
-then read the incoming diff of `references/` and `SKILL.md` and fast-forward
-(`git -C "$P2M_WORKSPACE" merge --ff-only origin/main`). On 2026-09-23 the local copy was seven
+`scripts/sync_workspace.py`.
+- It fetches, lists the incoming platform releases, saves the incoming diff of `references/` and
+  `SKILL.md` for you to **read**, and fast-forwards.
+- It then runs the live read-only contract tests (`tests/test_live_contract.py`), which pin the
+  API assumptions that once broke scripts. Running them here means they never depend on
+  remembering.
+- If one fails, fix the scripts before trusting them. On 2026-09-23 the local copy was seven
 releases behind, and those releases had rewritten the captain's faithfulness principles and
 added the moderation loop, all unread while a proposal was being drafted against the old text.
 

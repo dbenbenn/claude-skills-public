@@ -156,7 +156,14 @@ because each phase leaves everything working.
      are fine.
    - Nothing from private missions (QFS's private repo).
 4. **Tests first**: Phases 0–1 come before any refactor.
-5. **Open:** a private sandbox on the platform for write-path tests (layer 5 below).
+5. **No live write tests** (dbenbenn: "We're doing enough real writing that we'll notice such a
+   problem").
+6. **Pipeline regression runs locally on golden files.** Pick realistic tricky cases, fetch their
+   accepted solutions **once**, and store inputs and outputs under `tests/golden/`. Tests never
+   refetch.
+7. **The live read-only checks need a trigger, not my memory.** They run with the session-start
+   docs sync (fetch, read the diff, fast-forward `prove2me_workspace`), and always when that sync
+   brings a new platform release.
 
 ## Test layers
 
@@ -164,9 +171,8 @@ because each phase leaves everything working.
 |---|---|---|---|
 | 1. Unit | pure functions: names, range edits, prose loading, JSON building | seconds | every change |
 | 2. Lean integration | LeanInfo on fixture `.lean` files, checking the reported commands, declarations, dependencies and types | seconds each | every change |
-| 3. Pipeline regression | rebuild a public mission's solutions and compare them with the accepted submissions, fetched by `GET /submissions/:id/solution`; `draft.py verify` on a recorded proposal | minutes | before merging a migration |
-| 4. Live read-only contract | the platform behaves as `p2mlib.api` assumes: page size and `total`, the solution endpoint, graph node and edge shapes, proposal statuses, a known submission's final status; recorded responses for layer 1 come from here | about a minute | on demand and after a platform release |
-| 5. Live write path | submit / poll / retry / deprecate / publish / definitions against a **private sandbox** (a private trivial statement; proofs built to be ACCEPTED, rejected, SKETCH_ACCEPTED) | minutes | rarely, on demand; needs dbenbenn's OK |
+| 3. Pipeline regression | golden files fetched once into `tests/golden/`: the check module and its dependencies, plus the accepted solution of a few tricky targets. The rebuild must match the golden output. | minutes (Lean) | before merging a migration |
+| 4. Live read-only contract | the platform behaves as `p2mlib.api` assumes: page size and `total`, the solution endpoint, graph node and edge shapes, a known submission's final status, `deprecated_at` on the detail endpoint | 5 s | at every session-start docs sync, and whenever it brings a platform release |
 
 Layer 4 would have caught three real failures:
 - the list endpoint paging at 50 when we asked for 100;
