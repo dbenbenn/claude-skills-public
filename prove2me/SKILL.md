@@ -703,6 +703,13 @@ click is not one, a second click does not duplicate jobs, and a run that goes qu
 still lacking ids resumes on another click. When the last item publishes the status becomes `In
 review`; approval makes it a live mission.
 
+**"Compile failed" with a "Retry submit" button is the human's to click.** The retry re-runs
+Submit, which `mission_captain.md` reserves for the human, and no agent endpoint exists for it.
+The failed attempt need not stay visible in `/publish-jobs` (Moore M24, 2026-10-02: only the
+re-queued PENDING job was listed). What the captain can do is tell transient from real: run
+`scripts/check_server_shape.py MISSION_DIR NAME` on the failed item. It compiled in 3 s locally, so
+the failures were the platform's, and the retry published it.
+
 **A statement is Open the moment its job publishes**, before review and before the last item.
 Submit ready solutions as each one comes up; nothing waits for approval.
 
