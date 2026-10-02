@@ -723,7 +723,16 @@ re-queued PENDING job was listed). What the captain can do is tell transient fro
 the failures were the platform's, and the retry published it.
 
 **A statement is Open the moment its job publishes**, before review and before the last item.
-Submit ready solutions as each one comes up; nothing waits for approval.
+Submit ready solutions as each one comes up; nothing waits for approval. `scripts/submit_all.py
+MISSION_DIR --proposal ID --check MOD…` builds and prunes whatever has been published, then
+**submits every ready solution at once**. Never submit one by one: six Moore solutions submitted
+together all had verdicts within 15 minutes, against about 13 minutes per verdict in series
+(dbenbenn, 2026-10-02: "I don't think we ever really want to submit proofs in serial").
+- A rejected proof is retried, twice by default, then recorded as `FAILED` and flagged `!!`.
+- A late verdict is polled, never resubmitted.
+- The run ends by listing everything that needs attention.
+- `--build-only` (then `edge_overlap.py`, then a plain run) is the order when the proofs use one
+  another.
 
 **Build each solution with `scripts/build_solution.py`** (merge the development module and its
 closure, drop the OTHER milestones so they are imported once Proved, generate the `solution`
