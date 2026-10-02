@@ -436,11 +436,20 @@ def short_bundle_names(M, mdir):
     for f in glob.glob(os.path.join(mdir, 'lib', 'Thm_*.lean')):
         texts.append(open(f, encoding='utf-8').read())
     out = []
+    # split the statements files into single declarations, so a statement that also uses a longer
+    # name of the bundle (and so imports it genuinely) is not flagged: Lodha-Moore's `K` appears as
+    # the ascription `(K : Set ...)`, which the binder pattern cannot tell from a binder, in a
+    # statement that needs the bundle anyway (2026-10-02)
+    decls = []
+    for t in texts:
+        decls += re.split(r"(?m)^(?=theorem |lemma )", t)
     for D in getattr(M, 'DEFINITIONS', []):
         f = os.path.join(mdir, 'lib', 'Def_%s.lean' % D['name'])
         if os.path.exists(f):
-            for n in re.findall(r"^(?:noncomputable )?(?:def|abbrev|structure|inductive|instance) ([\w']+)",
-                                open(f, encoding='utf-8').read(), re.M):
+            names = re.findall(r"^(?:noncomputable )?(?:def|abbrev|structure|inductive|instance) ([\w']+)",
+                               open(f, encoding='utf-8').read(), re.M)
+            longs = [m for m in names if len(m) > 2]
+            for n in names:
                 if len(n) > 2:
                     continue
                 N = re.escape(n)
@@ -448,7 +457,9 @@ def short_bundle_names(M, mdir):
                     r"[(\{⦃]\s*(?:[\w'₀-₉]+\s+)*?%s(?:\s+[\w'₀-₉]+)*\s*:(?!=)" % N
                     + r"|(?:[∀∃∑∏⋃⋂λ]|\bfun\b|\blet\b|\bhave\b)ᶠ?\s*(?:[\w'₀-₉]+\s+)*?%s(?=[\s:,])" % N
                     + r"|\{\s*%s\s*\|" % N)
-                if any(binder.search(t) for t in texts):
+                if any(binder.search(t) and not any(re.search(r'(?<![\w.])%s(?![\w\'])' % re.escape(m), t)
+                                                    for m in longs)
+                       for t in decls):
                     out.append(('Def_' + D['name'], 'declaration `%s` has a short name that a statement binds as '
                                 'a variable (false imports in preambles); rename it' % n))
     return out
