@@ -399,3 +399,10 @@ before their bundles need be built.
     `'MooreFoelner.'` for a whole bundle, and the strict end guard dropped its import from five
     published preambles.
   - After the fix, all are identical.
+
+**Phase 5 (2026-10-02): done.** New missions keep prose in `prose/<name>.md`: a front matter of
+`key: value` lines (`title`, `milestone_title`), the natural-language statement as the body, and an
+optional `## Milestone` section. `p2mlib.mission.load` merges the files into `mission.py`'s items
+and refuses a field set in both places or a file naming no item. `draft.py`'s own `load()` (the
+cached `import mission`) now goes through it. Missions without `prose/` load unchanged; Lodha–Moore
+stays as it is while in review.

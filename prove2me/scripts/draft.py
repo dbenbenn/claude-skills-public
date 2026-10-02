@@ -80,11 +80,11 @@ def extract_payloads(path, namespace, bundles, opens=None):
 
 
 def load(mdir):
-    spec = importlib.util.spec_from_file_location('mission', os.path.join(mdir, 'mission.py'))
-    M = importlib.util.module_from_spec(spec)
-    sys.path.insert(0, mdir)
-    spec.loader.exec_module(M)
-    return M
+    """The mission's data with its prose/ files merged (p2mlib.mission: a fresh module each time,
+    never the cached `import mission`)."""
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from p2mlib.mission import load as _load
+    return _load(mdir)
 
 
 def desired(M, mdir):
