@@ -11,6 +11,7 @@ import pytest
 
 SCRIPTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts')
 sys.path.insert(0, SCRIPTS)
+sys.path.insert(0, os.path.dirname(SCRIPTS))          # p2mlib
 
 
 def pytest_configure(config):

@@ -1,0 +1,145 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "end": {
+    "byte": 44,
+    "col": 28,
+    "line": 3
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "ok"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 16,
+    "col": 0,
+    "line": 3
+   }
+  },
+  {
+   "attrs": [],
+   "end": {
+    "byte": 85,
+    "col": 39,
+    "line": 5
+   },
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "bad"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 46,
+    "col": 0,
+    "line": 5
+   }
+  },
+  {
+   "attrs": [],
+   "end": {
+    "byte": 86,
+    "col": 0,
+    "line": 6
+   },
+   "kind": "Lean.Parser.Command.eoi",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 86,
+    "col": 0,
+    "line": 6
+   }
+  }
+ ],
+ "decls": [
+  {
+   "kind": "theorem",
+   "name": "ok",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 44,
+     "col": 28,
+     "line": 3
+    },
+    "start": {
+     "byte": 16,
+     "col": 0,
+     "line": 3
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 26,
+     "col": 10,
+     "line": 3
+    },
+    "start": {
+     "byte": 24,
+     "col": 8,
+     "line": 3
+    }
+   },
+   "type": "True",
+   "type_hash": 3270818714,
+   "uses_imported": [],
+   "uses_local": []
+  },
+  {
+   "kind": "theorem",
+   "name": "bad",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 85,
+     "col": 39,
+     "line": 5
+    },
+    "start": {
+     "byte": 46,
+     "col": 0,
+     "line": 5
+    }
+   },
+   "selection": {
+    "end": {
+     "byte": 57,
+     "col": 11,
+     "line": 5
+    },
+    "start": {
+     "byte": 54,
+     "col": 8,
+     "line": 5
+    }
+   },
+   "type": "True",
+   "type_hash": 3270818714,
+   "uses_imported": [],
+   "uses_local": []
+  }
+ ],
+ "file": "Broken.lean",
+ "messages": [
+  {
+   "end": {
+    "byte": 85,
+    "col": 39,
+    "line": 5
+   },
+   "severity": "error",
+   "start": {
+    "byte": 68,
+    "col": 22,
+    "line": 5
+   },
+   "text": "Unknown identifier `nonexistent_lemma`"
+  }
+ ],
+ "mode": "elaborate"
+}

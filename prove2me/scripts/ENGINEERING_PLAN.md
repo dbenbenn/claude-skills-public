@@ -225,5 +225,41 @@ fixed.
 **A wrong claim corrected.** "/missions pages at 50" was false; my loop stopped at offset 400. The
 live contract now pins full 100-item pages.
 
-**Next: Phase 2.** LeanInfo becomes a real tool: JSON output, elaborate and parse-only modes,
-declaration types, caching, and tests on Lean fixtures.
+**Phase 2 (2026-10-02): done.** The tool is `lean/LeanInfo.lean`, with its wrapper
+`p2mlib/leaninfo.py`.
+
+**What it reports.**
+- **Commands:** kind, `in`-wrapped kind, byte and line ranges, the namespace and opens in force,
+  attributes, and declared names.
+- **Declarations:** full and private names, kind, range (doc comment and attributes included),
+  selection, pretty-printed type, `type_hash`, `uses_local` (auxiliaries folded through) and
+  `uses_imported` (our modules only).
+- **Messages:** all of them.
+
+**What the wrapper adds.**
+- Each declaration is mapped to its command, and constants Lean generates are flagged.
+- `command_span` tiles the file exactly, so cutting by command never drops or duplicates text.
+- `unknown_identifiers()` lists the identifiers Lean could not resolve.
+- Results are cached by content, plus the imports' mtimes.
+
+**Tests.** 18, on three fixtures (Structure, Broken, Notation):
+- offline tests of the wrapper on recorded JSON;
+- Lean tests requiring the tool to reproduce its recordings exactly, plus a test that the cache
+  answers a second run.
+
+**Real files.** The 2,251-line Lemma 5.6 proof takes 6 s to parse and 16 s to elaborate (355
+commands, 284 declarations). FAmenChild PartB2 parses with no errors.
+
+**Findings.**
+- **Messages.** Elaboration resets the message log per command (`elabCommandTopLevel`), so the
+  tool collects them command by command; the parse log starts fresh, so syntax errors survive.
+- **Parse-only mode.** Pure parsing failed on `ℝ≥0∞`: scoped notation needs its `open scoped`
+  elaborated. Parse-only mode therefore elaborates the commands that shape parsing, and never
+  declarations.
+- **`type_hash`.** It ignores binder names and binder brackets. A statement hidden behind a local
+  definition hashes differently (the `bijOn` / `CommonCaret` case), so Phase 4.2 needs a
+  Lean-side defeq comparison.
+
+**Next: Phase 3.** The `p2mlib` core: `api` (pagination, polling, retries), `workspace`, `names`,
+`leanedit` (cut and insert by LeanInfo ranges), and `mission` (loading without
+`import mission`).
