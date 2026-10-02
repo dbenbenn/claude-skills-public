@@ -2,11 +2,18 @@
  "commands": [
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "end": {
     "byte": 27,
     "col": 11,
     "line": 3
    },
+   "ids": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "",
@@ -19,12 +26,36 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 77,
     "col": 35,
     "line": 6
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 52,
+      "col": 12,
+      "line": 6
+     },
+     "start": {
+      "byte": 48,
+      "col": 8,
+      "line": 6
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "A.foo'"
@@ -46,12 +77,36 @@
    "attrs": [
     "simp"
    ],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 137,
     "col": 56,
     "line": 8
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 97,
+      "col": 18,
+      "line": 8
+     },
+     "start": {
+      "byte": 95,
+      "col": 16,
+      "line": 8
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "A.s1"
@@ -73,12 +128,36 @@
    "attrs": [
     "simp"
    ],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 197,
     "col": 48,
     "line": 11
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 157,
+      "col": 10,
+      "line": 11
+     },
+     "start": {
+      "byte": 155,
+      "col": 8,
+      "line": 11
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "A.s2"
@@ -98,12 +177,36 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 250,
     "col": 37,
     "line": 14
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 224,
+      "col": 13,
+      "line": 14
+     },
+     "start": {
+      "byte": 219,
+      "col": 8,
+      "line": 14
+     }
+    }
+   ],
    "inner_kind": "Lean.Parser.Command.declaration",
    "kind": "Lean.Parser.Command.in",
    "names": [
@@ -124,12 +227,36 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 292,
     "col": 40,
     "line": 16
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 274,
+      "col": 22,
+      "line": 16
+     },
+     "start": {
+      "byte": 268,
+      "col": 16,
+      "line": 16
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "A.hidden"
@@ -149,12 +276,36 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 329,
     "col": 35,
     "line": 18
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 312,
+      "col": 18,
+      "line": 18
+     },
+     "start": {
+      "byte": 302,
+      "col": 8,
+      "line": 18
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "A.usesHidden"
@@ -174,11 +325,22 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
    "end": {
     "byte": 336,
     "col": 5,
     "line": 20
    },
+   "ids": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "A",
@@ -191,11 +353,18 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "end": {
     "byte": 412,
     "col": 2,
     "line": 24
    },
+   "ids": [],
    "kind": "Lean.Parser.Command.moduleDoc",
    "names": [],
    "namespace": "",
@@ -208,11 +377,18 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "end": {
     "byte": 423,
     "col": 9,
     "line": 26
    },
+   "ids": [],
    "kind": "Lean.Parser.Command.section",
    "names": [],
    "namespace": "",
@@ -225,11 +401,22 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 9
+    }
+   ],
    "end": {
     "byte": 451,
     "col": 27,
     "line": 27
    },
+   "ids": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "",
@@ -242,12 +429,38 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [
+      10
+     ],
+     "opener": 9
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 482,
     "col": 29,
     "line": 29
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 467,
+      "col": 14,
+      "line": 29
+     },
+     "start": {
+      "byte": 461,
+      "col": 8,
+      "line": 29
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "inSec1"
@@ -267,12 +480,38 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [
+      10
+     ],
+     "opener": 9
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 518,
     "col": 34,
     "line": 31
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 498,
+      "col": 14,
+      "line": 31
+     },
+     "start": {
+      "byte": 492,
+      "col": 8,
+      "line": 31
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "inSec2"
@@ -292,11 +531,24 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [
+      10
+     ],
+     "opener": 9
+    }
+   ],
    "end": {
     "byte": 524,
     "col": 5,
     "line": 32
    },
+   "ids": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "",
@@ -309,12 +561,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.definition",
    "end": {
     "byte": 589,
     "col": 14,
     "line": 36
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 531,
+      "col": 5,
+      "line": 34
+     },
+     "start": {
+      "byte": 530,
+      "col": 4,
+      "line": 34
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "f"
@@ -334,12 +606,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 622,
     "col": 31,
     "line": 38
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 605,
+      "col": 14,
+      "line": 38
+     },
+     "start": {
+      "byte": 599,
+      "col": 8,
+      "line": 38
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "f_zero"
@@ -359,12 +651,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 795,
     "col": 30,
     "line": 42
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 778,
+      "col": 13,
+      "line": 42
+     },
+     "start": {
+      "byte": 773,
+      "col": 8,
+      "line": 42
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "f_one"
@@ -384,12 +696,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 850,
     "col": 53,
     "line": 44
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 812,
+      "col": 15,
+      "line": 44
+     },
+     "start": {
+      "byte": 805,
+      "col": 8,
+      "line": 44
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "viaSimp"
@@ -409,12 +741,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 957,
     "col": 34,
     "line": 47
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 937,
+      "col": 14,
+      "line": 47
+     },
+     "start": {
+      "byte": 929,
+      "col": 6,
+      "line": 47
+     }
+    }
+   ],
    "kind": "lemma",
    "names": [
     "viaLemma"
@@ -434,12 +786,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 1011,
     "col": 42,
     "line": 50
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 986,
+      "col": 17,
+      "line": 50
+     },
+     "start": {
+      "byte": 975,
+      "col": 6,
+      "line": 50
+     }
+    }
+   ],
    "inner_kind": "lemma",
    "kind": "Lean.Parser.Command.in",
    "names": [
@@ -460,12 +832,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.definition",
    "end": {
     "byte": 1030,
     "col": 15,
     "line": 52
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 1019,
+      "col": 6,
+      "line": 52
+     },
+     "start": {
+      "byte": 1017,
+      "col": 4,
+      "line": 52
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "g1"
@@ -485,12 +877,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.definition",
    "end": {
     "byte": 1048,
     "col": 15,
     "line": 53
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 1037,
+      "col": 6,
+      "line": 53
+     },
+     "start": {
+      "byte": 1035,
+      "col": 4,
+      "line": 53
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "g2"
@@ -510,11 +922,18 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "end": {
     "byte": 1071,
     "col": 21,
     "line": 55
    },
+   "ids": [],
    "kind": "Lean.Parser.Command.moduleDoc",
    "names": [],
    "namespace": "",
@@ -527,12 +946,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.structure",
    "end": {
     "byte": 1100,
     "col": 7,
     "line": 58
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 1084,
+      "col": 11,
+      "line": 57
+     },
+     "start": {
+      "byte": 1083,
+      "col": 10,
+      "line": 57
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "P"
@@ -547,12 +986,19 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.instance",
    "end": {
     "byte": 1141,
     "col": 31,
     "line": 60
    },
+   "ids": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [],
    "namespace": "",
@@ -570,12 +1016,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 1214,
     "col": 65,
     "line": 62
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 1159,
+      "col": 16,
+      "line": 62
+     },
+     "start": {
+      "byte": 1151,
+      "col": 8,
+      "line": 62
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "solution"
@@ -595,11 +1061,18 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "end": {
     "byte": 1215,
     "col": 0,
     "line": 63
    },
+   "ids": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],
    "namespace": "",

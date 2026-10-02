@@ -1,9 +1,12 @@
 """assemble_blueprint.py on real Blueprint jobs (golden_assemble/<case>/: src/Blueprint.lean,
 src/Part*.lean, meta.json, and expected.lean when the output is pinned).
 
-* pinned cases: the assembled text must equal expected.lean (fast, no Lean);
-* every case: the assembled file compiles and its top theorem uses only the axioms in meta.json
-  (P2M_LEAN=1). A case marked xfail is a known assembler bug; the xfail is strict."""
+* pinned cases: the assembled text must equal expected.lean;
+* every case: the assembled file compiles, no declaration of it uses `sorry`, and its top theorem
+  uses only the axioms in meta.json -- plus `sorryAx` when it imports the published theorems
+  listed under `published`, which are `sorry` stubs in the workspace.
+The assembler elaborates its input (LeanInfo), so both need P2M_LEAN=1. A case marked xfail is a
+known assembler bug; the xfail is strict."""
 import glob
 import json
 import os
@@ -28,6 +31,7 @@ def assemble(case, out):
     return out.read_text()
 
 
+@pytest.mark.lean
 @pytest.mark.parametrize('case', [c for c in CASES if os.path.exists(os.path.join(G, c, 'expected.lean'))])
 def test_assembly_matches_pinned(case, tmp_path):
     assert assemble(case, tmp_path / 'out.lean') == open(os.path.join(G, case, 'expected.lean')).read()
@@ -58,5 +62,12 @@ def test_assembled_compiles_with_expected_axioms(case, tmp_path):
         shutil.rmtree(d)
     out = r.stdout + r.stderr
     assert 'error' not in out, out[:3000]
-    ax = out.split('depends on axioms: [', 1)[1].split(']', 1)[0].replace('\n', ' ')
-    assert set(a.strip() for a in ax.split(',')) <= set(meta['axioms']), ax
+    assert "declaration uses 'sorry'" not in out
+    ax = {a.strip() for a in out.split('depends on axioms: [', 1)[1].split(']', 1)[0].replace('\n', ' ').split(',')}
+    if 'sorryAx' in ax:
+        # only through the imported published statements (sorry stubs in the workspace)
+        assert meta.get('published'), ax
+        for full in meta['published']:
+            assert 'import Theorems.Thm_%s\n' % full.replace('.', '_') in text, full
+        ax.discard('sorryAx')
+    assert ax <= set(meta['axioms']), ax

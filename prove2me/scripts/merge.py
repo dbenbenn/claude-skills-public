@@ -5,148 +5,144 @@ usage: merge.py OUT MODULE [MODULE ...]
 
 A solution may import only the mission's definitions, so a development shared across
 submissions is kept as modules (`Solutions/*.lean`, importing each other) and concatenated per
-submission. Import lines are dropped and one header is prefixed: the union of the modules' own
-non-`Solutions.` imports. A declaration that appears in more than one module with identical
-text is dropped from the later module; one whose name matches an earlier declaration but whose
-text differs is refused, since keeping either would rebind the other's uses. Names are compared
-by their namespace-qualified name (tracked from `namespace`/`section`/`end` lines), so two
-modules may reuse a short name in different namespaces (CFP §6's `S6.W` and `S6.CoxA.W` were
-refused while names were compared as written). Only the declaration's
-own span is ever dropped (see blocks()): dropping more once deleted a file's closing `end`, the merged file compiled locally with `solution` silently
-namespaced, and the verifier answered "Unknown identifier solution" four times. The script now
-refuses to write a file whose namespace/end counts differ or that holds more than one
-`theorem solution`; append the `solution` tail AFTER merging.
-"""
-import os, re, sys
+submission. Each module's import header is dropped and one header is prefixed: the union of the
+modules' own non-`Solutions.` imports. Each module becomes its own `section ... end`, so its
+`open`s stay file-scoped as they were (Monod 2026-09-30: an `open ... Matrix` in one module made
+`zpow_add` ambiguous in the next), and a scope it leaves open at end of file (a trailing
+`noncomputable section`) is closed before the wrapper's `end`.
 
-def header(mods):
+A declaration that appears in more than one module with identical text is dropped from the later
+module; one whose name matches an earlier declaration but whose text differs is refused, since
+keeping either would rebind the other's uses. A file already holding a `theorem solution` is
+refused (the verifier takes the FIRST one); append the `solution` tail AFTER merging.
+
+How: the modules are concatenated as they are (each in its section) and Lean parses that once
+(LeanInfo, parse-only: the dev modules need not be built, and notation a module declares is
+elaborated before the next one is parsed). Declarations are then compared by the full names Lean
+gives them -- `S6.W` and `S6.CoxA.W` are different (they were refused while names were compared as
+written) -- and only whole commands are removed, so dropping a duplicate can never take the next
+lemma's `@[simp]`, a docstring, a `variable` or a closing `end` with it (each happened under the
+earlier line-based splitter: the last one namespaced `solution` and the verifier answered
+"Unknown identifier solution" four times).
+
+`universe` levels are declared once, after the header: Lean refuses a level declared twice, and two
+modules writing `universe u v` and `universe u` collide.
+"""
+import os
+import re
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(HERE))  # p2mlib
+from p2mlib import leanedit, leaninfo  # noqa: E402
+from p2mlib.leantext import header_end, strip  # noqa: E402
+
+
+def header(texts):
     """The merged file's imports: every non-`Solutions.` import any module makes, first-seen
     order, so the header is derived from the modules rather than hard-coded per mission."""
-    seen, out = set(), []
-    for mod in mods:
-        for ln in open(mod).read().split('\n'):
-            if ln.startswith('import ') and not ln.startswith('import Solutions.') and ln not in seen:
-                seen.add(ln); out.append(ln)
-    return '\n'.join(out) + '\n'
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from prune_solution import parse
+    seen = []
+    for t in texts:
+        for m in re.findall(r'^import\s+(\S+)', strip(t[:header_end(t)]), re.M):
+            if not m.startswith('Solutions.') and m not in seen:
+                seen.append(m)
+    return ''.join('import %s\n' % m for m in seen)
 
 
-def blocks(text):
-    """Split into (name-or-None, text) chunks: each declaration's own span, as prune_solution
-    parses it (attributes, a docstring and a `set_option … in` above it included, its body, up to
-    the next top-level command), and between them unnamed chunks holding everything else --
-    `namespace`, `end`, `open`, `variable`, `notation` and the like.
+def _universes(regions):
+    """Declare every unscoped universe level once: (levels, regions without their `universe`
+    lines). A scoped `universe u in` declares for the next command only: it loses the levels
+    already declared (and the line, if none remain; never a bare `universe in`)."""
+    lvls = []
+    for r in regions:
+        for ln in r.split('\n'):
+            m = re.match(r'^universe\s+(.+?)\s*$', ln)
+            if m and not m.group(1).endswith(' in') and m.group(1) != 'in':
+                lvls += [u for u in m.group(1).split() if u not in lvls]
+    out = []
+    for r in regions:
+        lines = []
+        for ln in r.split('\n'):
+            m = re.match(r'^universe\s+(.+?)(\s+in)?\s*$', ln)
+            if not m:
+                lines.append(ln)
+            elif m.group(2):
+                fresh = [u for u in m.group(1).split() if u not in lvls]
+                if fresh:
+                    lines.append('universe ' + ' '.join(fresh) + ' in')
+        out.append('\n'.join(lines))
+    return lvls, out
 
-    Only a named chunk can be dropped as a duplicate, so dropping one can no longer take a
-    following `@[simp]`, docstring, `variable` or closing `end` with it: an earlier version ran
-    each chunk to the next declaration it recognised, and a dropped duplicate silently stripped
-    the `@[simp]` off the lemma after it."""
-    lines = text.split('\n')
-    out, cur = [], 0
-    for name, _kind, st, en, _attr in sorted(parse(lines), key=lambda d: d[2]):
-        # spans must not overlap; if parse ever returns one that does, emitting it whole
-        # duplicates the overlap (it once doubled a run of one-line `@[simp]` lemmas)
-        st = max(st, cur)
-        if en <= st:
+
+def merge(mods, scratch=None):
+    """(merged text, byte offset of each module's `section` in it). Exits 'refusing: ...'."""
+    texts = [open(m, encoding='utf-8').read() for m in mods]
+    hdr = header(texts)
+    naive, spans = hdr, []
+    for t in texts:
+        naive += 'section\n'
+        a = len(naive.encode())
+        naive += t[header_end(t):].rstrip('\n') + '\n'
+        spans.append((a, len(naive.encode())))
+        naive += 'end\n'
+    fd, tmp = tempfile.mkstemp(suffix='.lean', prefix='.merge_', dir=scratch)
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        f.write(naive)
+    try:
+        info = leaninfo.run(tmp, parse_only=True, use_cache=False)
+    finally:
+        os.remove(tmp)
+
+    def module(c):
+        return next((k for k, (a, b) in enumerate(spans) if a <= c.start.byte < b), None)
+
+    seen, drop = {}, []
+    for c in info.commands:
+        k = module(c)
+        if k is None or not c.names:
             continue
-        if st > cur:
-            out.append((None, '\n'.join(lines[cur:st])))
-        out.append((name, '\n'.join(lines[st:en])))
-        cur = en
-    if cur < len(lines):
-        out.append((None, '\n'.join(lines[cur:])))
-    return out
+        if 'solution' in c.names:
+            sys.exit('refusing: `theorem solution` already in %s; strip it (the verifier takes the '
+                     'FIRST one)' % mods[k])
+        decl = leanedit.text(info, c.index).strip()
+        for n in c.names:
+            if n in seen and seen[n] != decl:
+                # same name, different declaration (two provers' helpers named `ev`): keeping the
+                # first would silently rebind the second module's uses to the wrong definition
+                sys.exit('refusing: %s in %s differs from an earlier declaration of the same name '
+                         '-- rename one, or give each module its own namespace' % (n, mods[k]))
+        if all(n in seen for n in c.names):
+            sys.stderr.write('dropping duplicate %s from %s\n' % (', '.join(c.names), mods[k]))
+            drop.append(c.index)
+            continue
+        for n in c.names:
+            seen[n] = decl
+
+    regions, closers = [], []
+    for k, (a, b) in enumerate(spans):
+        regions.append(leanedit.remove_commands(info, drop, a, b).rstrip('\n'))
+        # the scopes this module opened and left open: those in force at its wrapper `end`
+        end = next(c for c in info.commands if c.start.byte >= b)
+        closers.append([leanedit.closer(info, o) for o, _ in reversed(end.context)
+                        if o is not None and module(info.commands[o]) == k])
+    lvls, regions = _universes(regions)
+    out = hdr + ('universe %s\n' % ' '.join(lvls) if lvls else '')
+    starts = []
+    for r, cl in zip(regions, closers):
+        out += '\n'
+        starts.append(len(out.encode()))
+        out += 'section\n' + r.strip('\n') + '\n' + ''.join(x + '\n' for x in cl) + 'end\n'
+    return out, starts
 
 
 def main():
+    if len(sys.argv) < 3:
+        sys.exit(__doc__)
     out_path, mods = sys.argv[1], sys.argv[2:]
-    seen = {}  # name -> the declaration's own text, to tell a true duplicate from a clash
-    pieces = [header(mods)]
-    for mod in mods:
-        body = [ln for ln in open(mod).read().split('\n') if not ln.startswith('import ')]
-        kept = []
-        scope = []  # [(kind, name)] for the open namespace/section blocks of this module
-        for bare, chunk in blocks('\n'.join(body)):
-            if bare is None:
-                for ln in chunk.split('\n'):
-                    m = re.match(r'^namespace\s+(\S+)', ln)
-                    if m:
-                        scope.append(('ns', m.group(1)))
-                    elif re.match(r'^((noncomputable\s+)?section\b|mutual\b)', ln):
-                        scope.append(('sec', ''))
-                    elif re.match(r'^end\b', ln) and scope:
-                        scope.pop()
-            name = None if bare is None else \
-                '.'.join([n for k, n in scope if k == 'ns'] + [bare.removeprefix('_root_.')])
-            if name is not None:
-                decl = chunk.strip()
-                if name in seen and seen[name] != decl:
-                    # same bare name, different declaration (e.g. two provers' helpers named
-                    # `ev` in different namespaces): keeping the first would silently
-                    # rebind the second module's uses to the wrong definition
-                    sys.exit(f'refusing: {name} in {mod} differs from an earlier declaration '
-                             'of the same name -- rename one, or give each module its own '
-                             'namespace and concatenate instead')
-                if name in seen:
-                    sys.stderr.write(f'dropping duplicate {name} from {mod}\n')
-                    continue
-                seen[name] = decl
-            kept.append(chunk)
-        # Each module keeps its own scope: its `open` lines were file-scoped in the module, and
-        # at top level of the merged file they leaked into every later module (Monod
-        # 2026-09-30: an `open ... Matrix` in one module made `zpow_add` ambiguous in the next).
-        # A block the module leaves open at end of file (a trailing `noncomputable section`) is
-        # closed here, before the wrapper's own `end`.
-        closers = ['end' if k == 'sec' else 'end ' + n for k, n in reversed(scope)]
-        pieces.append('section\n' + '\n'.join(kept).strip() + '\n' + ''.join(c + '\n' for c in closers)
-                      + 'end\n')
-    merged = '\n'.join(pieces)
-    # `universe` lines are not declarations, so the name dedup above never sees them, and Lean
-    # refuses a level declared twice. Two modules writing `universe u v` and `universe u` collide
-    # even though neither line repeats. Keep each level once, in first-seen order.
-    # A scoped `universe u in` declares its levels for the next command only: drop the levels
-    # already in scope (dropping the whole line if none remain, never leaving a bare
-    # `universe in`), and do not record the scoped levels as declared for the rest of the file.
-    # With every module inside a section, a `universe` line would be scoped to its module and a
-    # later duplicate dropped below would leave the later module without it: declare every
-    # (unscoped) level once, right after the header.
-    lvls = []
-    for ln in merged.split('\n'):
-        m = re.match(r'^universe\s+(.+?)\s*$', ln)
-        if m and not m.group(1).endswith(' in') and m.group(1) != 'in':
-            lvls += [u for u in m.group(1).split() if u not in lvls]
-    if lvls:
-        hdr = header(mods)
-        merged = hdr + 'universe ' + ' '.join(lvls) + '\n' + merged[len(hdr):]
-    seen_lvl, out_lines = [], []
-    for ln in merged.split('\n'):
-        m = re.match(r'^universe\s+(.+?)(\s+in)?\s*$', ln)
-        if not m:
-            out_lines.append(ln); continue
-        fresh = [u for u in m.group(1).split() if u not in seen_lvl]
-        if m.group(2):
-            if fresh:
-                out_lines.append('universe ' + ' '.join(fresh) + ' in')
-            continue
-        seen_lvl += fresh
-        if fresh:
-            out_lines.append('universe ' + ' '.join(fresh))
-    merged = '\n'.join(out_lines)
-    # `section` (named, anonymous or `noncomputable`) and `mutual` open a block closed by `end`
-    # exactly as `namespace` does; count them all, or a module using one is refused.
-    n_ns = sum(1 for ln in merged.split('\n')
-               if re.match(r'^(namespace\s|(noncomputable\s+)?section\b|mutual\b)', ln))
-    n_end = sum(1 for ln in merged.split('\n') if re.match(r'^end\b', ln))
-    if n_ns != n_end:
-        sys.exit(f'refusing: {n_ns} namespace/section lines but {n_end} end lines -- a trailing '
-                 '`theorem solution` would be namespaced and invisible to the verifier')
-    solution_count = sum(1 for ln in merged.split('\n') if re.match(r'^theorem\s+solution\b', ln))
-    if solution_count > 0:
-        sys.exit(f'refusing: {solution_count} `theorem solution` already in the modules; '
-                 'strip it (the verifier takes the FIRST one)')
-    open(out_path, 'w').write(merged)
+    merged, _ = merge(mods, scratch=os.path.dirname(os.path.abspath(out_path)))
+    open(out_path, 'w', encoding='utf-8').write(merged)
     print('lines:', merged.count('\n'))
 
 

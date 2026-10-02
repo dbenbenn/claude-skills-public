@@ -1,6 +1,8 @@
 """merge.py: concatenate modules into one solution file (run as the CLI, as build_solutions does)."""
 import os
 import subprocess
+
+import pytest
 import sys
 
 from conftest import SCRIPTS
@@ -18,6 +20,7 @@ def merge(tmp_path, *mods):
     return r, (out.read_text() if out.exists() else '')
 
 
+@pytest.mark.lean
 def test_same_short_name_in_different_namespaces_is_not_a_clash(tmp_path):
     # 5bc26ab: CFP §6's S6.W and S6.CoxA.W were refused as a clash
     r, out = merge(tmp_path, 'namespace S6\ndef W : Nat := 1\nend S6\n',
@@ -26,6 +29,7 @@ def test_same_short_name_in_different_namespaces_is_not_a_clash(tmp_path):
     assert out.count('def W') == 2
 
 
+@pytest.mark.lean
 def test_true_duplicate_is_dropped_and_clash_refused(tmp_path):
     r, out = merge(tmp_path, 'theorem t : True := trivial\n', 'theorem t : True := trivial\n')
     assert r.returncode == 0 and out.count('theorem t ') == 1
@@ -33,6 +37,7 @@ def test_true_duplicate_is_dropped_and_clash_refused(tmp_path):
     assert r.returncode != 0 and 'refusing' in (r.stdout + r.stderr)
 
 
+@pytest.mark.lean
 def test_dropping_a_duplicate_keeps_the_next_lemmas_attribute(tmp_path):
     # merge.blocks docstring: a dropped duplicate once stripped the `@[simp]` off the lemma after it
     r, out = merge(tmp_path, 'theorem t : True := trivial\n',
@@ -40,6 +45,7 @@ def test_dropping_a_duplicate_keeps_the_next_lemmas_attribute(tmp_path):
     assert r.returncode == 0 and '@[simp] theorem u' in out
 
 
+@pytest.mark.lean
 def test_each_module_is_its_own_section(tmp_path):
     # Monod 2026-09-30: one module's `open` leaked into the next and made a name ambiguous
     r, out = merge(tmp_path, 'open Nat\ntheorem a : True := trivial\n', 'theorem b : True := trivial\n')
@@ -48,6 +54,7 @@ def test_each_module_is_its_own_section(tmp_path):
     assert 'end' in out[a:b]
 
 
+@pytest.mark.lean
 def test_universe_levels_declared_once(tmp_path):
     r, out = merge(tmp_path, 'universe u v\ndef f (α : Type u) : Type u := α\n',
                    'universe u\ndef g (α : Type u) : Type u := α\n')
@@ -55,6 +62,26 @@ def test_universe_levels_declared_once(tmp_path):
     assert sum(1 for l in out.split('\n') if l.startswith('universe') and ' u' in l) == 1
 
 
+@pytest.mark.lean
 def test_existing_solution_refused(tmp_path):
     r, _ = merge(tmp_path, 'theorem solution : True := trivial\n')
     assert r.returncode != 0
+
+
+@pytest.mark.lean
+def test_scopes_a_module_leaves_open_are_closed(tmp_path):
+    # a trailing `noncomputable section` (and an unclosed namespace) close before the wrapper's
+    # `end`, so the next module and `theorem solution` are not inside them
+    r, out = merge(tmp_path, 'namespace N\nnoncomputable section\ndef a : Nat := 1\n',
+                   'theorem b : True := trivial\n')
+    assert r.returncode == 0, r.stderr
+    a, b = out.index('def a'), out.index('theorem b')
+    assert out[a:b].split() [-4:] == ['end', 'end', 'N', 'end'] or 'end\nend N\nend' in out[a:b]
+
+
+@pytest.mark.lean
+def test_comment_and_docstring_lines_are_not_declarations(tmp_path):
+    r, out = merge(tmp_path, '/-! theorem t : the module doc -/\n-- theorem t\ntheorem t : True := trivial\n',
+                   'theorem t : True := trivial\n')
+    assert r.returncode == 0, r.stderr
+    assert out.count('theorem t : True') == 1

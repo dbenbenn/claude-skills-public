@@ -96,6 +96,15 @@ partial def declaredNames (ns : Name) (stx : Syntax) : Array String := Id.run do
     out := out ++ declaredNames ns a
   return out
 
+/-- The source range of every `declId` of a command, in the order of `declaredNames`. -/
+partial def declIdRanges (stx : Syntax) : Array Lean.Syntax.Range := Id.run do
+  if stx.getKind == ``Lean.Parser.Command.declId then
+    return match stx[0].getRange? with | some r => #[r] | none => #[]
+  let mut out := #[]
+  for a in stx.getArgs do
+    out := out ++ declIdRanges a
+  return out
+
 /-- Attribute names written on a command (`@[simp, instance]`), from its syntax. -/
 partial def attrNames (stx : Syntax) : Array String := Id.run do
   let mut out := #[]
@@ -126,16 +135,18 @@ partial def valueStart? (stx : Syntax) : Option String.Pos.Raw :=
 def innerKind (stx : Syntax) : Option Name :=
   if stx.getKind == ``Lean.Parser.Command.in then some stx[2].getKind else none
 
-def commandJ (fm : FileMap) (stx : Syntax) (scope : Name × List OpenDecl) : Option Json := do
+def commandJ (fm : FileMap) (stx : Syntax) (scope : Name × List OpenDecl) (ctx : Json) : Option Json := do
   let r ← stx.getRange?
   let (ns, opens) := scope
   some <| Json.mkObj ([
+    ("context", ctx),
     ("kind", toJson (toString stx.getKind)),
     ("start", posJ fm r.start), ("end", posJ fm r.stop),
     ("namespace", toJson (nsStr ns)),
     ("opens", toJson (opens.map openJ)),
     ("attrs", toJson (attrNames stx)),
-    ("names", toJson (declaredNames ns stx))] ++
+    ("names", toJson (declaredNames ns stx)),
+    ("ids", Json.arr <| (declIdRanges stx).map fun r => Json.mkObj [("start", posJ fm r.start), ("end", posJ fm r.stop)])] ++
     (match innerKind stx with
     | some k => [("inner_kind", toJson (toString k))]
     | none => []) ++
@@ -145,6 +156,13 @@ def commandJ (fm : FileMap) (stx : Syntax) (scope : Name × List OpenDecl) : Opt
       | some p => [("value_start", posJ fm p)]
       | none => [])
     | none => []))
+
+/-- Commands that set context for the rest of their scope and end with it -- what a command moved
+elsewhere must carry. `open scoped X` adds no `OpenDecl`, so the commands themselves are recorded,
+not `Scope.openDecls`. -/
+def contextKind (k : Name) : Bool :=
+  k ∈ [``Lean.Parser.Command.open, ``Lean.Parser.Command.variable, ``Lean.Parser.Command.universe,
+       ``Lean.Parser.Command.include, ``Lean.Parser.Command.omit, ``Lean.Parser.Command.set_option]
 
 /-- Commands elaborated even in parse-only mode: they change how later text parses (notation,
 syntax, scoped opens) or which namespace and options are in force. Declarations are not. -/
@@ -194,9 +212,15 @@ unsafe def main (args : List String) : IO UInt32 := do
   -- each parse starts from a fresh log so its syntax errors survive too). In parse-only mode only
   -- the commands that change how later text parses or which namespace is open are elaborated
   -- (`open scoped ENNReal` makes `ℝ≥0∞` parse); declarations never are.
-  let rec loop (acc : Array (Name × List OpenDecl)) (got : Array Message) (refs : Array NameSet) :
-      FrontendM (Array (Name × List OpenDecl) × Array Message × Array NameSet) := do
+  -- the scope mirror: for each open scope, the command that opened it (none for the file's root),
+  -- how many of Lean's scope levels it opened (`namespace A.B` opens two), and the context
+  -- commands elaborated in it; every command records the mirror as it was before it
+  let rec loop (acc : Array (Name × List OpenDecl)) (got : Array Message) (refs : Array NameSet)
+      (stack : Array (Option Nat × Nat × Array Nat)) (ctxs : Array (Array (Option Nat × Array Nat))) :
+      FrontendM (Array (Name × List OpenDecl) × Array Message × Array NameSet × Array (Array (Option Nat × Array Nat))) := do
     updateCmdPos
+    let i := (← get).commands.size
+    let ctxs := ctxs.push (stack.map fun (o, _, cs) => (o, cs))
     let cmdState ← getCommandState
     let scope := cmdState.scopes.head!
     let acc := acc.push (scope.currNamespace, scope.openDecls)
@@ -217,14 +241,37 @@ unsafe def main (args : List String) : IO UInt32 := do
         cmdRefs := referencedConsts (info.trees.toArray.map (·.substitute info.assignment))
     let got := got ++ pmsgs.toArray ++ emsgs
     let refs := refs.push cmdRefs
-    if Parser.isTerminalCommand cmd then return (acc, got, refs) else loop acc got refs
-  let ((scopes, got, cmdRefs), s) ← (loop #[] #[] #[]).run { inputCtx } |>.run
+    let d1 := (← getCommandState).scopes.length
+    let d0 := stack.foldl (fun a (_, k, _) => a + k) 0
+    let mut stack := stack
+    if d1 > d0 then
+      stack := stack.push (some i, d1 - d0, #[])
+    else if d1 < d0 then
+      let mut d := d0
+      while d > d1 && stack.size > 1 do
+        d := d - stack.back!.2.1
+        stack := stack.pop
+    else if contextKind cmd.getKind then
+      stack := stack.modify (stack.size - 1) fun (o, k, cs) => (o, k, cs.push i)
+    if Parser.isTerminalCommand cmd then return (acc, got, refs, ctxs) else loop acc got refs stack ctxs
+  let ((scopes, got, cmdRefs, ctxs), s) ← (loop #[] #[] #[] #[(none, 1, #[])] #[]).run { inputCtx } |>.run
     { commandState := Command.mkState env {} opts, parserState, cmdPos := parserState.pos }
-  let cmds := s.commands.zip scopes
+  -- commands without a source range are not reported, so context indices are renumbered
+  let mut jidx : Array (Option Nat) := #[]
+  let mut nJ := 0
+  for stx in s.commands do
+    if stx.getRange?.isSome then
+      jidx := jidx.push (some nJ); nJ := nJ + 1
+    else
+      jidx := jidx.push none
+  let ctxJ (c : Array (Option Nat × Array Nat)) : Json := Json.arr <| c.map fun (o, cs) =>
+    Json.mkObj [("opener", match o.bind (jidx[·]?.join) with | some j => toJson j | none => Json.null),
+                ("cmds", toJson (cs.filterMap (jidx[·]?.join)))]
+  let cmds := s.commands.zip (scopes.zip (ctxs.map ctxJ))
   let msgArr := messages.reportedPlusUnreported.toArray ++ got
   let finalEnv := s.commandState.env
   let env := finalEnv
-  let commandsJ := cmds.filterMap fun (stx, sc) => commandJ fm stx sc
+  let commandsJ := cmds.filterMap fun (stx, sc, cx) => commandJ fm stx sc cx
   -- declarations: user-facing constants of this file (they have declaration ranges)
   let mine := env.constants.toList.filter fun (n, _) => (env.getModuleIdxFor? n).isNone
   let mut ranges : Std.HashMap Name DeclarationRanges := {}

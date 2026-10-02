@@ -55,6 +55,11 @@ class Command:
     inner_kind: str = None        # for `open … in` / `set_option … in`: the wrapped command's kind
     decl_kind: str = None         # for a declaration: theorem, definition, instance, structure, …
     value_start: Pos = None       # for a declaration with a value: where its `:=` (or `|`, `where`) starts
+    # the scopes it sits in, outermost first: (index of the namespace/section command that opened
+    # it, None for the file's root; [indices of the open/variable/universe/include/omit/set_option
+    # commands elaborated in it before this command])
+    context: list = field(default_factory=list)
+    ids: list = field(default_factory=list)   # (start Pos, end Pos) of each declId, parallel to names
 
     @property
     def short_kind(self):
@@ -134,7 +139,9 @@ def parse(data, text_bytes=b''):
     """An Info from LeanInfo's JSON (a dict)."""
     cmds = [Command(i, c['kind'], _pos(c['start']), _pos(c['end']), c['namespace'], c['opens'],
                     c['attrs'], c['names'], c.get('inner_kind'), (c.get('decl_kind') or '').rsplit('.', 1)[-1] or None,
-                    _pos(c['value_start']) if c.get('value_start') else None)
+                    _pos(c['value_start']) if c.get('value_start') else None,
+                    [(x['opener'], x['cmds']) for x in c.get('context') or []],
+                    [(_pos(x['start']), _pos(x['end'])) for x in c.get('ids') or []])
             for i, c in enumerate(data['commands'])]
     decls = []
     for d in data.get('decls') or []:
@@ -171,6 +178,20 @@ def _key(path, parse_only, ws, candidates=()):
     return h.hexdigest()
 
 
+def raw(path, parse_only=False, ws=None, timeout=3000, candidates=()):
+    """LeanInfo's JSON for `path` as a dict, uncached (tests/record_fixtures.py records it)."""
+    path = os.path.abspath(path)
+    ws = ws or workspace()
+    args = ['lake', 'env', 'lean', '--run', TOOL, path] + (['--parse-only'] if parse_only else []) + \
+        (['--candidates', ','.join(candidates)] if candidates else [])
+    r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout)
+    out = r.stdout.strip().split('\n')[-1] if r.stdout.strip() else ''
+    try:
+        return json.loads(out)
+    except ValueError:
+        raise RuntimeError('LeanInfo failed on %s:\n%s' % (path, (r.stdout + r.stderr)[-3000:]))
+
+
 def run(path, parse_only=False, ws=None, use_cache=True, timeout=3000, candidates=()):
     """LeanInfo on `path`. `candidates`: published modules to import beside the file's own, so each
     theorem reports `same_statement_as` (elaborate mode; see lean/LeanInfo.lean)."""
@@ -182,14 +203,7 @@ def run(path, parse_only=False, ws=None, use_cache=True, timeout=3000, candidate
     cf = os.path.join(CACHE, key + '.json')
     if use_cache and os.path.exists(cf):
         return parse(json.load(open(cf)), text)
-    args = ['lake', 'env', 'lean', '--run', TOOL, path] + (['--parse-only'] if parse_only else []) + \
-        (['--candidates', ','.join(candidates)] if candidates else [])
-    r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout)
-    out = r.stdout.strip().split('\n')[-1] if r.stdout.strip() else ''
-    try:
-        data = json.loads(out)
-    except ValueError:
-        raise RuntimeError('LeanInfo failed on %s:\n%s' % (path, (r.stdout + r.stderr)[-3000:]))
+    data = raw(path, parse_only, ws, timeout, candidates)
     if use_cache:
         os.makedirs(CACHE, exist_ok=True)
         json.dump(data, open(cf, 'w'))

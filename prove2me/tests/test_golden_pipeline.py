@@ -11,7 +11,9 @@ compile and import exactly `theorem_imports` (its graph edges), and is not compa
 
 `exact` means: the rebuild equals the accepted file, ignoring whitespace-only lines (blank lines
 mean nothing to Lean and the pruner's spacing is not under test) and the order of the `import`
-lines (a set: they are the graph edges), after deleting from the accepted
+lines (a set: they are the graph edges) and the lines that only wrap `theorem solution` in its
+scope (`section`, `open`, `end`: how the builder writes them is not under test, that they suffice
+is the compile check), after deleting from the accepted
 file the declarations listed in `dropped_since_accepted` -- dead code the pruner of the day kept and
 a better one removes (each with the reason). An unlisted difference fails: a new deletion is either
 a regression or a pruning gain, and the case says which.
@@ -22,6 +24,7 @@ so relying on them is stable): run with P2M_LEAN=1."""
 import difflib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -79,6 +82,16 @@ def test_rebuild_matches_accepted(case, tmp_path):
         want = leanedit.remove_commands(winfo, idx)
     def norm(t):
         lines = [line for line in t.splitlines(True) if line.strip()]
+        # the lines that only give `theorem solution` its scope (`section`, its `open`s, `end`) are
+        # the builder's choice: since Phase 4.3 one section with the scope's opens, before it a
+        # stack of `open ... in`; that they suffice is what the compile check above proves
+        k = max(i for i, l in enumerate(lines) if l.startswith('theorem solution'))
+        j = k
+        while j and re.match(r'(section|open\s.*)\n?$', lines[j - 1]):
+            j -= 1
+        while lines[-1].strip() == 'end':
+            lines.pop()
+        lines = lines[:j] + lines[k:]
         return ''.join(sorted(l for l in lines if l.startswith('import ')) +
                        [l for l in lines if not l.startswith('import ')])
     got, want = norm(got), norm(want)

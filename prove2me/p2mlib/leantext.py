@@ -114,3 +114,38 @@ def explicit_binders(header):
             depth -= 1
         i += 1
     return names
+
+
+_HEADER_LINE = re.compile(r'(?:import|prelude|module|public\s+import|meta\s+import)\b[^\n]*')
+
+
+def header_end(text):
+    """Where a Lean file's header ends: the offset of its first command. The header grammar is only
+    whitespace, comments, `prelude`, `module` and `import` lines, so this scanner is exact; a doc
+    comment (`/--`, `/-!`) already belongs to the first command."""
+    i, n = 0, len(text)
+    while i < n:
+        if text[i].isspace():
+            i += 1
+        elif text.startswith('--', i):
+            j = text.find('\n', i)
+            i = n if j < 0 else j + 1
+        elif text.startswith('/-', i) and not text.startswith(('/--', '/-!'), i):
+            depth, j = 0, i
+            while j < n:
+                if text.startswith('/-', j):
+                    depth += 1; j += 2
+                elif text.startswith('-/', j):
+                    depth -= 1; j += 2
+                    if depth == 0:
+                        break
+                else:
+                    j += 1
+            i = j
+        else:
+            m = _HEADER_LINE.match(text, i)
+            if not m:
+                break
+            i = m.end()
+    return i
+

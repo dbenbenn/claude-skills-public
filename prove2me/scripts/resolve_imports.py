@@ -33,12 +33,26 @@ START = re.compile(r'^(theorem|lemma|def|noncomputable|/--|/-!|end\b|namespace|s
                    r'abbrev|structure|open|variable|private|protected)')
 
 
+def decl_re(name):
+    """A line declaring theorem `name`: attributes written on the same line and modifiers allowed
+    (`@[simp] theorem s` was not found while this matched only lines starting `theorem`).
+
+    The source here is another Lean project's tree (QFS), whose modules the prove2.me workspace
+    cannot elaborate, so LeanInfo is not available: this stays a textual extractor."""
+    return re.compile(r'^(?:@\[[^\n]*?\]\s*)*(?:(?:private|protected|noncomputable)\s+)*(?:theorem|lemma)\s+'
+                      + re.escape(name) + r'(?=\s|$)')
+
+
 def extract(path, name):
-    """The text of declaration `name` in `path`, with a doc comment directly above it."""
+    """The text of declaration `name` in `path`, with the attribute lines and the doc comment
+    directly above it (an inlined `@[simp]` lemma that lost its attribute left the simp set)."""
     L = open(path, encoding='utf-8').read().split('\n')
+    dre = decl_re(name)
     for i, l in enumerate(L):
-        if re.match(r'^(private )?(theorem|lemma) ' + re.escape(name) + r'(\s|$)', l):
+        if dre.match(l):
             a = i
+            while a > 0 and re.match(r'^@\[[^\n]*\]\s*$', L[a - 1]):
+                a -= 1
             if a > 0 and L[a - 1].strip().endswith('-/'):
                 j = a - 1
                 while not L[j].lstrip().startswith('/--'):
@@ -57,8 +71,8 @@ def variables_before(path, name):
     so a lemma written under `variable {d : ℕ}` fails on `d` once copied out of its file (QFS,
     2026-09-27: thirteen Section6 lemmas)."""
     L = open(path, encoding='utf-8').read().split('\n')
-    end = next((i for i, l in enumerate(L)
-                if re.match(r'^(private )?(theorem|lemma) ' + re.escape(name) + r'(\s|$)', l)), len(L))
+    dre = decl_re(name)
+    end = next((i for i, l in enumerate(L) if dre.match(l)), len(L))
     out = []
     i = 0
     while i < end:
@@ -77,8 +91,7 @@ def variables_before(path, name):
 
 def find_src(src_dir, name):
     for f in sorted(glob.glob(os.path.join(src_dir, '**', '*.lean'), recursive=True)):
-        if re.search(r'^(private )?(theorem|lemma) ' + re.escape(name) + r'(\s|$)',
-                     open(f, encoding='utf-8').read(), re.M):
+        if any(decl_re(name).match(l) for l in open(f, encoding='utf-8').read().split('\n')):
             return f
     return None
 

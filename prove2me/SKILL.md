@@ -854,10 +854,10 @@ the published theorem, prune, and resubmit with `--replaces`. Counting shared de
 was tried and does not work: a common lemma library puts every pair above 60%.
 
 **Solutions.** Keep the development as small modules that import each other; to submit a full proof, build
-the submission by concatenating with `scripts/merge.py OUT MODULE…` (drops a declaration repeated
-verbatim, refuses one whose name repeats with different text, unbalanced blocks, or a `theorem
-solution`) and finishing with `theorem
-solution` stated verbatim; **then prune what the proof does not use**, with
+the submission by concatenating with `scripts/merge.py OUT MODULE…` (each module its own section,
+with any scope it leaves open closed; drops a declaration repeated verbatim and refuses one whose
+full name repeats with different text, or a `theorem solution`; Lean parses the modules, so names
+are full names) and finishing with `theorem solution` stated verbatim; **then prune what the proof does not use**, with
 `scripts/prune_solution.py FILE --check`. Concatenation pulls in whole modules, so an assembled
 file carries lemmas its target never touches — one Chou submission was 684 lines of which 205
 were reachable. That is not only untidy: an unused copy of a *published* theorem reads as a

@@ -1,6 +1,9 @@
 import Mathlib
 import Definitions.Def_LodhaMooreWords
 
+section
+open LodhaMoore
+namespace LM56
 /-!
 # Lemma 5.6 of Lodha–Moore fails when the commutation rule moves only positive letters
 
@@ -21,13 +24,7 @@ Proof (proofs/lemma56-literal/RESULT.md in the Lodha–Moore mission repo):
 * no frozen standard form is sufficiently expanded (the twist by `y` in the chart of `y_ε`'s
   descendants makes a required support a non-cone).
 -/
-
-open LodhaMoore
-
-namespace LM56
-
 /-! ## 1. The rules with positive commutation -/
-
 /-- `LodhaMoore.Step` with `y_u^i y_v^j ⇔ y_v^j y_u^i` only for `i, j > 0`. -/
 inductive PosStep : Word → Word → Prop
   | moveX (pre post : Word) (s t t' : Seq) (i : ℤ) (h : xFin s t = some t') :
@@ -56,7 +53,6 @@ inductive PosStep : Word → Word → Prop
 def W0 : Word := [(.y [false, false], -1), (.y [false, true], -1), (.y [true], -1), (.y [], 1)]
 
 /-! ## 2. Semantics -/
-
 abbrev Str := Stream' Bool
 
 /-- The cone of sequences extending `u`. -/
@@ -69,8 +65,19 @@ def xInvFun (ξ : Str) : Str :=
   | true, false => [false, true] ++ₛ ξ.drop 2
   | true, true => [true] ++ₛ ξ.drop 2
 
-namespace PartS1
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
+/-!
+# Lemma 5.6 under positive commutation — part S1: functions of streams
+
+The recursion equations of `x`, `x⁻¹`, `y`, `y⁻¹`, the inverse laws, and the basic facts about
+`localize`.
+-/
+/-! ## Digits of `l ++ₛ s` -/
 /-- Every stream is its first two digits followed by the rest. -/
 theorem decomp2 (ξ : Str) : ξ = [ξ 0, ξ 1] ++ₛ ξ.drop 2 := by
   apply Stream'.ext
@@ -88,25 +95,44 @@ theorem append_get_eq (l : List Bool) (s t : Str) (n : ℕ)
       ((h j rfl).trans (Stream'.get_append_right j l t).symm)
 
 /-! ## `x` and `x⁻¹` -/
-
 theorem xFun_00 (η : Str) : xFun ([false, false] ++ₛ η) = [false] ++ₛ η := rfl
-end PartS1
 
-alias xFun_00 := PartS1.xFun_00
+end LM56.PartS1
+end
 
-namespace PartS1
+section
+open LodhaMoore
+namespace LM56
+alias xFun_00 := LM56.PartS1.xFun_00
+
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem xFun_01 (η : Str) : xFun ([false, true] ++ₛ η) = [true, false] ++ₛ η := rfl
-end PartS1
 
-alias xFun_01 := PartS1.xFun_01
+end LM56.PartS1
+end
 
-namespace PartS1
+section
+open LodhaMoore
+namespace LM56
+alias xFun_01 := LM56.PartS1.xFun_01
+
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem xFun_1 (η : Str) : xFun ([true] ++ₛ η) = [true, true] ++ₛ η := rfl
 
 theorem xInvFun_0 (η : Str) : xInvFun ([false] ++ₛ η) = [false, false] ++ₛ η := rfl
+
 theorem xInvFun_10 (η : Str) : xInvFun ([true, false] ++ₛ η) = [false, true] ++ₛ η := rfl
+
 theorem xInvFun_11 (η : Str) : xInvFun ([true, true] ++ₛ η) = [true] ++ₛ η := rfl
 
 theorem xInvFun_xFun (ξ : Str) : xInvFun (xFun ξ) = ξ := by
@@ -122,12 +148,20 @@ theorem xInvFun_xFun (ξ : Str) : xInvFun (xFun ξ) = ξ := by
   · exact (congrArg xInvFun (PartS1.xFun_1 ([true] ++ₛ η))).trans
       (PartS1.xInvFun_11 ([true] ++ₛ η))
 
-end PartS1
+end LM56.PartS1
+end
 
-alias xInvFun_xFun := PartS1.xInvFun_xFun
+section
+open LodhaMoore
+namespace LM56
+alias xInvFun_xFun := LM56.PartS1.xInvFun_xFun
 
-namespace PartS1
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem xFun_xInvFun (ξ : Str) : xFun (xInvFun ξ) = ξ := by
   rw [decomp2 ξ]
   generalize ξ 0 = a
@@ -141,16 +175,23 @@ theorem xFun_xInvFun (ξ : Str) : xFun (xInvFun ξ) = ξ := by
   · rw [PartS1.xInvFun_10, PartS1.xFun_01]
   · rw [PartS1.xInvFun_11, PartS1.xFun_1]
 
-/-! ## The recursion of `y` and `y⁻¹` -/
+end LM56.PartS1
+end
 
-end PartS1
+section
+open LodhaMoore
+namespace LM56
+alias xFun_xInvFun := LM56.PartS1.xFun_xInvFun
 
-alias xFun_xInvFun := PartS1.xFun_xInvFun
+alias xFun_1 := LM56.PartS1.xFun_1
 
-alias xFun_1 := PartS1.xFun_1
+end LM56
+end
 
-namespace PartS1
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
+/-! ## The recursion of `y` and `y⁻¹` -/
 /-- Each step of the recursion outputs at least one digit. -/
 theorem one_le_length_yStep (σ : Bool) (ξ : Str) : 1 ≤ (yStep σ ξ).1.length := by
   cases σ <;> simp only [yStep] <;> split <;> simp
@@ -214,53 +255,97 @@ theorem yFun_step (σ : Bool) (ξ : Str) :
 
 theorem yFun_true_00 (η : Str) : yFun true ([false, false] ++ₛ η) = [false] ++ₛ yFun true η := by
   rw [yFun_step]; rfl
-end PartS1
 
-alias yFun_true_00 := PartS1.yFun_true_00
+end LM56.PartS1
+end
 
-namespace PartS1
+section
+open LodhaMoore
+namespace LM56
+alias yFun_true_00 := LM56.PartS1.yFun_true_00
+
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem yFun_true_01 (η : Str) :
     yFun true ([false, true] ++ₛ η) = [true, false] ++ₛ yFun false η := by
   rw [yFun_step]; rfl
-end PartS1
 
-alias yFun_true_01 := PartS1.yFun_true_01
+end LM56.PartS1
+end
 
-namespace PartS1
+section
+open LodhaMoore
+namespace LM56
+alias yFun_true_01 := LM56.PartS1.yFun_true_01
+
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem yFun_true_1 (η : Str) : yFun true ([true] ++ₛ η) = [true, true] ++ₛ yFun true η := by
   rw [yFun_step]; rfl
-end PartS1
 
-alias yFun_true_1 := PartS1.yFun_true_1
+end LM56.PartS1
+end
 
-namespace PartS1
+section
+open LodhaMoore
+namespace LM56
+alias yFun_true_1 := LM56.PartS1.yFun_true_1
+
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem yFun_false_0 (η : Str) :
     yFun false ([false] ++ₛ η) = [false, false] ++ₛ yFun false η := by
   rw [yFun_step]; rfl
-end PartS1
 
-alias yFun_false_0 := PartS1.yFun_false_0
+end LM56.PartS1
+end
 
-namespace PartS1
+section
+open LodhaMoore
+namespace LM56
+alias yFun_false_0 := LM56.PartS1.yFun_false_0
+
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem yFun_false_10 (η : Str) :
     yFun false ([true, false] ++ₛ η) = [false, true] ++ₛ yFun true η := by
   rw [yFun_step]; rfl
-end PartS1
 
-alias yFun_false_10 := PartS1.yFun_false_10
+end LM56.PartS1
+end
 
-namespace PartS1
+section
+open LodhaMoore
+namespace LM56
+alias yFun_false_10 := LM56.PartS1.yFun_false_10
+
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem yFun_false_11 (η : Str) :
     yFun false ([true, true] ++ₛ η) = [true] ++ₛ yFun false η := by
   rw [yFun_step]; rfl
 
 /-! ## The inverse laws of `y` -/
-
 /-- `yFun (!σ)` inverts `yFun σ`, digit by digit. -/
 theorem yFun_not_yFun_get (n : ℕ) : ∀ (σ : Bool) (ξ : Str), yFun (!σ) (yFun σ ξ) n = ξ n := by
   induction n using Nat.strong_induction_on with
@@ -301,37 +386,60 @@ theorem yFun_not_yFun_get (n : ℕ) : ∀ (σ : Bool) (ξ : Str), yFun (!σ) (yF
 theorem yFun_false_true (ξ : Str) : yFun false (yFun true ξ) = ξ :=
   Stream'.ext fun n => yFun_not_yFun_get n true ξ
 
-end PartS1
+end LM56.PartS1
+end
 
-alias yFun_false_true := PartS1.yFun_false_true
+section
+open LodhaMoore
+namespace LM56
+alias yFun_false_true := LM56.PartS1.yFun_false_true
 
-namespace PartS1
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem yFun_true_false (ξ : Str) : yFun true (yFun false ξ) = ξ :=
   Stream'.ext fun n => yFun_not_yFun_get n false ξ
 
-/-! ## Localization -/
+end LM56.PartS1
+end
 
-end PartS1
+section
+open LodhaMoore
+namespace LM56
+alias yFun_true_false := LM56.PartS1.yFun_true_false
 
-alias yFun_true_false := PartS1.yFun_true_false
+alias yFun_false_11 := LM56.PartS1.yFun_false_11
 
-alias yFun_false_11 := PartS1.yFun_false_11
+end LM56
+end
 
-namespace PartS1
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
+/-! ## Localization -/
 theorem localize_append (s : Seq) (f : Str → Str) (η : Str) :
     localize s f (s ++ₛ η) = s ++ₛ f η := by
   unfold localize
   rw [if_pos (by rw [Stream'.take_append_of_le_length _ _ _ le_rfl, List.take_length]),
     Stream'.drop_append_stream]
 
-end PartS1
+end LM56.PartS1
+end
 
-alias localize_append := PartS1.localize_append
+section
+open LodhaMoore
+namespace LM56
+alias localize_append := LM56.PartS1.localize_append
 
-namespace PartS1
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem localize_of_not_mem (s : Seq) (f : Str → Str) (ξ : Str) (h : ξ ∉ cone s) :
     localize s f ξ = ξ := by
   unfold localize
@@ -342,21 +450,34 @@ theorem localize_of_not_mem (s : Seq) (f : Str → Str) (ξ : Str) (h : ξ ∉ c
   rw [h'] at this
   exact ⟨_, this⟩
 
-end PartS1
+end LM56.PartS1
+end
 
-alias localize_of_not_mem := PartS1.localize_of_not_mem
+section
+open LodhaMoore
+namespace LM56
+alias localize_of_not_mem := LM56.PartS1.localize_of_not_mem
 
-namespace PartS1
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS1
 theorem localize_symm (s : Seq) (p : Equiv.Perm Str) (ξ : Str) :
     localize s p.symm (localize s p ξ) = ξ := by
   by_cases h : ξ ∈ cone s
   · obtain ⟨η, rfl⟩ := h
     rw [PartS1.localize_append, PartS1.localize_append, Equiv.symm_apply_apply]
   · rw [PartS1.localize_of_not_mem s _ ξ h, PartS1.localize_of_not_mem s _ ξ h]
-end PartS1
 
-alias localize_symm := PartS1.localize_symm
+end LM56.PartS1
+end
+
+section
+open LodhaMoore
+namespace LM56
+alias localize_symm := LM56.PartS1.localize_symm
 
 /-- `f` localized at `s`, as a permutation. -/
 def locP (s : Seq) (p : Equiv.Perm Str) : Equiv.Perm Str where
@@ -381,12 +502,27 @@ def act : Word → Equiv.Perm Str
   | [] => 1
   | (g, n) :: w => act w * genP g ^ n
 
-namespace PartS2
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS2
+/-!
+# Lemma 5.6 under positive commutation — part S2: words act, steps preserve the action
+
+`act_append`, `act_posStep`, `genP_x_of_xFin`, `genP_x_inv_of_xFinInv`, `genP_y_zpow_of_not_mem`,
+`genP_y_zpow_mem_iff`, `psi_D_00`, `psi_D_01`, `psi_D_1`, from the part-S1 lemmas of the Blueprint
+(recursion equations, inverse laws, `localize` lemmas).
+-/
+/-! ## Helpers: generators applied to sequences -/
 theorem genP_y_apply (s : Seq) (ξ : Str) : genP (.y s) ξ = localize s (yFun true) ξ := rfl
+
 theorem genP_y_inv_apply (s : Seq) (ξ : Str) :
     (genP (.y s))⁻¹ ξ = localize s (yFun false) ξ := rfl
+
 theorem genP_x_apply (s : Seq) (ξ : Str) : genP (.x s) ξ = localize s xFun ξ := rfl
+
 theorem genP_x_inv_apply (s : Seq) (ξ : Str) : (genP (.x s))⁻¹ ξ = localize s xInvFun ξ := rfl
 
 /-- Two sequences with a common infinite extension are compatible. -/
@@ -428,33 +564,42 @@ theorem not_mem_cone_append_of_not_mem {s v : Seq} {ξ : Str} (h : ξ ∉ cone s
 
 theorem y_app (s : Seq) (η : Str) : genP (.y s) (s ++ₛ η) = s ++ₛ yFun true η :=
   localize_append s (yFun true) η
+
 theorem yinv_app (s : Seq) (η : Str) : (genP (.y s))⁻¹ (s ++ₛ η) = s ++ₛ yFun false η :=
   localize_append s (yFun false) η
+
 theorem x_app (s : Seq) (η : Str) : genP (.x s) (s ++ₛ η) = s ++ₛ xFun η :=
   localize_append s xFun η
+
 theorem xinv_app (s : Seq) (η : Str) : (genP (.x s))⁻¹ (s ++ₛ η) = s ++ₛ xInvFun η :=
   localize_append s xInvFun η
 
 theorem y_fix {s : Seq} {ξ : Str} (h : ξ ∉ cone s) : genP (.y s) ξ = ξ :=
   localize_of_not_mem s _ ξ h
+
 theorem yinv_fix {s : Seq} {ξ : Str} (h : ξ ∉ cone s) : (genP (.y s))⁻¹ ξ = ξ :=
   localize_of_not_mem s _ ξ h
+
 theorem x_fix {s : Seq} {ξ : Str} (h : ξ ∉ cone s) : genP (.x s) ξ = ξ :=
   localize_of_not_mem s _ ξ h
+
 theorem xinv_fix {s : Seq} {ξ : Str} (h : ξ ∉ cone s) : (genP (.x s))⁻¹ ξ = ξ :=
   localize_of_not_mem s _ ξ h
 
 theorem y_app' (s u : Seq) (η : Str) :
     genP (.y (s ++ u)) (s ++ₛ (u ++ₛ η)) = s ++ₛ (u ++ₛ yFun true η) := by
   rw [← Stream'.append_append_stream, y_app, Stream'.append_append_stream]
+
 theorem yinv_app' (s u : Seq) (η : Str) :
     (genP (.y (s ++ u)))⁻¹ (s ++ₛ (u ++ₛ η)) = s ++ₛ (u ++ₛ yFun false η) := by
   rw [← Stream'.append_append_stream, yinv_app, Stream'.append_append_stream]
 
 theorem xInvFun_0 (η : Str) : xInvFun ([false] ++ₛ η) = [false, false] ++ₛ η := by
   rw [← xFun_00, xInvFun_xFun]
+
 theorem xInvFun_10 (η : Str) : xInvFun ([true, false] ++ₛ η) = [false, true] ++ₛ η := by
   rw [← xFun_01, xInvFun_xFun]
+
 theorem xInvFun_11 (η : Str) : xInvFun ([true, true] ++ₛ η) = [true] ++ₛ η := by
   rw [← xFun_1, xInvFun_xFun]
 
@@ -493,7 +638,6 @@ theorem tri_xinv (ζ : Str) : (∃ η, ζ = [false] ++ₛ η) ∨ (∃ η, ζ = 
     · exact Or.inr (Or.inr ⟨_, h2⟩)
 
 /-! ## `act_append` -/
-
 theorem act_append (u v : Word) : act (u ++ v) = act v * act u := by
   induction u with
   | nil => simp [act]
@@ -501,14 +645,21 @@ theorem act_append (u v : Word) : act (u ++ v) = act v * act u := by
     obtain ⟨g, n⟩ := p
     simp only [List.cons_append, act, ih, mul_assoc]
 
-/-! ## The `x`-moves and the `y`-powers -/
+end LM56.PartS2
+end
 
-end PartS2
+section
+open LodhaMoore
+namespace LM56
+alias act_append := LM56.PartS2.act_append
 
-alias act_append := PartS2.act_append
+end LM56
+end
 
-namespace PartS2
+section
 open LodhaMoore LM56
+namespace LM56.PartS2
+/-! ## The `x`-moves and the `y`-powers -/
 /-- `x_s` moves `t` to `t' = t.x_s` by prefix replacement. -/
 theorem genP_x_of_xFin {s t t' : Seq} (h : xFin s t = some t') (η : Str) :
     genP (.x s) (t ++ₛ η) = t' ++ₛ η := by
@@ -540,12 +691,20 @@ theorem genP_x_of_xFin {s t t' : Seq} (h : xFin s t = some t') (η : Str) :
     subst h
     exact x_fix (not_mem_cone_of_incompat h2 h1 η)
 
-end PartS2
+end LM56.PartS2
+end
 
-alias genP_x_of_xFin := PartS2.genP_x_of_xFin
+section
+open LodhaMoore
+namespace LM56
+alias genP_x_of_xFin := LM56.PartS2.genP_x_of_xFin
 
-namespace PartS2
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS2
 /-- `x_s⁻¹` moves `t` to `t' = t.x_s⁻¹` by prefix replacement. -/
 theorem genP_x_inv_of_xFinInv {s t t' : Seq} (h : xFinInv s t = some t') (η : Str) :
     (genP (.x s))⁻¹ (t ++ₛ η) = t' ++ₛ η := by
@@ -578,23 +737,39 @@ theorem genP_x_inv_of_xFinInv {s t t' : Seq} (h : xFinInv s t = some t') (η : S
     subst h
     exact xinv_fix (not_mem_cone_of_incompat h2 h1 η)
 
-end PartS2
+end LM56.PartS2
+end
 
-alias genP_x_inv_of_xFinInv := PartS2.genP_x_inv_of_xFinInv
+section
+open LodhaMoore
+namespace LM56
+alias genP_x_inv_of_xFinInv := LM56.PartS2.genP_x_inv_of_xFinInv
 
-namespace PartS2
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS2
 /-- `y_s^n` fixes the sequences outside `[s]`. -/
 theorem genP_y_zpow_of_not_mem (s : Seq) (n : ℤ) (ξ : Str) (h : ξ ∉ cone s) :
     (genP (.y s) ^ n) ξ = ξ :=
   Equiv.Perm.zpow_apply_eq_self_of_apply_eq_self (y_fix h) n
 
-end PartS2
+end LM56.PartS2
+end
 
-alias genP_y_zpow_of_not_mem := PartS2.genP_y_zpow_of_not_mem
+section
+open LodhaMoore
+namespace LM56
+alias genP_y_zpow_of_not_mem := LM56.PartS2.genP_y_zpow_of_not_mem
 
-namespace PartS2
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS2
 /-- `y_s^n` maps `[s]` to itself. -/
 theorem genP_y_zpow_mem_iff (s : Seq) (n : ℤ) (ξ : Str) :
     (genP (.y s) ^ n) ξ ∈ cone s ↔ ξ ∈ cone s := by
@@ -610,12 +785,15 @@ theorem genP_y_zpow_mem_iff (s : Seq) (n : ℤ) (ξ : Str) :
     rw [← (genP (.y s) ^ n).injective h''] at h'
     exact h' h
 
-/-! ## `psi .D` -/
+end LM56.PartS2
+end
 
-end PartS2
+section
+open LodhaMoore
+namespace LM56
+alias genP_y_zpow_mem_iff := LM56.PartS2.genP_y_zpow_mem_iff
 
-alias genP_y_zpow_mem_iff := PartS2.genP_y_zpow_mem_iff
-
+/-! ## 3. Labels, expansion trees and charts -/
 /-- The roots: `y_00⁻¹`, `y_01⁻¹`, `y_1⁻¹`, `y_ε`. -/
 inductive Root | A | B | C | D
   deriving DecidableEq
@@ -628,8 +806,13 @@ def psi : Root → Str → Str
   | .C, η => [true] ++ₛ η
   | .D, η => (act (W0.take 3)).symm η
 
-namespace PartS2
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS2
+/-! ## `psi .D` -/
 theorem psi_D_apply (ξ : Str) :
     psi .D ξ = genP (.y [false, false]) (genP (.y [false, true]) (genP (.y [true]) ξ)) := by
   show (act (W0.take 3)).symm ξ = _
@@ -642,29 +825,44 @@ theorem psi_D_00 (ρ : Str) :
   rw [psi_D_apply, y_fix (not_mem_cone_of_incompat (by decide) (by decide) ρ),
     y_fix (not_mem_cone_of_incompat (by decide) (by decide) ρ), y_app]
 
-end PartS2
+end LM56.PartS2
+end
 
-alias psi_D_00 := PartS2.psi_D_00
+section
+open LodhaMoore
+namespace LM56
+alias psi_D_00 := LM56.PartS2.psi_D_00
 
-namespace PartS2
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS2
 theorem psi_D_01 (ρ : Str) :
     psi .D ([false, true] ++ₛ ρ) = [false, true] ++ₛ yFun true ρ := by
   rw [psi_D_apply, y_fix (not_mem_cone_of_incompat (by decide) (by decide) ρ), y_app,
     y_fix (not_mem_cone_of_incompat (by decide) (by decide) _)]
 
-end PartS2
+end LM56.PartS2
+end
 
-alias psi_D_01 := PartS2.psi_D_01
+section
+open LodhaMoore
+namespace LM56
+alias psi_D_01 := LM56.PartS2.psi_D_01
 
-namespace PartS2
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartS2
 theorem psi_D_1 (ρ : Str) : psi .D ([true] ++ₛ ρ) = [true] ++ₛ yFun true ρ := by
   rw [psi_D_apply, y_app, y_fix (not_mem_cone_of_incompat (by decide) (by decide) _),
     y_fix (not_mem_cone_of_incompat (by decide) (by decide) _)]
 
 /-! ## Steps preserve the action -/
-
 /-- Conjugating `y_t` by a permutation that replaces the prefix `t` by `t'` gives `y_{t'}`. -/
 theorem semiconj_y {g : Equiv.Perm Str} {t t' : Seq} (hg : ∀ η, g (t ++ₛ η) = t' ++ₛ η) :
     SemiconjBy g (genP (.y t)) (genP (.y t')) := by
@@ -790,11 +988,16 @@ theorem act_posStep {V V' : Word} (h : PosStep V V') : act V = act V' := by
   | split pre post g i j hi hj hij => simp only [LM56.PartS2.act_append, split_block g i j]
   | merge pre post g i j hi hj hij => simp only [LM56.PartS2.act_append, split_block g i j]
   | cancel pre post s i hi => simp only [LM56.PartS2.act_append, cancel_block s i, one_mul]
-end PartS2
 
-alias act_posStep := PartS2.act_posStep
+end LM56.PartS2
+end
 
-alias psi_D_1 := PartS2.psi_D_1
+section
+open LodhaMoore
+namespace LM56
+alias act_posStep := LM56.PartS2.act_posStep
+
+alias psi_D_1 := LM56.PartS2.psi_D_1
 
 /-- A label `(r, w, c)`: root, leaf, sign (`true` for exponent `1`). -/
 abbrev Label := Root × Seq × Bool
@@ -815,8 +1018,19 @@ inductive Forest : List Label → Prop
       Forest (L₁ ++ [(r, w ++ [false], false), (r, w ++ [true, false], true),
         (r, w ++ [true, true], false)] ++ L₂)
 
-namespace PartL
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartL
+/-!
+# Lemma 5.6 under positive commutation — part L: the forest
+
+`Forest.not_pos_pos` and `Forest.region_ne`, each from an invariant of the form
+`List.IsChain R L` (a relation between consecutive labels) proved by induction on `Forest`.
+-/
+/-! ### Expanding one entry of a chain -/
 /-- Replacing the entry `a` of a chain by `a₁, a₂, a₃` keeps it a chain, when `a₁` inherits the
 left relations of `a` and `a₃` its right relations. -/
 theorem isChain_expand {α : Type*} {R : α → α → Prop} {L₁ L₂ : List α} {a a₁ a₂ a₃ : α}
@@ -837,7 +1051,6 @@ theorem isChain_expand {α : Type*} {R : α → α → Prop} {L₁ L₂ : List �
     exact hr y (ha2 a (by simp) y hy)
 
 /-! ### Signs -/
-
 /-- Two consecutive labels are not both positive. -/
 def SignRel (a b : Label) : Prop := ¬ (a.2.2 = true ∧ b.2.2 = true)
 
@@ -856,14 +1069,21 @@ theorem Forest.not_pos_pos {L : List Label} (hL : Forest L) (i : ℕ) (hi : i + 
     ¬ (L[i].2.2 = true ∧ L[i + 1].2.2 = true) :=
   (isChain_sign hL).getElem i hi
 
-/-! ### Incompatibility -/
+end LM56.PartL
+end
 
-end PartL
+section
+open LodhaMoore
+namespace LM56
+alias Forest.not_pos_pos := LM56.PartL.Forest.not_pos_pos
 
-alias Forest.not_pos_pos := PartL.Forest.not_pos_pos
+end LM56
+end
 
-namespace PartL
+section
 open LodhaMoore LM56
+namespace LM56.PartL
+/-! ### Incompatibility -/
 theorem incompatible_append_right {u v : Seq} (x : Seq) (h : Incompatible u v) :
     Incompatible u (v ++ x) := by
   refine ⟨fun h' => ?_, fun h' => h.2 ((List.prefix_append v x).trans h')⟩
@@ -902,7 +1122,6 @@ theorem not_incompatible_of_append_stream_eq {u v : Seq} {η η' : Str}
   · exact h2 h'
 
 /-! ### Regions -/
-
 theorem append_stream_inj (u : Seq) {η η' : Str} (h : u ++ₛ η = u ++ₛ η') : η = η' := by
   rw [← Stream'.drop_append_stream u η, h, Stream'.drop_append_stream]
 
@@ -1034,9 +1253,14 @@ theorem regInv {L : List Label} (hL : Forest L) :
 theorem Forest.region_ne {L : List Label} (hL : Forest L) (i : ℕ) (hi : i + 1 < L.length) :
     region L[i] ≠ region L[i + 1] :=
   regRel_region_ne ((regInv hL).1.getElem i hi)
-end PartL
 
-alias Forest.region_ne := PartL.Forest.region_ne
+end LM56.PartL
+end
+
+section
+open LodhaMoore
+namespace LM56
+alias Forest.region_ne := LM56.PartL.Forest.region_ne
 
 /-- `Good f V L`: reading `V` from the left with `f` the value of the prefix read so far, the
 `y`-letters of `V` carry the labels `L` in order; the label `(r, w, c)` on `y_t^e` means
@@ -1049,8 +1273,13 @@ def Good : Equiv.Perm Str → Word → List Label → Prop
       e = (if c then 1 else -1) ∧ (∀ η, f (psi r (w ++ₛ η)) = t ++ₛ η) ∧
         Good (genP (.y t) ^ e * f) V L
 
-namespace PartG
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartG
+/-! ## Unfolding `Good` -/
 theorem good_nil' (f : Equiv.Perm Str) (L : List Label) : Good f [] L ↔ L = [] := by
   simp [Good]
 
@@ -1089,17 +1318,24 @@ theorem good_append (f : Equiv.Perm Str) (U V : Word) (L : List Label) :
       · rintro ⟨L₁, L₂, rfl, ⟨r, w, c, L₁', rfl, he, hc, h1⟩, h2⟩
         exact ⟨r, w, c, L₁' ++ L₂, rfl, he, hc, L₁', L₂, rfl, h1, h2⟩
 
-/-! ## Cones -/
+end LM56.PartG
+end
 
-end PartG
-
-alias good_append := PartG.good_append
+section
+open LodhaMoore
+namespace LM56
+alias good_append := LM56.PartG.good_append
 
 /-- The invariant. -/
 def Frozen (V : Word) : Prop := ∃ L, Forest L ∧ Good 1 V L
 
-namespace PartG
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartG
+/-! ## Cones -/
 theorem mem_cone_iff (u : Seq) (ξ : Str) : ξ ∈ cone u ↔ ∃ η, u ++ₛ η = ξ := Iff.rfl
 
 theorem append_mem_cone (u : Seq) (η : Str) : u ++ₛ η ∈ cone u := ⟨η, rfl⟩
@@ -1121,7 +1357,6 @@ theorem not_mem_cone_of_ne {a b : Bool} (h : a ≠ b) (s l l' : Seq) (η : Str) 
   exact cons_not_mem_cone_cons h l l' η
 
 /-! ## The start word -/
-
 theorem act_W0_take3 :
     act (W0.take 3) = genP (.y [true]) ^ (-1 : ℤ) *
       (genP (.y [false, true]) ^ (-1 : ℤ) * (genP (.y [false, false]) ^ (-1 : ℤ) * 1)) := by
@@ -1146,14 +1381,21 @@ theorem frozen_W0 : Frozen W0 := by
     rw [← act_W0_take3]
     exact Equiv.apply_symm_apply _ _
 
-/-! ## Membership in cones of concrete shape -/
+end LM56.PartG
+end
 
-end PartG
+section
+open LodhaMoore
+namespace LM56
+alias frozen_W0 := LM56.PartG.frozen_W0
 
-alias frozen_W0 := PartG.frozen_W0
+end LM56
+end
 
-namespace PartG
+section
 open LodhaMoore LM56
+namespace LM56.PartG
+/-! ## Membership in cones of concrete shape -/
 theorem mem_cone_nil (ξ : Str) : ξ ∈ cone [] := ⟨ξ, rfl⟩
 
 theorem cons_append_mem_cone_cons_iff (a b : Bool) (l l' : Seq) (η : Str) :
@@ -1169,7 +1411,6 @@ theorem cons_append_mem_cone_cons_iff (a b : Bool) (l l' : Seq) (η : Str) :
     exact ⟨η', by rw [h']⟩
 
 /-! ## The values of `x_s` and `x_s⁻¹` on the three subcones of `[s]` -/
-
 theorem genP_x_apply (s : Seq) (ξ : Str) : genP (.x s) ξ = localize s xFun ξ := rfl
 
 theorem gx_00 (s : Seq) (η : Str) :
@@ -1197,7 +1438,6 @@ theorem gxinv_11 (s : Seq) (η : Str) :
   rw [Equiv.Perm.inv_eq_iff_eq, gx_1]
 
 /-! ## Regions of consecutive labels -/
-
 /-- The region of a label is the preimage of its subscript's cone under the prefix value. -/
 theorem region_eq_preimage {f : Equiv.Perm Str} {l : Label} {t : Seq}
     (h : ∀ η, f (psi l.1 (l.2.1 ++ₛ η)) = t ++ₛ η) : region l = f ⁻¹' cone t := by
@@ -1233,7 +1473,6 @@ theorem forest_pair {La Lc : List Label} {l₁ l₂ : Label} (hF : Forest (La ++
   exact ⟨h1, h2⟩
 
 /-! ## Replacing a block -/
-
 /-- If a block `B` can be replaced by `B'` of the same value, keeping `Good` and the forest, then
 `pre ++ B' ++ post` is frozen whenever `pre ++ B ++ post` is. -/
 theorem frozen_replace {pre B B' post : Word} (hV : Frozen (pre ++ B ++ post))
@@ -1250,7 +1489,6 @@ theorem frozen_replace {pre B B' post : Word} (hV : Frozen (pre ++ B ++ post))
   rwa [act_append, ← hact, ← act_append]
 
 /-! ## The blocks -/
-
 theorem block_moveX {s t t' : Seq} {i : ℤ} (h : xFin s t = some t') (f : Equiv.Perm Str)
     (Lb : List Label) (hG : Good f [(.y t, i), (.x s, 1)] Lb) :
     Good f [(.x s, 1), (.y t', i)] Lb := by
@@ -1368,7 +1606,6 @@ theorem block_x_two' {s : Seq} {i j : ℤ} (f : Equiv.Perm Str) (Lb : List Label
   simpa only [good_x', good_nil'] using hG
 
 /-! ## The invariant is preserved -/
-
 /-- `act_posStep` on a block alone. -/
 theorem act_block {B B' : Word} (h : PosStep ([] ++ B ++ []) ([] ++ B' ++ [])) : act B = act B' := by
   simpa only [List.nil_append, List.append_nil] using act_posStep h
@@ -1410,12 +1647,34 @@ theorem frozen_posStep {V V' : Word} (hV : Frozen V) (h : PosStep V V') : Frozen
     have := frozen_replace (B' := []) hV (act_block (.cancel [] [] s i hi))
       fun f La Lb Lc hF hG => (block_same f La Lb Lc hF hG).elim
     simpa only [List.append_nil] using this
-end PartG
 
-alias frozen_posStep := PartG.frozen_posStep
+end LM56.PartG
+end
 
-namespace PartF
+section
+open LodhaMoore
+namespace LM56
+alias frozen_posStep := LM56.PartG.frozen_posStep
+
+end LM56
+end
+
+section
 open LodhaMoore LM56
+namespace LM56.PartF
+/-!
+# Lemma 5.6 under positive commutation — part F
+
+`isStandardForm_W0` and `not_sufficientlyExpanded_of_frozen` (RESULT.md §5).
+
+Plan of the main proof:
+* cones of finite sequences (`mem_cone_iff`, compatibility, the non-cone lemma `ne_cone`);
+* the advance lemma `ADV` and the forest invariant `Inv` (D-leaf shapes, coverage, block order);
+* the support fact (g): in a standard form, the letters before a `y_t` preserve `[t]` and `[t z]`;
+* reading `Good` along `Ξ ++ Υ`: every label's region is `g⁻¹[t_k]` with `g` the value of `Ξ`;
+* phase 1 (`(D, [], true)` is a label) and phase 2 (some `(D, 00w, c)` is a label).
+-/
+/-! ## 1. Cones -/
 theorem mem_cone_iff {ξ : Str} {p : Seq} :
     ξ ∈ cone p ↔ ∀ i (h : i < p.length), ξ.get i = p[i] := by
   constructor
@@ -1518,7 +1777,6 @@ theorem ne_cone {S : Set Str} {q : Seq} {a : Bool} {α β γ : Str}
     rw [Stream'.get_append_left i q _ (by omega), ← h1 i hi, Stream'.get_append_left i q _ (by omega)]
 
 /-! ## 2. `W0` is a standard form -/
-
 theorem isStandardForm_W0 : IsStandardForm W0 := by
   refine ⟨?_, ⟨[], W0, rfl, ?_, ?_⟩, ?_⟩
   · simp [IsWord, W0]
@@ -1536,14 +1794,22 @@ theorem isStandardForm_W0 : IsStandardForm W0 := by
          obtain ⟨rfl, -⟩ := h2
          exact absurd hp (by decide))
 
-/-! ## 3. The advance lemma (ADV) -/
+end LM56.PartF
+end
 
-end PartF
+section
+open LodhaMoore
+namespace LM56
+/-! ## 4. No frozen standard form is sufficiently expanded -/
+alias isStandardForm_W0 := LM56.PartF.isStandardForm_W0
 
-alias isStandardForm_W0 := PartF.isStandardForm_W0
+end LM56
+end
 
-namespace PartF
+section
 open LodhaMoore LM56
+namespace LM56.PartF
+/-! ## 3. The advance lemma (ADV) -/
 /-- `(w η).y^σ = o (η.y^c)` for some output `o`. -/
 def ADV (σ : Bool) (w : Seq) (c : Bool) : Prop :=
   ∃ o : Seq, ∀ η, yFun σ (w ++ₛ η) = o ++ₛ yFun c η
@@ -1571,7 +1837,6 @@ theorem adv_neg {σ : Bool} {w : Seq} (h : ADV σ w false) :
   · rw [Stream'.append_append_stream, ho, yFun_false_11, Stream'.append_append_stream]
 
 /-! ## 4. The forest invariant -/
-
 /-- The block order of the roots. -/
 def rank : Root → ℕ
   | .A => 0
@@ -1723,7 +1988,6 @@ theorem inv_of_forest {L : List Label} (hF : Forest L) : Inv L := by
     · exact pairwise_replace ih.order (by simp)
 
 /-! ## 5. Regions of labels -/
-
 theorem psi_D_eq : psi .D = ⇑(act (W0.take 3)).symm := rfl
 
 theorem psi_D_injective : Function.Injective (psi .D) := by
@@ -1851,7 +2115,6 @@ theorem lt_of_A_D {L : List Label} (hI : Inv L) {i j : ℕ} (hi : i < L.length) 
     simp [rank] at this
 
 /-! ## 6. Reading `Good` along a standard form -/
-
 /-- The subscript of a generator. -/
 def gsub : Gen → Seq
   | .x s => s
@@ -1940,7 +2203,6 @@ theorem image_eq_preimage {f g : Equiv.Perm Str} {r : Root} {w t : Seq}
     exact hη
 
 /-! ## 7. The non-cone lemma for a twisted set -/
-
 theorem cons_inj {a b : Bool} {α β : Str} (h : Stream'.cons a α = Stream'.cons b β) :
     a = b ∧ α = β :=
   ⟨by simpa using congrArg Stream'.head h, by simpa using congrArg Stream'.tail h⟩
@@ -1992,7 +2254,6 @@ theorem not_mem_cone_of_mem_cone {ξ : Str} {p q : Seq} (hp : ξ ∈ cone p) (hp
   (compat_of_mem_cone hp hq).elim hpq hqp
 
 /-! ## 8. The two phases -/
-
 /-- What the main proof extracts from a frozen standard form `Ξ Υ`: `g` is the value of `Ξ`,
 `t k` the subscript of the `k`-th `y`-letter, `Occ`, `Pos`, `Neg` the occurrence predicates. -/
 structure Setting (g : Equiv.Perm Str) (L : List Label) (t : ℕ → Seq)
@@ -2135,7 +2396,6 @@ theorem setting_false {g L t Occ Pos Neg} (H : Setting g L t Occ Pos Neg) : Fals
       (cone_mono (List.prefix_append _ _) hlη)
 
 /-! ## 9. The theorem -/
-
 theorem not_sufficientlyExpanded_of_frozen {V : Word} (hV : Frozen V) (hS : IsStandardForm V) :
     ¬ SufficientlyExpanded V := by
   intro hSE
@@ -2229,10 +2489,16 @@ theorem not_sufficientlyExpanded_of_frozen {V : Word} (hV : Frozen V) (hS : IsSt
     have := hΥ k hk
     rw [hc] at this
     exact ⟨-1, by norm_num, List.mem_append_right _ (List.mem_of_getElem? this)⟩
-end PartF
 
-alias not_sufficientlyExpanded_of_frozen := PartF.not_sufficientlyExpanded_of_frozen
+end LM56.PartF
+end
 
+section
+open LodhaMoore
+namespace LM56
+alias not_sufficientlyExpanded_of_frozen := LM56.PartF.not_sufficientlyExpanded_of_frozen
+
+/-! ## 5. Lemma 5.6 fails -/
 theorem frozen_of_derives {V : Word} (h : Relation.ReflTransGen PosStep W0 V) : Frozen V := by
   induction h with
   | refl => exact frozen_W0
@@ -2246,4 +2512,4 @@ theorem lemma56_fails :
   exact not_sufficientlyExpanded_of_frozen (frozen_of_derives hd) hs hse
 
 end LM56
-
+end

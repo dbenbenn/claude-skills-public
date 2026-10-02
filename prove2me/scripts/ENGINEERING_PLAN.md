@@ -209,10 +209,10 @@ fixed.
 | # | Bug | Where | Fixed by |
 |---|---|---|---|
 | 1 | The pipeline cannot produce a hand-rewired solution: it misses copies under other names | Moore `bijOn` golden | Phase 4.2 finds `reduced_iff` by statement; `reduced_unique` and `exists_reduced_equiv` are *halves* of the published `∃!`, derived from it by a person, so no matcher produces the accepted file (see Phase 4.2) |
-| 2 | Parts with a `section`/`variable` block spanning targets are mis-split | `assemble_blueprint`, FAmenChild | Phase 4.3, LeanInfo ranges |
+| 2 | Parts with a `section`/`variable` block spanning targets are mis-split | `assemble_blueprint`, FAmenChild | **fixed** Phase 4.3, LeanInfo scopes |
 | 3 | A comment line beginning `theorem` is taken as the declaration | `rewire.published` | Phase 3, one `published()` |
-| 4 | A one-line `@[simp] theorem` is not found | `resolve_imports.extract` | Phase 4, LeanInfo ranges |
-| 5 | An attribute line above the declaration is not carried | `resolve_imports.extract` | Phase 4, LeanInfo ranges |
+| 4 | A one-line `@[simp] theorem` is not found | `resolve_imports.extract` | **fixed** Phase 4.3 (textual: the source is another project) |
+| 5 | An attribute line above the declaration is not carried | `resolve_imports.extract` | **fixed** Phase 4.3 |
 | 6 | A primed statement name is truncated | `draft.extract_payloads` | Phase 4, LeanInfo names |
 | 7 | Re-staging deletes a live auditor's directory | `caveat_audit.stage` | Phase 3, shared staging with `stage_auditor`'s guard |
 
@@ -353,3 +353,37 @@ blank lines. An unpinned difference still fails.
 directly. "A published theorem is proved here from lemmas the solution uses" is detectable from
 LeanInfo (a `same_statement_as` hit whose `uses_local` meets the solution's closure) and would
 have flagged the case for a person.
+
+**Phase 4.3 (2026-10-02): done.** Merge, build and assembly go by Lean's commands and scopes.
+- **LeanInfo context.** Every command now carries its scopes, outermost first: the namespace or
+  section command that opened each one, and the `open`, `variable`, `universe`, `include`, `omit`
+  and `set_option` commands elaborated in it so far. These are recorded as commands because
+  `open scoped` adds no `OpenDecl`. Commands also carry their `declId` ranges (`ids`).
+  `leanedit.scope_wrap(info, i)` turns that into text which re-creates command i's scope at the
+  top of any file, as a section with nothing leaking out; `top_level=True` opens the namespace
+  instead of entering it.
+- **`merge.py`**: concatenates the modules, each in its own section, and LeanInfo parses that once
+  (parse-only: the dev modules need not be built, and earlier modules' notation is elaborated
+  first). Duplicates are compared by full name and command text, and only whole commands are
+  removed. A scope a module leaves open is closed from the context at its wrapper `end`.
+- **`build_solutions.py`**: the check file is merged too, and the check block is found by full
+  name in its region; every check block is removed. The solution is the block's command renamed
+  at its `declId` (`lemma` → `theorem`, no `private`, no docstring), wrapped by
+  `scope_wrap(top_level=True)`. `assemble()` returns text, so it is tested without rewire.
+- **`assemble_blueprint.py`**: the Blueprint and the Parts are concatenated and elaborated once.
+  - Items are the commands that declare; dependencies are `uses_local` mapped to commands. A
+    proved stub becomes an alias that depends on its target, and each Part keeps its order.
+  - Each run of items from one scope is written inside its `scope_wrap`, which fixes strict xfail
+    #2 (FAmenChild's `section B2 … variable {X}`).
+  - Lemma 5.6 is re-pinned: same 32 aliases, compiles, standard axioms.
+- **`resolve_imports.extract`** stays textual: its `--src` is another Lean project, which the
+  workspace cannot elaborate. A shared `decl_re` takes attributes on the same line and above, which
+  fixes strict xfails #4 and #5.
+- **Golden criteria.**
+  - Pipeline: the lines that only wrap `theorem solution` (`section`, `open`, `end`) are not
+    compared; the compile check proves they suffice.
+  - Assembly: no declaration of the file may use `sorry`. `sorryAx` is allowed only through
+    imported published statements, which are `sorry` stubs in the workspace and listed under
+    `published`.
+- **`tests/record_fixtures.py`** re-records the LeanInfo fixtures. It was a hand loop, done four
+  times in this phase.

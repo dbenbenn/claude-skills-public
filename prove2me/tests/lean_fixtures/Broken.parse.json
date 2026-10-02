@@ -2,12 +2,32 @@
  "commands": [
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 44,
     "col": 28,
     "line": 3
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 26,
+      "col": 10,
+      "line": 3
+     },
+     "start": {
+      "byte": 24,
+      "col": 8,
+      "line": 3
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "ok"
@@ -27,12 +47,32 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
     "byte": 85,
     "col": 39,
     "line": 5
    },
+   "ids": [
+    {
+     "end": {
+      "byte": 57,
+      "col": 11,
+      "line": 5
+     },
+     "start": {
+      "byte": 54,
+      "col": 8,
+      "line": 5
+     }
+    }
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "bad"
@@ -52,11 +92,18 @@
   },
   {
    "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
    "end": {
     "byte": 86,
     "col": 0,
     "line": 6
    },
+   "ids": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],
    "namespace": "",

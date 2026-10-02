@@ -11,9 +11,11 @@ usage: build_solutions.py MISSION_DIR --check MOD [--check MOD ...] [--out DIR] 
 A development proves each statement in a check file, as `theorem <name>` or `theorem chk_<name>`,
 from the development's own modules, which carry primed copies of sibling statements because
 nothing was published when they were written. For each statement this merges the Solutions modules
-that check file imports (dependencies first, with merge.py), appends the check block renamed to
-`theorem solution` at top level under `open <namespace> in`, then runs rewire.py, which turns each
-copy of a published theorem into a call to it plus an import, prunes and compiles.
+that check file imports and the check file itself (dependencies first, with merge.py), removes every
+check block, appends this one renamed to `theorem solution` at the top level in a section that
+re-creates its scope (its `open`s and `variable`s, its namespace opened; all from Lean's parse,
+p2mlib.leanedit.scope_wrap), then runs rewire.py, which turns each copy of a published theorem
+into a call to it plus an import, prunes and compiles.
 
 Run `fetch_theorems.py` first, so every published name is in $P2M_WORKSPACE/Theorems; rewire only
 sees names there. Afterwards run edge_overlap.py on the output: a helper that re-derives a sibling
@@ -21,100 +23,108 @@ under another name is invisible to rewire.
 
 Generalised 2026-09-30 from the per-mission builders of CFP §5, §6 and §7.
 """
-import argparse, os, re, subprocess, sys
+import argparse, os, re, subprocess, sys, tempfile
 
 SK = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SK)
-from prune_solution import _workspace  # noqa: E402
+sys.path.insert(0, os.path.dirname(SK))  # p2mlib
+from merge import merge  # noqa: E402
+from p2mlib import leanedit, leaninfo  # noqa: E402
+from p2mlib.copies import imports_of  # noqa: E402
+from p2mlib.leantext import header_end  # noqa: E402
+from p2mlib.workspace import workspace as _workspace  # noqa: E402
 
 
 def deps(sol, mod, seen):
     """Append Solutions module `mod` ('Monod/AlgG') after the Solutions modules it imports."""
     text = open(os.path.join(sol, mod + '.lean'), encoding='utf-8').read()
-    for m in re.findall(r'^import Solutions\.([\w.]+)', text, re.M):
-        dep = m.replace('.', '/')
-        if dep not in seen:
-            deps(sol, dep, seen)
+    for m in imports_of(text[:header_end(text)]):
+        if m.startswith('Solutions.'):
+            dep = m[len('Solutions.'):].replace('.', '/')
+            if dep not in seen:
+                deps(sol, dep, seen)
     if mod not in seen:
         seen.append(mod)
     return seen
 
 
-def find_block(sol, checks, name):
-    """(check module, namespace, opens, block) for the check theorem proving `name`, else None."""
+def _last(n):
+    return n.rsplit('.', 1)[-1]
+
+
+def check_block(info, start, name):
+    """The command of the check module (the region from byte `start`) that proves `name`:
+    `chk_<name>` if there is one, else `<name>` -- full names compared by their last component,
+    so `isMarginal_EBad'` is never taken for `isMarginal_EBad`."""
+    region = [c for c in info.commands if c.start.byte >= start]
+    for want in ('chk_' + name, name):
+        for c in region:
+            if any(_last(n) == want for n in c.names):
+                return c
+    return None
+
+
+def solution_text(info, c, name):
+    """Check command c as `theorem solution`, at the top level, in a section that re-creates its
+    scope (leanedit.scope_wrap): the `open`s and `variable`s in force, and its namespace opened.
+    Its own `open X in` prefix comes with it as part of the command; one above another block does
+    not (copying `open` lines by regex gave `open X in in`, and swallowed the next block's prefix)."""
+    k = next(j for j, n in enumerate(c.names) if _last(n) in ('chk_' + name, name))
+    a, b = c.ids[k]
+    t = info.text_bytes
+    head = t[c.start.byte:a.byte].decode('utf-8')
+    head = re.sub(r'^\s*/--.*?-/\s*', '', head, flags=re.S)       # no docstring on `solution`
+    head = re.sub(r'\b(?:private|protected)\s+', '', head)         # nor a private one
+    head = re.sub(r'\blemma(\s+)$', r'theorem\1', head)
+    pre, post = leanedit.scope_wrap(info, c.index, top_level=True)
+    return pre + head + 'solution' + t[b.byte:c.end.byte].decode('utf-8') + '\n' + post
+
+
+def assemble(sol, checks, name, scratch):
+    """(status, merged text ending in `theorem solution`, namespace of the check block)."""
     for mod in checks:
         text = open(os.path.join(sol, mod + '.lean'), encoding='utf-8').read()
-        # the block ends at the next command; `open` included, or the `open X in` heading the
-        # next check block was swallowed and left dangling at the end of the solution (Moore, 2026-10-02)
-        m = re.search(r'^theorem (?:chk_)?%s(?![\w\']).*?(?=^(?:(?:theorem|lemma|end|namespace|section|open|def|'
-                      r'noncomputable|private|protected|example|variable|set_option|instance|abbrev|'
-                      r'attribute)\b|#|/-|@\[)|\Z)' % re.escape(name), text, re.M | re.S)
-        if not m:
+        if not re.search(r"(?<![\w'.])(?:chk_)?%s(?![\w'])" % re.escape(name), text):
             continue
-        # scan commands only: a docstring line beginning with "open" was once copied into a
-        # solution as an `open` command (F-amenability Cor 3, 2026-09-30)
-        before = re.sub(r'--[^\n]*', '', re.sub(r'/-.*?-/', '', text[:m.start()], flags=re.S))
-        # the namespaces still open at the block: push on `namespace`, pop on a matching `end`
-        stack = []
-        for kw, ns in re.findall(r'^(namespace|end)\s+([\w.]+)', before, re.M):
-            if kw == 'namespace':
-                stack.append(ns)
-            elif stack and stack[-1] == ns:
-                stack.pop()
-        # `open X in` scopes only the next command: keep it (without its `in`) when it sits
-        # directly above the block, drop it otherwise. Copying it verbatim gave `open X in in`
-        # and broke 20 of Moore's 31 solutions (2026-10-02).
-        opens = []
-        lines = [l for l in before.rstrip().split('\n')]
-        tail = len(lines)
-        while tail and re.match(r'^open .* in\s*$', lines[tail - 1]):
-            tail -= 1
-        for i, l in enumerate(lines):
-            mo = re.match(r'^open ([^\n]+?)(\s+in)?\s*$', l)
-            if not mo:
-                continue
-            if mo.group(2) and i < tail:
-                continue
-            opens.append(mo.group(1))
-        block = re.sub(r'^theorem (?:chk_)?%s(?![\w\'])' % re.escape(name), 'theorem solution', m.group(0).rstrip(),
-                       count=1, flags=re.M)
-        return mod, '.'.join(stack), opens, block
-    return None
+        seen = []
+        for m in imports_of(text[:header_end(text)]):
+            if m.startswith('Solutions.'):
+                deps(sol, m[len('Solutions.'):].replace('.', '/'), seen)
+        # the check file itself is merged whole: its own helpers (the Moore weak-reading
+        # counterexamples kept `wAct`, `mu`, ... there, and a solution once named undefined helpers)
+        files = [os.path.join(sol, s + '.lean') for s in seen] + [os.path.join(sol, mod + '.lean')]
+        try:
+            merged, starts = merge(files, scratch=scratch)
+        except SystemExit as e:
+            return 'MERGE-FAIL: %s' % e, '', ''
+        fd, tmp = tempfile.mkstemp(suffix='.lean', prefix='.build_', dir=scratch)
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(merged)
+        try:
+            info = leaninfo.run(tmp, parse_only=True, use_cache=False)
+        finally:
+            os.remove(tmp)
+        c = check_block(info, starts[-1], name)
+        if c is None:
+            continue
+        # every check block goes: each proves some statement, and only this one is the solution
+        drop = [x.index for x in info.commands if x.start.byte >= starts[-1]
+                and any(_last(n).startswith('chk_') or _last(n) == name for n in x.names)]
+        body = leanedit.remove_commands(info, drop).rstrip('\n') + '\n'
+        return 'OK', body + '\n' + solution_text(info, c, name), c.namespace
+    return 'NO-CHECK', '', ''
 
 
 def build(mdir, checks, name, out):
     ws = _workspace()
     sol = os.path.join(ws, 'Solutions')
-    found = find_block(sol, checks, name)
-    if not found:
-        return name, 'NO-CHECK', []
-    mod, ns, opens, block = found
-    seen = []
-    text = open(os.path.join(sol, mod + '.lean'), encoding='utf-8').read()
-    for m in re.findall(r'^import Solutions\.([\w.]+)', text, re.M):
-        deps(sol, m.replace('.', '/'), seen)
-    files = [os.path.join(sol, s + '.lean') for s in seen]
-    # the check file's own helpers (definitions and lemmas above its check blocks) are merged too,
-    # minus every check block: the Moore weak-reading counterexamples kept `wAct`, `mu`, ... in the
-    # check file itself, and the solution came out naming undefined helpers (2026-10-01)
-    from merge import blocks
-    last = lambda n: (n or '').split('.')[-1]
-    helpers = '\n'.join(t for n, t in blocks(text) if not (n and (last(n).startswith('chk_') or last(n) == name)))
-    if re.search(r'^(?:@\[[^\n]*\]\s*)?(?:private |protected )?(?:noncomputable )?(?:theorem|lemma|def|abbrev|instance|structure|inductive)\b',
-                 helpers, re.M):
-        hf = os.path.join(out, '.checkhelpers_%s.lean' % name)
-        open(hf, 'w', encoding='utf-8').write(helpers)
-        files.append(hf)
-    merged = os.path.join(out, '.merged_%s.lean' % name)
-    p = subprocess.run([sys.executable, os.path.join(SK, 'merge.py'), merged] + files, capture_output=True, text=True)
-    if p.returncode:
-        open(os.path.join(out, 'Sol_%s.log' % name), 'w').write(p.stdout + p.stderr)
-        return name, 'MERGE-FAIL', []
-    # the check file's own non-Solutions imports (Definitions, Theorems, Mathlib) go first
-    extra = [l for l in re.findall(r'^(import (?!Solutions\.)\S+)$', text, re.M)]
-    body = open(merged, encoding='utf-8').read()
-    have = set(re.findall(r'^(import \S+)$', body, re.M))
-    body = ''.join(l + '\n' for l in extra if l not in have) + body
+    st, body, ns = assemble(sol, checks, name, out)
+    if st != 'OK':
+        if st.startswith('MERGE-FAIL'):
+            open(os.path.join(out, 'Sol_%s.log' % name), 'w').write(st)
+            st = 'MERGE-FAIL'
+        return name, st, []
+    block = body[body.rindex('theorem solution'):]
     # A check block that names a published sibling statement directly (`Gpp_eq_G_top_and_Hpp_eq_H_top.2`)
     # needs its import, and the import is what draws the graph edge (Monod 2026-09-30).
     thm = os.path.join(ws, 'Theorems')
@@ -129,17 +139,13 @@ def build(mdir, checks, name, out):
                 if imp not in body:
                     body = imp + '\n' + body
                 break
-    prefix = ''.join('open %s in\n' % o for o in ([ns] if ns else []) + opens)
-    body += '\n%s%s\n' % (prefix, block)
+    merged = os.path.join(out, '.merged_%s.lean' % name)
     open(merged, 'w', encoding='utf-8').write(body)
     dst = os.path.join(out, 'Sol_%s.lean' % name)
     p = subprocess.run([sys.executable, os.path.join(SK, 'rewire.py'), merged, '--target', name, '-o', dst],
                        capture_output=True, text=True, cwd=ws)
     open(os.path.join(out, 'Sol_%s.log' % name), 'w').write(p.stdout + p.stderr)
     os.remove(merged)
-    for f in files:
-        if os.path.basename(f).startswith('.checkhelpers_'):
-            os.remove(f)
     imps = re.findall(r'^import Theorems\.(\S+)', open(dst).read(), re.M) if os.path.exists(dst) else []
     # rewire exits 1 when it left a copy it could not prove from the published theorem (a genuinely
     # different statement sharing a name); the file itself still compiles: report OK*, read the log

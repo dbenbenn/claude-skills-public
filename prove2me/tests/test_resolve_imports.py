@@ -40,20 +40,17 @@ def test_variables_before_with_continuation(src):
     assert RI.variables_before(src, 'foo') == ['variable {d : ℕ}\n  (h : d = d)']
 
 
-@pytest.mark.xfail(strict=True, reason="extract() matches only lines starting `theorem`/`lemma`, so "
-                   "`@[simp] theorem` is not found (Phase 4: LeanInfo declaration ranges include attributes)")
 def test_extract_finds_inline_attribute_declaration(tmp_path):
     p = tmp_path / 'A.lean'
     p.write_text('@[simp] theorem s (n : ℕ) : n + 0 = n := rfl\n')
     assert RI.extract(str(p), 's') is not None
 
 
-@pytest.mark.xfail(strict=True, reason="an attribute line above the declaration is not carried into the "
-                   "inlined copy, so an inlined @[simp] lemma silently leaves the simp set")
 def test_extract_keeps_attribute_line(tmp_path):
     p = tmp_path / 'A.lean'
-    p.write_text('@[simp]\ntheorem s (n : ℕ) : n + 0 = n := rfl\n')
-    assert RI.extract(str(p), 's').startswith('@[simp]')
+    p.write_text('/-- doc -/\n@[simp]\ntheorem s (n : ℕ) : n + 0 = n := rfl\n')
+    assert RI.extract(str(p), 's').startswith('/-- doc -/\n@[simp]\ntheorem s')
+    assert RI.find_src(str(tmp_path), 's') == str(p)
 
 
 @pytest.mark.parametrize('theorem,want', [
