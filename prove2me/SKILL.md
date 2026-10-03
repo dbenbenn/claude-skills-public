@@ -56,7 +56,9 @@ the measurements behind the audit rules in `references/audit-evidence.md`.
    `IMPORTS` lines; re-run whenever the Lean changes. **Then a source-side audit on every
    statement** with `scripts/source_audit.py`: it lists what the source sentence claims before it
    sees the read-back, and a verdict that is not `faithful` blocks the hand-over until each gap
-   has a written disposition. **The definitions bundle gets a source audit too**: give it
+   has a written disposition. **The definitions bundle gets a source audit too** (it also checks each
+   definition in every role a statement uses it — assumed or concluded — and that the bundle note
+   quotes each defining sentence with its subject; references/audit-evidence.md): give it
    `source_pages` in `mission.py` and run `source_audit.py stage MISSION_DIR Def_<name>`. Phase 1
    inventories every object the source defines on those pages (with the implicit claims a
    definition carries, "the subgroup … given by" asserting a subgroup); phase 2 marks each one

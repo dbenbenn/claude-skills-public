@@ -205,3 +205,18 @@ to a bookstore page in the same description turned out to 403.
 The related trap: page ranges. Secondary sources gave Olshanskii's ICM paper as pp. 415–423,
 the source's own printed bibliography as 415–424. Where the two disagree and the source is in
 hand, use the source and say in the audit that you did.
+
+## Bundle audits: a definition in its conclusion role (CFW, 2026-10-03)
+
+CFW's `IsHyperfinite` dropped the paper's presupposition "the discrete measured equivalence
+relation R" (Definition 1(2)). The bundle audit rated it EQUIVALENT "within the source's setting",
+because every statement that *assumed* hyperfiniteness also assumed "discrete measured";
+Corollaries 12–13 *concluded* it of tail relations that need not be, and two statement auditors
+handed the point to "the definitions audit". The bundle note's quote had also dropped the subject.
+The brief now asks phase 1 for the full defining sentence with its subject and the subject's
+presuppositions, and phase 2 for a role check (hypothesis vs conclusion) and a QUOTES check
+against the bundle note (`note.md`). Regression: run blind on the pre-change bundle, with neutral
+examples in the brief, the new audit flagged hyperfinite as DIFFERENT in Corollaries 12–13's
+conclusion role with its own near-miss (fold [2,3] onto [0,1], Lebesgue on [0,1] only) and the
+subject-less quote; it also found five more truncated quotes and five unquoted definitions
+(cfw-mission readbacks/regression/).
