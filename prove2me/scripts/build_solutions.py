@@ -107,6 +107,17 @@ def assemble(sol, checks, name, scratch):
         c = check_block(info, starts[-1], name)
         if c is None:
             continue
+        # check blocks are found by name and all stripped, so a `chk_` name must mean one block: an
+        # `alias chk_x := Dev.chk_x` reports no names, survived the stripping while its target did
+        # not, and every solution failed with "Unknown constant" (CFW 2026-10-03)
+        region = info.text_bytes[starts[-1]:].decode('utf-8', 'replace')
+        chk = [_last(n) for x in info.commands if x.start.byte >= starts[-1] for n in x.names
+               if _last(n).startswith('chk_')]
+        bad = sorted({n for n in chk if chk.count(n) > 1} |
+                     set(re.findall(r"(?m)^\s*(?:(?:private|protected)\s+)?alias\s+(?:\S+\.)?(chk_[\w']+)", region)))
+        if bad:
+            return ('CHECK-AMBIGUOUS: %s is an alias or names more than one block; rename the '
+                    'development\'s own copy so only the final check block starts with chk_' % ', '.join(bad)), '', ''
         # every check block goes: each proves some statement, and only this one is the solution;
         # so does every diagnostic command (`#print axioms LodhaMoore.chk_…` named the renamed
         # block and the solution stopped compiling, Lodha-Moore 2026-10-02)
@@ -123,9 +134,10 @@ def build(mdir, checks, name, out):
     sol = os.path.join(ws, 'Solutions')
     st, body, ns = assemble(sol, checks, name, out)
     if st != 'OK':
-        if st.startswith('MERGE-FAIL'):
-            open(os.path.join(out, 'Sol_%s.log' % name), 'w').write(st)
-            st = 'MERGE-FAIL'
+        for kind in ('MERGE-FAIL', 'CHECK-AMBIGUOUS'):
+            if st.startswith(kind):
+                open(os.path.join(out, 'Sol_%s.log' % name), 'w').write(st)
+                st = kind
         return name, st, []
     block = body[body.rindex('theorem solution'):]
     # A check block that names a published sibling statement directly (`Gpp_eq_G_top_and_Hpp_eq_H_top.2`)

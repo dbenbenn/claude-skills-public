@@ -104,3 +104,35 @@ def test_diagnostic_commands_are_dropped(tmp_path):
     # `#print axioms A.chk_foo` named the renamed block: the solution did not compile (LM 2026-10-02)
     text, _, _ = build(tmp_path, 'foo')
     assert '#print' not in text
+
+
+AMBIG = '''import Solutions.X.Statements
+
+namespace A.P5
+
+theorem chk_baz : True := trivial
+
+end A.P5
+
+namespace A
+
+alias chk_baz := A.P5.chk_baz
+
+theorem chk_foo : True := trivial
+
+end A
+'''
+
+
+@pytest.mark.lean
+@pytest.mark.parametrize('name', ['foo', 'baz'])
+def test_chk_alias_or_duplicate_is_refused(tmp_path, name):
+    # CFW 2026-10-03: a development's own `P5.chk_baz` was stripped as a check block, while the
+    # `alias chk_baz := P5.chk_baz` survived (an alias reports no names), so every solution failed
+    # with "Unknown constant"; refuse with a reason instead of emitting a broken file
+    sol = tmp_path / 'Solutions'
+    (sol / 'X').mkdir(parents=True)
+    (sol / 'X' / 'Statements.lean').write_text(STATEMENTS)
+    (sol / 'Chk.lean').write_text(AMBIG)
+    st, _, _ = B.assemble(str(sol), ['Chk'], name, str(tmp_path))
+    assert st.startswith('CHECK-AMBIGUOUS') and 'chk_baz' in st, st
