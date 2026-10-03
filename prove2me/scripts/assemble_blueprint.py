@@ -46,6 +46,15 @@ def imports(text):
     return re.findall(r'^import\s+(\S+)', strip(text[:header_end(text)]), re.M)
 
 
+def blueprint_modules(bpf, part_texts, ws):
+    """The module names under which the Parts import the Blueprint: its own module, from its path
+    under the workspace (CFW's blueprint is Solutions/CFW/Route.lean), and, as before, any
+    imported module named *Blueprint."""
+    rel = os.path.relpath(os.path.abspath(bpf), os.path.abspath(ws))
+    own = set() if rel.startswith('..') else {os.path.splitext(rel)[0].replace(os.sep, '.')}
+    return own | {m for t in part_texts for m in imports(t) if m.endswith('Blueprint')}
+
+
 def main():
     if len(sys.argv) < 4:
         sys.exit(__doc__)
@@ -53,7 +62,8 @@ def main():
     files = [bpf] + parts
     texts = [open(f, encoding='utf-8').read() for f in files]
     owners = [None] + [os.path.splitext(os.path.basename(p))[0] for p in parts]
-    bp_mods = {m for t in texts[1:] for m in imports(t) if m.endswith('Blueprint')}
+    from p2mlib.workspace import workspace
+    bp_mods = blueprint_modules(bpf, texts[1:], workspace())
     hdr = []
     for t in texts:
         hdr += [m for m in imports(t) if m not in bp_mods and m not in hdr]

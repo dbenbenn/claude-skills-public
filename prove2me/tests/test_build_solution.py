@@ -77,3 +77,13 @@ def test_dropped_theorems_without_a_workspace_statement_are_listed_for_fetching(
     (tmp_path / 'Theorems').mkdir()
     (tmp_path / 'Theorems' / 'Thm_LN_have.lean').write_text('')
     assert BS.missing_statements(str(tmp_path), ['LN.have', 'LN.need', 'short']) == ['LN.need']
+
+
+def test_assembler_recognizes_the_blueprint_by_its_path(tmp_path):
+    # CFW (2026-10-03): the route blueprint is Solutions/CFW/Route.lean; only modules named
+    # *Blueprint were recognized, so its import would have been kept beside its inlined text
+    import assemble_blueprint as AB
+    ws = tmp_path
+    bp = ws / 'Solutions' / 'CFW' / 'Route.lean'
+    parts = ['import Solutions.CFW.Route\nimport Mathlib\n', 'import Solutions.LN.Blueprint\n']
+    assert AB.blueprint_modules(str(bp), parts, str(ws)) == {'Solutions.CFW.Route', 'Solutions.LN.Blueprint'}
