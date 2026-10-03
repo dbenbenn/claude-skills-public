@@ -702,7 +702,12 @@ item. Raw Python strings let a stray `\'` reach a live Draft. Older missions kee
 The same holds for a p2m-standalone folder (`publish_standalone.py`), which now refuses to publish
 a new item whose prose is in `mission.py`: the Lusin–Novikov package copied the older standalone
 template, kept its prose in a Python `PROSE` dict, and published `\"Borel\"` with the backslash in
-five statements (2026-10-03). Every mission
+five statements (2026-10-03). Write the `.md` files themselves (Write/Edit; when the background
+guard refuses a direct write, Write into the job's tmp directory and `cp` the file in) and pass
+paths to the scripts. Generating them from a bash heredoc or a Python string brings the string
+layer back: an unquoted heredoc expanded `$[0, \infty]$` as arithmetic in three Garrido prose
+files, and a Python literal is one habitual `\"` away from the Borel mistake (dbenbenn,
+2026-10-03: "you have to pass file names around, not heredocs"). Every mission
 through Garrido III copied its own uploader and verifier instead, and most of those verifiers
 only checked that a read-back was non-empty. The upload creates the proposal once, posts
 definitions with their read-backs, reference items, draft theorems, `main_item_id`,
