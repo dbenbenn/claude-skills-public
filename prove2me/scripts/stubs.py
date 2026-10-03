@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Install a mission's draft statements in the workspace as the modules the platform will publish.
 
-usage: stubs.py MISSION_DIR [--check] [--no-build]
+usage: stubs.py MISSION_DIR [--check] [--adopt] [--no-build]
 
 Each statement of mission.py becomes Theorems/Thm_<NS>_<name>.lean in the workspace: its preamble
 and formal_statement with proof `sorry`, byte for byte the module the platform publishes at Submit
@@ -42,18 +42,36 @@ def wanted(mdir):
     return out
 
 
-def sync(mdir, ws=None, check=False):
-    """(problems, written modules). Writes and records the stubs unless `check`."""
+def unlisted(mdir, ws=None):
+    """The mission's statements whose workspace file matches the draft but is not listed as one:
+    published, or copied in by hand (Erschler-Zheng, 2026-10-04: 38 such stubs were taken for
+    published statements). Only the human can tell which; `sync(adopt=True)` lists them."""
+    ws = ws or workspace()
+    want, dr = wanted(os.path.abspath(mdir)), drafts(ws)
+    out = []
+    for mod, (rel, text) in sorted(want.items()):
+        p = os.path.join(ws, rel)
+        if mod not in dr and os.path.exists(p) and \
+                open(p, encoding='utf-8').read().rstrip() == text.rstrip():
+            out.append(mod)
+    return out
+
+
+def sync(mdir, ws=None, check=False, adopt=False):
+    """(problems, written modules). Writes and records the stubs unless `check`; with `adopt`, also
+    lists as drafts the identical files `unlisted` reports (copied by hand, not published)."""
     ws = ws or workspace()
     mdir = os.path.abspath(mdir)
     want, dr = wanted(mdir), drafts(ws)
-    problems, written, removed = [], [], []
+    problems, written, removed, adopted = [], [], [], []
     for mod, (rel, text) in sorted(want.items()):
         p = os.path.join(ws, rel)
         cur = open(p, encoding='utf-8').read() if os.path.exists(p) else None
         if cur is not None and mod not in dr:
             if cur.rstrip() != text.rstrip():
                 problems.append('PUBLISHED-DIFFERS %s: the platform has another statement under this name' % mod)
+            elif adopt and not check:
+                adopted.append(mod)
             continue
         if cur is not None and dr[mod] != mdir:
             problems.append('OTHER-DRAFT %s is a stub of %s' % (mod, dr[mod]))
@@ -77,8 +95,8 @@ def sync(mdir, ws=None, check=False):
         del dr[mod]
         removed.append(mod)
         print('   removed the stub of %s (no longer a statement)' % mod)
-    if not check and (written or removed):
-        update_drafts(add={m: mdir for m in written}, remove=removed, ws=ws)
+    if not check and (written or removed or adopted):
+        update_drafts(add={m: mdir for m in written + adopted}, remove=removed, ws=ws)
     return problems, written
 
 
@@ -87,9 +105,15 @@ def main():
     if len(args) != 1:
         sys.exit(__doc__)
     check, ws = '--check' in sys.argv, workspace()
-    problems, written = sync(args[0], ws, check)
+    loose = unlisted(args[0], ws)
+    problems, written = sync(args[0], ws, check, adopt='--adopt' in sys.argv)
     for p in problems:
         print('   ' + p)
+    if loose:
+        print('   %d statement(s) match the draft but are not listed as drafts (published, or copied by '
+              'hand)%s: %s' % (len(loose), '; adopted' if '--adopt' in sys.argv and not check
+                                else '; if not published, rerun with --adopt', ' '.join(loose[:6])
+                                + (' ...' if len(loose) > 6 else '')))
     print('%d stub(s) written; %d problem(s)' % (len(written), len(problems)))
     if written and '--no-build' not in sys.argv:
         r = subprocess.run(['lake', 'build'] + written, cwd=ws, capture_output=True, text=True)

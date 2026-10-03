@@ -114,3 +114,18 @@ def test_verify_resolves_statement_names_in_the_statements_layout(env):
     its['goal']['natural_language_statement'] += ' Compare `Mini.t1`.'
     bad = draft.dead_lean_refs(M, mdir, its, mls, 'This mission formalizes a paper.', lambda *a, **k: {})
     assert not [b for b in bad if 'Mini.t1' in b[1]], bad
+
+
+
+def test_a_stub_copied_by_hand_is_listed_and_adopted_on_request(env):
+    # Erschler-Zheng (2026-10-04): implementers copied each statement into Theorems/ by hand, so the
+    # files matched but were never listed as drafts; scripts then took 38 draft stubs for published
+    # statements. Such a file looks exactly like a published one, so it is not a problem: `unlisted`
+    # names it, and --adopt lists it as this mission's draft.
+    mdir, ws = env
+    stubs.sync(mdir, ws)
+    W.update_drafts(remove=['Theorems.Thm_Mini_t1'], ws=ws)            # the hand-copied state
+    assert stubs.sync(mdir, ws) == ([], [])
+    assert stubs.unlisted(mdir, ws) == ['Theorems.Thm_Mini_t1']
+    assert stubs.sync(mdir, ws, adopt=True) == ([], [])
+    assert W.drafts(ws)['Theorems.Thm_Mini_t1'] == mdir and stubs.unlisted(mdir, ws) == []
