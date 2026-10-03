@@ -149,3 +149,29 @@ def header_end(text):
             i = m.end()
     return i
 
+
+
+_TACTIC_MACRO = re.compile(r'^[ \t]*(?:(?:local|scoped)[ \t]+)?macro[ \t]+"([A-Za-z_][\w]*)"[ \t]*:[ \t]*tactic[ \t]*=>\s*`\(tactic\|', re.M)
+
+
+def inline_tactic_macros(text):
+    """(text, [names]): every `macro "name" : tactic => `(tactic| body)` removed and each use of
+    `name` replaced by `(body)`. The verifier rejects all macro registration (CFP §6's `grp`,
+    Lodha-Moore's `gp`, both merged in from development modules); a solution must inline them."""
+    names = []
+    while True:
+        m = _TACTIC_MACRO.search(text)
+        if not m:
+            return text, names
+        name, i, depth = m.group(1), m.end(), 1
+        while i < len(text) and depth:
+            depth += {'(': 1, ')': -1}.get(text[i], 0)
+            i += 1
+        body = ' '.join(text[m.end():i - 1].split())
+        end = text.find('\n', i)
+        end = len(text) if end < 0 else end + 1
+        while text[end:end + 1] == '\n' and text[m.start() - 2:m.start()] == '\n\n':
+            end += 1                                   # do not leave two blank lines behind
+        text = text[:m.start()] + text[end:]
+        text = re.sub(r"(?<![\w.'])%s(?![\w'!?])" % re.escape(name), lambda _: '(%s)' % body, text)
+        names.append(name)

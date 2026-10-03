@@ -97,3 +97,18 @@ def test_stage_warns_when_the_bundle_has_no_source_audit_yet(mdir, capsys):
     (mdir / 'readbacks' / 'Def_Mini.coverage.md').write_text('VERDICT: faithful\n')
     SRC.stage(str(mdir), 'goal')
     assert 'no source audit yet' not in capsys.readouterr().out
+
+
+def test_bundle_phase2_gets_the_bundle_note(mdir):
+    # CFW 2026-10-03: the note quoted Definition 1(2) without its subject ("the discrete measured
+    # equivalence relation R"), hiding a presupposition; phase 2 now checks the note's quotes
+    s = (mdir / 'mission.py').read_text()
+    (mdir / 'mission.py').write_text(s.replace("result='Def 1')", "result='Def 1', source_pages='1')"))
+    SRC.stage(str(mdir), 'Def_Mini')
+    d = os.path.join(SRC.ROOT, SRC.slug(str(mdir), 'Def_Mini'))
+    open(os.path.join(d, 'claims.md'), 'w').write('- D1. k.\nEND OF CLAIMS\n')
+    os.makedirs(mdir / 'readbacks', exist_ok=True)
+    (mdir / 'readbacks' / 'Def_Mini.readback.md').write_text('k is 1.\n')
+    SRC.reveal(str(mdir), 'Def_Mini')
+    assert 'Defines $k$.' in open(os.path.join(d, 'note.md')).read()
+    assert os.path.exists(os.path.join(d, 'context.md'))

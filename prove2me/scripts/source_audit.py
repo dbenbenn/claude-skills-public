@@ -162,9 +162,10 @@ def reveal(mdir, name):
     shutil.copy(os.path.join(mdir, 'readbacks', name + '.readback.md'), os.path.join(d, 'readback.md'))
     if name.startswith('Def_'):
         write_bundle_context(mdir, name, os.path.join(d, 'context.md'))
-        print('Continue with PHASE 2 of brief.md: readback.md and context.md are now in your directory.\n'
-              'Compare them with claims.md, write coverage.md exactly as Phase 2 specifies, and reply in at\n'
-              'most five lines. Do not change claims.md.')
+        write_bundle_note(mdir, name, os.path.join(d, 'note.md'))
+        print('Continue with PHASE 2 of brief.md: readback.md, context.md and note.md are now in your\n'
+              'directory. Compare them with claims.md, write coverage.md exactly as Phase 2 specifies, and\n'
+              'reply in at most five lines. Do not change claims.md.')
         return
     print('Continue with PHASE 2 of brief.md: readback.md is now in your directory. Compare it with\n'
           'claims.md, write coverage.md (with near-misses and the VERDICT line), and reply in at\n'
@@ -200,13 +201,30 @@ def rephase2(mdir, name):
     shutil.copy(claims, os.path.join(d, 'claims.md'))
     with contextlib.redirect_stdout(io.StringIO()):
         reveal(mdir, name)
-    extra = ' and context.md' if name.startswith('Def_') else ''
+    extra = ', context.md and note.md' if name.startswith('Def_') else ''
     print('Work only inside %s. Everything below is relative to it.\n\n'
           'Read brief.md. PHASE 1 is already done: claims.md in this directory is the complete claims\n'
           'list, written from the source alone; do not change it. Do PHASE 2 only: readback.md%s %s now\n'
           'in your directory. Compare with claims.md, write coverage.md (with near-misses and the VERDICT\n'
           'line) exactly as Phase 2 specifies, and reply in at most five lines. Do not read or write\n'
           'anything outside this directory.' % (d, extra, 'are' if extra else 'is'))
+
+
+# The bundle brief's role check and QUOTES check (2026-10-03, dbenbenn): CFW's IsHyperfinite was
+# judged EQUIVALENT "within the source's setting" because every statement that ASSUMED it also
+# assumed "discrete measured"; Corollaries 12-13 CONCLUDED it of tail relations that need not be,
+# and the bundle note had quoted Definition 1(2) without its subject "the discrete measured
+# equivalence relation R". The brief's examples are deliberately not the CFW case, so that the
+# regression run on the old CFW bundle tests the check rather than recognizes the answer.
+def write_bundle_note(mdir, name, dst):
+    """note.md for phase 2 of a bundle audit: the bundle's own note (its natural-language statement),
+    which quotes the source's defining sentence for each definition. CFW (2026-10-03) quoted
+    Definition 1(2) as "up to a null set, a countable increasing union of type I equivalence
+    relations", without its subject "the discrete measured equivalence relation R", and the
+    presupposition it carried was lost from IsHyperfinite; phase 2 checks the quotes."""
+    M = draft.load(mdir)
+    D = next((D for D in getattr(M, 'DEFINITIONS', []) if 'Def_' + D['name'] == name), {})
+    open(dst, 'w', encoding='utf-8').write('# The bundle note\n\n' + (D.get('nls') or '(no note)') + '\n')
 
 
 def write_bundle_context(mdir, name, dst):

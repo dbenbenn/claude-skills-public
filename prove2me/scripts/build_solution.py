@@ -165,6 +165,11 @@ def main():
     subprocess.run([sys.executable, os.path.join(HERE, 'merge.py'), merged] + wrapped, check=True)
     text = '\n'.join(l for l in open(merged, encoding='utf-8').read().split('\n')
                      if not l.startswith('import '))
+    # the verifier rejects macro registration; a development's tactic macros are inlined
+    from p2mlib.leantext import inline_tactic_macros
+    text, macros = inline_tactic_macros(text)
+    for n in macros:
+        print('  inlined tactic macro', n)
 
     # drop the declarations to be imported instead
     if a.drop:

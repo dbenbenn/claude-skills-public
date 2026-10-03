@@ -306,3 +306,18 @@ def test_unused_definition_imports_are_dropped_unless_their_namespace_is_mention
     # a dropped bundle's own imports are not "restored": only dropped theorem imports bring bundles back
     imports_of = {'Definitions.Def_Monod_PiecewiseProjective': ['Mathlib', 'Definitions.Def_Garrido']}.get
     assert prune.bundles_to_restore(header, ['Definitions.Def_Monod_PiecewiseProjective'], imports_of) == []
+
+
+def test_inline_tactic_macros_expands_uses_and_drops_the_definition():
+    # Lodha-Moore (2026-10-03): four solutions refused for a `macro "gp" : tactic` merged in from a
+    # development module (CFP §6 had the same with `grp`); the verifier rejects any macro
+    from p2mlib import leantext
+    text = ('import Mathlib\n\nmacro "gp" : tactic =>\n'
+            '  `(tactic| first | (simp only [pow_two]; done) | (simp only [pow_two]; group) | group)\n\n'
+            'theorem a (x : Nat) : True := by\n  gp\n\n'
+            "theorem b (gp' : Nat) : True := by\n  have := gp'\n  trivial\n")
+    out, names = leantext.inline_tactic_macros(text)
+    assert names == ['gp'] and 'macro' not in out
+    assert '  (first | (simp only [pow_two]; done) | (simp only [pow_two]; group) | group)\n' in out
+    assert "have := gp'" in out
+    assert leantext.inline_tactic_macros(out) == (out, [])
