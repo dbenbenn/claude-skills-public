@@ -1346,6 +1346,7 @@ script prints its usage when run with no arguments.
 | `edge_overlap.py` | Folded into edge_audit.py (Phase 4.4): its SHARED section is this check, judged by Lean. |
 | `fetch_theorems.py` | Write a mission's published statements into the workspace, so solutions can import them. |
 | `gen_index.py` | Regenerate the scripts index in SKILL.md from the scripts' own docstrings. |
+| `live_milestones.py` | Add milestones to a live mission, or edit one, from .md files; a dry run unless --go. |
 | `merge.py` | Concatenate a mission's shared modules into one self-contained prove2.me solution file. |
 | `p2m.py` | The prove2.me API client -- now p2mlib.api; this module re-exports it for the scripts. |
 | `patch_notes.py` | PATCH the natural-language statements of published items from reviewed Markdown files. |
