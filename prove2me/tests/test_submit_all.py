@@ -71,3 +71,30 @@ def test_a_draft_stub_is_not_published(tmp_path):
         (tmp_path / 'Theorems' / ('Thm_N_%s.lean' % n)).write_text('theorem N.%s : True := by sorry\n' % n)
     set_drafts({'Theorems.Thm_N_b': '/m'}, str(tmp_path))
     assert S.published_names(['a', 'b', 'c'], 'N', str(tmp_path)) == ['a']
+
+
+def test_waits_while_an_import_is_unpublished(mission, monkeypatch, tmp_path):
+    # CFW 2026-10-03: proofs import sibling stubs; a solution importing a statement the publish
+    # queue has not reached was REFUSED by submit_solution, and REFUSED is recorded as final
+    from p2mlib.workspace import set_drafts
+    ws = tmp_path / 'ws'
+    (ws / 'Theorems' / 'Thm_Other_x.lean').write_text('theorem Other.x : True := by sorry\n')
+    set_drafts({'Theorems.Thm_Other_x': '/m'}, str(ws))
+    (mission / 'solutions' / 'Sol_b.lean').write_text('import Theorems.Thm_Other_x\ntheorem solution : True := trivial\n')
+    rounds = [0]
+
+    def fake_run(cmd, *a, **k):
+        if any('fetch_theorems.py' in str(c) for c in cmd):
+            rounds[0] += 1
+            if rounds[0] == 2:          # the queue publishes Other.x: fetch retires the stub
+                set_drafts({}, str(ws))
+        return types.SimpleNamespace(returncode=0, stdout='', stderr='')
+    monkeypatch.setattr(S.subprocess, 'run', fake_run)
+    when = {}
+
+    def submit(ns, n, f):
+        when[n] = rounds[0]
+        return 'ACCEPTED s-' + n
+    code, done = run(mission, monkeypatch, submit)
+    assert code == 0 and all(v.startswith('ACCEPTED') for v in done.values())
+    assert when['a'] == 1 and when['c'] == 1 and when['b'] == 2

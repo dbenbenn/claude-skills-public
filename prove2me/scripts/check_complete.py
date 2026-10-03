@@ -41,10 +41,8 @@ def proofs(mdir, checks, ws):
         if info.errors:
             sys.exit('%s does not compile: %s' % (mod, info.errors[0].text.splitlines()[0][:200]))
         for d in info.decls:
-            if not d.short.startswith('chk_'):
-                continue
-            target = d.name.rsplit('.', 1)[0] + '.' + d.short[4:] if '.' in d.name else d.short[4:]
-            if target not in ms:
+            target = target_of(d.name, ms)
+            if target is None:
                 continue
             problem = None
             if not d.statement_compared:
@@ -55,6 +53,21 @@ def proofs(mdir, checks, ws):
                 problem = 'uses sorry other than through imported statements'
             out.setdefault(target, []).append((mod, d.name, problem is None, list(d.rests_on), problem))
     return M, ms, out
+
+
+def target_of(name, ms):
+    """The milestone a check block `<ns>.chk_<short>` proves: `<ns>.<short>` when that is a
+    milestone, else the one milestone named `<short>` (a Blueprint keeps its checks in its own
+    namespace, CFW's in CFWPlan.Main), else None (not a check, or ambiguous)."""
+    short = name.rsplit('.', 1)[-1]
+    if not short.startswith('chk_'):
+        return None
+    base = short[4:]
+    full = name.rsplit('.', 1)[0] + '.' + base if '.' in name else base
+    if full in ms:
+        return full
+    same = [m for m in ms if m.rsplit('.', 1)[-1] == base]
+    return same[0] if len(same) == 1 else None
 
 
 def complete(ms, good):

@@ -774,8 +774,11 @@ together all had verdicts within 15 minutes, against about 13 minutes per verdic
 **Build each solution with `scripts/build_solution.py`** (merge the development module and its
 closure, drop the OTHER milestones so they are imported once Proved, generate the `solution`
 wrapper from the published statement, then `resolve_imports.py` and `prune_solution.py --check`),
-and submit with `submit_solution.py`. Submit leaves first: a proof can import a milestone only
-after it is Proved, and the import is what puts the dependency on the graph. Check the goal's
+and submit with `submit_solution.py`. A proof can import any statement the platform has
+published, Open or Proved, from a live mission or one still in review; the import is what puts the
+dependency on the graph, and while an import is unproved the verdict is `SKETCH_ACCEPTED`, promoted
+when the import is proved. What it cannot import is a statement the publish queue has not reached
+(a draft stub): `submit_all.py` holds such a solution back, unrecorded, until the import publishes. Check the goal's
 imports before submitting: on QFS the goal's development proof repeated Lemma A.1's argument
 rather than calling it, so the graph would have missed goal ← Lemma A.1 until the proof was
 rewritten to use the milestone. Deprecated theorems are copied in, never imported (all four tools
@@ -831,6 +834,14 @@ Most parts took 5 to 20 minutes.
 What made it work:
 - **Write the Blueprint so the main theorem compiles from its stubs.** Check every stub for truth
   before dispatch: a false stub wastes a prover.
+- **In a mission, a step that is itself a milestone is not a Route lemma.** Import its statement
+  stub (`stubs.py`) and call it by its published name, in either direction of an iff; only that
+  milestone's own `chk_` proves it from the route. CFW's Blueprint (2026-10-03) stated Theorem 10,
+  Lemmas 3–9, Dye and Zimmer as Route lemmas (`theorem10`, `lemma3`, …) and every other proof
+  called those, so all its edges had to be recovered by rewire after the fact, which matched
+  `theorem10` to an unrelated published `BlockCycleRotation.theorem10` and could not see the goal's
+  use of one direction of Theorem 10. Rewired onto the stubs, `check_complete.py` reports each
+  milestone's real dependencies, and `build_solutions.py` has nothing left to guess.
 - **Brief the mathematics per part, then say "any correct route".** The provers repeatedly found
   better routes than the brief's: Mathlib's `FreeGroup.injective_lift_of_ping_pong`; transience via
   a Hardy inequality on a binary tree in the Schreier graph plus a Dirichlet-form bound on the

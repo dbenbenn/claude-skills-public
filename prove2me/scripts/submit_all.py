@@ -20,6 +20,10 @@ be written by hand) is recorded as `no-check` and skipped; --hold NAME builds bu
 (for a manual edge check). Prints one line per event; meant to run under a Monitor. Exits when
 every statement has an entry.
 
+A solution that imports a sibling statement the platform has not published yet (a draft stub) is
+not submitted: it waits, unrecorded, and is rebuilt once the queue publishes the import; with
+proofs written against sibling stubs this lets solutions stream out as the queue advances.
+
 --wait-all builds nothing until every statement is published: a solution built while a sibling it
 uses is still unpublished keeps that sibling's proof inline (rewire.py only sees published names),
 which is a missing graph edge. Use it whenever an early milestone's proof uses later ones (Moore's
@@ -77,6 +81,18 @@ def published_names(names, ns, ws=None):
     return out
 
 
+def waiting_on(path, ws=None):
+    """The `Theorems.*` modules a solution imports that the platform has not published yet (draft
+    stubs, stubs.py). A development that imports sibling stubs builds a solution as soon as its own
+    statement publishes, while a sibling may still be in the queue; submit_solution.py refuses that
+    file, and a refusal is recorded as final (CFW 2026-10-03). Such a solution waits for the queue."""
+    sys.path.insert(0, os.path.dirname(SK))
+    from p2mlib.workspace import drafts
+    dr = drafts(ws or _workspace())
+    imps = re.findall(r'^import (Theorems\.\S+)', open(path, encoding='utf-8').read(), re.M)
+    return sorted(set(imps) & set(dr))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('mission_dir')
@@ -104,6 +120,7 @@ def main():
     checks = sum((['--check', c] for c in a.checks), [])
     held = set(a.hold) | (set(names) if a.build_only else set())
     last = None
+    waiting = {}
     while True:
         subprocess.run([sys.executable, os.path.join(SK, 'fetch_theorems.py'), '--proposal', a.proposal],
                        capture_output=True)
@@ -134,6 +151,8 @@ def main():
             if n in done and not (v == 'held' and n not in held) and not v.startswith('retry '):
                 continue
             f = os.path.join(out, 'Sol_%s.lean' % n)
+            if n in waiting and os.path.exists(f) and waiting_on(f):
+                continue    # still waiting: no rebuild until the import publishes
             # a held solution is submitted as built: the audit fixes made by hand between the
             # --build-only run and this one were being overwritten by a rebuild (Moore, 2026-10-02)
             if (v == 'held' or v.startswith('retry ')) and os.path.exists(f):
@@ -152,6 +171,13 @@ def main():
                                 capture_output=True, text=True).returncode:
                 done[n] = 'prune-fail'
             else:
+                w = waiting_on(f)
+                if w:
+                    # not recorded: rebuilt and checked again next round, once the queue publishes w
+                    if waiting.get(n) != w:
+                        print(time.strftime('%H:%M'), n, 'waits for', ', '.join(m.split('.')[-1] for m in w), flush=True)
+                        waiting[n] = w
+                    continue
                 batch.append((n, f))
                 continue
             print(time.strftime('%H:%M'), n, '->', done[n], flush=True)

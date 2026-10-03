@@ -20,3 +20,20 @@ def test_statements_outside_the_mission_do_not_block():
     # Monod's published theorem: its platform status decides, the local check lists it
     done = C.complete(MS, {'N.a': ['Monod.x']})
     assert done['N.a']
+
+
+def test_check_block_outside_the_mission_namespace():
+    # CFW 2026-10-03: the Blueprint's checks live in CFWPlan.Main (and CFWPlan.Main.P5), not in
+    # ConnesFeldmanWeiss; the namespace-only match reported "no proof" for all 16 milestones
+    ms = ['N.foo', 'N.bar']
+    assert C.target_of('N.chk_foo', ms) == 'N.foo'
+    assert C.target_of('Plan.Main.chk_foo', ms) == 'N.foo'
+    assert C.target_of('Plan.Main.P5.chk_bar', ms) == 'N.bar'
+    assert C.target_of('Plan.Main.helper', ms) is None
+    assert C.target_of('Plan.chk_baz', ms) is None
+
+
+def test_ambiguous_short_name_needs_the_namespace():
+    ms = ['A.foo', 'B.foo']
+    assert C.target_of('A.chk_foo', ms) == 'A.foo'
+    assert C.target_of('Plan.chk_foo', ms) is None
