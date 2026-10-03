@@ -384,6 +384,12 @@ Design questions that recur, with the answers we have settled on:
   stated in that form; the general textbook form is a separate library contribution.
 - **The structure a source builds with ordinals or Lie groups** is replaced by an inductive
   predicate or omitted; say so in the description's Formalization scope and give the Lie-free route in the milestone.
+- **Always include the source's full-strength theorems** (dbenbenn, 2026-10-03). A formal
+  statement weaker than the source's (a restricted generality, a hypothesis supplied, one direction)
+  does not replace it: publish the source's version too, Open if no proof is at hand, as a milestone
+  next to the weaker one, and document the gap in the note. Garrido I's Theorems 2.6 and 2.7 were
+  formalized for power-set algebras with the extension given as a hypothesis; the bundle audit found
+  the gap two weeks after launch, and disclosing it was not enough.
 - **Fidelity is about statements, not just truth**: match the paper's constants (`π²/(2θ²) + …`,
   not a convenient weaker bound), generality (the three-variable definition, with the
   specialisation derived), and naming (every numbered result gets a Lean theorem named for it).
