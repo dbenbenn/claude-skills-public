@@ -1314,6 +1314,7 @@ script prints its usage when run with no arguments.
 | `gen_index.py` | Regenerate the scripts index in SKILL.md from the scripts' own docstrings. |
 | `merge.py` | Concatenate a mission's shared modules into one self-contained prove2.me solution file. |
 | `p2m.py` | The prove2.me API client -- now p2mlib.api; this module re-exports it for the scripts. |
+| `patch_notes.py` | PATCH the natural-language statements of published items from reviewed Markdown files. |
 | `prune_solution.py` | Delete the declarations an assembled solution never uses, before submitting it. |
 | `publish_standalone.py` | Publish a folder's standalone statements (POST /submit-problem), wait for the jobs, record ids in published_ids.json, and verify every published field against the folder. |
 | `publish_status.py` | Where has a Submit got to? |
