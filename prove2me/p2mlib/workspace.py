@@ -42,12 +42,34 @@ def drafts(ws=None):
 
 
 def set_drafts(d, ws=None):
+    """Replace the whole record (tests and one-off repairs). Scripts use update_drafts: two of them
+    can run at once (submit_all's fetch_theorems loop beside a hand-run fetch or stubs.py)."""
     import json
     p = os.path.join(ws or workspace(), DRAFTS)
     os.makedirs(os.path.dirname(p), exist_ok=True)
-    with open(p, 'w', encoding='utf-8') as f:
+    tmp = p + '.tmp%d' % os.getpid()
+    with open(tmp, 'w', encoding='utf-8') as f:
         json.dump(dict(sorted(d.items())), f, indent=1)
         f.write('\n')
+    os.replace(tmp, p)
+
+
+def update_drafts(add=None, remove=(), ws=None):
+    """Apply one writer's change -- `add` ({module: mission dir}) and `remove` (modules) -- to the
+    record as it is NOW, under an exclusive lock. Writing back a dict read earlier lost a concurrent
+    writer's change: 8 retired stubs came back as drafts (2026-10-03)."""
+    import fcntl
+    ws = ws or workspace()
+    lock = os.path.join(ws, DRAFTS) + '.lock'
+    os.makedirs(os.path.dirname(lock), exist_ok=True)
+    with open(lock, 'w') as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        d = drafts(ws)
+        for m in remove:
+            d.pop(m, None)
+        d.update(add or {})
+        set_drafts(d, ws)
+        return d
 
 
 class Published(NamedTuple):

@@ -254,3 +254,18 @@ def test_dropping_a_theorem_import_keeps_the_bundles_it_brought():
                                 ['Definitions.Def_CannonFloydParry', 'Definitions.Def_Monod'])
     assert out == ('import Definitions.Def_ThompsonAmenability\nimport Definitions.Def_CannonFloydParry\n'
                    'import Definitions.Def_Monod\nimport Mathlib\n')
+
+
+def test_update_drafts_applies_a_delta_to_the_current_file(tmp_path):
+    # 2026-10-03: fetch_theorems retired 8 published stubs while submit_all's own fetch_theorems run
+    # was in flight; that run wrote back the whole dict it had read a minute earlier, and the 8 were
+    # drafts again ("REFUSED: imports draft statements not yet published")
+    from p2mlib import workspace as W
+    ws = str(tmp_path)
+    W.set_drafts({'Theorems.A': '/m', 'Theorems.B': '/m'}, ws)
+    stale = W.drafts(ws)                          # a writer's snapshot
+    W.update_drafts(remove=['Theorems.A'], ws=ws)  # another writer retires A meanwhile
+    stale.pop('Theorems.B')                       # the first writer retires B ...
+    W.update_drafts(remove=['Theorems.B'], ws=ws)  # ... and records only its own change
+    W.update_drafts(add={'Theorems.C': '/n'}, ws=ws)
+    assert W.drafts(ws) == {'Theorems.C': '/n'}

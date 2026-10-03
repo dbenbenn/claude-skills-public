@@ -69,6 +69,11 @@ def test_one_changed_field_is_exactly_one_diff(mdir):
 
 def run_upload(mdir, fake, monkeypatch, *flags):
     import p2m
+    # upload --go installs the statement stubs (stubs.sync) in $P2M_WORKSPACE: never the real one
+    # (Thm_Mini_*.lean and their draft records were found in the live workspace, 2026-10-03)
+    ws = mdir.parent / 'ws'
+    (ws / 'Theorems').mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv('P2M_WORKSPACE', str(ws))
     monkeypatch.setattr(p2m, 'call', fake.call)
     monkeypatch.setattr(D.sys, 'argv', ['draft.py', str(mdir), 'upload'] + list(flags))
     D.main()

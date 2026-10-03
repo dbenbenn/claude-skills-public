@@ -28,7 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))  # p2mlib
 from p2mlib.mission import load  # noqa: E402
-from p2mlib.workspace import workspace, statement_module, statement_text, drafts, set_drafts  # noqa: E402
+from p2mlib.workspace import workspace, statement_module, statement_text, drafts, update_drafts  # noqa: E402
 
 
 def wanted(mdir):
@@ -47,7 +47,7 @@ def sync(mdir, ws=None, check=False):
     ws = ws or workspace()
     mdir = os.path.abspath(mdir)
     want, dr = wanted(mdir), drafts(ws)
-    problems, written = [], []
+    problems, written, removed = [], [], []
     for mod, (rel, text) in sorted(want.items()):
         p = os.path.join(ws, rel)
         cur = open(p, encoding='utf-8').read() if os.path.exists(p) else None
@@ -75,9 +75,10 @@ def sync(mdir, ws=None, check=False):
         if os.path.exists(p):
             os.remove(p)
         del dr[mod]
+        removed.append(mod)
         print('   removed the stub of %s (no longer a statement)' % mod)
-    if not check:
-        set_drafts(dr, ws)
+    if not check and (written or removed):
+        update_drafts(add={m: mdir for m in written}, remove=removed, ws=ws)
     return problems, written
 
 

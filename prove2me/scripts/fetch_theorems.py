@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from p2m import call
 from prune_solution import _workspace
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # p2mlib
-from p2mlib.workspace import statement_module, statement_text, drafts, set_drafts  # noqa: E402
+from p2mlib.workspace import statement_module, statement_text, drafts, update_drafts  # noqa: E402
 
 
 def paged(path, key):
@@ -96,7 +96,7 @@ def main():
                 print('   wrote %-8s %s' % (d.get('status'), rel))
             mods.append(rel[:-5].replace(os.sep, '.'))
     if retired:
-        set_drafts(dr, ws)
+        update_drafts(remove=retired, ws=ws)
         print('%d draft stub(s) now published' % len(retired))
     print('%d files: %d written, %d already current' % (len(mods), len(written), same))
     if build and written:
