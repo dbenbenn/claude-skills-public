@@ -359,6 +359,18 @@ def stage_all(mdir, names, force=False):
         print('staged %-60s %d bundle(s)   prompt: %s' % (key[:60], len(extras), os.path.join(pdir, slug + '.txt')))
 
 
+def stale_stagings(mdir):
+    """Staging directories of this mission whose item mission.py no longer has (renamed or dropped):
+    their testimony is of Lean that no longer exists, and collect-all, going by the current names,
+    never reaches them (dense-subgroups, 2026-10-03)."""
+    current = {slug_of(mdir, key) for key, _, _ in mission_items(mdir)}
+    prefix = os.path.basename(os.path.abspath(mdir)) + '-'
+    if not os.path.isdir(ROOT):
+        return []
+    return sorted(d for d in os.listdir(ROOT)
+                  if d.startswith(prefix) and d not in current and os.path.isdir(os.path.join(ROOT, d)))
+
+
 def collect_all(mdir, names, teardown_after=False):
     """Collect every staged item into MISSION_DIR/readbacks/<key>.{readback,audit}.md; exit 1 if
     any item is missing a file or fails a check, printing every IMPORTS line."""
@@ -389,6 +401,9 @@ def collect_all(mdir, names, teardown_after=False):
             bad.append(key)
         elif teardown_after:
             teardown(slug)
+    for d in stale_stagings(mdir):
+        print('STALE %s: staged for an item mission.py no longer has; its testimony is of the old Lean '
+              '(teardown %s --force)' % (d, d))
     print('\ncollected into %s; %s' % (rdir, 'FAILED: ' + ', '.join(bad) if bad else 'all clean'))
     return not bad
 

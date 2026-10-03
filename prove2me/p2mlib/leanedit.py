@@ -30,9 +30,11 @@ def _trailing_ws(b):
     return b[len(b.rstrip(b' \t\n')):]
 
 
-def remove_commands(info, indices, a=None, b=None):
+def remove_commands(info, indices, a=None, b=None, reps=None):
     """The source without the given commands (indices into info.commands); with byte bounds a, b,
-    only that region of it (the commands' spans clipped to it).
+    only that region of it (the commands' spans clipped to it). Each kept command i in `reps`
+    ({i: text}) is replaced by its text, trailing trivia kept (prune rewrites a `variable` command
+    whose other binders are still used).
 
     Each maximal run of removed commands goes with its trailing blank lines, and the kept text on
     either side is separated by the wider of the two separators the source had there (the one
@@ -41,6 +43,17 @@ def remove_commands(info, indices, a=None, b=None):
     drop = set(indices)
     t = info.text_bytes
     lo, hi = a or 0, len(t) if b is None else b
+    subs = sorted((info.commands[i].start.byte, info.commands[i].end.byte, txt.encode('utf-8'))
+                  for i, txt in (reps or {}).items() if i not in drop)
+
+    def kept(x, y):
+        """t[x:y] with every replaced command lying inside it substituted."""
+        parts, at = [], x
+        for s0, e0, new in subs:
+            if x <= s0 and e0 <= y:
+                parts += [t[at:s0], new]
+                at = e0
+        return b''.join(parts + [t[at:y]])
     spans = [(max(x, lo), min(y, hi)) for x, y in _spans(info)]
     spans = [(x, y) if x < y else (hi, hi) for x, y in spans]
     out, cur, i = [], lo, 0
@@ -51,13 +64,13 @@ def remove_commands(info, indices, a=None, b=None):
         j = i
         while j + 1 < len(spans) and j + 1 in drop:
             j += 1
-        before = t[cur:spans[i][0]]
+        before = kept(cur, spans[i][0])
         w1, w2 = _trailing_ws(before), _trailing_ws(t[spans[j][0]:spans[j][1]])
         k = max(w1.count(b'\n'), w2.count(b'\n'))
         sep = (b'\n' * k + w2.rsplit(b'\n', 1)[-1]) if k else (w2 or w1)
         out.append(before[:len(before) - len(w1)] + sep)
         cur, i = max(cur, spans[j][1]), j + 1
-    out.append(t[cur:hi])
+    out.append(kept(cur, hi))
     return b''.join(out).decode('utf-8')
 
 

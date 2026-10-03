@@ -58,6 +58,24 @@ def test_publish_status_until_click_exits_when_the_proposal_leaves_draft(monkeyp
     assert 'In review' in out and 'CLICK NEEDED' not in out
 
 
+def test_publish_status_watch_calls_a_stall_only_when_nothing_is_queued(monkeypatch, capsys):
+    import publish_status as PS
+    # LM, 2026-10-03: a job PENDING for 15 minutes in the shared compile queue was announced as
+    # "likely the publish stall; a re-click of Submit resumes it" -- the stall is an empty queue
+    busy = ('Draft', None, 18, {'PENDING': 1}, [])
+    snaps = iter([busy] * 25 + [('In review', '2026', 0, {}, [])])
+    monkeypatch.setattr(PS, 'snapshot', lambda pid: next(snaps))
+    monkeypatch.setattr(PS.time, 'sleep', lambda s: None)
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_status.py', 'P', '--watch'])
+    PS.main()
+    assert 'stall' not in capsys.readouterr().out
+    idle = ('Draft', None, 18, {}, [])
+    snaps = iter([idle] * 25 + [('In review', '2026', 0, {}, [])])
+    monkeypatch.setattr(PS, 'snapshot', lambda pid: next(snaps))
+    PS.main()
+    assert capsys.readouterr().out.count('stall') == 1
+
+
 def test_watch_proposal_exits_on_change(monkeypatch, capsys):
     import watch_proposal as W
     states = iter([('In review', None), ('In review', None), ('Approved', 'M1')])

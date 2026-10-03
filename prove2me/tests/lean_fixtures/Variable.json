@@ -1,0 +1,968 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "end": {
+    "byte": 66,
+    "col": 7,
+    "line": 5
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 30,
+      "col": 14,
+      "line": 3
+     },
+     "start": {
+      "byte": 26,
+      "col": 10,
+      "line": 3
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "Data"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 16,
+    "col": 0,
+    "line": 3
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 77,
+    "col": 9,
+    "line": 7
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.section",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 68,
+    "col": 0,
+    "line": 7
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 125,
+    "col": 46,
+    "line": 9
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.variable",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 79,
+    "col": 0,
+    "line": 9
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [
+      2
+     ],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 163,
+    "col": 36,
+    "line": 11
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 140,
+      "col": 13,
+      "line": 11
+     },
+     "start": {
+      "byte": 135,
+      "col": 8,
+      "line": 11
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "keepX"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 127,
+    "col": 0,
+    "line": 11
+   },
+   "value_start": {
+    "byte": 157,
+    "col": 30,
+    "line": 11
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [
+      2
+     ],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 197,
+    "col": 32,
+    "line": 13
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 178,
+      "col": 13,
+      "line": 13
+     },
+     "start": {
+      "byte": 173,
+      "col": 8,
+      "line": 13
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "usesD"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 165,
+    "col": 0,
+    "line": 13
+   },
+   "value_start": {
+    "byte": 191,
+    "col": 26,
+    "line": 13
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [
+      2
+     ],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 204,
+    "col": 5,
+    "line": 15
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 199,
+    "col": 0,
+    "line": 15
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 215,
+    "col": 9,
+    "line": 17
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.section",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 206,
+    "col": 0,
+    "line": 17
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 6
+    }
+   ],
+   "end": {
+    "byte": 253,
+    "col": 34,
+    "line": 19
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.variable",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 217,
+    "col": 0,
+    "line": 19
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7
+     ],
+     "opener": 6
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 297,
+    "col": 42,
+    "line": 21
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 268,
+      "col": 13,
+      "line": 21
+     },
+     "start": {
+      "byte": 263,
+      "col": 8,
+      "line": 21
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "keepQ"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 255,
+    "col": 0,
+    "line": 21
+   },
+   "value_start": {
+    "byte": 293,
+    "col": 38,
+    "line": 21
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7
+     ],
+     "opener": 6
+    }
+   ],
+   "end": {
+    "byte": 304,
+    "col": 5,
+    "line": 23
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 299,
+    "col": 0,
+    "line": 23
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 398,
+    "col": 9,
+    "line": 27
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 322,
+      "col": 16,
+      "line": 25
+     },
+     "start": {
+      "byte": 314,
+      "col": 8,
+      "line": 25
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "solution"
+   ],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 306,
+    "col": 0,
+    "line": 25
+   },
+   "value_start": {
+    "byte": 330,
+    "col": 24,
+    "line": 25
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 399,
+    "col": 0,
+    "line": 28
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 399,
+    "col": 0,
+    "line": 28
+   }
+  }
+ ],
+ "decls": [
+  {
+   "kind": "recursor",
+   "name": "Data.rec",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 66,
+     "col": 7,
+     "line": 5
+    },
+    "start": {
+     "byte": 16,
+     "col": 0,
+     "line": 3
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 30,
+     "col": 14,
+     "line": 3
+    },
+    "start": {
+     "byte": 26,
+     "col": 10,
+     "line": 3
+    }
+   },
+   "type": "{X : Type} → {motive : Data X → Sort u} → ((Q : Type) → (q : Q) → motive { Q := Q, q := q }) → (t : Data X) → motive t",
+   "type_hash": 3353329679,
+   "uses_imported": [],
+   "uses_local": [
+    "Data",
+    "Data.Q",
+    "Data.mk",
+    "Data.q"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "def",
+   "name": "Data.casesOn",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 66,
+     "col": 7,
+     "line": 5
+    },
+    "start": {
+     "byte": 16,
+     "col": 0,
+     "line": 3
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 30,
+     "col": 14,
+     "line": 3
+    },
+    "start": {
+     "byte": 26,
+     "col": 10,
+     "line": 3
+    }
+   },
+   "type": "{X : Type} → {motive : Data X → Sort u} → (t : Data X) → ((Q : Type) → (q : Q) → motive { Q := Q, q := q }) → motive t",
+   "type_hash": 1629891064,
+   "uses_imported": [],
+   "uses_local": [
+    "Data",
+    "Data.Q",
+    "Data.mk",
+    "Data.q",
+    "Data.rec"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "def",
+   "name": "Data.recOn",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 66,
+     "col": 7,
+     "line": 5
+    },
+    "start": {
+     "byte": 16,
+     "col": 0,
+     "line": 3
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 30,
+     "col": 14,
+     "line": 3
+    },
+    "start": {
+     "byte": 26,
+     "col": 10,
+     "line": 3
+    }
+   },
+   "type": "{X : Type} → {motive : Data X → Sort u} → (t : Data X) → ((Q : Type) → (q : Q) → motive { Q := Q, q := q }) → motive t",
+   "type_hash": 1629891064,
+   "uses_imported": [],
+   "uses_local": [
+    "Data",
+    "Data.Q",
+    "Data.mk",
+    "Data.q",
+    "Data.rec"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "def",
+   "name": "Data.noConfusion",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 66,
+     "col": 7,
+     "line": 5
+    },
+    "start": {
+     "byte": 16,
+     "col": 0,
+     "line": 3
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 30,
+     "col": 14,
+     "line": 3
+    },
+    "start": {
+     "byte": 26,
+     "col": 10,
+     "line": 3
+    }
+   },
+   "type": "{P : Sort u} → {X : Type} → {t : Data X} → {X' : Type} → {t' : Data X'} → X = X' → t ≍ t' → Data.noConfusionType P t t'",
+   "type_hash": 1146436081,
+   "uses_imported": [],
+   "uses_local": [
+    "Data",
+    "Data.Q",
+    "Data.casesOn",
+    "Data.q"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "structure",
+   "name": "Data",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 66,
+     "col": 7,
+     "line": 5
+    },
+    "start": {
+     "byte": 16,
+     "col": 0,
+     "line": 3
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 30,
+     "col": 14,
+     "line": 3
+    },
+    "start": {
+     "byte": 26,
+     "col": 10,
+     "line": 3
+    }
+   },
+   "type": "Type → Type 1",
+   "type_hash": 232905561,
+   "uses_imported": [],
+   "uses_local": [
+    "Data.Q",
+    "Data.mk",
+    "Data.q"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "def",
+   "name": "Data.mk.noConfusion",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 30,
+     "col": 14,
+     "line": 3
+    },
+    "start": {
+     "byte": 26,
+     "col": 10,
+     "line": 3
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 30,
+     "col": 14,
+     "line": 3
+    },
+    "start": {
+     "byte": 26,
+     "col": 10,
+     "line": 3
+    }
+   },
+   "type": "{X : Type} →\n  {P : Sort u} →\n    {Q : Type} →\n      {q : Q} → {Q' : Type} → {q' : Q'} → { Q := Q, q := q } = { Q := Q', q := q' } → (Q = Q' → q ≍ q' → P) → P",
+   "type_hash": 3831230919,
+   "uses_imported": [],
+   "uses_local": [
+    "Data",
+    "Data.Q",
+    "Data.mk",
+    "Data.noConfusion",
+    "Data.q"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "constructor",
+   "name": "Data.mk",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 30,
+     "col": 14,
+     "line": 3
+    },
+    "start": {
+     "byte": 26,
+     "col": 10,
+     "line": 3
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 30,
+     "col": 14,
+     "line": 3
+    },
+    "start": {
+     "byte": 26,
+     "col": 10,
+     "line": 3
+    }
+   },
+   "type": "{X : Type} → (Q : Type) → Q → Data X",
+   "type_hash": 551133132,
+   "uses_imported": [],
+   "uses_local": [
+    "Data",
+    "Data.Q",
+    "Data.q"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "def",
+   "name": "Data.Q",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 51,
+     "col": 3,
+     "line": 4
+    },
+    "start": {
+     "byte": 50,
+     "col": 2,
+     "line": 4
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 51,
+     "col": 3,
+     "line": 4
+    },
+    "start": {
+     "byte": 50,
+     "col": 2,
+     "line": 4
+    }
+   },
+   "type": "{X : Type} → Data X → Type",
+   "type_hash": 1312897245,
+   "uses_imported": [],
+   "uses_local": [
+    "Data",
+    "Data.q"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "def",
+   "name": "Data.q",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 62,
+     "col": 3,
+     "line": 5
+    },
+    "start": {
+     "byte": 61,
+     "col": 2,
+     "line": 5
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 62,
+     "col": 3,
+     "line": 5
+    },
+    "start": {
+     "byte": 61,
+     "col": 2,
+     "line": 5
+    }
+   },
+   "type": "{X : Type} → (self : Data X) → self.Q",
+   "type_hash": 3317809402,
+   "uses_imported": [],
+   "uses_local": [
+    "Data",
+    "Data.Q"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "theorem",
+   "name": "keepX",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 163,
+     "col": 36,
+     "line": 11
+    },
+    "start": {
+     "byte": 127,
+     "col": 0,
+     "line": 11
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 140,
+     "col": 13,
+     "line": 11
+    },
+    "start": {
+     "byte": 135,
+     "col": 8,
+     "line": 11
+    }
+   },
+   "type": "∀ {X : Type} [Inhabited X] (x : X), x = x",
+   "type_hash": 556191305,
+   "uses_imported": [],
+   "uses_local": [
+    "Data"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "theorem",
+   "name": "usesD",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 197,
+     "col": 32,
+     "line": 13
+    },
+    "start": {
+     "byte": 165,
+     "col": 0,
+     "line": 13
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 178,
+     "col": 13,
+     "line": 13
+    },
+    "start": {
+     "byte": 173,
+     "col": 8,
+     "line": 13
+    }
+   },
+   "type": "∀ {X : Type} [Inhabited X] (d : Data X), d.Q = d.Q",
+   "type_hash": 4232701061,
+   "uses_imported": [],
+   "uses_local": [
+    "Data",
+    "Data.Q"
+   ],
+   "uses_sorry": false
+  },
+  {
+   "kind": "theorem",
+   "name": "keepQ",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 297,
+     "col": 42,
+     "line": 21
+    },
+    "start": {
+     "byte": 255,
+     "col": 0,
+     "line": 21
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 268,
+     "col": 13,
+     "line": 21
+    },
+    "start": {
+     "byte": 263,
+     "col": 8,
+     "line": 21
+    }
+   },
+   "type": "∀ {Q : Type} (m : Q → Prop) (q : Q), m q → m q",
+   "type_hash": 3564093071,
+   "uses_imported": [],
+   "uses_local": [],
+   "uses_sorry": false
+  },
+  {
+   "kind": "theorem",
+   "name": "solution",
+   "private": false,
+   "range": {
+    "end": {
+     "byte": 398,
+     "col": 9,
+     "line": 27
+    },
+    "start": {
+     "byte": 306,
+     "col": 0,
+     "line": 25
+    }
+   },
+   "rests_on": [],
+   "selection": {
+    "end": {
+     "byte": 322,
+     "col": 16,
+     "line": 25
+    },
+    "start": {
+     "byte": 314,
+     "col": 8,
+     "line": 25
+    }
+   },
+   "type": "True",
+   "type_hash": 3270818714,
+   "uses_imported": [],
+   "uses_local": [
+    "keepQ"
+   ],
+   "uses_sorry": false
+  }
+ ],
+ "file": "Variable.lean",
+ "messages": [
+  {
+   "end": {
+    "byte": 163,
+    "col": 36,
+    "line": 11
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 127,
+    "col": 0,
+    "line": 11
+   },
+   "text": "automatically included section variable(s) unused in theorem `keepX`:\n  [Inhabited X]\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit [Inhabited X] in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 197,
+    "col": 32,
+    "line": 13
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 165,
+    "col": 0,
+    "line": 13
+   },
+   "text": "automatically included section variable(s) unused in theorem `usesD`:\n  [Inhabited X]\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit [Inhabited X] in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  }
+ ],
+ "mode": "elaborate"
+}

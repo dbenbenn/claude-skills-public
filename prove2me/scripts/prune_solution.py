@@ -249,7 +249,7 @@ def prune_by_lean(path):
         print('   - %s' % n)
     for m in drop_imports:
         print('   - import %s (no kept declaration uses it: a false graph edge)' % m)
-    return P.apply(info, drop, drop_imports)
+    return P.apply(info, drop, drop_imports, rep.get('replace'))
 
 
 def main():

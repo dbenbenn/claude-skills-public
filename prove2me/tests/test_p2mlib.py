@@ -195,3 +195,62 @@ def test_prune_drops_the_include_of_a_dropped_variable():
     drop, imports, rep = prune.plan(info)
     out = prune.apply(info, drop, imports)
     assert 'variable (hb : HB)' not in out and 'include hb' not in out and 'theorem solution' in out
+
+
+def alias_fixture():
+    import json, os
+    fix = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lean_fixtures')
+    return leaninfo.parse(json.load(open(os.path.join(fix, 'Alias.json'))), open(os.path.join(fix, 'Alias.lean'), 'rb').read())
+
+
+def test_prune_drops_an_unreached_alias_with_its_target():
+    # dense-subgroups (2026-10-03): assemble_blueprint turns each proved stub into `alias foo := NS.Part.foo`;
+    # Batteries' `alias` command reports no declId names, so it was never dropped while the declaration
+    # it points to was -- the pruned solution failed with "Unknown constant NS.Part.foo"
+    from p2mlib import prune
+    info = alias_fixture()
+    drop, imports, rep = prune.plan(info)
+    out = prune.apply(info, drop, imports)
+    assert 'alias unused' not in out and 'theorem unused' not in out
+    assert 'alias used := Al.P.used' in out and 'theorem used' in out and 'theorem solution' in out
+    assert rep['removed'] == ['Al.P.unused', 'Al.unused']
+    # a notation command generates parser/macro constants nothing "uses"; it is never pruned (the
+    # first version of this fix counted those as declarations and pruned M51's `local notation "E"`)
+    assert 'local notation "TT" => True' in out
+
+
+def variable_fixture():
+    import json, os
+    fix = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lean_fixtures')
+    return leaninfo.parse(json.load(open(os.path.join(fix, 'Variable.json'))), open(os.path.join(fix, 'Variable.lean'), 'rb').read())
+
+
+def test_prune_drops_only_the_binder_group_naming_a_dropped_declaration():
+    # dense-subgroups (2026-10-03), M51 Part D: `variable {R …} {P …} (hP : IsLeftInvariantMean μ R P)` and
+    # `variable {Q : Type*}` were dropped because pruned structure fields were named `Data.P`, `Data.Q`,
+    # and the kept lemmas of those sections lost R, P, Q. Only a binder group whose type names a pruned
+    # declaration goes (`(d : Data X)`), never the command's other binders.
+    from p2mlib import prune
+    info = variable_fixture()
+    drop, imports, rep = prune.plan(info)
+    out = prune.apply(info, drop, imports, rep.get('replace'))
+    assert 'structure Data' not in out and 'theorem usesD' not in out and 'theorem keepX' not in out
+    assert 'variable {X : Type} [Inhabited X]\n' in out and '(d : Data X)' not in out
+    assert 'variable {Q : Type} (m : Q → Prop)' in out
+    assert 'theorem keepQ' in out and 'theorem solution' in out
+
+
+def test_dropping_a_theorem_import_keeps_the_bundles_it_brought():
+    # dense-subgroups (2026-10-03): Sol_isAmenableRel_orbit_of_isCoamenable lost its unused
+    # `import Theorems.Thm_CannonFloydParry_*` lines, and with them the only route to the CFP bundle
+    # that kept code needs (`open CannonFloydParry`, `IsDyadic`)
+    from p2mlib import prune
+    header = 'import Definitions.Def_ThompsonAmenability\nimport Theorems.Thm_CFP_a\nimport Theorems.Thm_M_b\nimport Mathlib\n'
+    imports_of = {'Theorems.Thm_CFP_a': ['Mathlib', 'Definitions.Def_CannonFloydParry'],
+                  'Theorems.Thm_M_b': ['Mathlib', 'Definitions.Def_ThompsonAmenability', 'Definitions.Def_Monod']}
+    assert prune.bundles_to_restore(header, ['Theorems.Thm_CFP_a', 'Theorems.Thm_M_b'], imports_of.get) == [
+        'Definitions.Def_CannonFloydParry', 'Definitions.Def_Monod']
+    out = prune.restore_bundles(header.replace('import Theorems.Thm_CFP_a\n', '').replace('import Theorems.Thm_M_b\n', ''),
+                                ['Definitions.Def_CannonFloydParry', 'Definitions.Def_Monod'])
+    assert out == ('import Definitions.Def_ThompsonAmenability\nimport Definitions.Def_CannonFloydParry\n'
+                   'import Definitions.Def_Monod\nimport Mathlib\n')

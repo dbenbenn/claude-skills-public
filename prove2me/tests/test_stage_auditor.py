@@ -87,3 +87,17 @@ def test_collect_checks_and_import_denials(root, tmp_path, capsys):
     assert 'FAIL Lean identifiers (want 0; use $math$): 1' in out and 'FAIL absolute paths (want 0): 1' in out
     imports = [l for l in out.split('\n') if l.startswith('IMPORTS')]
     assert len(imports) == 2 and 'goes entirely unused' not in ' '.join(imports)   # 00cf91e: denials skipped
+
+
+def test_collect_all_names_stagings_left_by_a_renamed_item(tmp_path, monkeypatch, capsys):
+    # dense-subgroups (2026-10-03): exists_injective_lift_pow_of_proximal was renamed after staging;
+    # collect-all went by the new names and the old staging (testimony of the old Lean) lingered
+    import stage_auditor as SA
+    root = tmp_path / 'auditors'
+    for d in ('pkg-old_name', 'pkg-new_name', 'other-thing', '_prompts'):
+        (root / d).mkdir(parents=True)
+    monkeypatch.setattr(SA, 'ROOT', str(root))
+    monkeypatch.setattr(SA, 'mission_items', lambda mdir: [('new_name', None, [])])
+    mdir = tmp_path / 'pkg'
+    mdir.mkdir()
+    assert SA.stale_stagings(str(mdir)) == ['pkg-old_name']

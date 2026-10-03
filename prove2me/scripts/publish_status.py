@@ -77,9 +77,12 @@ def main():
             last, quiet = s, 0
         else:
             quiet += 1
-            if quiet == 20 and last and last[3] and not until_click:   # ~10 min without movement
-                print(time.strftime('%H:%M:%S'), 'no change for ~10 min: likely the publish stall;'
-                      ' a re-click of Submit resumes it', flush=True)
+            # ~10 min without movement AND nothing queued: a job PENDING in the shared compile
+            # queue is not the stall (15+ minutes there is routine; LM, 2026-10-03)
+            if (quiet == 20 and last and last[0] == 'Draft' and last[2] and not active(last[3])
+                    and not until_click):
+                print(time.strftime('%H:%M:%S'), 'no change for ~10 min and no job queued: likely the'
+                      ' publish stall; a re-click of Submit resumes it', flush=True)
         if until_click and s:
             idle = s[0] == 'Draft' and s[2] and not active(s[3])
             idle_since = (idle_since if idle_since is not None else time.time()) if idle else None
