@@ -87,3 +87,20 @@ def test_assembler_recognizes_the_blueprint_by_its_path(tmp_path):
     bp = ws / 'Solutions' / 'CFW' / 'Route.lean'
     parts = ['import Solutions.CFW.Route\nimport Mathlib\n', 'import Solutions.LN.Blueprint\n']
     assert AB.blueprint_modules(str(bp), parts, str(ws)) == {'Solutions.CFW.Route', 'Solutions.LN.Blueprint'}
+
+
+def test_wrapper_drops_universes_the_body_already_declares():
+    # Garrido full strength (2026-10-04): the development declares `universe u v` at the top of its
+    # file, and so does the published statement; the wrapper re-declared it and Lean answered
+    # "a universe level named `u` has already been declared"
+    body = 'universe u v\n\nsection\nnamespace Garrido\ntheorem foo : True := trivial\nend Garrido\nend\n'
+    stmt = 'universe u v\n\ntheorem solution {G : Type u} : True := by\n  trivial\n'
+    assert BS.drop_redeclared_universes(body, stmt) == '\ntheorem solution {G : Type u} : True := by\n  trivial\n'
+
+
+def test_wrapper_keeps_new_universes_and_ignores_sectioned_ones():
+    # a universe declared inside a section is out of scope after `end`; only names already at the
+    # top level are dropped, and a line keeps the names that are new
+    body = 'universe u\n\nsection\nuniverse w\nend\n'
+    stmt = 'universe u v w\n\ntheorem solution : True := trivial\n'
+    assert BS.drop_redeclared_universes(body, stmt) == 'universe v w\n\ntheorem solution : True := trivial\n'

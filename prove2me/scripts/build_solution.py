@@ -116,6 +116,32 @@ def closure(repo, pkg, module, dirs):
     return order
 
 
+def drop_redeclared_universes(body, stmt):
+    """`stmt` without the universe names `body` already declares at its top level (outside every
+    `section`/`namespace`): the published statement brings its own `universe u v`, and a
+    development that declares the same at the top of its file made the wrapper fail with "a
+    universe level named `u` has already been declared" (Garrido full strength, 2026-10-04)."""
+    depth, top = 0, set()
+    for l in body.split('\n'):
+        s = l.strip()
+        if re.match(r'(section|namespace)\b', s):
+            depth += 1
+        elif re.match(r'end\b', s):
+            depth = max(0, depth - 1)
+        elif depth == 0 and s.startswith('universe '):
+            top.update(s.split()[1:])
+    out = []
+    for l in stmt.split('\n'):
+        s = l.strip()
+        if s.startswith('universe '):
+            new = [n for n in s.split()[1:] if n not in top]
+            if not new:
+                continue
+            l = 'universe ' + ' '.join(new)
+        out.append(l)
+    return '\n'.join(out)
+
+
 def external_imports(mods, drop=()):
     """The `Definitions.*` and `Theorems.*` modules the merged modules import, in first-seen order.
     The merge strips every import line and resolve_imports.py recovers only names it can trace; a
@@ -190,6 +216,7 @@ def main():
     fs2, n = re.subn(r':=\s*by\s+sorry\s*', ':= by\n  apply %s <;> assumption\n' % a.target, fs2, count=1)
     if n != 1:
         sys.exit('cannot find `:= by sorry` in the published formal_statement')
+    fs2 = drop_redeclared_universes(text, fs2)
     opens = [l for l in (t.get('preamble') or '').split('\n') if l.startswith('open')]
     text = (text.rstrip() + '\n\nsection\n' + '\n'.join(opens + ['open ' + ns]) + '\n\n'
             + fs2.strip() + '\n\nend\n')
