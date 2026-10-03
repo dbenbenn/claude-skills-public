@@ -83,6 +83,14 @@ def stage(mdir, name, page_spec=None):
     mdir = os.path.abspath(mdir)
     M = draft.load(mdir)
     T = item(M, name)
+    if not T.get('bundle'):
+        # the bundle's audit comes first: statement audits skip bundle-level encodings, so without
+        # it nobody compares the bundle with the source (CFW 2026-10-03 ran it last; verify caught it)
+        for D in getattr(M, 'DEFINITIONS', []):
+            if D.get('source_pages') and not os.path.exists(
+                    os.path.join(mdir, 'readbacks', 'Def_%s.coverage.md' % D['name'])):
+                print('NOTE Def_%s has no source audit yet: the skill runs it before the statement '
+                      'audits (source_audit.py stage MISSION_DIR Def_%s)' % (D['name'], D['name']))
     # an item from another source (a cited external result) names its own PDF, and then the
     # mission's context pages and page offset do not apply to it
     own = bool(T.get('source_pdf'))

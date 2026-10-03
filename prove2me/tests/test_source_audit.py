@@ -84,3 +84,16 @@ def test_collect_verdict(mdir, cov, ok):
     open(os.path.join(d, 'coverage.md'), 'w').write(cov)
     assert bool(SRC.collect(str(mdir), 't1')) is ok
     assert (mdir / 'readbacks' / 't1.coverage.md').read_text() == cov and not os.path.exists(d)
+
+
+def test_stage_warns_when_the_bundle_has_no_source_audit_yet(mdir, capsys):
+    # CFW 2026-10-03: every statement was audited before the bundle; verify caught it only at the
+    # gap review. The skill runs the bundle's audit first (statement audits skip bundle encodings).
+    s = (mdir / 'mission.py').read_text()
+    (mdir / 'mission.py').write_text(s.replace("result='Def 1')", "result='Def 1', source_pages='1')"))
+    SRC.stage(str(mdir), 't1')
+    assert 'Def_Mini has no source audit yet' in capsys.readouterr().out
+    os.makedirs(mdir / 'readbacks', exist_ok=True)
+    (mdir / 'readbacks' / 'Def_Mini.coverage.md').write_text('VERDICT: faithful\n')
+    SRC.stage(str(mdir), 'goal')
+    assert 'no source audit yet' not in capsys.readouterr().out
