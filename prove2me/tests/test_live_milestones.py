@@ -62,3 +62,15 @@ def test_plan_insert_unknown_anchor_is_refused():
 def test_linked_theorem_ids():
     ms = [dict(id='a', theorem=dict(id='t1')), dict(id='b', theorem=None), dict(id='c', theorem_id='t3')]
     assert L.linked_theorem_ids(ms) == {'t1', 't3'}
+
+
+def test_all_pages_reads_past_the_default_page():
+    # GET /missions/:id/milestones pages at 20 by default: Garrido I has 24 milestones, and the
+    # first dry run planned moves for the first 20 only (2026-10-04)
+    data = [dict(id=str(i), sort_order=i) for i in range(24)]
+    calls = []
+
+    def fetch(offset, limit):
+        calls.append(offset)
+        return data[offset:offset + limit]
+    assert L.all_pages(fetch, limit=10) == data and calls == [0, 10, 20]

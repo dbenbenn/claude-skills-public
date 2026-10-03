@@ -78,10 +78,25 @@ def linked_theorem_ids(ms):
     return out
 
 
+def all_pages(fetch, limit=100):
+    """Every item of a paged listing; `fetch(offset, limit)` returns one page. The milestone list
+    pages at 20 by default, which once hid four of Garrido I's 24 milestones from the plan."""
+    out, off = [], 0
+    while True:
+        page = fetch(off, limit) or []
+        out += page
+        off += len(page)
+        if len(page) < limit:
+            return out
+
+
 def _milestones(mission):
     from p2m import call
-    r = call('GET', '/missions/%s/milestones' % mission)
-    return r.get('milestones') if isinstance(r, dict) else r
+
+    def fetch(off, limit):
+        r = call('GET', '/missions/%s/milestones?limit=%d&offset=%d' % (mission, limit, off))
+        return r.get('milestones') if isinstance(r, dict) else r
+    return all_pages(fetch)
 
 
 def _resolve(ms, prefix):
