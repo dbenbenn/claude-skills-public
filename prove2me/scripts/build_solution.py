@@ -2,7 +2,7 @@
 """Build the solution file for one published theorem from a Lean development, ready to submit.
 
 usage: build_solution.py TARGET MODULE OUT --root REPO --merge-dir DIR [--merge-dir DIR ...]
-                         [--drop NAME ...] [--package QuadraticFormsSobolev]
+                         [--drop NAME ...] [--package PKG]   (default: first component of MODULE)
 
   TARGET     the published theorem, e.g. QFS.theoremOneFour_univ
   MODULE     the development file that proves it (relative to REPO)
@@ -37,6 +37,12 @@ def published(name):
     if not r:
         sys.exit('no published theorem named ' + name)
     return r[0]
+
+
+def package_of(module):
+    """The Lean package a development module belongs to: the first component of its path
+    (`Solutions/LNS/Proofs.lean` -> `Solutions`), whose imports the closure follows."""
+    return module.replace(os.sep, '/').lstrip('./').split('/')[0]
 
 
 def closure(repo, pkg, module, dirs):
@@ -80,8 +86,9 @@ def main():
     ap.add_argument('--root', required=True)
     ap.add_argument('--merge-dir', action='append', required=True)
     ap.add_argument('--drop', action='append', default=[])
-    ap.add_argument('--package', default='QuadraticFormsSobolev')
+    ap.add_argument('--package', help='default: the first component of MODULE\'s path')
     a = ap.parse_args()
+    a.package = a.package or package_of(a.module)
     ns, short = a.target.rsplit('.', 1)
     work = a.out + '.work'
     os.makedirs(work, exist_ok=True)
