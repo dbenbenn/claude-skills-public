@@ -372,6 +372,13 @@ on it.
 
 Design questions that recur, with the answers we have settled on:
 
+- **Results the paper derives from its goal are milestones too, after the goal.** The docs say
+  milestones build toward the goal, but practice and the full-strength rule put the paper's later
+  numbered results in the same mission, ordered after it: Chou's goal is Proposition 2.2(b) with
+  Corollary 2.4 and Theorem 3.2 after it, Monod's Corollary 3 follows its goal Theorem 1, and
+  Erschler–Zheng's Theorem A and headline limit follow its goal Theorem 8.3 (dbenbenn, 2026-10-04).
+  Do not move a downstream result to a standalone or tell the human it cannot be a milestone; a
+  sequel mission is for scope, not for direction.
 - **One statement per source sentence.** A proposition with two clauses is one conjunctive
   theorem; splitting it into two milestones is not a decomposition when one induction proves both.
   Anyone who needs a half takes `.1` or `.2`.
