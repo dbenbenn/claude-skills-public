@@ -136,3 +136,69 @@ def test_chk_alias_or_duplicate_is_refused(tmp_path, name):
     (sol / 'Chk.lean').write_text(AMBIG)
     st, _, _ = B.assemble(str(sol), ['Chk'], name, str(tmp_path))
     assert st.startswith('CHECK-AMBIGUOUS') and 'chk_baz' in st, st
+
+
+# `lake env lean -Dpp.fullNames=true` on a solution whose check block lived in `namespace A.B`:
+# at the top level, under `open A` and `open A.B`, a name both namespaces define is ambiguous,
+# while inside `namespace A.B` the inner one won (CFW Corollary 13, 2026-10-03)
+LEAN_OUT = '''/tmp/Sol_x.lean:11:38: error: Ambiguous term
+  x
+Possible interpretations:
+  A.B.x n : n = n
+
+  A.x n : n = n
+/tmp/Sol_x.lean:12:9: error: Ambiguous term
+  x.z
+Possible interpretations:
+  @A.x.z n : n = n
+
+  A.B.x.z n : n = n
+/tmp/Sol_x.lean:13:2: error: unsolved goals
+'''
+
+
+def test_parse_ambiguities():
+    assert B.parse_ambiguities(LEAN_OUT) == [
+        (11, 38, 'x', ['A.B.x', 'A.x']),
+        (12, 9, 'x.z', ['A.x.z', 'A.B.x.z'])]
+
+
+@pytest.mark.parametrize('ns, want', [
+    ('A.B', 'A.B.x'),            # the inner namespace wins, as inside `namespace A.B`
+    ('A.B.C', 'A.B.x'),          # the longest enclosing namespace
+    ('A.C', 'A.x'),              # A.B does not enclose A.C
+    ('C', None),                 # nothing encloses: ambiguous inside the namespace too; left alone
+])
+def test_qualify_ambiguous_takes_the_innermost_enclosing_namespace(ns, want):
+    text = 'theorem solution (n : Nat) : n = n := x n\n'
+    new, done = B.qualify_ambiguous(text, [(1, 38, 'x', ['A.B.x', 'A.x'])], ns)
+    if want is None:
+        assert new == text and done == []
+    else:
+        assert new == 'theorem solution (n : Nat) : n = n := %s n\n' % want and done == [('x', want)]
+
+
+def test_qualify_ambiguous_columns_are_codepoints_and_edits_go_right_to_left():
+    # Lean's columns count codepoints: `μ` before the term must not shift it
+    text = 'example (μ : Nat) := (x μ, x μ)\n'
+    amb = [(1, 22, 'x', ['A.x', 'A.B.x']), (1, 27, 'x', ['A.x', 'A.B.x']),
+           (1, 22, 'x', ['A.x', 'A.B.x'])]                      # a repeated report is one edit
+    new, done = B.qualify_ambiguous(text, amb, 'A.B')
+    assert new == 'example (μ : Nat) := (A.B.x μ, A.B.x μ)\n' and len(done) == 2
+
+
+def test_qualify_ambiguous_skips_a_position_that_does_not_hold_the_term():
+    text = 'theorem solution : True := y\n'
+    new, done = B.qualify_ambiguous(text, [(1, 27, 'x', ['A.B.x', 'A.x'])], 'A.B')
+    assert new == text and done == []
+
+
+@pytest.mark.lean
+def test_repair_ambiguity_compiles(tmp_path):
+    f = tmp_path / 'Sol_x.lean'
+    f.write_text('namespace A\ntheorem x (n : Nat) : n = n := rfl\nnamespace B\n'
+                 'theorem x (n : Nat) : n = n := rfl\nend B\nend A\n'
+                 'section\nopen A\nopen A.B\ntheorem solution (n : Nat) : n = n := x n\nend\n')
+    done = B.repair_ambiguity(str(f), 'A.B')
+    assert done == [('x', 'A.B.x')]
+    assert 'theorem solution (n : Nat) : n = n := A.B.x n' in f.read_text()

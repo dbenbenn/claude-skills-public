@@ -80,6 +80,68 @@ def solution_text(info, c, name):
     return pre + head + 'solution' + t[b.byte:c.end.byte].decode('utf-8') + '\n' + post
 
 
+# Inside `namespace A.B` a name defined in both A and A.B means the inner one; at the top level,
+# under `open A` and `open A.B`, it is ambiguous (CFW Corollary 13, 2026-10-03). Lean's own error,
+# printed with full names, lists the candidates; the one Lean took inside the namespace is the
+# candidate in the longest namespace enclosing the check block's.
+AMBIGUOUS = re.compile(r'^[^\n]*?:(\d+):(\d+): error: Ambiguous term\n  (\S+)\n'
+                       r'Possible interpretations:\n((?:(?:  [^\n]*)?\n)+)', re.M)
+
+
+def parse_ambiguities(out):
+    """[(line, col, term, [candidate full names])] from Lean's output under -Dpp.fullNames=true."""
+    res = []
+    for m in AMBIGUOUS.finditer(out):
+        cands = [re.match(r'  [(@]*([^\s()]+)', l).group(1) for l in m.group(4).split('\n')
+                 if re.match(r'  [^\s]', l)]                  # a wrapped type line is indented more
+        res.append((int(m.group(1)), int(m.group(2)), m.group(3), cands))
+    return res
+
+
+def qualify_ambiguous(text, amb, ns):
+    """Write each ambiguous term (1-based line, codepoint column) as the candidate in the longest
+    namespace enclosing `ns`; leave it when none encloses (then it was ambiguous inside too).
+    Returns (text, [(term, replacement)])."""
+    lines = text.split('\n')
+    done, seen = [], set()
+    for line, col, term, cands in sorted(amb, key=lambda a: (a[0], a[1]), reverse=True):
+        if (line, col) in seen:
+            continue
+        seen.add((line, col))
+        best = None
+        for full in cands:
+            part = '' if full == term else full[:-len(term) - 1] if full.endswith('.' + term) else None
+            if part is None or (part and not (ns == part or ns.startswith(part + '.'))):
+                continue
+            if best is None or len(part) > len(best[0]):
+                best = (part, full)
+        l = lines[line - 1] if line <= len(lines) else ''
+        end = col + len(term)
+        if best is None or l[col:end] != term or re.match(r"[\w']", l[end:end + 1]) \
+                or re.match(r"[\w'.]", l[col - 1:col] if col else ''):
+            continue
+        repl = best[1] if best[0] else '_root_.' + term
+        lines[line - 1] = l[:col] + repl + l[end:]
+        done.append((term, repl))
+    return '\n'.join(lines), done[::-1]
+
+
+def repair_ambiguity(path, ns, rounds=3):
+    """Elaborate `path` and qualify its ambiguous terms as `namespace ns` resolved them, until Lean
+    reports no more. Returns [(term, replacement)]."""
+    done = []
+    for _ in range(rounds):
+        p = subprocess.run(['lake', 'env', 'lean', '-Dpp.fullNames=true', os.path.abspath(path)],
+                           capture_output=True, text=True, cwd=_workspace())
+        text = open(path, encoding='utf-8').read()
+        new, d = qualify_ambiguous(text, parse_ambiguities(p.stdout + p.stderr), ns)
+        if not d:
+            break
+        open(path, 'w', encoding='utf-8').write(new)
+        done += d
+    return done
+
+
 def assemble(sol, checks, name, scratch):
     """(status, merged text ending in `theorem solution`, namespace of the check block)."""
     for mod in checks:
@@ -157,10 +219,22 @@ def build(mdir, checks, name, out):
     merged = os.path.join(out, '.merged_%s.lean' % name)
     open(merged, 'w', encoding='utf-8').write(body)
     dst = os.path.join(out, 'Sol_%s.lean' % name)
-    p = subprocess.run([sys.executable, os.path.join(SK, 'rewire.py'), merged, '--target', name, '-o', dst],
-                       capture_output=True, text=True, cwd=ws)
-    open(os.path.join(out, 'Sol_%s.log' % name), 'w').write(p.stdout + p.stderr)
-    os.remove(merged)
+
+    def rewire():
+        return subprocess.run([sys.executable, os.path.join(SK, 'rewire.py'), merged, '--target', name,
+                               '-o', dst], capture_output=True, text=True, cwd=ws)
+    p = rewire()
+    log = p.stdout + p.stderr
+    if p.returncode and 'does not elaborate' in log and os.path.exists(dst):
+        fixed = repair_ambiguity(dst, ns)
+        if fixed:
+            os.replace(dst, merged)
+            p = rewire()
+            log = ('qualified ambiguous names (as namespace %s resolved them): %s\n' % (
+                ns, ', '.join('%s -> %s' % f for f in fixed)) + p.stdout + p.stderr)
+    open(os.path.join(out, 'Sol_%s.log' % name), 'w').write(log)
+    if os.path.exists(merged):
+        os.remove(merged)
     imps = re.findall(r'^import Theorems\.(\S+)', open(dst).read(), re.M) if os.path.exists(dst) else []
     # rewire exits 1 when it left a copy it could not prove from the published theorem (a genuinely
     # different statement sharing a name); the file itself still compiles: report OK*, read the log
