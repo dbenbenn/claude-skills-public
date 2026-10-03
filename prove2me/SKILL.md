@@ -544,6 +544,17 @@ instantiates the target at universe 0. Check locally with `theorem _check : Fals
 @Target` beside a sorried copy of the target. dbenbenn pre-approves disproofs of Open false
 statements; submit without asking.
 
+**A universe that occurs only under `max` can block an ordinary proof too.** The published
+`Garrido.exists_invariant_extension_of_isSetRing` binds `{X : Type (max u v)}` with `v` nowhere
+else. Its first solution, built by `build_solution.py` with the published binders copied into
+`theorem solution`, came back `WA` "universe level metavariables" (2026-10-04). It was accepted once
+`solution` took `{X : Type w}` in a universe of its own: inside, transfer to `ULift.{u} X :
+Type (max u w)`, apply the `max`-universe theorem there, and pull back along `Equiv.ulift`.
+Unification then only has to set `w := max u v`. A local `example : type_of% @Target := @copy`
+did *not* reproduce the failure, so do not count on catching it before submitting. Draft new
+statements with every universe occurring bare somewhere (`Type u`, `Type v`), and when one cannot
+be, prove the solution in an independent universe from the start.
+
 **The hypothesis that admits too much.** The defect that produces a false statement is usually a
 hypothesis that is weaker than the source's, not a wrong conclusion, and a blind read-back will
 not catch it: the auditor is describing the Lean, and the Lean does say what they say. Wolf's
