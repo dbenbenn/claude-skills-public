@@ -806,6 +806,18 @@ the proof; `watch_targets.py watch …` under a Monitor turns a status flip duri
 an event, and you decide whether to stop the prover. Do not automate the kill: the event is rare
 and a half-written proof of a now-closed statement is still evidence of an approach.
 
+**A theorem published after launch joins its mission as a milestone through
+`scripts/live_milestones.py`.** `add MISSION --after MILESTONE FILE.md…` inserts one milestone per
+file right after the named one, in the order given, and moves later milestones down only as far
+as the reading order needs; `edit MISSION MILESTONE FILE.md --reason …` retitles or rewrites one,
+with the reason solvers read in its history. Each file is a front matter (`title:`, and for `add`
+`theorem:`, the full name to link) over the milestone description; both are dry runs without
+`--go`, and `add` skips a theorem a milestone already links. When the new milestone is a stronger
+or fuller form of an existing one, edit the neighbour in the same pass: its title says which form
+it is (“(power-set form)”), and a sentence that said the fuller statement was out of scope is now
+false (Garrido I and Chou, 2026-10-03). Keep the files, with the old texts beside them, in a
+p2m-standalone/maintenance folder.
+
 **An external milestone is a target too, and the paper's case may be elementary.** Monod's C9 (the
 orbit relation of SL₂(A) on P¹ is not amenable, Carrière–Ghys) was scoped as "needs Zimmer
 amenability and CFW; probably its own mission". The special case Monod applies has a five-step
