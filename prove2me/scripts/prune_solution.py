@@ -248,7 +248,8 @@ def prune_by_lean(path):
     for n in rep['removed']:
         print('   - %s' % n)
     for m in drop_imports:
-        print('   - import %s (no kept declaration uses it: a false graph edge)' % m)
+        print('   - import %s (no kept declaration uses it: %s)'
+              % (m, 'a false graph edge' if m.startswith('Theorems.') else 'an unused bundle'))
     return P.apply(info, drop, drop_imports, rep.get('replace'))
 
 

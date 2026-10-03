@@ -8,7 +8,9 @@ folds through auxiliary constants, so `match`, `where`, `decreasing_by` and stru
 are seen exactly. A declaration command goes when nothing it declares is reached; with it go the
 `variable` and `attribute` commands that mention it and every diagnostic command (`#print`,
 `#check`, `#eval`, `#reduce`). An `import Theorems.X` goes when no kept declaration uses a
-constant of that module (`uses_imported`): that import would be a false graph edge.
+constant of that module (`uses_imported`): that import would be a false graph edge. A `Definitions.*` import
+goes the same way when, in addition, kept code never mentions one of the bundle's namespaces
+(`unused_bundles`); it is not a graph edge, only dead weight in the published proof.
 """
 import re
 
@@ -150,6 +152,8 @@ def plan(info):
     used_modules = {u['module'] for d in info.decls if d.command not in drop for u in d.uses_imported}
     header = info.slice(0, info.commands[0].start.byte) if info.commands else ''
     drop_imports = [m for m in re.findall(r'^import\s+(Theorems\.\S+)', header, re.M) if m not in used_modules]
+    kept = '\n'.join(info.slice(c.start.byte, c.end.byte) for c in info.commands if c.index not in drop)
+    drop_imports += unused_bundles(header, used_modules, kept)
     return drop, drop_imports, {'declarations': len([d for d in info.decls if not d.generated]),
                                 'removed': sorted(gone), 'imports_removed': drop_imports,
                                 'replace': replace}
@@ -165,6 +169,37 @@ def module_imports(module):
     return re.findall(r'^import\s+(\S+)', open(path, encoding='utf-8').read(), re.M)
 
 
+def bundle_namespaces(module):
+    """The namespaces a workspace bundle declares (`namespace A.B` gives `A.B` and `A`), or []."""
+    import os
+    from .workspace import workspace
+    path = os.path.join(workspace(), *module.split('.')) + '.lean'
+    if not os.path.exists(path):
+        return []
+    out = []
+    for n in re.findall(r'^\s*namespace\s+(\S+)', open(path, encoding='utf-8').read(), re.M):
+        for k in range(1, n.count('.') + 2):
+            p = '.'.join(n.split('.')[:k])
+            if p not in out:
+                out.append(p)
+    return out
+
+
+def unused_bundles(header, used_modules, kept_text, namespaces_of=bundle_namespaces):
+    """The `Definitions.*` imports of `header` that kept code does not use: no constant of the bundle
+    is used, and none of its namespaces is mentioned (a bundle can be needed for an `open` alone, as
+    CannonFloydParry was for dense-subgroups). Lusin-Novikov standalone (2026-10-03) kept an unused
+    Monod bundle carried over from the merged development."""
+    out = []
+    for m in re.findall(r'^import\s+(Definitions\.\S+)', header, re.M):
+        if m in used_modules:
+            continue
+        if any(re.search(r"(?<![\w.'])%s(?![\w'])" % re.escape(n), kept_text) for n in namespaces_of(m) or []):
+            continue
+        out.append(m)
+    return out
+
+
 def bundles_to_restore(header, drop_imports, imports_of=module_imports):
     """The `Definitions.*` modules the dropped theorem imports brought in that the header does not
     import itself: a dropped import must not take a bundle that kept code reaches only through it
@@ -172,6 +207,8 @@ def bundles_to_restore(header, drop_imports, imports_of=module_imports):
     have = set(re.findall(r'^import\s+(\S+)', header, re.M))
     out = []
     for m in drop_imports:
+        if not m.startswith('Theorems.'):
+            continue                    # a dropped bundle is unused; what it imports is not restored
         for d in imports_of(m) or []:
             if d.startswith('Definitions.') and d not in have and d not in out:
                 out.append(d)

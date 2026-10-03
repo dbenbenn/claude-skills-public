@@ -10,5 +10,8 @@
  "why": "primed dev lemma isMarginal_EBad' beside chk_isMarginal_EBad; a one-line check block; the merged Statements stubs rewired to imports and pruned",
  "dropped_since_accepted": {
   "MooreFoelner.Dev.Sec5Marg.ActsBy.def": "used nowhere (the rebuilt file compiles without it); the regex pruner of 2026-10-01 kept it, the Lean-dependency pruner (Phase 4.1) removes it"
+ },
+ "imports_dropped_since_accepted": {
+  "Definitions.Def_ThompsonAmenability": "used nowhere (the rebuilt file compiles without it, and Def_MooreTrees still brings what it needs); the pruner keeps a bundle import only when kept code uses one of its constants or names one of its namespaces (2026-10-03)"
  }
 }

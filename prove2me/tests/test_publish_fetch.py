@@ -43,12 +43,14 @@ def folder(tmp_path):
     (tmp_path / 'lib' / 'Thm_t.lean').write_text('import Definitions.Def_Bun\nimport Mathlib\n\nnamespace Q\n\ntheorem t : Bun.k = 1 := by\n  sorry\n\nend Q\n')
     (tmp_path / 'mission.py').write_text('''NAMESPACE = 'Q'
 TAGS = ['x']
-DEFINITIONS = [dict(name='Bun', title='A bundle', nls='The bundle.', page='1', result='Def 1')]
+DEFINITIONS = [dict(name='Bun', page='1', result='Def 1')]
 THEOREMS = [dict(name='t', page='2', result='Lemma 1')]
-PROSE = {'t': dict(title='Lemma 1 — t', nls='It is $1$.')}
 def src(page, result, extra=None, ref=None):
     return 'Paper, p. %s, %s' % (page, result)
 ''')
+    (tmp_path / 'prose').mkdir()
+    (tmp_path / 'prose' / 'Bun.md').write_text('---\ntitle: A bundle\n---\n\nThe bundle.\n')
+    (tmp_path / 'prose' / 't.md').write_text('---\ntitle: Lemma 1 — t\n---\n\nIt is $1$.\n')
     return tmp_path
 
 
@@ -110,3 +112,31 @@ def test_rerun_waits_on_a_queued_job_instead_of_publishing_twice(folder, monkeyp
     monkeypatch.setattr(P.sys, 'argv', ['publish_standalone.py', str(folder)])
     P.main()
     assert ('def', 'Bun') not in fake.posted and ('thm', 'Q.t') in fake.posted
+
+
+def test_publish_refuses_prose_with_an_escaped_quote(folder, monkeypatch):
+    # Lusin-Novikov standalone (2026-10-03): a raw string kept `\"Borel\"` in five published
+    # natural-language statements, which then needed a PATCH each
+    import p2m
+    (folder / 'prose' / 't.md').write_text('---\ntitle: Lemma 1 — t\n---\n\nIt is \\"one\\".\n')
+    fake = FakePublisher()
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_standalone.py', str(folder)])
+    with pytest.raises(SystemExit) as e:
+        PS.main()
+    assert 'escaped quote' in str(e.value) and fake.posted == []
+
+
+def test_publish_refuses_a_new_item_whose_prose_is_in_python(folder, monkeypatch):
+    # prose lives in prose/<name>.md; mission.py's PROSE dict is only read to verify old folders
+    import p2m
+    (folder / 'prose' / 't.md').unlink()
+    m = (folder / 'mission.py').read_text() + "PROSE = {'t': dict(title='Lemma 1 — t', nls='It is $1$.')}\n"
+    (folder / 'mission.py').write_text(m)
+    fake = FakePublisher()
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    monkeypatch.setattr(PS.time, 'sleep', lambda s: None)
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_standalone.py', str(folder)])
+    with pytest.raises(SystemExit) as e:
+        PS.main()
+    assert 'prose/<name>.md' in str(e.value) and ('thm', 'Q.t') not in fake.posted

@@ -4,8 +4,11 @@ published_ids.json, and verify every published field against the folder.
 
 usage: publish_standalone.py DIR [--dry]
 
-DIR/mission.py supplies NAMESPACE, TAGS, THEOREMS [{name, page, result, ...}], PROSE {name: {title,
-nls}}, src(page, result, extra, ref), and optionally DEFINITIONS [{name, title, nls, page, result[,
+DIR/mission.py supplies NAMESPACE, TAGS, THEOREMS [{name, page, result, ...}], src(page, result, extra,
+ref), and DIR/prose/<name>.md each item's title (front matter) and natural-language statement (body);
+a PROSE {name: {title, nls}} dict in mission.py is read only to verify a folder published before
+2026-10-03, and a new item whose prose is in Python is refused (Python string escapes put a literal
+backslash into five Lusin-Novikov statements). Also and optionally DEFINITIONS [{name, title, nls, page, result[,
 extra, tags]}] with code in DIR/lib/Def_<name>.lean, published first; DIR/lib/Thm_<name>.lean holds the statement (imports, then
 the namespaced `theorem … := by sorry`). Already-published names (published_ids.json) are skipped,
 so a rerun only verifies. Generalised 2026-09-30 from the per-folder publish.py of
@@ -25,10 +28,14 @@ def main():
     from p2m import call
     from p2mlib.mission import load, lib_payload
     M = load(here)
-    payloads = []
+    payloads, in_python = [], set()
     for T in M.THEOREMS:
         pre, body = lib_payload(os.path.join(here, 'lib', 'Thm_%s.lean' % T['name']))
-        P = M.PROSE[T['name']]
+        if T.get('_prose_file'):
+            P = {'title': T['title'], 'nls': T['nls']}
+        else:
+            P = M.PROSE[T['name']]
+            in_python.add('%s.%s' % (T.get('namespace', M.NAMESPACE), T['name']))
         payloads.append({'theorem_name': '%s.%s' % (T.get('namespace', M.NAMESPACE), T['name']),
                          'theorem_title': P['title'], 'formal_statement': body, 'preamble': pre,
                          'natural_language_statement': P['nls'],
@@ -36,6 +43,8 @@ def main():
                          'tags': T.get('tags', M.TAGS)})
     defs = []
     for D in getattr(M, 'DEFINITIONS', []):
+        if not D.get('_prose_file'):
+            in_python.add('Def_' + D['name'])
         defs.append({'definition_name': D['name'], 'definition_title': D['title'],
                      'definition': open(os.path.join(here, 'lib', 'Def_%s.lean' % D['name']), encoding='utf-8').read(),
                      'natural_language_statement': D['nls'],
@@ -45,6 +54,13 @@ def main():
         print('Def_' + d['definition_name']); print('   ', d['source'])
     for p in payloads:
         print(p['theorem_name']); print('   ', p['source'])
+    # a raw string keeps `\"`, which Markdown shows as a backslash (Lusin-Novikov, 2026-10-03: five
+    # natural-language statements published with `\"Borel\"` and patched one by one)
+    bad = [x.get('theorem_name') or 'Def_' + x.get('definition_name', '?')
+           for x in payloads + defs for k in ('theorem_title', 'natural_language_statement', 'source')
+           if '\\"' in (x.get(k) or '')]
+    if bad:
+        sys.exit('escaped quote (\\") in the prose of: ' + ', '.join(sorted(set(bad))))
     if '--dry' in sys.argv:
         return
     ids_path = os.path.join(here, 'published_ids.json')
@@ -83,6 +99,8 @@ def main():
             json.dump(ids, open(ids_path, 'w'), indent=1)
             continue
         if not job:
+            if key in in_python:
+                sys.exit('%s: write its prose in prose/%s.md, not in mission.py' % (key, d['definition_name']))
             r = call('POST', '/submit-definition', d)
             assert isinstance(r, dict) and '__error' not in r and r.get('job_id'), r
             job = r['job_id']
@@ -112,6 +130,9 @@ def main():
             jobs[p['theorem_name']] = job
         else:
             todo.append(p)
+    py = [p['theorem_name'] for p in todo if p['theorem_name'] in in_python]
+    if py:
+        sys.exit('write the prose of %s in prose/<name>.md, not in mission.py' % ', '.join(py))
     if todo:
         r = call('POST', '/submit-problem', {'problems': todo})
         assert isinstance(r, dict) and '__error' not in r and r.get('jobs'), r

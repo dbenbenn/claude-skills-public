@@ -690,7 +690,11 @@ keeps its prose out of Python: `prose/<name>.md` per item, a front matter of `ti
 `milestone_title:` lines, the natural-language statement as the body, and an optional
 `## Milestone` section for the milestone description. `p2mlib.mission.load` merges the files
 into `mission.py`'s items by name and refuses a field set in both places or a file naming no
-item. Raw Python strings let a stray `\'` reach a live Draft. Older missions keep their layout. Every mission
+item. Raw Python strings let a stray `\'` reach a live Draft. Older missions keep their layout.
+The same holds for a p2m-standalone folder (`publish_standalone.py`), which now refuses to publish
+a new item whose prose is in `mission.py`: the Lusin–Novikov package copied the older standalone
+template, kept its prose in a Python `PROSE` dict, and published `\"Borel\"` with the backslash in
+five statements (2026-10-03). Every mission
 through Garrido III copied its own uploader and verifier instead, and most of those verifiers
 only checked that a read-back was non-empty. The upload creates the proposal once, posts
 definitions with their read-backs, reference items, draft theorems, `main_item_id`,

@@ -87,6 +87,7 @@ def merge_prose(m, mdir):
             if items[name].get(k):
                 raise SystemExit('%s.%s is set both in mission.py and in prose/%s; keep one' % (name, k, f))
             items[name][k] = v
+        items[name]['_prose_file'] = os.path.join('prose', f)
 
 
 STATEMENT_START = re.compile(r'^(?:namespace|theorem|open\s.*\bin\s*$)', re.M)

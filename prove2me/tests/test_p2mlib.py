@@ -288,3 +288,21 @@ def test_explicit_payloads_win_over_the_lib_default(tmp_path):
     (tmp_path / 'lib').mkdir()
     (tmp_path / 'lib' / 'Thm_foo.lean').write_text('import Mathlib\n\ntheorem foo : True := trivial\n')
     assert mission.load(str(tmp_path)).payloads() == {'x': ('a', 'b')}
+
+
+def test_unused_definition_imports_are_dropped_unless_their_namespace_is_mentioned():
+    # Lusin-Novikov standalone (2026-10-03): the root solution kept `import Definitions.Def_Monod_*`,
+    # carried over from the merged LN development, though nothing in it used the Monod bundle
+    from p2mlib import prune
+    header = ('import Definitions.Def_Monod_PiecewiseProjective\nimport Definitions.Def_CFP\n'
+              'import Definitions.Def_Used\nimport Theorems.Thm_T\nimport Mathlib\n')
+    ns = {'Definitions.Def_Monod_PiecewiseProjective': ['Monod'], 'Definitions.Def_CFP': ['CannonFloydParry'],
+          'Definitions.Def_Used': ['U']}
+    kept = 'open CannonFloydParry\ntheorem solution : True := trivial\n'     # used only through `open`
+    assert prune.unused_bundles(header, {'Definitions.Def_Used'}, kept, ns.get) == [
+        'Definitions.Def_Monod_PiecewiseProjective']
+    assert prune.unused_bundles(header, set(), 'theorem s := Monod.foo\n', ns.get) == [
+        'Definitions.Def_CFP', 'Definitions.Def_Used']
+    # a dropped bundle's own imports are not "restored": only dropped theorem imports bring bundles back
+    imports_of = {'Definitions.Def_Monod_PiecewiseProjective': ['Mathlib', 'Definitions.Def_Garrido']}.get
+    assert prune.bundles_to_restore(header, ['Definitions.Def_Monod_PiecewiseProjective'], imports_of) == []

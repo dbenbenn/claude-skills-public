@@ -80,6 +80,10 @@ def test_rebuild_matches_accepted(case, tmp_path):
         idx = [leanedit.command_of(winfo, n) for n in dropped]
         assert None not in idx, 'a dropped_since_accepted name is not in expected.lean: %s' % dropped
         want = leanedit.remove_commands(winfo, idx)
+    for m in meta.get('imports_dropped_since_accepted', {}):
+        assert re.search(r'(?m)^import %s$' % re.escape(m), want), 'not imported by expected.lean: ' + m
+        want = re.sub(r'(?m)^import %s\n' % re.escape(m), '', want)
+
     def norm(t):
         lines = [line for line in t.splitlines(True) if line.strip()]
         # the lines that only give `theorem solution` its scope (`section`, its `open`s, `end`) are

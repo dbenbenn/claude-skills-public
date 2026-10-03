@@ -32,3 +32,48 @@ def test_package_defaults_to_the_module_path_root(tmp_path):
     mods = BS.closure(str(tmp_path), BS.package_of('Solutions/LNS/P.lean'), 'Solutions/LNS/P.lean',
                       ['Solutions/LN', 'Solutions/LNS'])
     assert [os.path.relpath(m, tmp_path) for m in mods] == ['Solutions/LN/A.lean', 'Solutions/LNS/P.lean']
+
+
+TWO_NAMESPACES = '''section
+namespace Dev.PartB
+theorem cover : True := trivial
+end Dev.PartB
+end
+
+section
+namespace Dev
+alias cover := Dev.PartB.cover
+end Dev
+end
+
+section
+namespace LN
+theorem cover : True := Dev.cover
+theorem graph : True := cover
+end LN
+end
+'''
+
+
+def test_drop_matches_the_qualified_name_when_it_exists():
+    # Lusin-Novikov standalone (2026-10-03): --drop LN.cover also dropped Dev.PartB.cover and the
+    # alias Dev.cover (same last component), which the kept code still needed
+    lines, dropped = BS.drop_declarations(TWO_NAMESPACES.split('\n'), ['LN.cover'])
+    text = '\n'.join(lines)
+    assert dropped == ['LN.cover']
+    assert 'namespace Dev.PartB\ntheorem cover' in text and 'alias cover := Dev.PartB.cover' in text
+    assert 'theorem graph' in text and 'theorem cover : True := Dev.cover' not in text
+
+
+def test_drop_falls_back_to_the_short_name():
+    # a development copy under another namespace (no exact match) is still dropped, as before
+    lines, dropped = BS.drop_declarations(TWO_NAMESPACES.split('\n'), ['Published.graph'])
+    assert dropped == ['LN.graph'] and 'theorem graph' not in '\n'.join(lines)
+
+
+def test_dropped_theorems_without_a_workspace_statement_are_listed_for_fetching(tmp_path):
+    # Lusin-Novikov (2026-10-03): resolve_imports cannot import a dropped theorem whose statement
+    # file was never fetched; it tried to inline a same-named development lemma instead
+    (tmp_path / 'Theorems').mkdir()
+    (tmp_path / 'Theorems' / 'Thm_LN_have.lean').write_text('')
+    assert BS.missing_statements(str(tmp_path), ['LN.have', 'LN.need', 'short']) == ['LN.need']

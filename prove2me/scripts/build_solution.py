@@ -39,6 +39,57 @@ def published(name):
     return r[0]
 
 
+def namespaces_by_line(lines):
+    """The namespace in force at each line, from `namespace` / `section` / `end` lines."""
+    stack, out = [], []
+    for l in lines:
+        out.append('.'.join(n for k, n in stack if k == 'ns'))
+        m = re.match(r'^\s*(namespace|section|end)\b\s*(\S*)', l)
+        if not m:
+            continue
+        if m.group(1) == 'namespace':
+            stack += [('ns', p) for p in m.group(2).split('.')]
+        elif m.group(1) == 'section':
+            stack.append(('sec', m.group(2)))
+        elif stack:
+            # `end A.B` closes the namespaces A and B; a bare `end` closes the innermost section
+            for _ in range(max(1, m.group(2).count('.') + 1) if m.group(2) else 1):
+                if stack:
+                    stack.pop()
+    return out
+
+
+def drop_declarations(lines, drops):
+    """(lines without the declarations to be imported instead, [full names dropped]). A qualified
+    drop takes the declaration of exactly that name when there is one (Lusin-Novikov, 2026-10-03:
+    matching the last component also dropped `Dev.PartB.cover` and an alias to it, both still
+    needed); otherwise, as before, every declaration with that last component (a development copy
+    under another namespace)."""
+    ns = namespaces_by_line(lines)
+    decls = []
+    for name, _k, st, en, _attr in parse(lines):
+        head = next((i for i in range(st, en) if name in lines[i]), st)
+        full = name[len('_root_.'):] if name.startswith('_root_.') else '.'.join(x for x in (ns[head], name) if x)
+        decls.append((full, st, en))
+    spans, dropped = [], []
+    for d in drops:
+        hit = [x for x in decls if x[0] == d] or [x for x in decls if x[0].split('.')[-1] == d.split('.')[-1]]
+        for full, st, en in hit:
+            if (st, en) not in spans:
+                spans.append((st, en)); dropped.append(full)
+    lines = list(lines)
+    for st, en in sorted(spans, reverse=True):
+        del lines[st:en]
+    return lines, dropped
+
+
+def missing_statements(root, drops):
+    """The qualified --drop names whose published statement is not in ROOT/Theorems: resolve_imports
+    can only import a theorem whose file is there, so they are fetched first."""
+    return [d for d in drops if '.' in d and not os.path.exists(
+        os.path.join(root, 'Theorems', 'Thm_%s.lean' % d.replace('.', '_')))]
+
+
 def package_of(module):
     """The Lean package a development module belongs to: the first component of its path
     (`Solutions/LNS/Proofs.lean` -> `Solutions`), whose imports the closure follows."""
@@ -89,6 +140,11 @@ def main():
     ap.add_argument('--package', help='default: the first component of MODULE\'s path')
     a = ap.parse_args()
     a.package = a.package or package_of(a.module)
+    need = missing_statements(a.root, a.drop)
+    if need:
+        print('fetching the statements of', ' '.join(need))
+        subprocess.run([sys.executable, os.path.join(HERE, 'fetch_theorems.py'), '--names'] + need,
+                       check=True, cwd=a.root)
     ns, short = a.target.rsplit('.', 1)
     work = a.out + '.work'
     os.makedirs(work, exist_ok=True)
@@ -112,13 +168,9 @@ def main():
 
     # drop the declarations to be imported instead
     if a.drop:
-        lines = text.split('\n')
-        spans = []
-        for name, _k, st, en, _attr in parse(lines):
-            if any(name.split('.')[-1] == d.split('.')[-1] for d in a.drop):
-                spans.append((st, en)); print('  drop', name)
-        for st, en in sorted(spans, reverse=True):
-            del lines[st:en]
+        lines, dropped = drop_declarations(text.split('\n'), a.drop)
+        for n in dropped:
+            print('  drop', n)
         text = '\n'.join(lines)
 
     # 3. the solution wrapper, from the published statement
