@@ -814,6 +814,52 @@ Blueprint gives after the stub. Two jobs show the pattern working:
 Each prover builds its own `.olean` of the Blueprint (`lake build <module>` builds only that
 module).
 
+The pattern scales to research-level external milestones. On 2026-10-03, overnight, it closed:
+- Monod 2023 Theorem 5.1: six parts, about 3,450 lines;
+- the general Carrière–Ghys theorem (Lodha–Moore Theorem 2.2): eight parts, including Jørgensen's
+  sequence, Tits's embedding lemma and ping-pong over a normed field;
+- Kaimanovich's "F is not Liouville": four parts.
+
+Most parts took 5 to 20 minutes.
+
+What made it work:
+- **Write the Blueprint so the main theorem compiles from its stubs.** Check every stub for truth
+  before dispatch: a false stub wastes a prover.
+- **Brief the mathematics per part, then say "any correct route".** The provers repeatedly found
+  better routes than the brief's: Mathlib's `FreeGroup.injective_lift_of_ping_pong`; transience via
+  a Hardy inequality on a binary tree in the Schreier graph plus a Dirichlet-form bound on the
+  truncated Green function, with no comparison theorem; Zariski's lemma for cyclotomic finiteness.
+- **Give the riskiest part a second, independent prover** in its own file (`PartT2.lean`, its own
+  namespace, told not to read the other), and stop the slower one.
+- **Run `assemble_blueprint.py` on the parts already finished** while the rest still run. Interim
+  assemblies catch name and scope problems early.
+
+**Naming rules for check blocks:**
+- `build_solutions.py` drops every declaration named `chk_…` except the target's. A Blueprint lemma
+  called `chk_exists_…` vanished from the solution and broke it, so reserve the prefix for
+  milestone check blocks.
+- `check_complete.py` finds a milestone's proof only as `<mission namespace>.chk_<name>`. A block
+  in `LodhaMoore.Dev.LM7` was "no proof"; moved into `namespace LodhaMoore`, it was found.
+- When a new module replaces an old `sorry` check block, rename the old one away from `chk_`.
+
+**Before choosing overnight targets, list the live Open theorems of every mission.** Use
+`GET /theorems?mission_id=…`, not the memory of what is complete. One sweep found five unexpected
+Open items: two other-user helpers, an old (3.3) and two deliberately superseded statements. Three
+were closed within the hour from published theorems.
+
+**A solution submitted outside `submit_all.py` while it runs:** the script keeps `submitted.json`
+in memory and rewrites it. Stop it, record the submission (e.g.
+`"SKETCH_ACCEPTED <sid>"`), and restart it with the same arguments, adding any new check modules.
+Otherwise the entry is overwritten, or the statement is submitted twice.
+
+**Analytic stand-ins for probability, when Mathlib has no path space:**
+- A random walk's law is a convolution power. Use `Finsupp` convolution:
+  `ν.sum fun g a => μ.sum fun h b => single (g*h) (a*b)`, because `MonoidAlgebra` is a structure
+  in this Mathlib.
+- A.s. stabilisation becomes ℓ¹-Cauchy laws, with the changes bounded by Green-function terms.
+- Transience comes from a variational inequality, f(o)² ≤ C·E_μ(f), together with
+  E_μ(u_N) ≤ 2u_N(o) for the truncated Green function.
+
 **Published statements in the workspace.** After Submit, `scripts/fetch_theorems.py MISSION…`
 writes every published theorem and bundle of the missions into `Theorems/` and `Definitions/` in
 server shape and builds them, so solutions import exactly what the verifier compiles against; it
