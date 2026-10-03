@@ -2,7 +2,7 @@
 """Make a merged solution file self-contained: import what is published, inline what is not.
 
 usage: resolve_imports.py BODY.lean OUT.lean --src DIR [--ns QFS] [--import NAME ...]
-                          [--defs-prefix Def_QFS_] [--max-iter 15]
+                          [--module MOD ...] [--defs-prefix Def_QFS_] [--max-iter 15]
 
 A development written as a Lean project uses lemmas from its own modules. A prove2.me solution
 may import only definition bundles, published theorems and Mathlib, so every lemma the merged
@@ -109,6 +109,24 @@ def proved(ns, name):
     return False
 
 
+def header(ws, prefix, modules, imports, ns):
+    """The import lines: every bundle Definitions/<prefix>*.lean, then each --module as given (the
+    development's own bundle and published-theorem imports, which the merge strips), then each
+    named theorem, then Mathlib. Bundles of another namespace are reachable only through --module:
+    a development on the Monod bundle once failed with "cannot find a source for HB"."""
+    hdr = ['import Definitions.%s' % os.path.basename(f)[:-5]
+           for f in sorted(glob.glob(os.path.join(ws, 'Definitions', prefix + '*.lean')))]
+    hdr += ['import ' + m for m in modules if 'import ' + m not in hdr]
+    # an import is (namespace, name): a lemma may live in another namespace (QFS's goal uses
+    # Dyda.lintegral_le_regional_unitBall); a bare name is in --ns
+    for n in imports:
+        line = 'import Theorems.Thm_%s_%s' % ((n.rsplit('.', 1)[0], n.rsplit('.', 1)[1]) if '.' in n
+                                             else (ns, n))
+        if line not in hdr:
+            hdr.append(line)
+    return hdr + ['import Mathlib', '']
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('body'); ap.add_argument('out')
@@ -116,6 +134,8 @@ def main():
     ap.add_argument('--ns', default='QFS')
     ap.add_argument('--import', dest='imports', action='append', default=[])
     ap.add_argument('--defs-prefix', default=None)
+    ap.add_argument('--module', dest='modules', action='append', default=[],
+                    help='a module to import as is (a bundle or published theorem the development imported)')
     ap.add_argument('--max-iter', type=int, default=15)
     a = ap.parse_args()
     ws = _workspace()
@@ -125,12 +145,7 @@ def main():
     scratch = os.path.join(ws, 'scratch', 'resolve_imports_%d.lean' % os.getpid())
 
     def build():
-        hdr = ['import Definitions.%s' % os.path.basename(f)[:-5]
-               for f in sorted(glob.glob(os.path.join(ws, 'Definitions', prefix + '*.lean')))]
-        # an import is (namespace, name): a lemma may live in another namespace (QFS's goal uses
-        # Dyda.lintegral_le_regional_unitBall); a bare name is in --ns
-        hdr += ['import Theorems.Thm_%s_%s' % ((n.rsplit('.', 1)[0], n.rsplit('.', 1)[1]) if '.' in n
-                                              else (a.ns, n)) for n in imports] + ['import Mathlib', '']
+        hdr = header(ws, prefix, a.modules, imports, a.ns)
         # each copied declaration in its own section, with its source file's `variable`s
         inl = ''.join('section\n' + ''.join(v + '\n' for v in variables_before(s, n)) + '\n'
                       + extract(s, n) + '\nend\n\n' for s, n in inline)

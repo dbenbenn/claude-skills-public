@@ -59,6 +59,21 @@ def closure(repo, pkg, module, dirs):
     return order
 
 
+def external_imports(mods, drop=()):
+    """The `Definitions.*` and `Theorems.*` modules the merged modules import, in first-seen order.
+    The merge strips every import line and resolve_imports.py recovers only names it can trace; a
+    bundle used under `open` (bare `HB` from the Monod bundle) it cannot, so these are passed on as
+    --module (dense-subgroups, 2026-10-03). A --drop target's own statement module is left out:
+    resolve_imports imports it only if it is Proved. Unused theorem imports are pruned later."""
+    dropped = {'Theorems.Thm_' + d.replace('.', '_') for d in drop}
+    out = []
+    for p in mods:
+        for m in re.findall(r'^import\s+(\S+)', open(p, encoding='utf-8').read(), re.M):
+            if m.startswith(('Definitions.', 'Theorems.')) and m not in dropped and m not in out:
+                out.append(m)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('target'); ap.add_argument('module'); ap.add_argument('out')
@@ -118,8 +133,9 @@ def main():
     open(body, 'w', encoding='utf-8').write(text)
 
     # 4. resolve, prune, check
+    mods_args = [x for m in external_imports(mods, a.drop) for x in ('--module', m)]
     subprocess.run([sys.executable, os.path.join(HERE, 'resolve_imports.py'), body, a.out,
-                    '--src', os.path.join(a.root, a.package), '--ns', ns], check=True)
+                    '--src', os.path.join(a.root, a.package), '--ns', ns] + mods_args, check=True)
     subprocess.run([sys.executable, os.path.join(HERE, 'prune_solution.py'), a.out, '--check'], check=True)
     print('built %s' % a.out)
 

@@ -61,3 +61,17 @@ def test_extract_keeps_attribute_line(tmp_path):
 def test_proved_decides_import_vs_inline(monkeypatch, theorem, want):
     monkeypatch.setattr(RI, 'call', lambda m, p, b=None: {'theorems': [theorem]})
     assert RI.proved('N', 'x') is want
+
+
+def test_header_carries_raw_modules_before_named_theorems(tmp_path):
+    # dense-subgroups 2026-10-03: a development on the Monod bundle failed with "cannot find a
+    # source for HB" -- only Def_<ns>_* bundles were re-imported, and the merged modules' own
+    # `import Definitions.Def_Monod_PiecewiseProjective` had been stripped
+    (tmp_path / 'Definitions').mkdir()
+    (tmp_path / 'Definitions' / 'Def_QFS_A.lean').write_text('')
+    h = RI.header(str(tmp_path), 'Def_QFS_', ['Definitions.Def_Monod_PiecewiseProjective',
+                                              'Theorems.Thm_CannonFloydParry_bijOn_dyadic',
+                                              'Definitions.Def_QFS_A'], ['N.x'], 'QFS')
+    assert h == ['import Definitions.Def_QFS_A', 'import Definitions.Def_Monod_PiecewiseProjective',
+                 'import Theorems.Thm_CannonFloydParry_bijOn_dyadic', 'import Theorems.Thm_N_x',
+                 'import Mathlib', '']
