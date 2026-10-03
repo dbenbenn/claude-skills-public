@@ -23,13 +23,11 @@ def main():
     here = os.path.abspath(args[0])
     sys.path[:0] = [here, SK]
     from p2m import call
-    from p2mlib.mission import load
+    from p2mlib.mission import load, lib_payload
     M = load(here)
     payloads = []
     for T in M.THEOREMS:
-        src = open(os.path.join(here, 'lib', 'Thm_%s.lean' % T['name']), encoding='utf-8').read().split('\n')
-        pre = '\n'.join(l for l in src if l.startswith('import '))
-        body = '\n'.join(l for l in src if not l.startswith('import ')).strip() + '\n'
+        pre, body = lib_payload(os.path.join(here, 'lib', 'Thm_%s.lean' % T['name']))
         P = M.PROSE[T['name']]
         payloads.append({'theorem_name': '%s.%s' % (T.get('namespace', M.NAMESPACE), T['name']),
                          'theorem_title': P['title'], 'formal_statement': body, 'preamble': pre,

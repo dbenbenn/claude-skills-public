@@ -124,6 +124,29 @@ def statement_payloads(mdir):
     return out
 
 
+def lib_payload(path):
+    """(preamble, formal_statement) of a standalone statement file lib/Thm_<name>.lean, split exactly
+    as publish_standalone.py sends it: the import lines, then everything else."""
+    lines = open(path, encoding='utf-8').read().split('\n')
+    pre = '\n'.join(l for l in lines if l.startswith('import '))
+    body = '\n'.join(l for l in lines if not l.startswith('import ')).strip() + '\n'
+    return pre, body
+
+
+def lib_payloads(mdir):
+    """{short name: (preamble, formal_statement)} from MISSION_DIR/lib/Thm_*.lean, the layout of a
+    p2m-standalone folder (publish_standalone.py)."""
+    out = {}
+    for f in sorted(os.listdir(os.path.join(mdir, 'lib'))):
+        if f.startswith('Thm_') and f.endswith('.lean'):
+            pre, fs = lib_payload(os.path.join(mdir, 'lib', f))
+            m = re.search(r'^theorem\s+(\S+)', fs, re.M)
+            if not m:
+                raise SystemExit('lib/%s has no theorem' % f)
+            out[m.group(1).rsplit('.', 1)[-1]] = (pre, fs)
+    return out
+
+
 def load(mdir):
     mdir = os.path.abspath(mdir)
     name = '_p2m_mission_%d' % next(_n)
@@ -135,4 +158,6 @@ def load(mdir):
     merge_prose(m, mdir)
     if not hasattr(m, 'payloads') and os.path.isdir(os.path.join(mdir, 'statements')):
         m.payloads = lambda: statement_payloads(mdir)
+    elif not hasattr(m, 'payloads') and os.path.isdir(os.path.join(mdir, 'lib')):
+        m.payloads = lambda: lib_payloads(mdir)
     return m

@@ -269,3 +269,22 @@ def test_update_drafts_applies_a_delta_to_the_current_file(tmp_path):
     W.update_drafts(remove=['Theorems.B'], ws=ws)  # ... and records only its own change
     W.update_drafts(add={'Theorems.C': '/n'}, ws=ws)
     assert W.drafts(ws) == {'Theorems.C': '/n'}
+
+
+def test_standalone_lib_layout_gets_default_payloads(tmp_path):
+    # 2026-10-03: stage_auditor needed a hand-copied payloads() in every standalone mission.py
+    (tmp_path / 'mission.py').write_text("THEOREMS = [dict(name='foo')]\nPROSE = {}\n")
+    (tmp_path / 'lib').mkdir()
+    (tmp_path / 'lib' / 'Thm_foo.lean').write_text(
+        'import Mathlib\n\nnamespace N\n\ntheorem foo : True := by\n  sorry\n\nend N\n')
+    m = mission.load(str(tmp_path))
+    assert m.payloads() == {'foo': ('import Mathlib',
+                                    'namespace N\n\ntheorem foo : True := by\n  sorry\n\nend N\n')}
+    assert mission.lib_payload(str(tmp_path / 'lib' / 'Thm_foo.lean')) == m.payloads()['foo']
+
+
+def test_explicit_payloads_win_over_the_lib_default(tmp_path):
+    (tmp_path / 'mission.py').write_text("THEOREMS = []\nPROSE = {}\ndef payloads():\n    return {'x': ('a', 'b')}\n")
+    (tmp_path / 'lib').mkdir()
+    (tmp_path / 'lib' / 'Thm_foo.lean').write_text('import Mathlib\n\ntheorem foo : True := trivial\n')
+    assert mission.load(str(tmp_path)).payloads() == {'x': ('a', 'b')}
