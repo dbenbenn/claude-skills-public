@@ -130,3 +130,19 @@ def test_parse_only_knows_scoped_and_in_file_notation():
     assert p.errors == [] and [n for c in p.commands for n in c.names] == ['g', 'g_le', 'n1']
     e = recorded('Notation')
     assert {d.name for d in e.decls if not d.generated} == {'g', 'g_le', 'n1'}
+
+
+def test_cache_key_changes_when_an_import_is_built(tmp_path):
+    # markov-heat-kernels 2026-10-04: a stub whose .lean existed but was not yet built made the
+    # first run fail; the key hashed only the .lean, so after `lake build` the failure was served
+    # from the cache. The built .olean is part of the key.
+    ws = tmp_path / 'ws'
+    (ws / 'Theorems').mkdir(parents=True)
+    (ws / 'Theorems' / 'Stub.lean').write_text('theorem t : True := trivial\n')
+    f = ws / 'Use.lean'
+    f.write_text('import Theorems.Stub\n')
+    before = LI._key(str(f), False, str(ws))
+    olean = ws / '.lake' / 'build' / 'lib' / 'lean' / 'Theorems' / 'Stub.olean'
+    olean.parent.mkdir(parents=True)
+    olean.write_bytes(b'built')
+    assert LI._key(str(f), False, str(ws)) != before

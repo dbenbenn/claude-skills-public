@@ -179,6 +179,14 @@ def _key(path, parse_only, ws, candidates=()):
         if os.path.exists(f):
             st = os.stat(f)
             h.update(('%s:%d:%d' % (mod, st.st_mtime_ns, st.st_size)).encode())
+            # and whether it is built: an unbuilt import fails the run, and building it later
+            # leaves the .lean untouched (markov-heat-kernels 2026-10-04 served a stale failure)
+            o = os.path.join(ws, '.lake', 'build', 'lib', 'lean', mod.replace('.', os.sep) + '.olean')
+            if os.path.exists(o):
+                so = os.stat(o)
+                h.update(('olean:%d:%d' % (so.st_mtime_ns, so.st_size)).encode())
+            else:
+                h.update(b'olean:none')
     return h.hexdigest()
 
 
