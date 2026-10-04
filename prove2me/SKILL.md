@@ -379,6 +379,18 @@ Design questions that recur, with the answers we have settled on:
   Erschler–Zheng's Theorem A and headline limit follow its goal Theorem 8.3 (dbenbenn, 2026-10-04).
   Do not move a downstream result to a standalone or tell the human it cannot be a milestone; a
   sequel mission is for scope, not for direction.
+- **Auxiliary results are never milestones.** The milestones are the source's own claims. A result
+  of ours that backs a note -- a printed formula or a candidate reading fails (the typo rule,
+  "conditions only when proven needed"), or a supporting fact the note asserts and the paper does
+  not (math claims link to Lean) -- goes in the mission's standalone package
+  (`p2m-standalone/<mission>-readings`, as for Moore and Lodha–Moore), named in the mission's
+  namespace, linked from the note, listed in `mission.py` `COMPANIONS` so `draft.py verify`
+  resolves the name, and published after the mission's Submit. The source's printed version of a
+  theorem (the full-strength rule) *is* a source claim and stays a milestone. (dbenbenn,
+  2026-10-04, on 28 such items in the Erschler–Zheng Draft: "a claimed 'failure' of the source
+  material doesn't belong as a milestone. The milestones should reflect the claims made in the
+  source. … those auxiliary results are never milestones." Items dropped from `mission.py` leave the live
+  Draft only through `draft.py prune`.)
 - **One statement per source sentence.** A proposition with two clauses is one conjunctive
   theorem; splitting it into two milestones is not a decomposition when one induction proves both.
   Anyone who needs a half takes `.1` or `.2`.

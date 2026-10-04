@@ -3,6 +3,7 @@
 
 usage: draft.py MISSION_DIR verify
        draft.py MISSION_DIR upload [--go]        (dry run without --go)
+       draft.py MISSION_DIR prune [--go]         (delete live items the repo dropped; dry without --go)
 
 Every mission used to carry its own upload_X.py and verify_X.py, each copied from the last and
 edited; eleven verifiers across six repos, most of which only checked that a read-back was
@@ -23,6 +24,8 @@ data, not code: MISSION_DIR/mission.py defines
                needs them (verify otherwise flags them; see unneeded_refs)
   ORDER        optional item_order as a list of keys (Def names, 'ref:<name>', theorem names);
                the default is definitions, references, theorems; the goal always goes last
+  COMPANIONS   optional paths of standalone packages holding the mission's auxiliary results
+               (never milestones): verify resolves the prose's Lean names from their lib/
   src(page, result, extra=None, ref=None) -> the `source` string
   payloads()   -> {short_name: (preamble, formal_statement)}; extract_payloads() below does it
                for the usual layout (one statements file, bundles imported by use)
@@ -38,6 +41,11 @@ like the item-list approval.
 that has not changed is never touched and cannot lose a confirmation to a no-op edit. It creates
 the proposal on the first run. `verify` compares every field the upload sets, flags live items
 and milestones the repo does not have, and ends with `BAD <n>`; its exit status is n != 0.
+
+`prune` is the only deletion: an item dropped from mission.py stays on the live Draft, which upload
+reports as a stray and leaves alone, until prune deletes it (DELETE .../items/:id, which also drops
+it from item_order and its milestone) and removes it from proposal.json. Deleting is a decision:
+run it only for items the human agreed should go.
 """
 import glob, importlib.util, json, os, re, subprocess, sys, urllib.parse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -201,6 +209,17 @@ def diff(M, mdir, call, st):
     if d.get('main_item_id') != ids.get(M.GOAL):
         bad.append(('goal', 'main_item_id'))
     return bad, d, lm
+
+
+def strays(M, mdir, call, st):
+    """[(item id, name, confirmed_at)] for live items the repo no longer lists (prune deletes them)."""
+    items, _, _, _ = desired(M, mdir)
+    d = call('GET', '/mission-proposals/' + st['id'])
+    d = d.get('proposal', d)
+    known = {st['items'].get(k) for k in items}
+    name_of = {v: k for k, v in st['items'].items()}
+    return [(it['id'], name_of.get(it['id']) or it.get('theorem_name') or it.get('definition_name') or '?',
+             it.get('confirmed_at')) for it in d.get('items') or [] if it['id'] not in known]
 
 
 def unneeded_refs(M, mdir, items, miles, call):
@@ -373,6 +392,14 @@ def dead_lean_refs(M, mdir, its, mls, desc, call):
     for f in sorted(glob.glob(os.path.join(mdir, 'lib', '*.lean')) + glob.glob(os.path.join(mdir, 'statements', '*.lean'))):
         n, sp = _decls(f, seen)
         names |= n; spaces |= sp
+    # a companion package (mission.py COMPANIONS, paths) holds the mission's auxiliary results, which
+    # are never milestones and are published after it; its declarations resolve the notes' names
+    # (Erschler-Zheng, 2026-10-04: 28 items moved to the standalone erschler-zheng-readings)
+    for c in getattr(M, 'COMPANIONS', []):
+        c = os.path.expanduser(c)
+        for f in sorted(glob.glob(os.path.join(c, 'lib', '*.lean')) + glob.glob(os.path.join(c, 'statements', '*.lean'))):
+            n, _ = _decls(f, seen)
+            names |= n
     short = {q.split('.')[-1] for q in names}
     left = [h for h in refs if h not in names and h not in short
             and not any(q.endswith('.' + h) for q in names)]
@@ -568,7 +595,7 @@ def goal_unquoted(M, items):
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[2] not in ('verify', 'upload'):
+    if len(sys.argv) < 3 or sys.argv[2] not in ('verify', 'upload', 'prune'):
         sys.exit(__doc__)
     mdir, cmd, go = os.path.abspath(sys.argv[1]), sys.argv[2], '--go' in sys.argv[3:]
     M = load(mdir)
@@ -602,6 +629,22 @@ def main():
         print('items %d  milestones %d  status %s | BAD %d'
               % (len(d.get('items') or []), len(lm), d.get('status'), len(bad)))
         sys.exit(1 if bad else 0)
+
+    if cmd == 'prune':
+        if 'id' not in st:
+            sys.exit('no proposal.json -- nothing uploaded yet')
+        gone = strays(M, mdir, call, st)
+        for iid, name, confirmed in gone:
+            print('   %s DELETE %s (%s)%s' % ('' if go else 'would', name, iid,
+                                            ', confirmed %s' % confirmed if confirmed else ''))
+            if go:
+                r = call('DELETE', '/mission-proposals/%s/items/%s' % (st['id'], iid))
+                if isinstance(r, dict) and '__error' in r:
+                    sys.exit('FAILED deleting %s: %s' % (name, str(r['__error'])[:400]))
+                st['items'] = {k: v for k, v in st['items'].items() if v != iid}
+                json.dump(st, open(stp, 'w'), indent=1)
+        print('%s: %d item(s)%s' % ('deleted' if go else 'dry run', len(gone), '' if go else ' -- pass --go to delete'))
+        return
 
     items, miles, order, desc = desired(M, mdir)
     long = too_long(items, miles)
@@ -680,10 +723,10 @@ def main():
         print('   NOTE %s: %s' % (k, w))
     for k, w in unneeded_refs(M, mdir, items, miles, call):
         print('   NOTE %s: %s' % (k, w))
-    strays = [(k, w) for k, w in bad if w.startswith('stray')]
-    for k, w in strays:
-        print('   NOTE %s: %s -- not deleted; remove it deliberately if it should go' % (k, w))
-    print('%s: %d difference(s)%s' % ('uploaded' if go else 'dry run', len(bad) - len(strays),
+    loose = [(k, w) for k, w in bad if w.startswith('stray')]
+    for k, w in loose:
+        print('   NOTE %s: %s -- not deleted; `prune` deletes it once its removal is agreed' % (k, w))
+    print('%s: %d difference(s)%s' % ('uploaded' if go else 'dry run', len(bad) - len(loose),
                                        '' if go else ' -- pass --go to apply'))
     if go:
         # keep the workspace's statement stubs equal to what was just uploaded (stubs.py)

@@ -169,6 +169,28 @@ def test_verify_finds_a_published_theorem_by_exact_name(env, monkeypatch):
     assert 'Other.lemma_x`' not in named and 'Other.lemma_gone' in named
 
 
+def test_verify_resolves_names_from_a_companion_package(env, monkeypatch, tmp_path):
+    # Erschler-Zheng 2026-10-04: auxiliary results are never milestones (dbenbenn), so 28 items moved
+    # to the standalone package erschler-zheng-readings; the notes still name them, and they are
+    # published only after the mission, so neither the workspace nor the platform knows them yet
+    import draft
+    mdir, ws = env
+    monkeypatch.setenv('P2M_WORKSPACE', ws)
+    statements_layout(mdir)
+    comp = tmp_path / 'companion'
+    (comp / 'lib').mkdir(parents=True)
+    (comp / 'lib' / 'Thm_Other_aux_fact.lean').write_text(
+        'import Mathlib\n\nnamespace Other\n\ntheorem aux_fact : True := by\n  sorry\n\nend Other\n')
+    _probe_fails_everything(monkeypatch, draft)
+    M = draft.load(mdir)
+    its, mls, _, _ = draft.desired(M, mdir)
+    desc = 'Cites `Other.aux_fact` and `Other.not_there`.'
+    named = ' '.join(b[1] for b in draft.dead_lean_refs(M, mdir, its, mls, desc, lambda *a, **k: {}))
+    assert 'Other.aux_fact' in named                       # not declared: no companion yet
+    M.COMPANIONS = [str(comp)]
+    named = ' '.join(b[1] for b in draft.dead_lean_refs(M, mdir, its, mls, desc, lambda *a, **k: {}))
+    assert 'Other.aux_fact' not in named and 'Other.not_there' in named
+
 
 def test_a_stub_copied_by_hand_is_listed_and_adopted_on_request(env):
     # Erschler-Zheng (2026-10-04): implementers copied each statement into Theorems/ by hand, so the

@@ -39,6 +39,12 @@ class FakeProposal:
         if m == 'PATCH' and p == '/mission-proposals/P':
             self.prop.update(b)
             return {}
+        if m == 'DELETE' and p.startswith('/mission-proposals/P/items/'):
+            iid = p.rsplit('/', 1)[1]                       # live: 204, and gone from item_order
+            del self.items[iid]
+            self.miles.pop(iid, None)
+            self.prop['item_order'] = [i for i in self.prop['item_order'] if i != iid]
+            return {}
         raise AssertionError((m, p))
 
 
@@ -168,3 +174,29 @@ def test_missing_tags_default_to_the_mission_tags(mdir):
     M = D.load(str(mdir))
     items, _, _, _ = D.desired(M, str(mdir))
     assert all(it['tags'] == ['mission-tag'] for it in items.values() if it['kind'] != 'reference')
+
+
+def run_prune(mdir, fake, monkeypatch, *flags):
+    import p2m
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    monkeypatch.setattr(D.sys, 'argv', ['draft.py', str(mdir), 'prune'] + list(flags))
+    D.main()
+
+
+def test_prune_deletes_only_items_the_repo_dropped(mdir, monkeypatch, capsys):
+    # Erschler-Zheng 2026-10-04: 28 auxiliary items left mission.py for a standalone package
+    # (dbenbenn: auxiliary results are never milestones); upload only reports a stray, never deletes
+    fake, ids = live_from_repo(mdir)
+    fake.items['i_gone'] = dict(fake.items[ids['t1']], id='i_gone', theorem_name='Mini.gone')
+    fake.miles['i_gone'] = ('Lemma 9 — gone', 'Dropped.')
+    fake.prop['item_order'].insert(1, 'i_gone')
+    st = json.loads((mdir / 'proposal.json').read_text())
+    st['items']['gone'] = 'i_gone'
+    (mdir / 'proposal.json').write_text(json.dumps(st))
+    run_prune(mdir, fake, monkeypatch)
+    assert fake.writes == [] and 'gone' in capsys.readouterr().out
+    run_prune(mdir, fake, monkeypatch, '--go')
+    assert fake.writes == [('DELETE', '/mission-proposals/P/items/i_gone')]
+    assert 'gone' not in json.loads((mdir / 'proposal.json').read_text())['items']
+    bad, _, _ = D.diff(D.load(str(mdir)), str(mdir), fake.call, json.loads((mdir / 'proposal.json').read_text()))
+    assert bad == []
