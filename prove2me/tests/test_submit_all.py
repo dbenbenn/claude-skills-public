@@ -37,7 +37,7 @@ def run(m, monkeypatch, submit, call=lambda *a, **k: {}):
 def test_retry_then_accept_and_pending_polled_not_resubmitted(mission, monkeypatch):
     n_sub = {'b': 0, 'c': 0}
 
-    def submit(ns, n, f, expl=None):
+    def submit(ns, n, f, expl=None, differs=None):
         if n == 'a':
             return 'ACCEPTED s1'
         n_sub[n] += 1
@@ -54,7 +54,7 @@ def test_retry_then_accept_and_pending_polled_not_resubmitted(mission, monkeypat
 def test_failed_after_retries_and_duplicate_not_retried(mission, monkeypatch):
     calls = []
 
-    def submit(ns, n, f, expl=None):
+    def submit(ns, n, f, expl=None, differs=None):
         calls.append(n)
         return {'a': 'ACCEPTED s1', 'b': 'WA sX', 'c': 'DUPLICATE: live submission y'}[n]
     code, done = run(mission, monkeypatch, submit)
@@ -94,7 +94,7 @@ def test_waits_while_an_import_is_unpublished(mission, monkeypatch, tmp_path):
     monkeypatch.setattr(S.subprocess, 'run', fake_run)
     when = {}
 
-    def submit(ns, n, f, expl=None):
+    def submit(ns, n, f, expl=None, differs=None):
         when[n] = rounds[0]
         return 'ACCEPTED s-' + n
     code, done = run(mission, monkeypatch, submit)
@@ -117,10 +117,32 @@ def test_waits_for_its_explanation_and_passes_it(mission, monkeypatch):
     monkeypatch.setattr(S.subprocess, 'run', fake_run)
     when, got = {}, {}
 
-    def submit(ns, n, f, expl=None):
+    def submit(ns, n, f, expl=None, differs=None):
         when[n], got[n] = rounds[0], expl
         return 'ACCEPTED s-' + n
     code, done = run(mission, monkeypatch, submit)
     assert code == 0 and all(v.startswith('ACCEPTED') for v in done.values())
     assert when['a'] == 1 and when['b'] == 2
     assert got['b'].endswith('explanations/b.md')
+
+
+def test_already_proved_waits_for_a_comparison(mission, monkeypatch):
+    # dbenbenn 2026-10-04: when the theorem got proved meanwhile, submit ours only if it is
+    # meaningfully different, which means reading the other proof; comparisons/<name>.md records
+    # the reading: "Different from <id>: ..." submits it, "Same as <id>: ..." settles the skip
+    got = {}
+
+    def submit(ns, n, f, expl=None, differs=None):
+        got[n] = differs
+        if n in 'bc' and differs is None:
+            return 'ALREADY-PROVED: 226ad5b4 (Nickrobbins95, ACCEPTED, edges none)'
+        return 'ACCEPTED s-' + n
+    code, done = run(mission, monkeypatch, submit)
+    assert code == 0 and done['b'].startswith('ALREADY-PROVED') and done['c'].startswith('ALREADY-PROVED')
+    (mission / 'comparisons').mkdir()
+    (mission / 'comparisons' / 'b.md').write_text('Same as 226ad5b4: the same induction on word length.')
+    (mission / 'comparisons' / 'c.md').write_text('Different from 226ad5b4: ...')
+    got.clear()
+    code, done = run(mission, monkeypatch, submit)
+    assert code == 0 and done['c'] == 'ACCEPTED s-c' and got == {'c': str(mission / 'comparisons' / 'c.md')}
+    assert done['b'].startswith('SKIPPED same as 226ad5b4')

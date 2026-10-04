@@ -26,3 +26,14 @@ def pytest_collection_modifyitems(config, items):
         if 'lean' in item.keywords and os.environ.get('P2M_LEAN') != '1':
             item.add_marker(pytest.mark.skip(reason='Lean test; set P2M_LEAN=1'))
 
+
+
+@pytest.fixture(autouse=True)
+def no_live_submissions(monkeypatch):
+    """No test reaches POST /verify: a submit test whose refusal regresses would otherwise submit for
+    real (no live-write tests). A test that needs a verdict monkeypatches post_verify itself."""
+    import submit_verify
+
+    def refuse(*a, **k):
+        raise AssertionError('a test reached POST /verify')
+    monkeypatch.setattr(submit_verify, 'post_verify', refuse)

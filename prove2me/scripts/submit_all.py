@@ -13,7 +13,13 @@ Moore solutions submitted together all had verdicts within 15 minutes (2026-10-0
 
 A verdict other than ACCEPTED/SKETCH_ACCEPTED is retried, up to --retries (default 2), then
 recorded as `FAILED ...` and printed with `!!`. Refusals a resubmission cannot change (DUPLICATE,
-REFUSED, EDGES-DIFFER) are recorded without a retry. A verdict that is only late (`PENDING sid`)
+REFUSED, EDGES-DIFFER) are recorded without a retry. A statement proved meanwhile by a proof whose
+edges include ours is recorded `ALREADY-PROVED ...` and not submitted (submit_solution.blocking;
+dbenbenn 2026-10-04: submit our own proof "only if it's meaningfully different: correct edges, or
+mathematically different"). Deciding that means reading the other proof, which submit_solution
+saves under solutions/others/; the reading goes in MISSION_DIR/comparisons/<name>.md. On a later
+run, "Different from <id>: ..." submits ours as built (--differs), and "Same as <id>: ..." records
+`SKIPPED same as <id>`, which is settled and not listed again. A verdict that is only late (`PENDING sid`)
 is polled on later rounds, never resubmitted. The run ends by listing every entry that needs
 attention, and exits 1 if there is one. A statement no check file proves (an external milestone, a reduction to
 be written by hand) is recorded as `no-check` and skipped; --hold NAME builds but does not submit
@@ -45,7 +51,8 @@ from p2m import call  # noqa: E402
 
 LIVE = ('ACCEPTED', 'SKETCH_ACCEPTED')
 # refusals that a resubmission cannot change: record them, do not retry
-FINAL = ('DUPLICATE', 'REFUSED', 'EDGES-DIFFER')
+FINAL = ('DUPLICATE', 'REFUSED', 'EDGES-DIFFER', 'ALREADY-PROVED')
+SKIP = 'ALREADY-PROVED'
 
 
 def explanation_file(mdir, n):
@@ -55,10 +62,25 @@ def explanation_file(mdir, n):
     return p if os.path.isfile(p) else None
 
 
-def submit(ns, n, f, expl):
+def comparison_file(mdir, n):
+    """MISSION_DIR/comparisons/<name>.md, written after reading the live proof(s) of a statement
+    proved meanwhile against ours (they are saved in solutions/others/), or None. It begins
+    "Different from <id>: ..." (submitted, with it as submit_solution.py --differs) or
+    "Same as <id>: ..." (not submitted)."""
+    p = os.path.join(mdir, 'comparisons', n + '.md')
+    return p if os.path.isfile(p) else None
+
+
+def same_as(path):
+    """'same as <id>' when the comparison at `path` came out the same, else None."""
+    head = open(path, encoding='utf-8').read().lstrip().split(':', 1)[0]
+    return head[0].lower() + head[1:] if head.startswith('Same as') else None
+
+
+def submit(ns, n, f, expl, differs=None):
     """Submit one solution; return 'STATUS SID', 'PENDING SID', or a one-line failure."""
     r = subprocess.run([sys.executable, os.path.join(SK, 'submit_solution.py'), '%s.%s' % (ns, n), f,
-                        '--explanation', expl, '--go'],
+                        '--explanation', expl] + (['--differs', differs] if differs else []) + ['--go'],
                        capture_output=True, text=True)
     o = r.stdout + r.stderr
     v = re.search(r'verdict (\S+) (\S+)', o)
@@ -66,7 +88,7 @@ def submit(ns, n, f, expl):
         return 'EDGES-DIFFER %s %s' % v.groups()
     if v:
         return '%s %s' % v.groups()
-    for key in ('DUPLICATE', 'REFUSED'):
+    for key in ('DUPLICATE', SKIP, 'REFUSED'):
         if key in o:
             return '%s: %s' % (key, o.strip().split(key, 1)[1][:200].strip())
     return 'ERROR: ' + ' '.join(o.strip().split())[-300:]
@@ -156,14 +178,20 @@ def main():
                     done[n] = 'retry %s %s' % (st2, sid)
                 json.dump(done, open(state, 'w'), indent=1)
                 continue
-            if n in done and not (v == 'held' and n not in held) and not v.startswith('retry '):
+            if n in done and not (v == 'held' and n not in held) and not v.startswith('retry ') \
+                    and not (v.startswith(SKIP) and comparison_file(mdir, n)):
+                continue
+            if v.startswith(SKIP) and same_as(comparison_file(mdir, n)):
+                done[n] = 'SKIPPED %s (comparisons/%s.md)' % (same_as(comparison_file(mdir, n)), n)
+                print(time.strftime('%H:%M'), n, '->', done[n], flush=True)
+                json.dump(done, open(state, 'w'), indent=1)
                 continue
             f = os.path.join(out, 'Sol_%s.lean' % n)
             if n in waiting and os.path.exists(f) and waiting_on(f):
                 continue    # still waiting: no rebuild until the import publishes
             # a held solution is submitted as built: the audit fixes made by hand between the
             # --build-only run and this one were being overwritten by a rebuild (Moore, 2026-10-02)
-            if (v == 'held' or v.startswith('retry ')) and os.path.exists(f):
+            if (v == 'held' or v.startswith('retry ') or v.startswith(SKIP)) and os.path.exists(f):
                 st = 'OK'
             else:
                 p = subprocess.run([sys.executable, os.path.join(SK, 'build_solutions.py'), mdir] + checks + [n],
@@ -203,7 +231,8 @@ def main():
             print(time.strftime('%H:%M'), 'submitting %d in parallel: %s' % (len(batch), ' '.join(n for n, _ in batch)),
                   flush=True)
             with ThreadPoolExecutor(max_workers=a.parallel) as ex:
-                for n, res in zip([n for n, _ in batch], ex.map(lambda nf: submit(ns, nf[0], nf[1], explanation_file(mdir, nf[0])), batch)):
+                for n, res in zip([n for n, _ in batch], ex.map(lambda nf: submit(ns, nf[0], nf[1], explanation_file(mdir, nf[0]),
+                                                             differs=comparison_file(mdir, nf[0])), batch)):
                     tries[n] = tries.get(n, 0) + 1
                     if res.split()[0] in LIVE or res.startswith('PENDING ') or res.startswith(FINAL):
                         done[n] = res
@@ -211,7 +240,8 @@ def main():
                         done[n] = 'retry ' + res          # rebuilt-free resubmission next round
                     else:
                         done[n] = 'FAILED %s (after %d tries)' % (res, tries[n])
-                    flag = '!! ' if not (res.split()[0] in LIVE or res.startswith('PENDING ')) else ''
+                    flag = '' if res.split()[0] in LIVE or res.startswith('PENDING ') else \
+                        '-- ' if res.startswith(SKIP) else '!! '
                     print(time.strftime('%H:%M'), flag + n, '->', done[n], flush=True)
             json.dump(done, open(state, 'w'), indent=1)
             json.dump(tries, open(tries_path, 'w'), indent=1)
@@ -224,9 +254,15 @@ def main():
         time.sleep(a.every)
     bad = [n for n in names if done.get(n, '').split(' ')[0].rstrip(':') in
            ('FAILED', 'EDGES-DIFFER', 'DUPLICATE', 'REFUSED', 'ERROR', 'build-fail', 'prune-fail')]
+    skipped = [n for n in names if done.get(n, '').startswith(SKIP)]
     for n in bad:
         print('!! %s: %s' % (n, done[n]), flush=True)
-    print('ALL DONE' + (' -- %d need attention' % len(bad) if bad else ''), flush=True)
+    for n in skipped:
+        print('-- %s: %s\n   not submitted: read the proof(s) saved in solutions/others/ against ours, write '
+              'comparisons/%s.md ("Different from <id>: ..." or "Same as <id>: ..."), and run again'
+              % (n, done[n], n), flush=True)
+    print('ALL DONE' + (' -- %d need attention' % len(bad) if bad else '')
+          + (' -- %d skipped as already proved' % len(skipped) if skipped else ''), flush=True)
     sys.exit(1 if bad else 0)
 
 

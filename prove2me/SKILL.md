@@ -813,6 +813,26 @@ On 2026-10-04, 480 of our 1,053 accepted submissions had no explanation: the too
 and prove.md calls it "very IMPORTANT". The backfill for the live missions is in
 `p2m-standalone/maintenance/explanations`.
 
+**A statement proved meanwhile gets our proof only if ours is meaningfully different**: correct
+edges, or different mathematics (dbenbenn, 2026-10-04). `submit_solution.py` reads the live proofs
+at submission time, since a batch built hours earlier can find the theorem proved in between.
+- The same Lean source is a `DUPLICATE`, never submitted.
+- A proof with an edge that no live proof has goes in, and the log says what it adds. Our edges are
+  checked to be used, so this is a different decomposition, or the other proof inlined a milestone.
+- A proof whose edges a live proving proof already includes is held: `ALREADY-PROVED`. Two full
+  proofs land here; the old graph-only check never compared them, because a full proof has no
+  sketch node.
+- A held proof waits for a decision, and the decision means reading the other proof. The script
+  saves it, Lean and explanation, under `solutions/others/`. Compare the route, the key lemma and
+  the edges (`edge_audit.py MISSION` judges whether its edges are false or missing). Then write
+  `MISSION_DIR/comparisons/<name>.md`, beginning "Different from <id>: …" or "Same as <id>: …",
+  and run `submit_all.py` again. A "Different" proof is submitted with the comparison as
+  `--differs`; a "Same" one is recorded `SKIPPED` and settled.
+
+The case behind it: Nickrobbins95 proved the Lodha–Moore torsion-free milestone 7 hours before our
+batch reached it, with a 252-line direct proof. Ours, 20 lines through `G0 ≤ H(ℝ)` and Monod's
+torsion-free theorem, would still go in, because it records the paper's route as edges.
+
 **Build each solution with `scripts/build_solution.py`** (merge the development module and its
 closure, drop the OTHER milestones so they are imported once Proved, generate the `solution`
 wrapper from the published statement, then `resolve_imports.py` and `prune_solution.py --check`),

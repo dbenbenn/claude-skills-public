@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Submit a solution, check the graph shows exactly its imports, then retire what it replaces.
 
-usage: submit_solution.py THEOREM FILE --explanation FILE.md [--allow-copy NAME ...] [--replaces SID ...] [--go]
+usage: submit_solution.py THEOREM FILE --explanation FILE.md [--allow-copy NAME ...] [--differs NOTE.md]
+                           [--replaces SID ...] [--go]
        (dry run without --go; THEOREM is a full name like Chou.hasPackingProperty_of_finite,
         or a theorem id; --go refuses without an explanation that passes p2mlib.explanation,
         unless --no-explanation is given)
@@ -9,6 +10,12 @@ usage: submit_solution.py THEOREM FILE --explanation FILE.md [--allow-copy NAME 
 The last step of rewire.py and of any prune that drops a false edge, done the same way every
 time instead of by a per-mission submit script:
 
+  0. read the theorem's live proofs (`blocking`): refuse the same Lean source (DUPLICATE), and
+     refuse a proof that adds no graph edge to one that already proves the theorem
+     (ALREADY-PROVED). That refusal saves each such proof, Lean and explanation, under
+     others/ beside FILE: deciding whether ours is meaningfully different means reading it.
+     The comparison is then written down; one that begins "Different from <id>:" (other
+     mathematics, or edges correct where its are false) is passed as --differs NOTE.md;
   1. POST /verify and poll (submit_verify.post_verify / poll); stop unless ACCEPTED or
      SKETCH_ACCEPTED;
   2. read the theorem's graph and require the new sketch's theorem edges to equal the file's
@@ -64,6 +71,86 @@ def sketch_edges(tid, sid):
     present = any(e['source'] == node or e['target'] == node for e in g['edges'])
     return present, {names[e['source']] for e in g['edges']
                      if e['target'] == node and '.' in (names.get(e['source']) or '')}
+
+
+def live_proofs(tid, replaces=()):
+    """The theorem's live accepted proofs: dicts with id, status, username, edges (the theorems its
+    graph sketch points from; empty for a full proof) and content (its Lean source). Listed from
+    /submissions, not from the graph: the graph has a sketch node only for a proof with theorem
+    edges, so two full proofs of one theorem were never compared (Lodha-Moore, 2026-10-04)."""
+    subs = call('GET', '/theorems/%s/submissions?status=ACCEPTED,SKETCH_ACCEPTED&limit=200' % tid)
+    g = call('GET', '/theorems/%s/graph' % tid)
+    names = {n.get('theorem_id'): n.get('theorem_name') for n in g['nodes'] if n.get('node_type') == 'theorem'}
+    out = []
+    for s in (subs or {}).get('submissions') or []:
+        if s.get('deprecated_at') or any(s['id'].startswith(r) for r in replaces):
+            continue
+        node = 'sketch-' + s['id']
+        edges = {names[e['source']] for e in g['edges']
+                 if e['target'] == node and '.' in (names.get(e['source']) or '')}
+        content = (call('GET', '/submissions/%s/solution' % s['id']) or {}).get('content') or ''
+        out.append(dict(id=s['id'], status=s.get('status'), username=s.get('username'), edges=edges,
+                        content=content, explanation=s.get('explanation') or ''))
+    return out
+
+
+def save_others(path, proofs):
+    """Write each proof's Lean source and explanation to others/<FILE stem>.<id8>.lean and .md
+    beside FILE, for the comparison that decides whether ours is meaningfully different (dbenbenn,
+    2026-10-04: "you might have to go read the other proof to make a decision about whether it's
+    different"). Returns the .lean paths."""
+    d = os.path.join(os.path.dirname(os.path.abspath(path)), 'others')
+    os.makedirs(d, exist_ok=True)
+    stem = os.path.splitext(os.path.basename(path))[0]
+    out = []
+    for p in proofs:
+        base = os.path.join(d, '%s.%s' % (stem, p['id'][:8]))
+        with open(base + '.lean', 'w', encoding='utf-8') as f:
+            f.write(p['content'])
+        with open(base + '.md', 'w', encoding='utf-8') as f:
+            f.write(p.get('explanation') or '(no explanation)\n')
+        out.append(base + '.lean')
+    return out
+
+
+def _norm(text):
+    return '\n'.join(l.rstrip() for l in text.strip().splitlines())
+
+
+def blocking(want, text, live):
+    """(kind, proofs): the live proofs that make this one redundant, or (None, []).
+
+    DUPLICATE: the same Lean source (Chornyi Cor 3 was resubmitted verbatim after a context summary
+    lost track of the first submission, 2026-10-02). ALREADY-PROVED: a proof whose edges include all
+    of `want`, when that proof proves the theorem (ACCEPTED; a reduction is ACCEPTED once its
+    children are proved) or has exactly these edges. This proof would add no graph edge to it, and
+    goes in only if it is meaningfully different (dbenbenn, 2026-10-04: "submit our own separate
+    proof only if it's meaningfully different: correct edges, or mathematically different"). A proof
+    with an edge that no live proof has is never blocked: the Lodha-Moore torsion-free milestone had
+    a 252-line direct proof by another user, and ours records the paper's route through two
+    milestones, edges the graph lacked."""
+    dup = [p for p in live if _norm(p['content']) == _norm(text)]
+    if dup:
+        return 'DUPLICATE', dup
+    cov = [p for p in live if want <= p['edges'] and (p['status'] == 'ACCEPTED' or p['edges'] == want)]
+    return ('ALREADY-PROVED', cov) if cov else (None, [])
+
+
+def note_problems(note, proofs):
+    """Why a --differs note does not excuse `proofs`: it is a comparison that came out
+    "Different from <id>: ..." (a "Same as" comparison is the reason not to submit), names each
+    proof (the first eight characters of its id, so it was written against that proof) and says
+    how ours differs, in 150 characters or more."""
+    probs = [] if note.lstrip().startswith('Different from') else \
+        ['the note does not begin "Different from <id>:"']
+    probs += ['the note does not name %s' % p['id'][:8] for p in proofs if p['id'][:8] not in note]
+    if len(note.strip()) < 150:
+        probs.append('the note is too short to say how the proof differs (150 characters)')
+    return probs
+
+
+def describe(p):
+    return '%s (%s, %s, edges %s)' % (p['id'][:8], p['username'], p['status'], sorted(p['edges']) or 'none')
 
 
 def check_solution_top_level(path):
@@ -161,6 +248,9 @@ def main():
     elif go and not no_expl:
         sys.exit('REFUSED: no --explanation FILE.md (write the proof\'s explanation first; '
                  '--no-explanation only for a deliberate exception)')
+    differs = None
+    if '--differs' in args:
+        i = args.index('--differs'); differs = open(args[i + 1], encoding='utf-8').read(); del args[i:i + 2]
     allow = []
     while '--allow-copy' in args:
         i = args.index('--allow-copy'); allow.append(args[i + 1]); del args[i:i + 2]
@@ -178,23 +268,29 @@ def main():
     want = import_names(path)
     print('%s\n   file %s\n   edges it should create: %s\n   replaces: %s'
           % (args[0], path, sorted(want) or 'none (a full proof)', replaces or 'nothing'))
-    # a live proof with exactly these edges already exists: resubmitting only duplicates the
-    # sketch node and every edge in the graph (Chornyi Cor 3 was resubmitted verbatim after a
-    # context summary lost track of the first submission, 2026-10-02)
-    g = call('GET', '/theorems/%s/graph' % tid)
-    names = {n.get('theorem_id'): n.get('theorem_name') for n in g['nodes'] if n.get('node_type') == 'theorem'}
-    for n in g['nodes']:
-        if n.get('node_type') != 'sketch' or n.get('parent_theorem_id') != tid \
-                or n.get('status') not in ('ACCEPTED', 'SKETCH_ACCEPTED') \
-                or n.get('deprecated_at') not in (None, 'None') or n.get('submission_id') in replaces:
-            continue
-        node = 'sketch-' + n['submission_id']
-        have = {names[e['source']] for e in g['edges']
-                if e['target'] == node and '.' in (names.get(e['source']) or '')}
-        if have == want:
-            sys.exit('DUPLICATE: live submission %s (%s) already proves this with the same edges %s; '
-                     'pass --replaces %s to supersede it' % (n['submission_id'], n['status'],
-                                                             sorted(want) or 'none', n['submission_id']))
+    # checked here, at submission time: a batch built hours earlier can find its theorem proved by
+    # someone else meanwhile (Lodha-Moore torsion-free, 7 hours before our batch, 2026-10-03)
+    live = live_proofs(tid, replaces)
+    kind, hits = blocking(want, open(path, encoding='utf-8').read(), live)
+    if kind == 'DUPLICATE':
+        sys.exit('DUPLICATE: live submission %s has this Lean source; pass --replaces %s to supersede it'
+                 % (describe(hits[0]), hits[0]['id']))
+    if kind:
+        probs = note_problems(differs, hits) if differs is not None else ['no --differs NOTE.md']
+        if probs:
+            saved = save_others(path, hits)
+            sys.exit('ALREADY-PROVED: %s already prove%s this, and this proof adds no edge (its edges: %s). '
+                     'Submit it only if it is meaningfully different. Read %s (and the .md explanation '
+                     'beside each) against ours and write the comparison: "Different from <id>: ..." '
+                     '(other mathematics, or edges correct where its are false: edge_audit.py MISSION '
+                     'judges them) is passed as --differs NOTE.md; "Same as <id>: ..." settles that it '
+                     'is not submitted; --replaces SID supersedes our own. (%s)'
+                     % ('; '.join(describe(p) for p in hits), '' if len(hits) > 1 else 's',
+                        sorted(want) or 'none', ', '.join(saved), '; '.join(probs)))
+        print('   already proved by %s; submitted as different (--differs)' % '; '.join(describe(p) for p in hits))
+    elif any(p['status'] == 'ACCEPTED' for p in live):
+        print('   already proved by %s; submitted for its edges %s, which no live proof\'s edges include'
+              % ('; '.join(describe(p) for p in live if p['status'] == 'ACCEPTED'), sorted(want)))
     if not go:
         print('dry run -- pass --go to submit'); return
     from submit_verify import post_verify, poll
