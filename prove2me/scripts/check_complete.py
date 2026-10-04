@@ -20,6 +20,7 @@ mission that a proof rests on is listed, since its platform status decides the r
 Exit 0 when the goal is COMPLETE.
 """
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -70,6 +71,31 @@ def target_of(name, ms):
     return same[0] if len(same) == 1 else None
 
 
+AUX = re.compile(r'^(_proof_|_auxLemma|_simp_|_eq_|match_|proof_)\d*$')
+
+
+def owner(name, ms):
+    """The milestone an auxiliary declaration Lean generated inside a statement belongs to
+    (`N.a._proof_1`, `N.a.match_2` -> `N.a`); any other name unchanged."""
+    parts = name.split('.')
+    for i in range(len(parts) - 1, 0, -1):
+        if not AUX.match(parts[i]):
+            break
+        if '.'.join(parts[:i]) in ms:
+            return '.'.join(parts[:i])
+    return name
+
+
+def normalize(rests_on, ms):
+    """rests_on with auxiliary declarations folded into their milestone, duplicates dropped."""
+    out = []
+    for r in rests_on:
+        r = owner(r, ms)
+        if r not in out:
+            out.append(r)
+    return out
+
+
 def complete(ms, good):
     """{milestone: True/False} -- complete when a good proof's every rests-on milestone is complete;
     cycles are never complete. good: {milestone: rests_on of its best good proof}."""
@@ -109,7 +135,7 @@ def main():
     for m, ps in found.items():
         ok = [p for p in ps if p[2]]
         if ok:
-            good[m] = min((p[3] for p in ok), key=len)
+            good[m] = normalize(min((p[3] for p in ok), key=len), ms)
     done = complete(ms, good)
     external = sorted({r for rs in good.values() for r in rs if r not in ms})
     short = lambda f: f.rsplit('.', 1)[-1]

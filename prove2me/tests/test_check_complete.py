@@ -54,3 +54,16 @@ def test_summary_with_and_without_a_goal():
     M.GOAL = 'ref:Other.b'
     line, ok = C.summary(M, {'N.a': True}, ['N.a'], {'N.a': []})
     assert not ok and 'goal not complete' in line
+
+
+def test_auxiliary_declarations_belong_to_their_milestone():
+    # EZ 2026-10-04: every use of the A4 stub (`sec_list_prod`, whose statement indexes a list)
+    # also rests on the auxiliary `N.sec_list_prod._proof_1` that Lean generates inside the stub;
+    # it was printed as a statement outside the mission
+    ms = ['N.a', 'N.b']
+    assert C.owner('N.a._proof_1', ms) == 'N.a'
+    assert C.owner('N.a.match_2', ms) == 'N.a'
+    assert C.owner('N.a', ms) == 'N.a'
+    assert C.owner('Monod.x._proof_1', ms) == 'Monod.x._proof_1'   # not a milestone's: kept
+    assert C.owner('N.ab', ms) == 'N.ab'
+    assert C.normalize(['N.a._proof_1', 'N.a', 'N.b._proof_3'], ms) == ['N.a', 'N.b']
