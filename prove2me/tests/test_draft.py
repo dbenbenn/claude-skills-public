@@ -147,3 +147,24 @@ def test_extract_payloads_namespace_prefix_id(tmp_path):
     p.write_text("namespace Q\n\ntheorem t : MooreFoelner.rightMul 1 1 = none := by\n  sorry\n\nend Q\n")
     assert 'import Definitions.Def_MooreFoelner' in \
         D.extract_payloads(str(p), 'Q', {'Definitions.Def_MooreFoelner': ['MooreFoelner.']})['t'][0]
+
+
+def test_a_title_over_200_characters_is_refused_before_any_write(mdir, monkeypatch):
+    # Erschler-Zheng 2026-10-04: the platform refuses a title over 200 characters, and the upload
+    # stopped halfway with a Draft of two items; eight titles were too long
+    fake, ids = live_from_repo(mdir)
+    long = 'Lemma 1 — ' + 'x' * 200
+    t = (mdir / 'mission.py').read_text().replace("title='Lemma 1 — one'", "title=%r" % long)
+    (mdir / 'mission.py').write_text(t)
+    with pytest.raises(SystemExit) as e:
+        run_upload(mdir, fake, monkeypatch, '--go')
+    assert 'over 200' in str(e.value) and 't1' in str(e.value)
+    assert fake.writes == []
+
+
+def test_missing_tags_default_to_the_mission_tags(mdir):
+    t = (mdir / 'mission.py').read_text().replace(", tags=['x']", '') + "\nTAGS = ['mission-tag']\n"
+    (mdir / 'mission.py').write_text(t)
+    M = D.load(str(mdir))
+    items, _, _, _ = D.desired(M, str(mdir))
+    assert all(it['tags'] == ['mission-tag'] for it in items.values() if it['kind'] != 'reference')

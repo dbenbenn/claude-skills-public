@@ -96,7 +96,7 @@ def desired(M, mdir):
         items[D['name']] = {
             'kind': 'definition', 'definition_name': D['name'], 'definition_title': D['title'],
             'definition': open(os.path.join(mdir, 'lib', 'Def_' + D['name'] + '.lean'), encoding='utf-8').read(),
-            'natural_language_statement': D['nls'], 'tags': D['tags'],
+            'natural_language_statement': D['nls'], 'tags': D.get('tags', getattr(M, 'TAGS', [])),
             'source': M.src(D['page'], D['result'], D.get('extra'), D.get('ref')),
             'readback': rb('Def_' + D['name']), 'readback_model': READBACK_MODEL}
     for R in M.REFERENCES:
@@ -107,7 +107,8 @@ def desired(M, mdir):
             'kind': 'theorem', 'theorem_name': T.get('namespace', M.NAMESPACE) + '.' + T['name'],
             'theorem_title': T['title'],
             'preamble': pre, 'formal_statement': fs, 'natural_language_statement': T['nls'],
-            'tags': T['tags'], 'source': M.src(T['page'], T['result'], T.get('extra'), T.get('ref')),
+            'tags': T.get('tags', getattr(M, 'TAGS', [])),
+            'source': M.src(T['page'], T['result'], T.get('extra'), T.get('ref')),
             'readback': rb(T['name']), 'readback_model': READBACK_MODEL}
     miles = {}
     for R in M.REFERENCES:
@@ -124,6 +125,19 @@ def desired(M, mdir):
     order = [k for k in order if k != M.GOAL] + [M.GOAL]
     desc = open(os.path.join(mdir, 'description.md'), encoding='utf-8').read()
     return items, miles, order, desc
+
+
+# the platform refuses a longer definition_title, theorem_title or milestone_title (400); checked
+# before any write, since the Erschler-Zheng upload stopped halfway on eight such titles (2026-10-04)
+TITLE_MAX = 200
+
+
+def too_long(items, miles):
+    """[(key, field, length)] for every title longer than the platform accepts."""
+    out = [(k, f, len(it[f])) for k, it in items.items() for f in ('definition_title', 'theorem_title')
+           if len(it.get(f) or '') > TITLE_MAX]
+    out += [(k, 'milestone_title', len(t)) for k, (t, _) in miles.items() if len(t or '') > TITLE_MAX]
+    return out
 
 
 # fields compared per kind; `kind`, `theorem_id` and `readback_model` are identity, not content
@@ -574,6 +588,10 @@ def main():
         sys.exit(1 if bad else 0)
 
     items, miles, order, desc = desired(M, mdir)
+    long = too_long(items, miles)
+    if long:
+        sys.exit('REFUSED: titles over %d characters (the platform refuses them):\n  ' % TITLE_MAX
+                 + '\n  '.join('%s %s (%d)' % x for x in long))
 
     def do(m, p, b, what):
         if not go:
