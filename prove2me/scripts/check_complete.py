@@ -85,6 +85,20 @@ def complete(ms, good):
     return {m: visit(m, frozenset()) for m in ms}
 
 
+def summary(M, done, ms, good):
+    """(the closing line, success). A standalone package has no GOAL: it succeeds when every
+    statement is complete (markov-heat-kernels 2026-10-04 crashed here with AttributeError)."""
+    n = sum(done.values())
+    head = '%d of %d milestones complete; %d have a proof; ' % (n, len(ms), len(good))
+    g = getattr(M, 'GOAL', None)
+    if not g:
+        ok = n == len(ms)
+        return head + 'no goal (standalone package): %s' % ('all complete' if ok else 'not all complete'), ok
+    goal = g[4:] if g.startswith('ref:') else M.NAMESPACE + '.' + g
+    ok = bool(done.get(goal))
+    return head + 'goal ' + ('COMPLETE' if ok else 'not complete'), ok
+
+
 def main():
     args = sys.argv[1:]
     if len(args) < 2:
@@ -111,11 +125,9 @@ def main():
             print('no proof %s' % short(m))
     if external:
         print('rests on statements outside the mission (their platform status decides): %s' % ', '.join(external))
-    goal = (M.GOAL[4:] if M.GOAL.startswith('ref:') else M.NAMESPACE + '.' + M.GOAL)
-    n = sum(done.values())
-    print('\n%d of %d milestones complete; %d have a proof; goal %s' % (n, len(ms), len(good),
-          'COMPLETE' if done.get(goal) else 'not complete'))
-    sys.exit(0 if done.get(goal) else 1)
+    line, ok = summary(M, done, ms, good)
+    print('\n' + line)
+    sys.exit(0 if ok else 1)
 
 
 if __name__ == '__main__':

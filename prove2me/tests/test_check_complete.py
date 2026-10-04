@@ -37,3 +37,20 @@ def test_ambiguous_short_name_needs_the_namespace():
     ms = ['A.foo', 'B.foo']
     assert C.target_of('A.chk_foo', ms) == 'A.foo'
     assert C.target_of('Plan.chk_foo', ms) is None
+
+
+def test_summary_with_and_without_a_goal():
+    # markov-heat-kernels 2026-10-04: a standalone package has no GOAL, and main printed the
+    # verdicts and then crashed with AttributeError: GOAL
+    import types
+    M = types.SimpleNamespace(NAMESPACE='N')
+    line, ok = C.summary(M, {'N.a': True, 'N.b': False}, ['N.a', 'N.b'], {'N.a': []})
+    assert not ok and 'no goal' in line and '1 of 2' in line
+    line, ok = C.summary(M, {'N.a': True}, ['N.a'], {'N.a': []})
+    assert ok
+    M.GOAL = 'a'
+    line, ok = C.summary(M, {'N.a': True}, ['N.a'], {'N.a': []})
+    assert ok and 'goal COMPLETE' in line
+    M.GOAL = 'ref:Other.b'
+    line, ok = C.summary(M, {'N.a': True}, ['N.a'], {'N.a': []})
+    assert not ok and 'goal not complete' in line
