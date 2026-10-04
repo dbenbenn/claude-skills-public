@@ -390,9 +390,12 @@ Design questions that recur, with the answers we have settled on:
   2026-10-04, on 28 such items in the Erschler–Zheng Draft: "a claimed 'failure' of the source
   material doesn't belong as a milestone. The milestones should reflect the claims made in the
   source. … those auxiliary results are never milestones." Items dropped from `mission.py` leave the live
-  Draft only through `draft.py prune`.) The note names the theorem and says what it shows, nothing
-  more: "a standalone theorem, published after this mission and not a milestone" is logistics the
-  reader has no use for (dbenbenn, 2026-10-04: "quite accreted").
+  Draft only through `draft.py prune`.) The note cites the theorem in one clause and says what it
+  shows, nothing more: not its publication status, not its proof, which is the theorem's own
+  explanation. Lemma 2.1's note went from "a standalone theorem, published after this mission and not
+  a milestone, proves …" and an account of the counterexample to "'Sufficiently large' cannot be
+  dropped: the statement is false at $n = 1$ (`…`)" (dbenbenn, 2026-10-04: "quite accreted", "even
+  less accretion").
 - **One statement per source sentence.** A proposition with two clauses is one conjunctive
   theorem; splitting it into two milestones is not a decomposition when one induction proves both.
   Anyone who needs a half takes `.1` or `.2`.
