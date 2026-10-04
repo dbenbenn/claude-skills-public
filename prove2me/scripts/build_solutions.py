@@ -29,6 +29,7 @@ SK = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SK)
 sys.path.insert(0, os.path.dirname(SK))  # p2mlib
 from merge import merge  # noqa: E402
+from build_solution import drop_redeclared_universes  # noqa: E402
 from p2mlib import leanedit, leaninfo  # noqa: E402
 from p2mlib.copies import imports_of  # noqa: E402
 from p2mlib.leantext import header_end  # noqa: E402
@@ -62,6 +63,13 @@ def check_block(info, start, name):
             if any(_last(n) == want for n in c.names):
                 return c
     return None
+
+
+def with_solution(body, sol):
+    """The merged body followed by the solution section, less the universes the body already
+    declares at its top level: scope_wrap re-creates the check block's scope, `universe` lines
+    included, and a name declared twice is an error (markov-heat-kernels H2/H4/H8/H9, 2026-10-04)."""
+    return body + '\n' + drop_redeclared_universes(body, sol)
 
 
 def solution_text(info, c, name):
@@ -187,7 +195,7 @@ def assemble(sol, checks, name, scratch):
         drop = [x.index for x in info.commands if x.short_kind in DIAGNOSTIC or (x.start.byte >= starts[-1]
                 and any(_last(n).startswith('chk_') or _last(n) == name for n in x.names))]
         body = leanedit.remove_commands(info, drop).rstrip('\n') + '\n'
-        return 'OK', body + '\n' + solution_text(info, c, name), c.namespace
+        return 'OK', with_solution(body, solution_text(info, c, name)), c.namespace
     return 'NO-CHECK', '', ''
 
 

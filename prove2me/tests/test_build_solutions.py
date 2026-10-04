@@ -202,3 +202,14 @@ def test_repair_ambiguity_compiles(tmp_path):
     done = B.repair_ambiguity(str(f), 'A.B')
     assert done == [('x', 'A.B.x')]
     assert 'theorem solution (n : Nat) : n = n := A.B.x n' in f.read_text()
+
+
+def test_solution_section_drops_universes_declared_at_top_level():
+    # markov-heat-kernels 2026-10-04: H2, H4, H8, H9 failed with "a universe level named `u` has
+    # already been declared": scope_wrap re-creates the check block's scope, including the
+    # `universe u` the merged file already declares at its top level
+    body = 'universe u\n\nnamespace A\ntheorem chk_x {X : Type u} : True := trivial\nend A\n'
+    sol = 'section\nuniverse u v\nopen A\n\ntheorem solution {X : Type u} : True := trivial\nend\n'
+    out = B.with_solution(body, sol)
+    assert out.count('universe u') == 1 and 'universe v' in out
+    assert out.startswith(body) and out.rstrip().endswith('end')
