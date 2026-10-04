@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Source-side audit: what does the source sentence claim, and does the formalization say it?
 
-usage: source_audit.py stage   MISSION_DIR NAME [--pages 12-14]   -> phase 1 prompt
+usage: source_audit.py stage   MISSION_DIR NAME [--pages 12-14] [--force]  -> phase 1 prompt
+       (--force re-stages a directory whose phase 1 has not written claims.md)
        source_audit.py decisions MISSION_DIR                   -> DECISIONS.md: every finding on the
                                                                   goal and milestones, for the human
                                                                   to decide (the gap review; see
@@ -79,8 +80,17 @@ def slug(mdir, name):
     return ('src-%s-%s' % (os.path.basename(os.path.abspath(mdir)), name))[:150]
 
 
-def stage(mdir, name, page_spec=None):
+def stage(mdir, name, page_spec=None, force=False):
     mdir = os.path.abspath(mdir)
+    if force:
+        # re-stage after the item's pages or quote changed (EZ 2026-10-04: context_pages added
+        # after 58 audits were staged); a finished phase 1 is an auditor's work, never discarded
+        d0 = os.path.join(ROOT, slug(mdir, name))
+        if os.path.exists(os.path.join(d0, 'claims.md')):
+            sys.exit('REFUSING to re-stage %s: its claims.md exists (phase 1 ran) -- collect it, '
+                     'or run rephase2 if only the Lean changed' % slug(mdir, name))
+        if os.path.isdir(d0):
+            teardown(slug(mdir, name), force=True)
     M = draft.load(mdir)
     T = item(M, name)
     if not T.get('bundle'):
@@ -297,7 +307,7 @@ if __name__ == '__main__':
     if len(a) < 3 or a[0] not in ('stage', 'reveal', 'collect', 'rephase2'):
         sys.exit(__doc__)
     if a[0] == 'stage':
-        stage(a[1], a[2], a[a.index('--pages') + 1] if '--pages' in a else None)
+        stage(a[1], a[2], a[a.index('--pages') + 1] if '--pages' in a else None, force='--force' in a)
     elif a[0] == 'reveal':
         reveal(a[1], a[2])
     elif a[0] == 'rephase2':

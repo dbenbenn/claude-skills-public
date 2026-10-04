@@ -112,3 +112,20 @@ def test_bundle_phase2_gets_the_bundle_note(mdir):
     SRC.reveal(str(mdir), 'Def_Mini')
     assert 'Defines $k$.' in open(os.path.join(d, 'note.md')).read()
     assert os.path.exists(os.path.join(d, 'context.md'))
+
+
+def test_stage_force_restages_unworked_but_never_discards_claims(mdir):
+    # Erschler–Zheng 2026-10-04: context_pages were added to mission.py after 58 audits were
+    # staged; stage refused the existing directories and had no --force, so they were torn down
+    # by hand. --force re-stages a directory whose phase 1 has not produced claims.md.
+    SRC.stage(str(mdir), 't1')
+    with pytest.raises(SystemExit):
+        SRC.stage(str(mdir), 't1')                       # still refuses without force
+    RENDERED.clear()
+    SRC.stage(str(mdir), 't1', force=True)
+    assert sorted(RENDERED) == [1, 2]
+    d = os.path.join(SRC.ROOT, SRC.slug(str(mdir), 't1'))
+    open(os.path.join(d, 'claims.md'), 'w').write('C1\nEND OF CLAIMS\n')
+    with pytest.raises(SystemExit, match='claims.md'):
+        SRC.stage(str(mdir), 't1', force=True)           # a phase-1 result is never discarded
+    assert os.path.exists(os.path.join(d, 'claims.md'))
