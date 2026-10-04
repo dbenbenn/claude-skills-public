@@ -390,7 +390,9 @@ Design questions that recur, with the answers we have settled on:
   2026-10-04, on 28 such items in the Erschler–Zheng Draft: "a claimed 'failure' of the source
   material doesn't belong as a milestone. The milestones should reflect the claims made in the
   source. … those auxiliary results are never milestones." Items dropped from `mission.py` leave the live
-  Draft only through `draft.py prune`.)
+  Draft only through `draft.py prune`.) The note names the theorem and says what it shows, nothing
+  more: "a standalone theorem, published after this mission and not a milestone" is logistics the
+  reader has no use for (dbenbenn, 2026-10-04: "quite accreted").
 - **One statement per source sentence.** A proposition with two clauses is one conjunctive
   theorem; splitting it into two milestones is not a decomposition when one induction proves both.
   Anyone who needs a half takes `.1` or `.2`.
