@@ -376,9 +376,17 @@ def dead_lean_refs(M, mdir, its, mls, desc, call):
     short = {q.split('.')[-1] for q in names}
     left = [h for h in refs if h not in names and h not in short
             and not any(q.endswith('.' + h) for q in names)]
+    # a definition bundle's name (`Garrido_Grigorchuk`) is no Lean declaration: it resolves when it
+    # names a bundle of this mission, a referenced item, or a bundle in the workspace (Erschler-Zheng,
+    # 2026-10-04: six bundle names in the description and notes were reported dead)
+    from prune_solution import _workspace
+    ws = _workspace()
+    bundles = ({D['name'] for D in getattr(M, 'DEFINITIONS', [])}
+               | {R['theorem_name'] for R in getattr(M, 'REFERENCES', [])}
+               | {os.path.basename(f)[len('Def_'):-len('.lean')]
+                  for f in glob.glob(os.path.join(ws, 'Definitions', 'Def_*.lean'))})
+    left = [h for h in left if h not in bundles]
     if left:
-        from prune_solution import _workspace
-        ws = _workspace()
         imps = sorted({l for f in glob.glob(os.path.join(mdir, 'lib', '*.lean')) + glob.glob(os.path.join(mdir, 'statements', '*.lean'))
                        for l in open(f, encoding='utf-8').read().split('\n') if l.startswith('import ')})
         imps = [l for l in imps if os.path.exists(os.path.join(ws, *l.split()[1].split('.')) + '.lean')
@@ -399,7 +407,15 @@ def dead_lean_refs(M, mdir, its, mls, desc, call):
             # limit=20 and with nothing at limit=100 (2026-09-30). Try the short and the full
             # name, three rounds, and call a name dead only when every answer misses it.
             found, errored = False, False
-            for _ in range(3):
+            # the exact-name filter first: the keyword search had not indexed two theorems published
+            # an hour earlier (markov-heat-kernels, 2026-10-04)
+            try:
+                r = call('GET', '/theorems?theorem_name=' + urllib.parse.quote(h))
+                items = r.get('theorems', []) if isinstance(r, dict) else r
+                found = any(t.get('theorem_name') == h for t in items or [])
+            except Exception:  # noqa: BLE001
+                pass
+            for _ in range(0 if found else 3):
                 for q in (h.split('.')[-1], h):
                     try:
                         r = call('GET', '/theorems?q=' + urllib.parse.quote(q) + '&limit=20')

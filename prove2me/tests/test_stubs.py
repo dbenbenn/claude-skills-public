@@ -116,6 +116,59 @@ def test_verify_resolves_statement_names_in_the_statements_layout(env):
     assert not [b for b in bad if 'Mini.t1' in b[1]], bad
 
 
+def _probe_fails_everything(monkeypatch, draft):
+    """`lake env lean` on the probe: an error on every #check line (no workspace Lean in tests)."""
+    import types
+
+    def run(cmd, cwd=None, **k):
+        lines = open(cmd[-1], encoding='utf-8').read().split('\n')
+        err = ''.join('%s:%d:1: error: unknown\n' % (cmd[-1], i + 1)
+                      for i, l in enumerate(lines) if l.startswith('#check'))
+        return types.SimpleNamespace(stdout=err, stderr='', returncode=1)
+    monkeypatch.setattr(draft.subprocess, 'run', run)
+
+
+def test_verify_resolves_definition_bundle_names(env, monkeypatch):
+    # Erschler-Zheng 2026-10-04: the description names `Garrido_Grigorchuk` and `Chou_Growth`
+    # (bundles, linked to their pages) and the notes `ErschlerZheng_Walks`; none is a Lean
+    # declaration, so all were reported dead
+    import draft
+    from pathlib import Path
+    mdir, ws = env
+    ws = Path(ws)
+    monkeypatch.setenv('P2M_WORKSPACE', str(ws))
+    statements_layout(mdir)
+    (ws / 'Definitions').mkdir(exist_ok=True)
+    (ws / 'Definitions' / 'Def_Other_Bundle.lean').write_text('def foo : Nat := 1\n')
+    _probe_fails_everything(monkeypatch, draft)
+    M = draft.load(mdir)
+    its, mls, _, _ = draft.desired(M, mdir)
+    bad = draft.dead_lean_refs(M, mdir, its, mls, 'Uses `Mini` and `Other_Bundle`; not `Gone_Bundle`.',
+                               lambda *a, **k: {})
+    named = ' '.join(b[1] for b in bad)
+    assert '`Mini`' not in named and '`Other_Bundle`' not in named and '`Gone_Bundle`' in named
+
+
+def test_verify_finds_a_published_theorem_by_exact_name(env, monkeypatch):
+    # the keyword search had not indexed two theorems published an hour earlier (markov-heat-kernels,
+    # 2026-10-04); GET /theorems?theorem_name= is exact
+    import draft
+    mdir, ws = env
+    monkeypatch.setenv('P2M_WORKSPACE', ws)
+    statements_layout(mdir)
+    _probe_fails_everything(monkeypatch, draft)
+
+    def call(m, p, b=None):
+        if p.startswith('/theorems?theorem_name=Other.lemma_x'):
+            return {'theorems': [{'theorem_name': 'Other.lemma_x'}]}
+        return {'theorems': []}
+    M = draft.load(mdir)
+    its, mls, _, _ = draft.desired(M, mdir)
+    bad = draft.dead_lean_refs(M, mdir, its, mls, 'Cites `Other.lemma_x` and `Other.lemma_gone`.', call)
+    named = ' '.join(b[1] for b in bad)
+    assert 'Other.lemma_x`' not in named and 'Other.lemma_gone' in named
+
+
 
 def test_a_stub_copied_by_hand_is_listed_and_adopted_on_request(env):
     # Erschler-Zheng (2026-10-04): implementers copied each statement into Theorems/ by hand, so the
