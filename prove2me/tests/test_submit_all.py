@@ -14,9 +14,11 @@ def mission(tmp_path, monkeypatch):
     (m / 'mission.py').write_text("NAMESPACE='TestNS'\nTHEOREMS=[dict(name='a'),dict(name='b'),dict(name='c')]\n")
     ws = tmp_path / 'ws' / 'Theorems'
     ws.mkdir(parents=True)
+    (m / 'explanations').mkdir()
     for n in 'abc':
         (m / 'solutions' / ('Sol_%s.lean' % n)).write_text('theorem solution : True := trivial\n')
         (ws / ('Thm_TestNS_%s.lean' % n)).write_text('')
+        (m / 'explanations' / ('%s.md' % n)).write_text('We prove $$\\mathrm{True}.$$ ' + 'x' * 200)
     (m / 'solutions' / 'submitted.json').write_text(json.dumps({n: 'held' for n in 'abc'}))
     monkeypatch.setattr(S, '_workspace', lambda: str(tmp_path / 'ws'))
     monkeypatch.setattr(S.subprocess, 'run', lambda *a, **k: types.SimpleNamespace(returncode=0, stdout='', stderr=''))
@@ -35,7 +37,7 @@ def run(m, monkeypatch, submit, call=lambda *a, **k: {}):
 def test_retry_then_accept_and_pending_polled_not_resubmitted(mission, monkeypatch):
     n_sub = {'b': 0, 'c': 0}
 
-    def submit(ns, n, f):
+    def submit(ns, n, f, expl=None):
         if n == 'a':
             return 'ACCEPTED s1'
         n_sub[n] += 1
@@ -52,7 +54,7 @@ def test_retry_then_accept_and_pending_polled_not_resubmitted(mission, monkeypat
 def test_failed_after_retries_and_duplicate_not_retried(mission, monkeypatch):
     calls = []
 
-    def submit(ns, n, f):
+    def submit(ns, n, f, expl=None):
         calls.append(n)
         return {'a': 'ACCEPTED s1', 'b': 'WA sX', 'c': 'DUPLICATE: live submission y'}[n]
     code, done = run(mission, monkeypatch, submit)
@@ -92,9 +94,33 @@ def test_waits_while_an_import_is_unpublished(mission, monkeypatch, tmp_path):
     monkeypatch.setattr(S.subprocess, 'run', fake_run)
     when = {}
 
-    def submit(ns, n, f):
+    def submit(ns, n, f, expl=None):
         when[n] = rounds[0]
         return 'ACCEPTED s-' + n
     code, done = run(mission, monkeypatch, submit)
     assert code == 0 and all(v.startswith('ACCEPTED') for v in done.values())
     assert when['a'] == 1 and when['c'] == 1 and when['b'] == 2
+
+
+def test_waits_for_its_explanation_and_passes_it(mission, monkeypatch):
+    # 2026-10-04: 480 of 1053 accepted submissions had no explanation; a proof is submitted only
+    # with MISSION_DIR/explanations/<name>.md, and waits (unrecorded) until that file exists
+    (mission / 'explanations' / 'b.md').unlink()
+    rounds = [0]
+
+    def fake_run(cmd, *a, **k):
+        if any('fetch_theorems.py' in str(c) for c in cmd):
+            rounds[0] += 1
+            if rounds[0] == 2:
+                (mission / 'explanations' / 'b.md').write_text('We prove $$\\mathrm{True}.$$ ' + 'x' * 200)
+        return types.SimpleNamespace(returncode=0, stdout='', stderr='')
+    monkeypatch.setattr(S.subprocess, 'run', fake_run)
+    when, got = {}, {}
+
+    def submit(ns, n, f, expl=None):
+        when[n], got[n] = rounds[0], expl
+        return 'ACCEPTED s-' + n
+    code, done = run(mission, monkeypatch, submit)
+    assert code == 0 and all(v.startswith('ACCEPTED') for v in done.values())
+    assert when['a'] == 1 and when['b'] == 2
+    assert got['b'].endswith('explanations/b.md')

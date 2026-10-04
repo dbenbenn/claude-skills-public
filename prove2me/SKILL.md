@@ -800,6 +800,19 @@ together all had verdicts within 15 minutes, against about 13 minutes per verdic
 - `--build-only` (then `edge_audit.py --local`, then a plain run) is the order when the proofs use
   one another.
 
+**Every proof carries an explanation**, written before it is submitted:
+`MISSION_DIR/explanations/<name>.md`, in prove.md's format.
+- It opens with the statement in a `$$…$$` display and the hypotheses the proof uses.
+- Then comes the proof idea, then the steps.
+- It cites the imported theorems by full name and the file's main lemmas by name.
+- `submit_all.py` holds a solution back, unrecorded, until its explanation exists.
+- `submit_solution.py --go` refuses without one that passes `p2mlib.explanation`.
+- `patch_explanations.py` patches explanations onto submissions already made.
+
+On 2026-10-04, 480 of our 1,053 accepted submissions had no explanation: the tooling never sent one,
+and prove.md calls it "very IMPORTANT". The backfill for the live missions is in
+`p2m-standalone/maintenance/explanations`.
+
 **Build each solution with `scripts/build_solution.py`** (merge the development module and its
 closure, drop the OTHER milestones so they are imported once Proved, generate the `solution`
 wrapper from the published statement, then `resolve_imports.py` and `prune_solution.py --check`),
@@ -1367,6 +1380,7 @@ script prints its usage when run with no arguments.
 | `live_milestones.py` | Add milestones to a live mission, or edit one, from .md files; a dry run unless --go. |
 | `merge.py` | Concatenate a mission's shared modules into one self-contained prove2.me solution file. |
 | `p2m.py` | The prove2.me API client -- now p2mlib.api; this module re-exports it for the scripts. |
+| `patch_explanations.py` | PATCH proof explanations from files named by submission id, checking each one first. |
 | `patch_notes.py` | PATCH the natural-language statements of published items from reviewed Markdown files. |
 | `prune_solution.py` | Delete the declarations an assembled solution never uses, before submitting it. |
 | `publish_standalone.py` | Publish a folder's standalone statements (POST /submit-problem), wait for the jobs, record ids in published_ids.json, and verify every published field against the folder. |

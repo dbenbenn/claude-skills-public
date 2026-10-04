@@ -54,6 +54,15 @@ def fake_platform(live_edges, verdict='ACCEPTED'):
     return call
 
 
+EXPL = 'We prove $$\\mathrm{True}.$$ It follows from the imported statement, applied once. ' + 'x' * 150
+
+
+def expl(tmp_path, text=EXPL):
+    p = tmp_path / 'expl.md'
+    p.write_text(text)
+    return str(p)
+
+
 def run(monkeypatch, call, *args):
     monkeypatch.setattr(S, 'call', call)
     monkeypatch.setattr(S, 'check_no_inline_copies', lambda *a: None)
@@ -64,7 +73,7 @@ def run(monkeypatch, call, *args):
 def test_duplicate_of_a_live_proof_refused(ws, tmp_path, monkeypatch):
     # 000c8f8: Chornyi Cor 3 was resubmitted verbatim and its graph edges doubled
     with pytest.raises(SystemExit) as e:
-        run(monkeypatch, fake_platform(live_edges=True), 'N.target', sol(tmp_path, TOP), '--go')
+        run(monkeypatch, fake_platform(live_edges=True), 'N.target', sol(tmp_path, TOP), '--explanation', expl(tmp_path), '--go')
     assert 'DUPLICATE' in str(e.value)
 
 
@@ -79,5 +88,19 @@ def test_late_verdict_is_pending_not_rejected(ws, tmp_path, monkeypatch):
     monkeypatch.setattr(submit_verify, 'post_verify', lambda *a: {'submission_id': 'new'})
     monkeypatch.setattr(submit_verify, 'poll', lambda sid: {'status': 'PENDING', '__error': 'no verdict after 60 minutes'})
     with pytest.raises(SystemExit) as e:
-        run(monkeypatch, fake_platform(live_edges=False), 'N.target', sol(tmp_path, TOP), '--go')
+        run(monkeypatch, fake_platform(live_edges=False), 'N.target', sol(tmp_path, TOP), '--explanation', expl(tmp_path), '--go')
     assert 'PENDING' in str(e.value) and 'not accepted' not in str(e.value)
+
+
+def test_go_without_an_explanation_is_refused(ws, tmp_path, monkeypatch):
+    # 2026-10-04: 480 of 1053 accepted submissions had no explanation (prove.md asks for one)
+    with pytest.raises(SystemExit) as e:
+        run(monkeypatch, fake_platform(live_edges=False), 'N.target', sol(tmp_path, TOP), '--go')
+    assert 'no --explanation' in str(e.value)
+
+
+def test_an_explanation_without_the_statement_display_is_refused(ws, tmp_path, monkeypatch):
+    with pytest.raises(SystemExit) as e:
+        run(monkeypatch, fake_platform(live_edges=False), 'N.target', sol(tmp_path, TOP),
+            '--explanation', expl(tmp_path, 'It follows from the imported statement. ' * 10), '--go')
+    assert 'display' in str(e.value)

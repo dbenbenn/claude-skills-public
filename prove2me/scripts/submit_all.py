@@ -48,9 +48,17 @@ LIVE = ('ACCEPTED', 'SKETCH_ACCEPTED')
 FINAL = ('DUPLICATE', 'REFUSED', 'EDGES-DIFFER')
 
 
-def submit(ns, n, f):
+def explanation_file(mdir, n):
+    """MISSION_DIR/explanations/<name>.md, the proof's explanation, or None if not written yet.
+    Every proof carries one (prove.md); 480 of 1053 accepted submissions had none on 2026-10-04."""
+    p = os.path.join(mdir, 'explanations', n + '.md')
+    return p if os.path.isfile(p) else None
+
+
+def submit(ns, n, f, expl):
     """Submit one solution; return 'STATUS SID', 'PENDING SID', or a one-line failure."""
-    r = subprocess.run([sys.executable, os.path.join(SK, 'submit_solution.py'), '%s.%s' % (ns, n), f, '--go'],
+    r = subprocess.run([sys.executable, os.path.join(SK, 'submit_solution.py'), '%s.%s' % (ns, n), f,
+                        '--explanation', expl, '--go'],
                        capture_output=True, text=True)
     o = r.stdout + r.stderr
     v = re.search(r'verdict (\S+) (\S+)', o)
@@ -171,6 +179,12 @@ def main():
                                 capture_output=True, text=True).returncode:
                 done[n] = 'prune-fail'
             else:
+                if explanation_file(mdir, n) is None:
+                    # not recorded: submitted on a later round, once explanations/<name>.md exists
+                    if waiting.get(n) != 'explanation':
+                        print(time.strftime('%H:%M'), n, 'waits for explanations/%s.md' % n, flush=True)
+                        waiting[n] = 'explanation'
+                    continue
                 w = waiting_on(f)
                 if w:
                     # not recorded: rebuilt and checked again next round, once the queue publishes w
@@ -189,7 +203,7 @@ def main():
             print(time.strftime('%H:%M'), 'submitting %d in parallel: %s' % (len(batch), ' '.join(n for n, _ in batch)),
                   flush=True)
             with ThreadPoolExecutor(max_workers=a.parallel) as ex:
-                for n, res in zip([n for n, _ in batch], ex.map(lambda nf: submit(ns, *nf), batch)):
+                for n, res in zip([n for n, _ in batch], ex.map(lambda nf: submit(ns, nf[0], nf[1], explanation_file(mdir, nf[0])), batch)):
                     tries[n] = tries.get(n, 0) + 1
                     if res.split()[0] in LIVE or res.startswith('PENDING ') or res.startswith(FINAL):
                         done[n] = res

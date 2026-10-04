@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Submit a solution, check the graph shows exactly its imports, then retire what it replaces.
 
-usage: submit_solution.py THEOREM FILE [--explanation FILE.md] [--allow-copy NAME ...] [--replaces SID ...] [--go]
+usage: submit_solution.py THEOREM FILE --explanation FILE.md [--allow-copy NAME ...] [--replaces SID ...] [--go]
        (dry run without --go; THEOREM is a full name like Chou.hasPackingProperty_of_finite,
-        or a theorem id)
+        or a theorem id; --go refuses without an explanation that passes p2mlib.explanation,
+        unless --no-explanation is given)
 
 The last step of rewire.py and of any prune that drops a false edge, done the same way every
 time instead of by a per-mission submit script:
@@ -21,8 +22,10 @@ Exit status is 0 only if all three held.
 import os, re, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(HERE))
 from p2m import call
 from prune_solution import _workspace
+from p2mlib import explanation
 
 
 def theorem_id(name):
@@ -147,6 +150,17 @@ def main():
     expl, replaces = None, []
     if '--explanation' in args:
         i = args.index('--explanation'); expl = open(args[i + 1], encoding='utf-8').read(); del args[i:i + 2]
+    # every proof carries a paper-style explanation (prove.md); 480 of 1053 accepted submissions
+    # had none on 2026-10-04. --no-explanation is the explicit, logged exception.
+    no_expl = '--no-explanation' in args
+    args = [a for a in args if a != '--no-explanation']
+    if expl is not None:
+        probs = explanation.problems(expl)
+        if probs:
+            sys.exit('REFUSED: the explanation does not meet the platform rules:\n  ' + '\n  '.join(probs))
+    elif go and not no_expl:
+        sys.exit('REFUSED: no --explanation FILE.md (write the proof\'s explanation first; '
+                 '--no-explanation only for a deliberate exception)')
     allow = []
     while '--allow-copy' in args:
         i = args.index('--allow-copy'); allow.append(args[i + 1]); del args[i:i + 2]
