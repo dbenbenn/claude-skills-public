@@ -96,6 +96,13 @@ AMBIGUOUS = re.compile(r'^[^\n]*?:(\d+):(\d+): error: Ambiguous term\n  (\S+)\n'
                        r'Possible interpretations:\n((?:(?:  [^\n]*)?\n)+)', re.M)
 
 
+# A constant named in a tactic (`unfold IsCofinal`) is resolved by name alone, and Lean's error is
+# one line listing the candidates; the term as written is their common dotted suffix. Mathlib's root
+# `IsCofinal` against the bundle's broke the Erschler-Zheng printed Gray-code solution (2026-10-04).
+AMBIGUOUS_NAME = re.compile(r'^[^\n]*?:(\d+):(\d+): error: ambiguous term, use fully qualified name, '
+                            r'possible interpretations \[([^\]\n]*)\]', re.M)
+
+
 def parse_ambiguities(out):
     """[(line, col, term, [candidate full names])] from Lean's output under -Dpp.fullNames=true."""
     res = []
@@ -103,6 +110,14 @@ def parse_ambiguities(out):
         cands = [re.match(r'  [(@]*([^\s()]+)', l).group(1) for l in m.group(4).split('\n')
                  if re.match(r'  [^\s]', l)]                  # a wrapped type line is indented more
         res.append((int(m.group(1)), int(m.group(2)), m.group(3), cands))
+    for m in AMBIGUOUS_NAME.finditer(out):
+        cands = [re.sub(r'^_root_\.', '', c.strip().lstrip('@')) for c in m.group(3).split(',')]
+        parts = [c.split('.') for c in cands]
+        k = 0
+        while all(len(p) > k for p in parts) and len({p[-1 - k] for p in parts}) == 1:
+            k += 1
+        if k:
+            res.append((int(m.group(1)), int(m.group(2)), '.'.join(parts[0][-k:]), cands))
     return res
 
 

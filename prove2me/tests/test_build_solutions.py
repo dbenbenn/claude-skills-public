@@ -163,6 +163,21 @@ def test_parse_ambiguities():
         (12, 9, 'x.z', ['A.x.z', 'A.B.x.z'])]
 
 
+# a constant named in a tactic (`unfold IsCofinal`) is resolved by name, and the error is one line;
+# Mathlib's root `IsCofinal` against the bundle's (Erschler-Zheng printed Gray code, 2026-10-04)
+LEAN_OUT_ID = ('/x/Sol_g.lean:955:11: error: ambiguous term, use fully qualified name, possible '
+               'interpretations [@_root_.IsCofinal, ErschlerZheng.IsCofinal]\n')
+
+
+def test_parse_ambiguities_of_a_name_resolved_in_a_tactic():
+    amb = B.parse_ambiguities(LEAN_OUT_ID)
+    assert amb == [(955, 11, 'IsCofinal', ['IsCofinal', 'ErschlerZheng.IsCofinal'])]
+    text = '\n' * 954 + '  · unfold IsCofinal\n'
+    new, done = B.qualify_ambiguous(text, amb, 'ErschlerZheng.GrayDev')
+    assert new.split('\n')[954] == '  · unfold ErschlerZheng.IsCofinal'
+    assert done == [('IsCofinal', 'ErschlerZheng.IsCofinal')]
+
+
 @pytest.mark.parametrize('ns, want', [
     ('A.B', 'A.B.x'),            # the inner namespace wins, as inside `namespace A.B`
     ('A.B.C', 'A.B.x'),          # the longest enclosing namespace
