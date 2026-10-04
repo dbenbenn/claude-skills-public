@@ -97,13 +97,19 @@ def _findings(cov):
             if i not in ids:
                 ids.append(i)
         lines = txt.split('\n')
+
+        def exact(s):
+            # the ID itself, not a sub-item of it: "D1.i1" does not name D1 (Erschler-Zheng bundle
+            # rows all read "D1.i1: BY CONSTRUCTION", 2026-10-04)
+            return re.search(r'(?<![\w.])%s(?![\w.])' % re.escape(i), s or '') is not None
         for i in ids:
             line = None
             for n, l in enumerate(lines):
-                # the claim's own bullet: its ID leads the line, or sits in the leading bold span
-                # ("- **C3, C4, C5** MISSING", Monod) -- not a later mention in someone else's row
-                b = re.match(r'^\s*[-*]\s*(?:\*\*([^*]+)\*\*|(\S+))', l)
-                if b and i in re.findall(r'\b([CHD]\d+[a-z]?)\b', b.group(1) or b.group(2) or ''):
+                # the claim's own entry: its ID leads the line, or sits in the leading bold span,
+                # bullet or not ("- **C3, C4, C5** MISSING", Monod; "**D1:** ... not quoted", a
+                # bundle audit's QUOTES section) -- not a later mention in someone else's row
+                b = re.match(r'^\s*[-*]\s*(?:\*\*([^*]+)\*\*|(\S+))', l) or re.match(r'^\s*\*\*([^*]+)\*\*()', l)
+                if b and exact(b.group(1) or b.group(2) or ''):
                     # the whole bullet, not its first line: auditors wrap a bullet over several
                     # lines, and the human decides from this text ("The read-back uses C1 only in
                     # the single instance where the relation is the" -- cut off, Monod M6)
@@ -113,6 +119,16 @@ def _findings(cov):
                             break
                         body.append(c)
                     line = ' '.join(' '.join(body).split()); break
+            if line is None:
+                # no entry of its own: the block its heading opens ("### D4: concatenation")
+                for n, l in enumerate(lines):
+                    if re.match(r'^#+\s', l) and exact(l.split(':')[0]):
+                        body = [l]
+                        for c in lines[n + 1:]:
+                            if c.startswith('#'):
+                                break
+                            body.append(c)
+                        line = ' '.join(' '.join(body).split()); break
             rows.append((i, line or '(named in VERDICT: %s)' % verdict))
         if not ids:
             rows.append(('VERDICT', verdict))

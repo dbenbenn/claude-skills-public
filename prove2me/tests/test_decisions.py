@@ -37,6 +37,34 @@ def test_findings_skip_parenthetical_ids_and_keep_whole_bullet(mdir):
     assert 'extra hypothesis the paper does not have' in rows['DIRECTNESS']
 
 
+BUNDLE_COV = """# Coverage of the bundle
+
+### D1 *(convention)*: right actions
+- **Adopted.** The file installs the right action.
+- **D1.i1:** BY CONSTRUCTION (RB "Action of a product").
+- **Quote:** UNQUOTED (see QUOTES).
+
+### D4: concatenation
+- **D4.i1:** LITERAL.
+
+### UNQUOTED
+
+**D1:** the right action is described as "of p. 9", but the defining sentence is not quoted.
+
+VERDICT: findings: D1, D4
+"""
+
+
+def test_bundle_findings_take_the_finding_not_a_sub_bullet(tmp_path):
+    # Erschler-Zheng 2026-10-04: every Grigorchuk bundle row read "D1.i1: BY CONSTRUCTION" -- the
+    # first bullet whose bold span mentions D1 -- instead of the finding itself
+    cov = tmp_path / 'b.coverage.md'
+    cov.write_text(BUNDLE_COV)
+    rows = dict(DE._findings(str(cov)))
+    assert rows['D1'].startswith('**D1:** the right action') and 'not quoted' in rows['D1']
+    assert rows['D4'].startswith('### D4: concatenation')           # no own entry: its ### block
+
+
 def test_claims_text_bold_or_plain():
     import tempfile, os
     with tempfile.TemporaryDirectory() as d:
