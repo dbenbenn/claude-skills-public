@@ -101,7 +101,8 @@ def _findings(cov):
         def exact(s):
             # the ID itself, not a sub-item of it: "D1.i1" does not name D1 (Erschler-Zheng bundle
             # rows all read "D1.i1: BY CONSTRUCTION", 2026-10-04)
-            return re.search(r'(?<![\w.])%s(?![\w.])' % re.escape(i), s or '') is not None
+            # nor does "D2-a" (a sub-bullet, Erschler-Zheng D2/D15/D32)
+            return re.search(r'(?<![\w.])%s(?![\w.]|-\w)' % re.escape(i), s or '') is not None
         for i in ids:
             line = None
             for n, l in enumerate(lines):

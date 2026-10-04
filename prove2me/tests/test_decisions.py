@@ -45,6 +45,7 @@ BUNDLE_COV = """# Coverage of the bundle
 - **Quote:** UNQUOTED (see QUOTES).
 
 ### D4: concatenation
+- **D4-a:** a sub-item, not the finding.
 - **D4.i1:** LITERAL.
 
 ### UNQUOTED
