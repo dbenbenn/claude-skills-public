@@ -193,11 +193,15 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 
 **Prose**
 - Each milestone description opens with the source's sentence in quotation marks and its page,
-  then a marked *Route*, *External* or *Correction* paragraph if one earns its place. The label
-  says what the paragraph does: *Route* is how to prove it, *External* is a cited result, and
-  *Correction* is a slip in the source's proof and its fix ("The proof on p. 18 misprints …; the
-  evident intent is …"). A Route that only lists the source's mistakes reads as a route that
-  explains nothing (dbenbenn, Moore M28 and M1). Nothing about our own formal proof's choices goes
+  then marked paragraphs, each only if it earns its place. The label says what the paragraph
+  does. Every departure of the statement from the print gets one, before the Route: *Correction*
+  when the printed claim is false or undefined (the counterexample cited in one clause), and
+  *Formalization note* when the statement reads the print (an unstated range, a hypothesis read
+  generously) or strengthens it. *External* is a cited result, and *Route* is how to prove it; a
+  slip confined to the source's proof ("The proof on p. 18 misprints …; the evident intent is …")
+  goes in the Route, not under *Correction* (dbenbenn, Erschler–Zheng milestone review,
+  2026-10-05). A Route that only lists the source's mistakes reads as a route that explains
+  nothing (dbenbenn, Moore M28 and M1). Nothing about our own formal proof's choices goes
   here; that lives in the repo's proof notes. The paper's words appear only inside quotation
   marks; quotes checked against the page image, including the subject they predicate.
 - **Recheck all the quotes, as the platform holds them.** Every quotation in every field — milestone
