@@ -95,17 +95,20 @@ def submit(ns, n, f, expl, differs=None):
 
 
 def published_names(names, ns, ws=None):
-    """The statements of `names` (in namespace `ns`) that the platform has published: their module is
-    in the workspace's Theorems/ and is NOT a draft stub. Counting the file alone took every draft
-    stub (stubs.py) for published, and five solutions were sent for statements still in the publish
-    queue (Lodha-Moore, 2026-10-02; refused before submission by the name lookup)."""
+    """The statements of `names` (in namespace `ns`, or `ns[name]` when `ns` is a dict) that the
+    platform has published: their module is in the workspace's Theorems/ and is NOT a draft stub.
+    Counting the file alone took every draft stub (stubs.py) for published, and five solutions were
+    sent for statements still in the publish queue (Lodha-Moore, 2026-10-02; refused before
+    submission by the name lookup). An entry's own `namespace` (an external milestone) has its own
+    module name: looked up under the mission's NAMESPACE, Erschler-Zheng's Kaimanovich-Vershik
+    milestone was never taken for published (2026-10-06)."""
     sys.path.insert(0, os.path.dirname(SK))
     from p2mlib.workspace import drafts
     ws = ws or _workspace()
     dr = drafts(ws)
     out = []
     for n in names:
-        mod = 'Theorems.Thm_%s_%s' % (ns.replace('.', '_'), n)
+        mod = 'Theorems.Thm_%s_%s' % ((ns[n] if isinstance(ns, dict) else ns).replace('.', '_'), n)
         if os.path.exists(os.path.join(ws, *mod.split('.')) + '.lean') and mod not in dr:
             out.append(n)
     return out
@@ -139,7 +142,8 @@ def main():
     sys.path.insert(0, mdir)
     from p2mlib.mission import load
     mission = load(mdir)
-    ns, names = mission.NAMESPACE, [T['name'] for T in mission.THEOREMS]
+    names = [T['name'] for T in mission.THEOREMS]
+    ns = {T['name']: T.get('namespace', mission.NAMESPACE) for T in mission.THEOREMS}
     out = os.path.join(mdir, 'solutions')
     os.makedirs(out, exist_ok=True)
     state = os.path.join(out, 'submitted.json')
@@ -231,7 +235,7 @@ def main():
             print(time.strftime('%H:%M'), 'submitting %d in parallel: %s' % (len(batch), ' '.join(n for n, _ in batch)),
                   flush=True)
             with ThreadPoolExecutor(max_workers=a.parallel) as ex:
-                for n, res in zip([n for n, _ in batch], ex.map(lambda nf: submit(ns, nf[0], nf[1], explanation_file(mdir, nf[0]),
+                for n, res in zip([n for n, _ in batch], ex.map(lambda nf: submit(ns[nf[0]], nf[0], nf[1], explanation_file(mdir, nf[0]),
                                                              differs=comparison_file(mdir, nf[0])), batch)):
                     tries[n] = tries.get(n, 0) + 1
                     if res.split()[0] in LIVE or res.startswith('PENDING ') or res.startswith(FINAL):

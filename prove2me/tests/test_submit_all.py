@@ -75,6 +75,33 @@ def test_a_draft_stub_is_not_published(tmp_path):
     assert S.published_names(['a', 'b', 'c'], 'N', str(tmp_path)) == ['a']
 
 
+def test_an_entry_in_its_own_namespace(mission, monkeypatch, tmp_path):
+    # Erschler-Zheng 2026-10-06: the external entries (namespace KaimanovichVershik, Bartholdi) were
+    # looked up as Thm_<NAMESPACE>_<name>, so they never counted as published and were never submitted
+    (mission / 'mission.py').write_text("NAMESPACE='TestNS'\nTHEOREMS=[dict(name='a'),dict(name='b'),"
+                                        "dict(name='c', namespace='Ext.Sub')]\n")
+    ws = tmp_path / 'ws' / 'Theorems'
+    (ws / 'Thm_TestNS_c.lean').unlink()
+    (ws / 'Thm_Ext_Sub_c.lean').write_text('')
+    rounds = [0]
+
+    def fake_run(cmd, *a, **k):
+        if any('fetch_theorems.py' in str(c) for c in cmd):
+            rounds[0] += 1
+            if rounds[0] > 3:
+                raise RuntimeError('c was never taken for published')
+        return types.SimpleNamespace(returncode=0, stdout='', stderr='')
+    monkeypatch.setattr(S.subprocess, 'run', fake_run)
+    got = {}
+
+    def submit(ns, n, f, expl=None, differs=None):
+        got[n] = ns
+        return 'ACCEPTED s-' + n
+    code, done = run(mission, monkeypatch, submit)
+    assert code == 0 and done['c'] == 'ACCEPTED s-c'
+    assert got == {'a': 'TestNS', 'b': 'TestNS', 'c': 'Ext.Sub'}
+
+
 def test_waits_while_an_import_is_unpublished(mission, monkeypatch, tmp_path):
     # CFW 2026-10-03: proofs import sibling stubs; a solution importing a statement the publish
     # queue has not reached was REFUSED by submit_solution, and REFUSED is recorded as final
