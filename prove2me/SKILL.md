@@ -402,7 +402,10 @@ Design questions that recur, with the answers we have settled on:
   less accretion").
 - **One statement per source sentence.** A proposition with two clauses is one conjunctive
   theorem; splitting it into two milestones is not a decomposition when one induction proves both.
-  Anyone who needs a half takes `.1` or `.2`.
+  Anyone who needs a half takes `.1` or `.2`. When the full-strength rule calls for the missing half
+  of a sentence (the converse of an "if and only if"), restate the existing milestone as the whole
+  sentence; do not add the half as a second milestone (Erschler–Zheng's Kaimanovich–Vershik
+  correspondence, merged into one equivalence on dbenbenn's call, 2026-10-05).
 - **A step the paper states inside a proof** ("if $G$ is a non-locally finite periodic group then
   $G \in NF \setminus EG$") is a milestone with exactly that sentence's hypotheses and conclusion,
   not the fragment the argument used.
