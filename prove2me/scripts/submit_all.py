@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Build and submit each of a mission's statements as it is published, once each, until all are done.
 
-usage: submit_all.py MISSION_DIR --proposal ID --check MOD [--check MOD ...] [--hold NAME ...]
+usage: submit_all.py MISSION_DIR [--proposal ID] --check MOD [--check MOD ...] [--hold NAME ...]
                      [--every SECONDS]
 
-Loops: fetch_theorems.py --proposal ID (so published statements and siblings are in Theorems/),
+Loops: fetch_theorems.py --proposal ID (so published statements and siblings are in Theorems/);
+without --proposal (a standalone folder, whose statements publish_standalone.py publishes one job at
+a time), fetch_theorems.py --names with every THEOREMS entry;
 then for every THEOREMS entry of MISSION_DIR/mission.py that is published and not yet in
 MISSION_DIR/solutions/submitted.json: build_solutions.py and prune_solution.py --check, one at a
 time, and then every solution ready in that round is submitted at once (submit_solution.py --go;
@@ -129,7 +131,7 @@ def waiting_on(path, ws=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('mission_dir')
-    ap.add_argument('--proposal', required=True)
+    ap.add_argument('--proposal')
     ap.add_argument('--check', dest='checks', action='append', required=True)
     ap.add_argument('--hold', nargs='*', default=[])
     ap.add_argument('--every', type=int, default=120)
@@ -156,8 +158,8 @@ def main():
     last = None
     waiting = {}
     while True:
-        subprocess.run([sys.executable, os.path.join(SK, 'fetch_theorems.py'), '--proposal', a.proposal],
-                       capture_output=True)
+        fetch = ['--proposal', a.proposal] if a.proposal else ['--names'] + ['%s.%s' % (ns[n], n) for n in names]
+        subprocess.run([sys.executable, os.path.join(SK, 'fetch_theorems.py')] + fetch, capture_output=True)
         here = published_names(names, ns)
         if a.wait_all and len(here) < len(names):
             if len(here) != last:

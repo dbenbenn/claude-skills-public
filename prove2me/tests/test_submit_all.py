@@ -25,13 +25,33 @@ def mission(tmp_path, monkeypatch):
     return m
 
 
-def run(m, monkeypatch, submit, call=lambda *a, **k: {}):
+def run(m, monkeypatch, submit, call=lambda *a, **k: {}, proposal=('--proposal', 'x')):
     monkeypatch.setattr(S, 'submit', submit)
     monkeypatch.setattr(S, 'call', call)
-    monkeypatch.setattr(S.sys, 'argv', ['submit_all.py', str(m), '--proposal', 'x', '--check', 'X', '--every', '0'])
+    monkeypatch.setattr(S.sys, 'argv', ['submit_all.py', str(m), *proposal, '--check', 'X', '--every', '0'])
     with pytest.raises(SystemExit) as e:
         S.main()
     return e.value.code, json.loads((m / 'solutions' / 'submitted.json').read_text())
+
+
+def test_without_a_proposal_fetches_the_folders_statements_by_name(mission, monkeypatch):
+    # Erschler-Zheng 2026-10-06: a standalone package has no proposal; its statements publish one by
+    # one through publish_standalone.py, and each proof should go in as its statement publishes
+    (mission / 'mission.py').write_text("NAMESPACE='TestNS'\nTHEOREMS=[dict(name='a'),dict(name='b'),"
+                                        "dict(name='c', namespace='Ext')]\n")
+    (mission / 'solutions' / 'submitted.json').write_text(json.dumps({'a': 'held', 'b': 'held'}))
+    fetched = []
+
+    def fake_run(cmd, *a, **k):
+        if any('fetch_theorems.py' in str(c) for c in cmd):
+            fetched.append(cmd[cmd.index(next(c for c in cmd if 'fetch_theorems.py' in str(c))) + 1:])
+            (mission.parent / 'ws' / 'Theorems' / 'Thm_Ext_c.lean').write_text('')
+        return types.SimpleNamespace(returncode=0, stdout='OK', stderr='')
+    monkeypatch.setattr(S.subprocess, 'run', fake_run)
+    code, done = run(mission, monkeypatch, lambda ns, n, f, expl=None, differs=None: 'ACCEPTED s-' + n,
+                     proposal=())
+    assert code == 0 and done['c'] == 'ACCEPTED s-c'
+    assert fetched[0] == ['--names', 'TestNS.a', 'TestNS.b', 'Ext.c']
 
 
 def test_retry_then_accept_and_pending_polled_not_resubmitted(mission, monkeypatch):
