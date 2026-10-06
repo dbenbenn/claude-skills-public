@@ -101,6 +101,30 @@ def test_publish_bundle_first_then_statement_and_verify(folder, monkeypatch, cap
     assert fake.posted == []
 
 
+def test_only_publishes_the_named_statements(folder, monkeypatch, capsys):
+    # Erschler-Zheng 2026-10-06: the mission's Thm 7.13 and goal proofs import one of the package's
+    # 28 statements; publishing that one alone costs the mission's publish queue one slot, not 28
+    import p2m
+    mp = folder / 'mission.py'
+    mp.write_text(mp.read_text().replace("THEOREMS = [dict(name='t', page='2', result='Lemma 1')]",
+                                         "THEOREMS = [dict(name='t', page='2', result='Lemma 1'), "
+                                         "dict(name='u', page='3', result='Lemma 2')]"))
+    (folder / 'lib' / 'Thm_u.lean').write_text('import Mathlib\n\nnamespace Q\n\ntheorem u : True := by\n  sorry\n\nend Q\n')
+    (folder / 'prose' / 'u.md').write_text('---\ntitle: Lemma 2 — u\n---\n\nIt is true.\n')
+    fake = FakePublisher()
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    monkeypatch.setattr(PS.time, 'sleep', lambda s: None)
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_standalone.py', str(folder), '--only=t'])
+    PS.main()
+    assert fake.posted == [('def', 'Bun'), ('thm', 'Q.t')]
+    assert json.loads((folder / 'published_ids.json').read_text()) == {'Def_Bun': 'D1', 'Q.t': 'T1'}
+    assert 'Q.u' not in capsys.readouterr().out
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_standalone.py', str(folder), '--only=t,nope'])
+    with pytest.raises(SystemExit) as e:
+        PS.main()
+    assert 'nope' in str(e.value)
+
+
 def test_rerun_waits_on_a_queued_job_instead_of_publishing_twice(folder, monkeypatch, capsys):
     # Lodha-Moore 2026-10-02: the run was killed while the platform sat on the bundle's job for an
     # hour; published_ids.json had nothing, and a rerun would have submitted the bundle again

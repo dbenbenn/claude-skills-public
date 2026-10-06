@@ -2,7 +2,7 @@
 """Publish a folder's standalone statements (POST /submit-problem), wait for the jobs, record ids in
 published_ids.json, and verify every published field against the folder.
 
-usage: publish_standalone.py DIR [--dry]
+usage: publish_standalone.py DIR [--dry] [--only=NAME[,NAME...]]
 
 DIR/mission.py supplies NAMESPACE, TAGS, THEOREMS [{name, page, result, ...}], src(page, result, extra,
 ref), and DIR/prose/<name>.md each item's title (front matter) and natural-language statement (body);
@@ -50,6 +50,15 @@ def main():
                      'natural_language_statement': D['nls'],
                      'source': M.src(D['page'], D['result'], D.get('extra'), D.get('ref')),
                      'tags': D.get('tags', M.TAGS)})
+    # --only=NAME[,NAME]: publish (and verify) just these statements, by short or full name; a later
+    # run without it publishes the rest (Erschler-Zheng 2026-10-06: one of 28 was imported by the
+    # mission's proofs, and the whole package would have held the mission's publish queue ~6 hours)
+    only = [n for a in sys.argv[1:] if a.startswith('--only=') for n in a[len('--only='):].split(',') if n]
+    if only:
+        known = {p['theorem_name'] for p in payloads} | {p['theorem_name'].rsplit('.', 1)[-1] for p in payloads}
+        if [n for n in only if n not in known]:
+            sys.exit('--only: no statement named ' + ', '.join(n for n in only if n not in known))
+        payloads = [p for p in payloads if p['theorem_name'] in only or p['theorem_name'].rsplit('.', 1)[-1] in only]
     for d in defs:
         print('Def_' + d['definition_name']); print('   ', d['source'])
     for p in payloads:
