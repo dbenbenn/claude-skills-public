@@ -791,6 +791,14 @@ click is not one, a second click does not duplicate jobs, and a run that goes qu
 still lacking ids resumes on another click. When the last item publishes the status becomes `In
 review`; approval makes it a live mission.
 
+**The one-at-a-time order is the browser's, not the server's.** The server compiles publish jobs
+concurrently: Submit's loop sends the next item only when the last one finishes, so a mission
+publishes serially, but jobs from `publish_standalone.py` run beside it and do not wait behind it
+(2026-10-06: a six-item package published in ~35 minutes, its five statements together in ~17,
+while the Erschler–Zheng queue kept its own ~15-minute pace). Never hold a standalone package back
+to "not delay" a mission's milestones; publish it when it is ready (dbenbenn: "I bet you could
+submit them now without interfering").
+
 **Watch for the approval yourself.** Once a proposal reads `In review`, start
 `scripts/watch_proposal.py PROPOSAL_ID --every 600` as a background command. It exits when the
 status changes, and that exit wakes the session. Without it, approval is noticed only when the
