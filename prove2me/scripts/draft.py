@@ -573,6 +573,40 @@ def double_backslash(items, miles, desc):
     return out
 
 
+EXTRACTION_MATH = re.compile(
+    r"\b[A-Za-z]{1,2} \([A-Za-z0-9]+ ?\)"      # "F (X)", "Pf (X)", "F (Y )": a function applied, with a stray space
+    r"|\([A-Za-z0-9]+ \)"                          # "(Y )"
+    r"|\b[a-zA-Z][0-9]\b"                          # "x0", "g1": a lost subscript
+    r"|\b[a-zA-Z][a-z0-9]?−1\b"                     # "g1−1", "gn−1": a lost superscript (or subscript)
+    r"|\blimn\b|\brkQ\b|\bZd\b")                # "limn→∞", "rkQ", "Zd"
+
+
+def extraction_math(items, miles, desc):
+    """[(where, why)] for a quotation whose mathematics looks copied from a pdftotext extraction.
+
+    pdftotext keeps the source's words but not its typesetting: "F (X)" gains a space, "x_0" and
+    "g_n^{-1}" collapse to "x0" and "gn−1", so a reader cannot tell g_{n-1} from g_n^{-1}. The IET
+    Draft shipped 55 such quotes, and dbenbenn caught the first one in review (2026-10-06). The
+    skill already says to read quotes off the rendered page; this checks the result. Mathematics
+    inside a quotation is typeset as `$…$`, so only text outside math inside “…” is searched."""
+    texts = [('description', desc)]
+    for k, it in items.items():
+        for f in ('natural_language_statement', 'source'):
+            if it.get(f):
+                texts.append((k, it[f]))
+    for k, (t, d) in miles.items():
+        texts.append((k + ' milestone', (t or '') + '\n' + (d or '')))
+    out = []
+    for where, t in texts:
+        for q in re.finditer(r'“[^”]*”', t):
+            plain = re.sub(r'\$[^$]*\$', lambda m: ' ' * len(m.group(0)), q.group(0))
+            hits = sorted({m.group(0) for m in EXTRACTION_MATH.finditer(plain)})
+            if hits:
+                out.append((where, 'quotation has untypeset (pdftotext) math %s: %s' %
+                            (', '.join(repr(h) for h in hits), ' '.join(q.group(0)[:80].split()))))
+    return out
+
+
 def goal_unquoted(M, items):
     """[(goal, why)] when the source's sentence for the goal never reaches the platform.
 
@@ -617,6 +651,7 @@ def main():
         bad += dead_lean_refs(M, mdir, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         bad += bundle_relation_docstrings(M, mdir)
         bad += double_backslash(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
+        bad += extraction_math(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
         bad += deprecated_refs(M, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         import decisions
         bad += decisions.check(mdir)

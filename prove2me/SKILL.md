@@ -204,6 +204,12 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   nothing (dbenbenn, Moore M28 and M1). Nothing about our own formal proof's choices goes
   here; that lives in the repo's proof notes. The paper's words appear only inside quotation
   marks; quotes checked against the page image, including the subject they predicate.
+- **Typeset the mathematics inside a quotation from the page image, never from pdftotext.** The
+  extraction keeps the words and loses the typesetting: "F (X)", "x0", "gn−1" (is it $g_{n-1}$ or
+  $g_n^{-1}$?). `draft.py verify` flags such quotes (`extraction_math`). The IET Draft shipped 55
+  of them, and the first independent recheck missed them, because its brief called transcriptions
+  "cosmetic" (dbenbenn caught one in review, 2026-10-06). A quote recheck brief asks for the
+  mathematics too.
 - **Recheck all the quotes, as the platform holds them.** Every quotation in every field — milestone
   descriptions, natural-language statements, `source`, the mission description — read from the
   live Draft and compared word for word, punctuation included, with the rendered page. Do it

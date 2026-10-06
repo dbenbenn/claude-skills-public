@@ -112,6 +112,17 @@ def test_double_backslash_and_escaped_quote_flagged():
     assert where.count('a') == 1 and where.count('b') == 2 and 'c' not in where
 
 
+def test_pdftotext_math_in_quotes_flagged():
+    # IET 2026-10-06: quotes copied from pdftotext kept "F (X)", "F (Y )", "x0", "gn−1" (g_n^{-1}
+    # read as g_{n-1}); dbenbenn caught it in review
+    items = {'a': {'natural_language_statement': 'JMMS, p. 2: “setting F (X) to be the direct limit of F (Y ) as Y runs”'},
+             'b': {'natural_language_statement': 'p. 14: “On = {x0 , g1−1 x0 · · · , gn−1 x0 }.”'},
+             'c': {'natural_language_statement': 'p. 2: “setting $F(X)$ to be the direct limit of $F(Y)$” and F (X) outside quotes'},
+             'd': {'natural_language_statement': 'p. 4: “Is the group IET amenable?”'}}
+    where = [w for w, _ in D.extraction_math(items, {}, '')]
+    assert 'a' in where and 'b' in where and 'c' not in where and 'd' not in where
+
+
 def test_title_mismatch_and_goal_quote(mdir):
     M = D.load(str(mdir))
     items, miles, _, _ = D.desired(M, str(mdir))
