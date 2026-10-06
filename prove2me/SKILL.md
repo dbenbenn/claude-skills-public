@@ -799,6 +799,13 @@ while the Erschler–Zheng queue kept its own ~15-minute pace). Never hold a sta
 to "not delay" a mission's milestones; publish it when it is ready (dbenbenn: "I bet you could
 submit them now without interfering").
 
+**To wait for publication, run `scripts/wait_published.py` as a background command**, never an
+ad-hoc loop: `wait_published.py NAME…` exits when each name is published (looked up by name, so a
+job that has scrolled out of `/publish-jobs?limit=N` still counts) or one's newest job has FAILED;
+`wait_published.py --proposal ID` exits when the Submit queue has drained. Its exit is the
+notification. An ad-hoc waiter on `/publish-jobs?limit=6` never exited once later jobs pushed its
+job out of the window (2026-10-06).
+
 **Watch for the approval yourself.** Once a proposal reads `In review`, start
 `scripts/watch_proposal.py PROPOSAL_ID --every 600` as a background command. It exits when the
 status changes, and that exit wakes the session. Without it, approval is noticed only when the
