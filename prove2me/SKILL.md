@@ -1247,6 +1247,8 @@ an accepted sketch — changing exactly one thing at a time:
 Two such submissions localised the above in minutes after two blind fixes had failed. Rule out
 size first from the record: a 102KB solution had been accepted, so a 70KB one is not too big.
 
+**The hard size limit is 1 MiB.** The soundness guard refuses a solution over 1,048,576 bytes before compiling it: "Source too large for token scanner" (FAILED, 2026-10-07, a 1.65 MB port of OpenAI's Kaplansky counterexample). Stripping comments saved only 6%. A larger proof has to be split into published intermediate statements, each proved by its own submission. 299 KB and 332 KB solutions were accepted.
+
 ### Find an inlined sibling by its statement, never by its name
 
 An edge in the mission graph exists only when a *solution* carries `import Theorems.Thm_<name>`.
