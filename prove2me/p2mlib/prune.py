@@ -15,6 +15,7 @@ goes the same way when, in addition, kept code never mentions one of the bundle'
 import re
 
 from . import leanedit, names
+from .leantext import strip as leantext_strip
 
 DIAGNOSTIC = {'check', 'eval', 'print', 'printAxioms', 'reduce', 'check_failure', 'synth', 'evalBang'}
 
@@ -62,6 +63,76 @@ def _binder_names(variable_cmd):
     return out
 
 
+_IDENT = re.compile(r"(?<![\w'!?\u2080-\u209c.])[^\W\d][\w'!?\u2080-\u209c]*(?:\.[^\W\d][\w'!?\u2080-\u209c]*)*")
+
+
+def _scope_candidates(tok, c):
+    """The full names an identifier `tok` can denote in command `c`: `tok` qualified by each
+    prefix of the namespace in force (innermost first, then the root), and by each `open`."""
+    if tok.startswith('_root_.'):
+        return [tok[len('_root_.'):]]
+    ns = c.namespace.split('.') if c.namespace else []
+    out = ['.'.join(ns[:k] + [tok]) for k in range(len(ns), -1, -1)]
+    for o in c.opens or []:
+        n = o.get('namespace') if isinstance(o, dict) else None
+        if n:
+            out.append(n + '.' + tok)
+    return out
+
+
+def _resolves_gone(text, c, gone, kept, bound=()):
+    """Does `text`, read in the scope of command `c`, name a declaration that is going? An
+    identifier counts when every local declaration it can denote there is in `gone`; one that
+    can also denote a kept declaration, or none of ours (a binder, a Mathlib name), does not.
+    `bound` names (the command's own binders) shadow everything."""
+    for tok in _IDENT.findall(leantext_strip(text)):
+        if tok.split('.')[0] in bound:
+            continue
+        hit = [x for x in _scope_candidates(tok, c) if x in gone or x in kept]
+        if hit and all(x in gone for x in hit):
+            return True
+    return False
+
+
+NOTATIONS = {'notation', 'notation3', 'mixfix'}
+
+
+def _notation_roots(info, by_name, roots):
+    """Notation commands are never pruned, and Lean prechecks a notation's identifiers when the
+    command runs ("Unknown identifier `sideA` at quotation precheck", OAI Kaplansky 2026-10-07).
+    So every declaration a notation names, read in its scope, joins `roots`, and so do the
+    declarations named by the in-scope `variable` binders it uses (`local notation "SA" => sideA
+    len m j firstA ...`), recursively through those binders' types. Returns {variable command
+    index: binder names a notation needs}, binders the variable pass must keep."""
+    keep = {}
+    for c in info.commands:
+        if c.short_kind not in NOTATIONS:
+            continue
+        t = info.slice(c.start.byte, c.end.byte)
+        body = t.split('=>', 1)[1] if '=>' in t else t
+        vcmds = [i for _, cmds in (c.context or []) for i in cmds
+                 if info.commands[i].short_kind == 'variable']
+        pending = [(body, c)]
+        need = set()
+        while pending:
+            text, scope = pending.pop()
+            for tok in _IDENT.findall(leantext_strip(text)):
+                for x in _scope_candidates(tok, scope):
+                    if x in by_name:
+                        roots.add(x)
+                head = tok.split('.')[0]
+                if head in need:
+                    continue
+                for i in vcmds:
+                    vc = info.commands[i]
+                    for _, ns, typ in _binder_groups(info.slice(vc.start.byte, vc.end.byte)) or []:
+                        if head in ns:
+                            need.add(head)
+                            keep.setdefault(i, set()).update(ns)
+                            pending.append((typ, vc))
+    return keep
+
+
 def plan(info):
     """(drop: set of command indices, drop_imports: [module], report: dict)."""
     by_name = {d.name: d for d in info.decls}
@@ -81,6 +152,7 @@ def plan(info):
                         roots.add(d.name)
     if 'solution' not in by_name:
         raise SystemExit('no `solution` declaration -- refusing to prune')
+    notation_vars = _notation_roots(info, by_name, roots)
     seen, stack = set(roots), list(roots)
     while stack:
         d = by_name.get(stack.pop())
@@ -110,12 +182,14 @@ def plan(info):
             declared_gone += list(c.names) or [d.name for d in own]
         elif c.short_kind in DIAGNOSTIC:
             drop.add(c.index)
-    # a short name that a kept declaration also has is ambiguous (two `DirectionFrame`s in two
-    # namespaces, OAI Gottschalk 2026-10-07): text matching cannot tell which one a binder means,
-    # so it does not count as gone
-    kept_short = {names.short(d.name) for d in info.decls
-                  if d.command is not None and d.command not in drop}
-    declared_gone = [g for g in declared_gone if names.short(g) not in kept_short]
+    # a binder type names a going declaration when, resolved in the variable command's own scope
+    # (its namespace and opens), its identifier can only mean declarations that go. Short-name
+    # matching could not tell two `DirectionFrame`s in two namespaces apart (OAI Gottschalk
+    # 2026-10-07), and skipping every shared short name kept `(firstA : CA m j → VA)` after its
+    # `TwoSideFullStage.CA` went because a kept `CA` lived elsewhere ("Unknown identifier `CA`",
+    # OAI Kaplansky 2026-10-07)
+    gone_full = set(declared_gone)
+    kept_full = {d.name for d in info.decls if d.command is not None and d.command not in drop}
     dropped_vars, replace = set(), {}
     for c in info.commands:
         if c.short_kind in ('variable', 'attribute') and c.index not in drop:
@@ -126,7 +200,8 @@ def plan(info):
                 continue
             groups = _binder_groups(t)
             if groups is None:          # unparsed: the whole command, as before
-                if any(names.mentions(t, g) for g in declared_gone):
+                if _resolves_gone(t.split(None, 1)[-1], c, gone_full, kept_full,
+                                  set(_binder_names(t))):
                     drop.add(c.index)
                     dropped_vars |= set(_binder_names(t))
                 continue
@@ -136,13 +211,14 @@ def plan(info):
             # does not mention a pruned `Foo.Q` (OAI Gottschalk port, 2026-10-07: every group naming
             # `Q` was dropped, and with it `[Field Q]`)
             bound = {n for g in groups for n in g[1]}
-            dg = [g for g in declared_gone if names.short(g) not in bound]
             bad, changed = set(), True
             while changed:
                 changed = False
                 lost = {n for k in bad for n in groups[k][1]}
                 for k, (_, ns, typ) in enumerate(groups):
-                    if k not in bad and (any(names.mentions(typ, g) for g in dg)
+                    if set(ns) & notation_vars.get(c.index, set()):
+                        continue                # a kept notation names this binder
+                    if k not in bad and (_resolves_gone(typ, c, gone_full, kept_full, bound)
                                          or any(names.mentions(typ, n) for n in lost)):
                         bad.add(k)
                         changed = True

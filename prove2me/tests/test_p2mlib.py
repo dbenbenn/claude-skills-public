@@ -321,3 +321,23 @@ def test_inline_tactic_macros_expands_uses_and_drops_the_definition():
     assert '  (first | (simp only [pow_two]; done) | (simp only [pow_two]; group) | group)\n' in out
     assert "have := gp'" in out
     assert leantext.inline_tactic_macros(out) == (out, [])
+
+
+def test_prune_resolves_a_binder_type_in_its_own_scope():
+    # OAI Kaplansky (2026-10-07): `variable (firstA lastA : CA m j → VA)` under `open TwoSideFullStage`
+    # stayed after `TwoSideFullStage.CA` was pruned, because a kept `CA` elsewhere shared the short
+    # name, and the pruned file failed with "Unknown identifier `CA`". Read in its scope, `CA` there
+    # can only be `A.CA`, which goes; `B.CA` stays.
+    import json, os
+    from p2mlib import prune
+    fix = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lean_fixtures')
+    info = leaninfo.parse(json.load(open(os.path.join(fix, 'ScopedVariable.json'))),
+                          open(os.path.join(fix, 'ScopedVariable.lean'), 'rb').read())
+    drop, imports, rep = prune.plan(info)
+    out = prune.apply(info, drop, imports, rep.get('replace'))
+    assert 'A.CA' in rep['removed'] and 'B.CA' not in rep['removed']
+    assert '(x : CA)' not in out and 'theorem unusedC' not in out
+    assert 'variable (n : Nat)' in out and 'def useB' in out
+    # Lean prechecks a notation's identifiers ("Unknown identifier `sideA` at quotation precheck",
+    # OAI Kaplansky 2026-10-07): what a kept notation names stays, with the binders it uses
+    assert 'def named' in out and 'variable (k : Nat)' in out and 'local notation "GG"' in out
