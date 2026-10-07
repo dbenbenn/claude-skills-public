@@ -4,7 +4,8 @@ published_ids.json, and verify every published field against the folder.
 
 usage: publish_standalone.py DIR [--dry] [--only=NAME[,NAME...]]
 
-DIR/mission.py supplies NAMESPACE, TAGS, THEOREMS [{name, page, result, ...}], src(page, result, extra,
+DIR/mission.py supplies NAMESPACE, TAGS, THEOREMS [{name, page, result, ...}; optional namespace, and theorem
+when the declared name differs from the file key name, e.g. two `special_identity` in two namespaces], src(page, result, extra,
 ref), and DIR/prose/<name>.md each item's title (front matter) and natural-language statement (body);
 a PROSE {name: {title, nls}} dict in mission.py is read only to verify a folder published before
 2026-10-03, and a new item whose prose is in Python is refused (Python string escapes put a literal
@@ -36,7 +37,7 @@ def main():
         else:
             P = M.PROSE[T['name']]
             in_python.add('%s.%s' % (T.get('namespace', M.NAMESPACE), T['name']))
-        payloads.append({'theorem_name': '%s.%s' % (T.get('namespace', M.NAMESPACE), T['name']),
+        payloads.append({'theorem_name': '%s.%s' % (T.get('namespace', M.NAMESPACE), T.get('theorem', T['name'])),
                          'theorem_title': P['title'], 'formal_statement': body, 'preamble': pre,
                          'natural_language_statement': P['nls'],
                          'source': M.src(T['page'], T['result'], T.get('extra'), T.get('ref')),
