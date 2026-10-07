@@ -53,10 +53,21 @@ def import_names(path):
     out = set()
     for mod in re.findall(r'^import (Theorems\.\S+)', open(path, encoding='utf-8').read(), re.M):
         t = open(os.path.join(ws, mod.replace('.', '/') + '.lean'), encoding='utf-8').read()
-        ns = re.search(r'^namespace (\S+)', t, re.M)
         want = mod.split('.', 1)[1][len('Thm_'):]
-        cands = [(ns.group(1) + '.' if ns else '') + n
-                 for n in re.findall(r'^\s*(?:private\s+)?(?:theorem|lemma)\s+(\S+)', t, re.M)]
+        # the namespace in force at each declaration: nested `namespace A` / `namespace B` lines
+        # give `A.B` (an OAI-generated statement nests `namespace OAI` and `namespace X`, and
+        # only the first was read, 2026-10-07)
+        cands, stack = [], []
+        for line in t.split('\n'):
+            m = re.match(r'^(namespace|section)\b\s*(\S*)', line)
+            if m:
+                stack.append((m.group(1), m.group(2))); continue
+            m = re.match(r'^end\b\s*(\S*)\s*$', line)
+            if m and stack:
+                stack.pop(); continue
+            m = re.match(r'^\s*(?:private\s+)?(?:theorem|lemma)\s+(\S+)', line)
+            if m:
+                cands.append('.'.join([n for k, n in stack if k == 'namespace'] + [m.group(1)]))
         hit = [c for c in cands if c.replace('.', '_') == want or c.split('.')[-1] == want]
         if not hit:
             sys.exit('cannot find the theorem of %s' % mod)
