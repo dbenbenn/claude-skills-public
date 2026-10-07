@@ -1247,7 +1247,7 @@ an accepted sketch — changing exactly one thing at a time:
 Two such submissions localised the above in minutes after two blind fixes had failed. Rule out
 size first from the record: a 102KB solution had been accepted, so a 70KB one is not too big.
 
-**The hard size limit is 1 MiB.** The soundness guard refuses a solution over 1,048,576 bytes before compiling it: "Source too large for token scanner" (FAILED, 2026-10-07, a 1.65 MB port of OpenAI's Kaplansky counterexample). Stripping comments saved only 6%. A larger proof has to be split into published intermediate statements, each proved by its own submission. 299 KB and 332 KB solutions were accepted.
+**The hard size limit is 1 MiB.** The soundness guard refuses a solution over 1,048,576 bytes before compiling it: "Source too large for token scanner" (FAILED, 2026-10-07, a 1.65 MB port of OpenAI's Kaplansky counterexample). Stripping comments saved only 6%. A larger proof has to be split into published intermediate statements, each proved by its own submission. A disproof cannot be split, since it cannot import theorems, so it has to be golfed instead. The Kaplansky disproof went from 1.65 MB to 995 KB by pruning, stripping comments, renaming identifiers to short names, adding `notation` aliases for long Mathlib names, and one global `open scoped Classical`. Tactic `macro`/`syntax` shortcuts are refused by the soundness guard, but `notation` lines pass. 299 KB and 332 KB solutions were accepted.
 
 ### Find an inlined sibling by its statement, never by its name
 
