@@ -180,7 +180,13 @@ def prune(text, verbose=True):
             while j < len(lines) and lines[j].startswith((' ', '\t')) and lines[j].strip():
                 j += 1
             span = '\n'.join(lines[i:j])
-            if any(re.search(r'(?<![\w.\'])%s(?![\w\'])' % re.escape(n), span) for n in gone):
+            # names the command binds itself are not references: OAI's `variable {G : Type uG}
+            # [Group G]` was dropped because some pruned declaration's last component was `G`
+            # (2026-10-07), and every later use of `[Group G]` lost its instance
+            bound = {b for grp in re.findall(r'[{(\[⦃]\s*([^:{}()\[\]⦃⦄]+?)\s*:', span)
+                     for b in grp.split()}
+            if any(re.search(r'(?<![\w.\'])%s(?![\w\'])' % re.escape(n), span)
+                   for n in gone - bound):
                 for k in range(i, j):
                     keep_mask[k] = False
             i = j
