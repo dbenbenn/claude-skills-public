@@ -110,6 +110,12 @@ def plan(info):
             declared_gone += list(c.names) or [d.name for d in own]
         elif c.short_kind in DIAGNOSTIC:
             drop.add(c.index)
+    # a short name that a kept declaration also has is ambiguous (two `DirectionFrame`s in two
+    # namespaces, OAI Gottschalk 2026-10-07): text matching cannot tell which one a binder means,
+    # so it does not count as gone
+    kept_short = {names.short(d.name) for d in info.decls
+                  if d.command is not None and d.command not in drop}
+    declared_gone = [g for g in declared_gone if names.short(g) not in kept_short]
     dropped_vars, replace = set(), {}
     for c in info.commands:
         if c.short_kind in ('variable', 'attribute') and c.index not in drop:
@@ -126,12 +132,17 @@ def plan(info):
                 continue
             # a group goes when its type names a dropped declaration, or a binder of a group
             # that went (`(d : Data μ G) (hd : d.ok)`); the others stay, so `{X} {μ}` outlive `d`
+            # a name the command binds shadows any global of that short name: `{Q : Type*} [Field Q]`
+            # does not mention a pruned `Foo.Q` (OAI Gottschalk port, 2026-10-07: every group naming
+            # `Q` was dropped, and with it `[Field Q]`)
+            bound = {n for g in groups for n in g[1]}
+            dg = [g for g in declared_gone if names.short(g) not in bound]
             bad, changed = set(), True
             while changed:
                 changed = False
                 lost = {n for k in bad for n in groups[k][1]}
                 for k, (_, ns, typ) in enumerate(groups):
-                    if k not in bad and (any(names.mentions(typ, g) for g in declared_gone)
+                    if k not in bad and (any(names.mentions(typ, g) for g in dg)
                                          or any(names.mentions(typ, n) for n in lost)):
                         bad.add(k)
                         changed = True
