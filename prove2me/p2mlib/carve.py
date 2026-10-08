@@ -451,6 +451,30 @@ class Graph:
                 return hits
         return []
 
+    def resolve_lean(self, tok, ns, opens, m):
+        """The reading Lean itself takes (ResolveName.resolveGlobalName): a match in the current
+        namespace or an enclosing one, innermost first, wins over the root and the open namespaces;
+        only without one are the root and the opens read together. Used to decide whether a
+        context line still means what it meant (Hecke 7/8 B000, 2026-10-08: `variable (p : ι → O)`
+        in namespace SecondPassArithmetic meant its own `O`; with it carved away, the opened
+        `EisensteinEmbedding.O` and `ActualEisensteinCubic.O` became an ambiguous reading)."""
+        if tok.startswith('_root_.'):
+            return self.resolve(tok, ns, opens, m)
+        for strip in range(3):
+            parts = tok.split('.')
+            if strip and len(parts) <= strip:
+                break
+            t = '.'.join(parts[:len(parts) - strip])
+            for p in prefixes(ns)[:-1]:
+                hits = [n for n in self.pub.get(join(p, t), ()) if self.visible(n, m)]
+                if hits:
+                    return hits
+            hits = [n for c in [t] + [join(o, t) for o in opens]
+                    for n in self.pub.get(c, ()) if self.visible(n, m)]
+            if hits:
+                return list(dict.fromkeys(hits))
+        return self.resolve(tok, ns, opens, m)
+
     # ---------------------------------------------------------- dependencies
     def _owners(self, names, self_key):
         out = set()
@@ -1036,7 +1060,7 @@ class Carver:
         """Does identifier tok, read in command c's scope, name only gone project declarations?"""
         if tok.split('.')[0] in bound:
             return False
-        hits = self.g.resolve(tok, c.namespace, opens, m)
+        hits = self.g.resolve_lean(tok, c.namespace, opens, m)
         return bool(hits) and all(pubname(h) not in have for h in hits)
 
     def _drops(self, m, kept, have):
@@ -1135,8 +1159,17 @@ class Carver:
                 r = self._open(info, c, m, alive, (c.start.byte, c.end.byte))
                 if r is None:
                     drop.add(c.index)
-                elif r:
-                    reps[c.index] = _cmd_text(info, c, r)
+                    continue
+                r = list(r) + self._hiding_edits(info, c, m, have)
+                if r:
+                    txt = _cmd_text(info, c, r)
+                    # `open X hiding` left with no names, `open X ()` left empty (Hecke 7/8 B000:
+                    # `open SecondPassArithmetic hiding O` once its `O` was carved away)
+                    txt = re.sub(r'\s+hiding\s*$', '', txt.rstrip())
+                    if re.search(r'\(\s*\)\s*$', txt):
+                        drop.add(c.index)
+                    else:
+                        reps[c.index] = txt
                 continue
             if k in REFUSED or (c.heads and any(_head_kind(h) in REFUSED for h in c.heads)):
                 raise CarveError('%s keeps a `%s` command (line %d), which prove2.me refuses: no '
@@ -1220,6 +1253,24 @@ class Carver:
                     edits.append((i['start'], i['end'], ' '.join('_root_.' + x for x in meant)))
         if toks and (dead == len(toks) or (special and dead)):
             return None
+        return edits
+
+    def _hiding_edits(self, info, c, m, have):
+        """Remove from an `open X hiding a b` / `open X (a b)` list the names that were project
+        declarations of X and are not in the carved file ("Unknown constant `X.a`")."""
+        g, t = self.g, info.text_bytes
+        targets = []
+        for i in c.idents or []:
+            if i['role'] == 'open':
+                targets += g.open_targets(i['name'], c.namespace, m)
+        edits = []
+        for i in c.idents or []:
+            if i['role'] != 'hiding':
+                continue
+            full = [join(x, i['name']) for x in targets]
+            proj = [n for f in full for n in g.pub.get(f, ())]
+            if proj and all(pubname(n) not in have for n in proj):
+                edits.append((i['start'], _skip_ws(t, i['end']), ''))
         return edits
 
     def _rename_edits(self, info, c, m, opens, rename):
