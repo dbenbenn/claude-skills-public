@@ -1239,7 +1239,7 @@ class Carver:
                     # name an anonymous local instance: a consumer importing this file
                     # re-activates it by name, and Lean's generated name depends on the file
                     edits.append((at, at, ' ' + pubname(key).rsplit('.', 1)[-1]))
-                pre = self._reactivate(info, c, m, drop, reactivated, inst_names)
+                pre = self._reactivate(info, c, m, drop, reactivated, inst_names, have, c.index in sorry)
             elif c.short_kind in NOTATION:
                 edits += self._rename_edits(info, c, m, opens, rename)
             if edits or pre:
@@ -1257,7 +1257,7 @@ class Carver:
         return ('section\n-- module %s\n' % m + (body + '\n' if body else '') +
                 ''.join(x + '\n' for x in closers) + 'end\n\n')
 
-    def _reactivate(self, info, c, m, drop, done, inst_names):
+    def _reactivate(self, info, c, m, drop, done, inst_names, have, sorried=False):
         """`attribute [local instance] N` lines for the local instances in kept command c's scope
         that c uses but this file does not declare (an imported bundle carries them as plain
         constants: Hecke 7/8, FiniteRayExpansion's `local instance : Fintype (MulChar R ℂ)` in
@@ -1271,14 +1271,16 @@ class Carver:
         for n in g.nodes[key].names:
             x = g.consts.get(n) or {}
             deps.update(x.get('t') or ())
-            deps.update(x.get('v') or ())
+            if not sorried:                   # a stub's `by sorry` uses only its statement's
+                deps.update(x.get('v') or ())
         chain = tuple(o for o, _ in c.context)
         out = []
         for vi in sorted(drop):
             if vi >= c.index or (vi, chain) in done or not _in_scope(info, vi, c):
                 continue
             ik = g.cmd_node.get((m, vi))
-            if not ik or not (set(g.nodes[ik].names) & deps) or not _local_instance(info, info.commands[vi])[0]:
+            if not ik or pubname(ik) not in have or pubname(ik) in self.keep_names or \
+                    not (set(g.nodes[ik].names) & deps) or not _local_instance(info, info.commands[vi])[0]:
                 continue
             done.add((vi, chain))
             out.append('attribute [local instance] %s\n' % inst_names.get(ik, pubname(ik)))
