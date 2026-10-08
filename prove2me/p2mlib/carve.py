@@ -1076,6 +1076,12 @@ class Carver:
         keep = set(keep)
         have = set(have) | g.have_names(keep)
         self.keep_names = g.have_names(keep)
+        # names for local instances emitted again in this file: unique to the file, since an
+        # anonymous copy gets the same generated name in every file of one root (two stubs each
+        # declaring `…instMeasurableSingletonClassFreeRow_theorems`, both imported by a piece)
+        import hashlib
+        self.tag = hashlib.sha1('\n'.join(sorted(keep)).encode()).hexdigest()[:6]
+        self.re_count = collections.Counter()
         rename = dict(rename or {})
         mods = g.topo({g.nodes[k].module for k in keep})
         kept_cmds = {m: {g.nodes[k].cmd for k in keep if g.nodes[k].module == m} for m in mods}
@@ -1186,7 +1192,7 @@ class Carver:
                 toks = set().union(*[v for vi, v in dead_tok.items() if _in_scope(info, vi, c)]) \
                     if dead_tok else set()
                 r = self._variable(info, c, m, have, opens, dropped_vars, protect.get(c.index, set()),
-                                   toks)
+                                   toks, self._pin_edits(info, c, m, have, opens, c.end.byte, set()))
                 if r is None:
                     drop.add(c.index)
                 elif r is not False:
@@ -1271,7 +1277,7 @@ class Carver:
         - imported (a bundle carries it as a plain constant): `attribute [local instance] N`
           (FiniteRayExpansion's `Fintype (MulChar R ℂ)` in B002); inst_names maps a port name to
           the name Lean gave it in a published bundle that kept it anonymous;
-        - not imported: its command again, anonymous so that Lean picks a name unused here."""
+        - not imported: its command again, under a name unique to this file."""
         g = self.g
         chain = tuple(o for o, _ in c.context)
         out = []
@@ -1290,10 +1296,13 @@ class Carver:
                 opens = g.scope_opens(info, vc, m)
                 refs = [i for i in vc.idents or [] if i['role'] == 'ref']
                 if not any(self._gone(i['name'], vc, m, have, opens) for i in refs):
-                    out.append(leanedit.text(info, vi).strip() + '\n')
+                    short = pubname(ik).rsplit('.', 1)[-1]
+                    self.re_count[short] += 1
+                    name = ' %s_r%s_%d' % (short, self.tag, self.re_count[short])
+                    out.append(_cmd_text(info, vc, [(anon_at, anon_at, name)]).strip() + '\n')
         return ''.join(out)
 
-    def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=()):
+    def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=(), pins=None):
         """The `variable` command without its gone binder groups: False (unchanged), None (none
         left) or the new text."""
         groups = c.binders or []
@@ -1315,14 +1324,19 @@ class Carver:
         # a name bound again here is a new variable, not the dropped one
         dropped_vars.difference_update(n for j, grp in enumerate(groups) if j not in bad
                                        for n in grp['names'])
-        if not bad:
+        pins = pins or []
+        if not bad and not pins:
             return False
         dropped_vars.update(n for j in bad for n in groups[j]['names'])
         if len(bad) == len(groups):
             return None
         t = info.text_bytes
-        return 'variable ' + ('\n  ').join(t[grp['start']:grp['end']].decode('utf-8')
-                                          for j, grp in enumerate(groups) if j not in bad)
+
+        def grp_text(grp):
+            mine = sorted(e for e in pins if grp['start'] <= e[0] < grp['end'])
+            parts, cur = _apply(t, grp['start'], mine)
+            return (b''.join(parts) + t[cur:grp['end']]).decode('utf-8')
+        return 'variable ' + ('\n  ').join(grp_text(grp) for j, grp in enumerate(groups) if j not in bad)
 
     def _open(self, info, c, m, alive, span):
         """Edits for the namespace tokens of an `open` in [span): [] unchanged, None when nothing
