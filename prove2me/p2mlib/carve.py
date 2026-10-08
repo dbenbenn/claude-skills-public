@@ -243,6 +243,20 @@ def _local_instance(info, c):
     return True, (mt.end() if nxt in ':([{⦃' else None)
 
 
+ANY_INSTANCE = re.compile(rb'(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?(?:noncomputable\s+)?(?:private\s+)?'
+                          rb'(?:(?:local|scoped)\s+)?instance(?:\s*\(priority\s*:=[^)]*\))?', re.S)
+
+
+def _anonymous_instance(info, c):
+    """Byte offset where an anonymous `instance` command's name goes, else None."""
+    t = info.text_bytes
+    mt = ANY_INSTANCE.match(t, c.start.byte, c.end.byte)
+    if not mt:
+        return None
+    nxt = t[_skip_ws(t, mt.end()):_skip_ws(t, mt.end()) + 3].decode('utf-8', 'ignore')[:1]
+    return mt.end() if nxt in ':([{⦃' else None
+
+
 def _notation_tokens(text):
     """The literal tokens a notation command declares (`local notation "O" => …` -> {'O'})."""
     head = text.split('=>', 1)[0]
@@ -1244,11 +1258,15 @@ class Carver:
             if c.index in kept:
                 edits += self._decl_edits(info, c, m, have, alive, opens, dropped_vars,
                                           deprivatize, c.index in sorry, rename)
-                is_inst, at = _local_instance(info, c)
+                at = _anonymous_instance(info, c)
                 key = g.cmd_node.get((m, c.index))
-                if is_inst and at is not None and key:
-                    # name an anonymous local instance: a consumer importing this file
-                    # re-activates it by name, and Lean's generated name depends on the file
+                if at is not None and key:
+                    # name an anonymous instance as the port named it: Lean's generated name
+                    # depends on the file and on what it imports, so a carved file's could
+                    # collide with a name kept from the port (Hecke 7/8: `instance : Countable O`
+                    # auto-named instCountableO in a bundle, a piece keeping the port's
+                    # `local instance instCountableO`), and a consumer re-activates a local one
+                    # by name
                     edits.append((at, at, ' ' + pubname(key).rsplit('.', 1)[-1]))
                 pre = self._reactivate(info, c, m, drop, reactivated, inst_names, have, c.index in sorry)
             elif c.short_kind in NOTATION:
