@@ -1447,9 +1447,11 @@ class Carver:
         return edits
 
     def _pin_edits(self, info, c, m, have, opens, body_end, taken):
-        """A reference that meant one declaration in its module but would read ambiguously in the
-        carved file, where modules the original never imported sit side by side (Hecke 7/8 B027:
-        `PrimeIdeal` under `open ProbePhysical HeckeInverseAmplification`), is written in full."""
+        """A reference that meant one declaration in its module but would read ambiguously or
+        differently in the carved file, where modules the original never imported sit side by
+        side, is written in full (Hecke 7/8 B027: `PrimeIdeal` under `open ProbePhysical
+        HeckeInverseAmplification`; a piece: `sourceRowSeries` in namespace ProbePhysical meant the
+        opened ProbeEuler's, before a later module declared ProbePhysical.sourceRowSeries)."""
         g = self.g
         binders = {i['name'] for i in c.idents or [] if i['role'] == 'binder'}
         out = []
@@ -1462,7 +1464,7 @@ class Carver:
             if len(src) != 1 or k:
                 continue
             now, k2 = g.lean_hits(tok, c.namespace, opens, lambda n: pubname(n) in have)
-            if k2 == 0 and len({pubname(n) for n in now}) > 1:
+            if k2 == 0 and now and {pubname(n) for n in now} != {pubname(src[0])}:
                 out.append((i['start'], i['end'], '_root_.' + pubname(src[0])))
         return out
 
