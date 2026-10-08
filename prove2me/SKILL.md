@@ -1247,6 +1247,8 @@ an accepted sketch — changing exactly one thing at a time:
 Two such submissions localised the above in minutes after two blind fixes had failed. Rule out
 size first from the record: a 102KB solution had been accepted, so a 70KB one is not too big.
 
+**Two publish timeouts, two remedies.** "FAILED: Compilation timed out after 300s" means the item itself is too slow: split it, with pieces of about 60–70 s or less single-threaded locally (a 102 s Erdős 3 bundle failed three times, and its 69 s and 33 s halves passed). "ERROR: Internal error while publishing: Module compilation timed out" means the server is building imported bundles on a cold worker. It grows more frequent the deeper the item sits in a bundle chain, but every one so far has eventually passed on an unchanged retry (Erdős 3, 2026-10-08), so retry it and never split it.
+
 **The hard size limit is 1 MiB.** The soundness guard refuses a solution over 1,048,576 bytes before compiling it: "Source too large for token scanner" (FAILED, 2026-10-07, a 1.65 MB port of OpenAI's Kaplansky counterexample). Stripping comments saved only 6%. A larger proof has to be split into published intermediate statements, each proved by its own submission. A disproof cannot be split, since it cannot import theorems, so it has to be golfed instead. The Kaplansky disproof went from 1.65 MB to 995 KB by pruning, stripping comments, renaming identifiers to short names, adding `notation` aliases for long Mathlib names, and one global `open scoped Classical`. Tactic `macro`/`syntax` shortcuts are refused by the soundness guard, but `notation` lines pass. 299 KB and 332 KB solutions were accepted.
 
 ### Splitting a large ported proof
