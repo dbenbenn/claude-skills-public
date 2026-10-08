@@ -498,20 +498,25 @@ class Graph:
         `EisensteinEmbedding.O` and `ActualEisensteinCubic.O` became an ambiguous reading)."""
         if tok.startswith('_root_.'):
             return self.resolve(tok, ns, opens, m)
+        hits, _ = self.lean_hits(tok, ns, opens, lambda n: self.visible(n, m))
+        return hits or self.resolve(tok, ns, opens, m)
+
+    def lean_hits(self, tok, ns, opens, ok):
+        """resolve_lean's search over the constants n with ok(n): (hits, fields stripped)."""
         for strip in range(3):
             parts = tok.split('.')
             if strip and len(parts) <= strip:
                 break
             t = '.'.join(parts[:len(parts) - strip])
             for p in prefixes(ns)[:-1]:
-                hits = [n for n in self.pub.get(join(p, t), ()) if self.visible(n, m)]
+                hits = [n for n in self.pub.get(join(p, t), ()) if ok(n)]
                 if hits:
-                    return hits
+                    return hits, strip
             hits = [n for c in [t] + [join(o, t) for o in opens]
-                    for n in self.pub.get(c, ()) if self.visible(n, m)]
+                    for n in self.pub.get(c, ()) if ok(n)]
             if hits:
-                return list(dict.fromkeys(hits))
-        return self.resolve(tok, ns, opens, m)
+                return list(dict.fromkeys(hits)), strip
+        return [], 0
 
     # ---------------------------------------------------------- dependencies
     def _owners(self, names, self_key):
@@ -1422,7 +1427,28 @@ class Carver:
             edits.append((c.value_start.byte, c.end.byte, ':= by\n  sorry'))
         body_end = c.value_start.byte if sorry and c.value_start else c.end.byte
         edits += [e for e in self._rename_edits(info, c, m, opens, rename) if e[0] < body_end]
+        edits += self._pin_edits(info, c, m, have, opens, body_end, {e[0] for e in edits})
         return edits
+
+    def _pin_edits(self, info, c, m, have, opens, body_end, taken):
+        """A reference that meant one declaration in its module but would read ambiguously in the
+        carved file, where modules the original never imported sit side by side (Hecke 7/8 B027:
+        `PrimeIdeal` under `open ProbePhysical HeckeInverseAmplification`), is written in full."""
+        g = self.g
+        binders = {i['name'] for i in c.idents or [] if i['role'] == 'binder'}
+        out = []
+        for i in c.idents or []:
+            tok = i['name']
+            if i['role'] != 'ref' or i['start'] >= body_end or i['start'] in taken or \
+                    tok.startswith('_root_.') or tok.split('.')[0] in binders:
+                continue
+            src, k = g.lean_hits(tok, c.namespace, opens, lambda n: g.visible(n, m))
+            if len(src) != 1 or k:
+                continue
+            now, k2 = g.lean_hits(tok, c.namespace, opens, lambda n: pubname(n) in have)
+            if k2 == 0 and len({pubname(n) for n in now}) > 1:
+                out.append((i['start'], i['end'], '_root_.' + pubname(src[0])))
+        return out
 
 
 # ================================================================ generated files
