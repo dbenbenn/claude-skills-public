@@ -67,7 +67,10 @@ def import_names(path):
                 stack.pop(); continue
             m = re.match(r'^\s*(?:private\s+)?(?:theorem|lemma)\s+(\S+)', line)
             if m:
-                cands.append('.'.join([n for k, n in stack if k == 'namespace'] + [m.group(1)]))
+                name = m.group(1)
+                # `theorem _root_.A.b` ignores the namespaces in force (carved SWPort pieces, 2026-10-08)
+                cands.append(name[len('_root_.'):] if name.startswith('_root_.') else
+                             '.'.join([n for k, n in stack if k == 'namespace'] + [name]))
         hit = [c for c in cands if c.replace('.', '_') == want or c.split('.')[-1] == want]
         if not hit:
             sys.exit('cannot find the theorem of %s' % mod)
