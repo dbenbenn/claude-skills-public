@@ -381,3 +381,29 @@ def test_command_line_plan_gen_order(tmp_path):
     assert not (tmp_path / 'out' / 'lib' / 'Thm_CD_main.lean').exists()      # external
     waves = run('order', str(cfg))
     assert waves.startswith('wave 0') and 'statement:CD.main' not in waves
+
+
+def test_notation_tokens_and_their_uses():
+    # Hecke 7/8 stub ProbeEuler.pow_mul_sqrt: `variable (p : O)` outlived its `local notation "O"`
+    assert C._notation_tokens('local notation "O" => ActualEisensteinCubic.O') == {'O'}
+    assert C._notation_tokens('local infixl:65 " ∣_ " => f') == {'∣_'}
+    assert C._uses_token('(p : O)', 'O') and C._uses_token('Ideal O', 'O')
+    assert not C._uses_token('(p : Odd n)', 'O') and not C._uses_token('(x : A.O)', 'O')
+    assert C._uses_token('a ∣_ b', '∣_')
+
+
+def test_local_instance_names_go_after_the_keyword():
+    # an anonymous `local instance` is named when carved, so an importer can re-activate it
+    from types import SimpleNamespace as N
+
+    def cmd(text):
+        b = text.encode()
+        return N(text_bytes=b), N(start=N(byte=0), end=N(byte=len(b)))
+    i, c = cmd('noncomputable local instance : Fintype (MulChar R ℂ) := Fintype.ofFinite _')
+    assert C._local_instance(i, c) == (True, len('noncomputable local instance'))
+    i, c = cmd('local instance (priority := 10) {ι : Type*} : DecidableEq (ι ⊕ Fin 2) := x')
+    assert C._local_instance(i, c) == (True, len('local instance (priority := 10)'))
+    i, c = cmd('local instance foo : Bar := x')
+    assert C._local_instance(i, c) == (True, None)
+    i, c = cmd('instance : Bar := x')
+    assert C._local_instance(i, c) == (False, None)

@@ -27,7 +27,11 @@ CONFIG.json (paths may use ~):
    "build_logs": ["build.log"],               # `lake build` output: per-module times for costs
    "time_scale": 1.5,                         # verifier time / local build time
    "frozen": {"plan": "old_plan.json", "bundles": ["OAIErdos3B000"]},  # published: keep as is
-   "collapse_mathlib": true}                  # `import Mathlib` instead of the module list
+   "collapse_mathlib": true,                  # `import Mathlib` instead of the module list
+   "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
+                                              # anonymous local instances a frozen bundle kept
+                                              # unnamed (Lean's name there differs from the
+                                              # port's); consumers re-activate them by it
 
 Steps. `graph` runs DeclGraph on the compiled roots (one Lean process) and LeanInfo, parse-only,
 on each module (one at a time, cached under ~/.cache/p2m/leaninfo; slow the first time on a
@@ -78,7 +82,12 @@ def plan_path(cfg):
 def load_graph(cfg):
     if not os.path.exists(graph_path(cfg)):
         sys.exit('no %s: run `carve.py graph` first' % graph_path(cfg))
-    return C.Graph.load(graph_path(cfg), cfg['src'])
+    g = C.Graph.load(graph_path(cfg), cfg['src'])
+    names = cfg.get('instance_names') or {}
+    if isinstance(names, str):
+        names = json.load(open(os.path.expanduser(names), encoding='utf-8'))
+    g.instance_names = names
+    return g
 
 
 def costs(cfg, g):

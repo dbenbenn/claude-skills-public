@@ -29,6 +29,7 @@ import subprocess
 from dataclasses import dataclass, field
 
 from . import leanedit, leaninfo
+from .leantext import strip
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECLGRAPH = os.path.join(os.path.dirname(HERE), 'lean', 'DeclGraph.lean')
@@ -225,6 +226,43 @@ def _is_local(text):
     """A `local`/`scoped` notation, or an `attribute [local …]`: it lasts to the end of its scope."""
     return bool(re.match(r'\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?(?:local|scoped)\b', text, re.S)) or \
         '[local ' in text or '[scoped ' in text
+
+
+# a `local instance` command, anonymous when the next token opens its binders or type
+LOCAL_INSTANCE = re.compile(rb'(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?(?:noncomputable\s+)?(?:private\s+)?'
+                            rb'local\s+instance(?:\s*\(priority\s*:=[^)]*\))?', re.S)
+
+
+def _local_instance(info, c):
+    """(is a `local instance`, byte offset where an anonymous one's name goes or None)."""
+    t = info.text_bytes
+    mt = LOCAL_INSTANCE.match(t, c.start.byte, c.end.byte)
+    if not mt:
+        return False, None
+    nxt = t[_skip_ws(t, mt.end()):_skip_ws(t, mt.end()) + 3].decode('utf-8', 'ignore')[:1]
+    return True, (mt.end() if nxt in ':([{⦃' else None)
+
+
+def _notation_tokens(text):
+    """The literal tokens a notation command declares (`local notation "O" => …` -> {'O'})."""
+    head = text.split('=>', 1)[0]
+    return {x.strip() for x in re.findall(r'"((?:[^"\\]|\\.)*)"', head) if x.strip()}
+
+
+def _in_scope(info, vi, c):
+    """Is command vi (a notation, a local instance) still in force at command c: earlier, and
+    its enclosing scopes all still open there?"""
+    if vi >= c.index:
+        return False
+    a = [o for o, _ in info.commands[vi].context]
+    b = [o for o, _ in c.context]
+    return b[:len(a)] == a
+
+
+def _uses_token(text, tok):
+    if re.match(r"^[\w'.]+$", tok):
+        return re.search(r"(?<![\w'.])%s(?![\w'])" % re.escape(tok), text) is not None
+    return tok in text
 
 
 def _head_kind(h):
@@ -1126,6 +1164,13 @@ class Carver:
                         for grp in vc.binders or []:
                             if set(grp['names']) & heads:
                                 protect[vi].update(grp['names'])
+        # tokens of the notations this file drops: a `variable` group written with one has lost
+        # its meaning (Hecke 7/8 stub ProbeEuler.pow_mul_sqrt: `variable (p : O)` kept after
+        # `local notation "O" => ActualEisensteinCubic.O` went with its target)
+        dead_tok = {c.index: _notation_tokens(leanedit.text(info, c.index)) for c in info.commands
+                    if c.index in drop and c.short_kind in NOTATION}
+        inst_names = getattr(g, 'instance_names', None) or {}
+        reactivated = set()
         for c in info.commands:
             if c.index in drop:
                 continue
@@ -1133,7 +1178,10 @@ class Carver:
             opens = g.scope_opens(info, c, m)
             k = c.short_kind
             if k == 'variable':
-                r = self._variable(info, c, m, have, opens, dropped_vars, protect.get(c.index, set()))
+                toks = set().union(*[v for vi, v in dead_tok.items() if _in_scope(info, vi, c)]) \
+                    if dead_tok else set()
+                r = self._variable(info, c, m, have, opens, dropped_vars, protect.get(c.index, set()),
+                                   toks)
                 if r is None:
                     drop.add(c.index)
                 elif r is not False:
@@ -1181,13 +1229,21 @@ class Carver:
             if k in REFUSED or (c.heads and any(_head_kind(h) in REFUSED for h in c.heads)):
                 raise CarveError('%s keeps a `%s` command (line %d), which prove2.me refuses: no '
                                  'macro or syntax commands' % (m, k, c.start.line))
+            pre = ''
             if c.index in kept:
                 edits += self._decl_edits(info, c, m, have, alive, opens, dropped_vars,
                                           deprivatize, c.index in sorry, rename)
+                is_inst, at = _local_instance(info, c)
+                key = g.cmd_node.get((m, c.index))
+                if is_inst and at is not None and key:
+                    # name an anonymous local instance: a consumer importing this file
+                    # re-activates it by name, and Lean's generated name depends on the file
+                    edits.append((at, at, ' ' + pubname(key).rsplit('.', 1)[-1]))
+                pre = self._reactivate(info, c, m, drop, reactivated, inst_names)
             elif c.short_kind in NOTATION:
                 edits += self._rename_edits(info, c, m, opens, rename)
-            if edits:
-                reps[c.index] = _cmd_text(info, c, edits)
+            if edits or pre:
+                reps[c.index] = pre + _cmd_text(info, c, edits)
         first = info.commands[0].start.byte if info.commands else 0
         body = leanedit.remove_commands(info, drop, a=first, reps=reps)
         closers = []
@@ -1201,7 +1257,34 @@ class Carver:
         return ('section\n-- module %s\n' % m + (body + '\n' if body else '') +
                 ''.join(x + '\n' for x in closers) + 'end\n\n')
 
-    def _variable(self, info, c, m, have, opens, dropped_vars, protected):
+    def _reactivate(self, info, c, m, drop, done, inst_names):
+        """`attribute [local instance] N` lines for the local instances in kept command c's scope
+        that c uses but this file does not declare (an imported bundle carries them as plain
+        constants: Hecke 7/8, FiniteRayExpansion's `local instance : Fintype (MulChar R ℂ)` in
+        B002, its user `zeroExtendUnits_fourier` in a piece). inst_names maps a port name to the
+        name Lean gave it in a published bundle that kept it anonymous."""
+        g = self.g
+        key = g.cmd_node.get((m, c.index))
+        if not key:
+            return ''
+        deps = set()
+        for n in g.nodes[key].names:
+            x = g.consts.get(n) or {}
+            deps.update(x.get('t') or ())
+            deps.update(x.get('v') or ())
+        chain = tuple(o for o, _ in c.context)
+        out = []
+        for vi in sorted(drop):
+            if vi >= c.index or (vi, chain) in done or not _in_scope(info, vi, c):
+                continue
+            ik = g.cmd_node.get((m, vi))
+            if not ik or not (set(g.nodes[ik].names) & deps) or not _local_instance(info, info.commands[vi])[0]:
+                continue
+            done.add((vi, chain))
+            out.append('attribute [local instance] %s\n' % inst_names.get(ik, pubname(ik)))
+        return ''.join(out)
+
+    def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=()):
         """The `variable` command without its gone binder groups: False (unchanged), None (none
         left) or the new text."""
         groups = c.binders or []
@@ -1215,7 +1298,8 @@ class Carver:
                 if j in bad or set(grp['names']) & protected:
                     continue
                 inside = [i for i in refs if grp['start'] <= i['start'] < grp['end']]
-                if any(i['name'].split('.')[0] in lost - set(grp['names']) or
+                gtxt = info.text_bytes[grp['start']:grp['end']].decode('utf-8')
+                if any(_uses_token(gtxt, tk) for tk in dead_tokens) or any(i['name'].split('.')[0] in lost - set(grp['names']) or
                        self._gone(i['name'], c, m, have, opens, bound - lost) for i in inside):
                     bad.add(j)
                     changed = True
@@ -1379,8 +1463,11 @@ def gen_stub(g, plan, node, collapse_mathlib=True):
     avail = _bundle_have(g, plan, bs)
     body = Carver(g).carve({node}, g.have_names({node} | avail), sorry={node},
                            rename=collision_renames(g))
+    # no comments: a statement's formal_statement freezes at publish and api.call refuses one
+    # carrying a comment (the `-- module` markers, OpenAI's comments in kept context lines)
+    body = re.sub(r'\n\s*\n(\s*\n)+', '\n\n', '\n'.join(l.rstrip() for l in strip(body).split('\n')))
     hdr = header(g, {g.nodes[node].module}, bs, (), collapse_mathlib)
-    return hdr + '\n' + body.rstrip('\n') + '\n'
+    return hdr + '\n' + body.strip('\n') + '\n'
 
 
 def solution_tail(g, node):
