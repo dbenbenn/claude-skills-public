@@ -60,6 +60,15 @@ class Command:
     # commands elaborated in it before this command])
     context: list = field(default_factory=list)
     ids: list = field(default_factory=list)   # (start Pos, end Pos) of each declId, parallel to names
+    # with run(idents=True) (LeanInfo --idents; byte offsets): every identifier with its role
+    # ({'name', 'role', 'start', 'end'}; roles in lean/LeanInfo.lean), the `… in` wrapper heads
+    # ({'kind', 'start', 'end'}), a `variable` command's binder groups ({'start', 'end', 'names'}),
+    # and a declaration's doc comment and `private` keyword ({'start', 'end'} or None)
+    idents: list = None
+    heads: list = None
+    binders: list = None
+    doc: dict = None
+    private: dict = None
 
     @property
     def short_kind(self):
@@ -144,7 +153,8 @@ def parse(data, text_bytes=b''):
                     c['attrs'], c['names'], c.get('inner_kind'), (c.get('decl_kind') or '').rsplit('.', 1)[-1] or None,
                     _pos(c['value_start']) if c.get('value_start') else None,
                     [(x['opener'], x['cmds']) for x in c.get('context') or []],
-                    [(_pos(x['start']), _pos(x['end'])) for x in c.get('ids') or []])
+                    [(_pos(x['start']), _pos(x['end'])) for x in c.get('ids') or []],
+                    c.get('idents'), c.get('heads'), c.get('binders'), c.get('doc'), c.get('private'))
             for i, c in enumerate(data['commands'])]
     decls = []
     for d in data.get('decls') or []:
@@ -162,8 +172,10 @@ def parse(data, text_bytes=b''):
     return Info(data['file'], data['mode'], cmds, decls, msgs, text_bytes)
 
 
-def _key(path, parse_only, ws, candidates=()):
+def _key(path, parse_only, ws, candidates=(), idents=False):
     h = hashlib.sha256()
+    if idents:
+        h.update(b'idents')
     if candidates:
         h.update(('candidates:' + ','.join(candidates)).encode())
     h.update(open(TOOL, 'rb').read())
@@ -190,12 +202,12 @@ def _key(path, parse_only, ws, candidates=()):
     return h.hexdigest()
 
 
-def raw(path, parse_only=False, ws=None, timeout=3000, candidates=()):
+def raw(path, parse_only=False, ws=None, timeout=3000, candidates=(), idents=False):
     """LeanInfo's JSON for `path` as a dict, uncached (tests/record_fixtures.py records it)."""
     path = os.path.abspath(path)
     ws = ws or workspace()
     args = ['lake', 'env', 'lean', '--run', TOOL, path] + (['--parse-only'] if parse_only else []) + \
-        (['--candidates', ','.join(candidates)] if candidates else [])
+        (['--candidates', ','.join(candidates)] if candidates else []) + (['--idents'] if idents else [])
     r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout)
     out = r.stdout.strip().split('\n')[-1] if r.stdout.strip() else ''
     try:
@@ -204,18 +216,19 @@ def raw(path, parse_only=False, ws=None, timeout=3000, candidates=()):
         raise RuntimeError('LeanInfo failed on %s:\n%s' % (path, (r.stdout + r.stderr)[-3000:]))
 
 
-def run(path, parse_only=False, ws=None, use_cache=True, timeout=3000, candidates=()):
+def run(path, parse_only=False, ws=None, use_cache=True, timeout=3000, candidates=(), idents=False):
     """LeanInfo on `path`. `candidates`: published modules to import beside the file's own, so each
-    theorem reports `same_statement_as` (elaborate mode; see lean/LeanInfo.lean)."""
+    theorem reports `same_statement_as` (elaborate mode; see lean/LeanInfo.lean). `idents`: every
+    command also reports its identifiers by role (the carver's input)."""
     path = os.path.abspath(path)
     ws = ws or workspace()
     text = open(path, 'rb').read()
     candidates = list(candidates)
-    key = _key(path, parse_only, ws, candidates)
+    key = _key(path, parse_only, ws, candidates, idents)
     cf = os.path.join(CACHE, key + '.json')
     if use_cache and os.path.exists(cf):
         return parse(json.load(open(cf)), text)
-    data = raw(path, parse_only, ws, timeout, candidates)
+    data = raw(path, parse_only, ws, timeout, candidates, idents)
     if use_cache:
         os.makedirs(CACHE, exist_ok=True)
         json.dump(data, open(cf, 'w'))

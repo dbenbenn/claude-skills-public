@@ -10,8 +10,9 @@ with no arguments.
 | Path | What it is |
 |---|---|
 | `scripts/*.py` | the command-line tools |
-| `p2mlib/` | the shared library: `api` (client, pagination, polling), `workspace` (the Lean workspace, published statements), `names` (one identifier grammar, primes included), `leantext` (comment stripper, header scanner), `leaninfo` (wrapper for the Lean tool), `leanedit` (edits by command ranges and scopes), `prune`, `copies`, `mission` (loader, prose files), `staging` |
-| `lean/LeanInfo.lean` | the Lean tool: what a file contains, as Lean sees it |
+| `p2mlib/` | the shared library: `api` (client, pagination, polling), `workspace` (the Lean workspace, published statements), `names` (one identifier grammar, primes included), `leantext` (comment stripper, header scanner), `leaninfo` (wrapper for the Lean tool), `leanedit` (edits by command ranges and scopes), `prune`, `copies`, `mission` (loader, prose files), `staging`, `carve` (splitting a large port: graph, plan, carver) |
+| `lean/LeanInfo.lean` | the Lean tool: what a file contains, as Lean sees it (`--idents`: every identifier by role, for the carver) |
+| `lean/DeclGraph.lean` | the declaration graph of a compiled development (`scripts/carve.py graph`) |
 | `tests/` | the test suite and its fixtures |
 
 ## Principles

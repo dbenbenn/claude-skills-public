@@ -141,7 +141,85 @@ partial def valueStart? (stx : Syntax) : Option String.Pos.Raw :=
 def innerKind (stx : Syntax) : Option Name :=
   if stx.getKind == ``Lean.Parser.Command.in then some stx[2].getKind else none
 
-def commandJ (fm : FileMap) (stx : Syntax) (scope : Name × List OpenDecl) (ctx : Json) : Option Json := do
+/-! ### `--idents`: the identifiers of a command, by role (for the carver, scripts/carve.py)
+
+Every `ident` in a command's syntax with its byte range and a role: `decl` (the name a `declId`
+declares), `open` (a namespace an `open` names), `binder` (a name a bracketed binder binds),
+`univ` (a universe name in `foo.{u}` or `universe u`), `dot` (`.foo`), `named` (`(x := e)`),
+`hiding` (names an `open … hiding/renaming/( )` lists), `scope` (the name of a `namespace`,
+`section` or `end`), `attr` (an attribute: inside `@[…]` or `attribute […]`), `option` (a `set_option` name), or `ref`
+(everything else: what the command refers to). With
+them: `heads`, each `open … in` / `omit … in` / `include … in` / `set_option … in` wrapper of the
+command (its kind and the byte range up to the wrapped command); `binders`, for a `variable`
+command, each bracketed binder group's range and the names it binds; `doc` and `private`, the
+ranges of a declaration's doc comment and `private` keyword. -/
+
+partial def identRoles (stx : Syntax) (role : String) (acc : Array (String × String × Nat × Nat)) :
+    Array (String × String × Nat × Nat) :=
+  match stx with
+  | .ident .. => match stx.getRange? with
+    | some r => acc.push (toString stx.getId, role, r.start.byteIdx, r.stop.byteIdx)
+    | none => acc
+  | .node _ k args =>
+    let all (role : String) (acc : Array _) (xs : Array Syntax) := xs.foldl (fun a x => identRoles x role a) acc
+    if k == ``Lean.Parser.Command.namespace || k == ``Lean.Parser.Command.end ||
+        k == ``Lean.Parser.Command.section then all "scope" acc args
+    else if k == ``Lean.Parser.Command.universe then all "univ" acc args
+    else if k == ``Lean.Parser.Term.attributes || k == ``Lean.Parser.Term.attrInstance then all "attr" acc args
+    else if k.toString.endsWith "set_option" && args.size > 1 then
+      all role (identRoles args[1]! "option" acc) (#[args[0]!] ++ args.extract 2 args.size)
+    else if k == ``Lean.Parser.Command.declId then
+      all "univ" (identRoles args[0]! "decl" acc) (args.extract 1 args.size)
+    else if k == ``Lean.Parser.Command.openSimple then all "open" acc args
+    else if k == ``Lean.Parser.Command.openScoped then all "open" acc args
+    else if k == ``Lean.Parser.Command.openOnly || k == ``Lean.Parser.Command.openHiding ||
+        k == ``Lean.Parser.Command.openRenaming then
+      all "hiding" (identRoles args[0]! "open" acc) (args.extract 1 args.size)
+    else if k == ``Lean.Parser.Term.explicitBinder || k == ``Lean.Parser.Term.implicitBinder ||
+        k == ``Lean.Parser.Term.strictImplicitBinder || k == ``Lean.Parser.Term.instBinder then
+      -- args[1]: the bound names (`many1 binderIdent`, or the optional `inst :`)
+      all role (all "binder" acc #[args[0]!, args[1]!]) (args.extract 2 args.size)
+    else if k == ``Lean.Parser.Term.dotIdent then all "dot" acc args
+    else if k == ``Lean.Parser.Term.namedArgument then
+      all role (identRoles args[1]! "named" acc) (args.extract 2 args.size)
+    else all role acc args
+  | _ => acc
+
+/-- The `… in` wrappers of a command, outermost first: (kind of the head, start, start of what it wraps). -/
+partial def inHeads (stx : Syntax) : Array (String × Nat × Nat) :=
+  if stx.getKind == ``Lean.Parser.Command.in then
+    match stx[0].getPos?, stx[2].getPos? with
+    | some a, some b => #[(toString stx[0].getKind, a.byteIdx, b.byteIdx)] ++ inHeads stx[2]
+    | _, _ => inHeads stx[2]
+  else #[]
+
+partial def unwrapIn (stx : Syntax) : Syntax :=
+  if stx.getKind == ``Lean.Parser.Command.in then unwrapIn stx[2] else stx
+
+partial def findKind (k : Name) (stx : Syntax) : Option Syntax :=
+  if stx.getKind == k then some stx else stx.getArgs.findSome? (findKind k)
+
+def rangeJ (stx : Syntax) : Json := match stx.getRange? with
+  | some r => Json.mkObj [("start", toJson r.start.byteIdx), ("end", toJson r.stop.byteIdx)]
+  | none => Json.null
+
+def identsJ (stx : Syntax) : List (String × Json) := Id.run do
+  let ids := identRoles stx "ref" #[]
+  let mut out : List (String × Json) := [("idents", Json.arr <| ids.map fun (n, r, a, b) =>
+    Json.mkObj [("name", toJson n), ("role", toJson r), ("start", toJson a), ("end", toJson b)])]
+  out := out ++ [("heads", Json.arr <| (inHeads stx).map fun (k, a, b) =>
+    Json.mkObj [("kind", toJson k), ("start", toJson a), ("end", toJson b)])]
+  let core := unwrapIn stx
+  if core.getKind == ``Lean.Parser.Command.variable then
+    out := out ++ [("binders", Json.arr <| core[1].getArgs.map fun g =>
+      let names := (identRoles g "ref" #[]).filterMap fun (n, r, _, _) => if r == "binder" then some n else none
+      (rangeJ g).mergeObj (Json.mkObj [("names", toJson names)]))]
+  if core[0].getKind == ``Lean.Parser.Command.declModifiers then
+    if let some d := findKind ``Lean.Parser.Command.docComment core[0] then out := out ++ [("doc", rangeJ d)]
+    if let some p := findKind ``Lean.Parser.Command.private core[0] then out := out ++ [("private", rangeJ p)]
+  return out
+
+def commandJ (fm : FileMap) (stx : Syntax) (scope : Name × List OpenDecl) (ctx : Json) (idents := false) : Option Json := do
   let r ← stx.getRange?
   let (ns, opens) := scope
   some <| Json.mkObj ([
@@ -161,7 +239,8 @@ def commandJ (fm : FileMap) (stx : Syntax) (scope : Name × List OpenDecl) (ctx 
       (match valueStart? stx with
       | some p => [("value_start", posJ fm p)]
       | none => [])
-    | none => []))
+    | none => []) ++
+    (if idents then identsJ stx else []))
 
 /-- Commands that set context for the rest of their scope and end with it -- what a command moved
 elsewhere must carry. `open scoped X` adds no `OpenDecl`, so the commands themselves are recorded,
@@ -229,6 +308,7 @@ partial def restsOn (env : Environment) (todo : List Name) (seen stmts : NameSet
 unsafe def main (args : List String) : IO UInt32 := do
   let some path := args.head? | IO.eprintln "usage: LeanInfo FILE.lean [--parse-only]"; return 2
   let parseOnly := args.contains "--parse-only"
+  let idents := args.contains "--idents"
   let candidates : Array Name := match args.dropWhile (· != "--candidates") with
     | _ :: ms :: _ => (ms.splitOn ",").filter (· ≠ "") |>.map String.toName |>.toArray
     | _ => #[]
@@ -308,7 +388,7 @@ unsafe def main (args : List String) : IO UInt32 := do
   let msgArr := messages.reportedPlusUnreported.toArray ++ got
   let finalEnv := s.commandState.env
   let env := finalEnv
-  let commandsJ := cmds.filterMap fun (stx, sc, cx) => commandJ fm stx sc cx
+  let commandsJ := cmds.filterMap fun (stx, sc, cx) => commandJ fm stx sc cx idents
   -- declarations: user-facing constants of this file (they have declaration ranges)
   let mine := env.constants.toList.filter fun (n, _) => (env.getModuleIdxFor? n).isNone
   let mut ranges : Std.HashMap Name DeclarationRanges := {}

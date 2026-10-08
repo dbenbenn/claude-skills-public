@@ -1249,6 +1249,35 @@ size first from the record: a 102KB solution had been accepted, so a 70KB one is
 
 **The hard size limit is 1 MiB.** The soundness guard refuses a solution over 1,048,576 bytes before compiling it: "Source too large for token scanner" (FAILED, 2026-10-07, a 1.65 MB port of OpenAI's Kaplansky counterexample). Stripping comments saved only 6%. A larger proof has to be split into published intermediate statements, each proved by its own submission. A disproof cannot be split, since it cannot import theorems, so it has to be golfed instead. The Kaplansky disproof went from 1.65 MB to 995 KB by pruning, stripping comments, renaming identifiers to short names, adding `notation` aliases for long Mathlib names, and one global `open scoped Classical`. Tactic `macro`/`syntax` shortcuts are refused by the soundness guard, but `notation` lines pass. 299 KB and 332 KB solutions were accepted.
 
+### Splitting a large ported proof
+
+A port over the 1 MiB cap, or with pieces the 300 s verifier cannot finish, is split by
+`scripts/carve.py` (`graph`, `plan`, `gen`, `order`; its docstring has the config). Never write
+a per-mission carver: five did (Kaplansky, Deligne–Drinfeld, Catalan, Chowla, Erdős 3,
+2026-10-07/08), and each relearned the same bugs, now tests in `tests/test_carve.py`. The tool
+publishes every reachable definition in Definitions bundles and promotes theorems to published
+statements until each piece fits its budget. It carves by Lean's own command ranges, and each
+piece renames OpenAI's copy of its target `<name>_oai`; without the rename the submissions came
+back WA. The lessons:
+- **Budget.** Aim for pieces of about 60 s or less when compiled locally with `-j1`. That leaves
+  margin under the 300 s verifier; the Erdős 3 cost model scales local build times by 1.5, and
+  bundle B005 still timed out twice at 300 s before it was published.
+- **Splitting only helps when it removes shared recomputation.** A definition that every piece
+  re-elaborates costs every piece. Splitting pays when expensive shared material moves into a
+  bundle or a published statement that later pieces import instead of re-proving. Cutting a proof
+  whose pieces all redo the same heavy work only multiplies that work.
+- **Publish concurrently along the DAG.** `carve.py order` prints waves. Everything in a wave can
+  be published at once when the earlier waves are done: independent bundles together, then each
+  statement after its bundles, then each piece after the statements it imports. Erdős 3 first
+  published its bundles as a chain, one at a time, and then re-planned them as a DAG
+  (2026-10-08).
+- **No `macro` or `syntax` commands.** The soundness guard refuses them, and the carver refuses to
+  keep one. `notation` is fine.
+- `carve.py plan` refuses a plan in which a bundle misses a definition that one of its members
+  needs (Erdős 3 B006 `A.space`, B024 `coord`), or in which a bundle or piece rests on `sorry`
+  (B022). Compile every bundle locally before publishing it. A published bundle is frozen
+  (`frozen` in the config), so a later re-plan keeps it as it is.
+
 ### Find an inlined sibling by its statement, never by its name
 
 An edge in the mission graph exists only when a *solution* carries `import Theorems.Thm_<name>`.
@@ -1432,6 +1461,7 @@ script prints its usage when run with no arguments.
 | `assemble_blueprint.py` | Assemble one Lean file from a Blueprint (definitions + `sorry` lemmas) and Part files proving them. |
 | `build_solution.py` | Build the solution file for one published theorem from a Lean development, ready to submit. |
 | `build_solutions.py` | Build a mission's solutions from its development's check files: one file per statement. |
+| `carve.py` | Split a large ported Lean development into published Definitions bundles, intermediate statements and one carved proof piece per statement. |
 | `caveat_audit.py` | Audit the prose that explains a source-audit gap: does the natural-language statement's note account for each gap accurately, and does it claim anything the Lean or a citation does not back? |
 | `check_complete.py` | Is a mission's development complete? |
 | `check_description.py` | Run the prove2me skill's description checklist mechanically. |

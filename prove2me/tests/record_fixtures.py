@@ -2,6 +2,7 @@
 """Re-record lean_fixtures/<Name>.json and <Name>.parse.json from the current LeanInfo.
 
 usage: python3 tests/record_fixtures.py [NAME ...]   (default: every fixture test_leaninfo replays)
+       python3 tests/record_fixtures.py carve       (the carver's CarveDev development, test_carve)
 
 Run after changing lean/LeanInfo.lean, then read `git diff tests/lean_fixtures`: the diff is the
 change in what the tool reports, and test_tool_reproduces_recording pins it."""
@@ -27,6 +28,17 @@ def record(name):
         print('recorded', name + suffix)
 
 
+def record_carve():
+    """Compile lean_fixtures/carve/CarveDev (core Lean only) into a scratch directory, then record
+    DeclGraph's output and each module's LeanInfo (parse-only, --idents) beside the sources."""
+    import tempfile
+    from p2mlib import carve
+    src = os.path.join(FIX, 'carve')
+    with tempfile.TemporaryDirectory() as d:
+        for rel in carve.record_fixture(src, 'CarveDev', ['CarveDev.Top'], os.path.join(d, 'olean'), src):
+            print('recorded carve/' + rel)
+
+
 if __name__ == '__main__':
     for n in sys.argv[1:] or REPLAYED:
-        record(n)
+        record_carve() if n == 'carve' else record(n)
