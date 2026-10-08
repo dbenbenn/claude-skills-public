@@ -1038,19 +1038,26 @@ class Carver:
         kept_cmds = {m: {g.nodes[k].cmd for k in keep if g.nodes[k].module == m} for m in mods}
         # pass 1: what goes, per module (independent of namespaces)
         drops = {m: self._drops(m, kept_cmds[m], have) for m in mods}
-        # namespaces the carved file has: those of its names, and of its kept namespace commands
+        # namespaces the carved file has at each module: those of its imported names, then those
+        # of the kept names and namespace commands of the modules emitted so far (an `open` may
+        # only rely on a namespace that exists by then: Hecke 7/8 B001, `open
+        # HeckeInverseAmplification` emitted before the later module that re-creates it)
         alive = set()
-        for p in have:
+        for p in have - self.keep_names:
             alive.update(ns_prefixes(p))
+        by_mod = collections.defaultdict(set)
+        for k in keep:
+            for n in g.nodes[k].names:
+                by_mod[g.nodes[k].module].update(ns_prefixes(pubname(n)))
+        out = []
         for m in mods:
             info = g.infos[m]
+            alive |= by_mod[m]
             for c in info.commands:
                 if c.short_kind == 'namespace' and c.index not in drops[m]:
                     full = join(c.namespace, leanedit.text(info, c.index).split()[1])
                     alive.update(ns_prefixes(full + '.x'))
-        out = []
-        for m in mods:
-            out.append(self._module(m, kept_cmds[m], drops[m], have, alive, deprivatize,
+            out.append(self._module(m, kept_cmds[m], drops[m], have, set(alive), deprivatize,
                                     {g.nodes[k].cmd for k in sorry if g.nodes[k].module == m},
                                     rename))
         return ''.join(out)
