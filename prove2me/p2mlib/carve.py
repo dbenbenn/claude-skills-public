@@ -1263,32 +1263,34 @@ class Carver:
                 ''.join(x + '\n' for x in closers) + 'end\n\n')
 
     def _reactivate(self, info, c, m, drop, done, inst_names, have, sorried=False):
-        """`attribute [local instance] N` lines for the local instances in kept command c's scope
-        that c uses but this file does not declare (an imported bundle carries them as plain
-        constants: Hecke 7/8, FiniteRayExpansion's `local instance : Fintype (MulChar R ℂ)` in
-        B002, its user `zeroExtendUnits_fourier` in a piece). inst_names maps a port name to the
-        name Lean gave it in a published bundle that kept it anonymous."""
+        """The local instances in force at kept command c in its module that this file does not
+        declare, put back in force. Their use can be invisible in the declaration graph (Hecke 7/8
+        AmplificationAllocationCost: `local instance : DecidableEq (ι ⊕ Fin 2) := Classical.decEq _`
+        won instance synthesis, but the elaborated term kept the defeq instance it was checked
+        against, so the theorem's constants never name it), so every one in scope counts:
+        - imported (a bundle carries it as a plain constant): `attribute [local instance] N`
+          (FiniteRayExpansion's `Fintype (MulChar R ℂ)` in B002); inst_names maps a port name to
+          the name Lean gave it in a published bundle that kept it anonymous;
+        - not imported: its command again, anonymous so that Lean picks a name unused here."""
         g = self.g
-        key = g.cmd_node.get((m, c.index))
-        if not key:
-            return ''
-        deps = set()
-        for n in g.nodes[key].names:
-            x = g.consts.get(n) or {}
-            deps.update(x.get('t') or ())
-            if not sorried:                   # a stub's `by sorry` uses only its statement's
-                deps.update(x.get('v') or ())
         chain = tuple(o for o, _ in c.context)
         out = []
         for vi in sorted(drop):
             if vi >= c.index or (vi, chain) in done or not _in_scope(info, vi, c):
                 continue
+            vc = info.commands[vi]
+            is_inst, anon_at = _local_instance(info, vc)
             ik = g.cmd_node.get((m, vi))
-            if not ik or pubname(ik) not in have or pubname(ik) in self.keep_names or \
-                    not (set(g.nodes[ik].names) & deps) or not _local_instance(info, info.commands[vi])[0]:
+            if not is_inst or not ik or pubname(ik) in self.keep_names:
                 continue
             done.add((vi, chain))
-            out.append('attribute [local instance] %s\n' % inst_names.get(ik, pubname(ik)))
+            if pubname(ik) in have:
+                out.append('attribute [local instance] %s\n' % inst_names.get(ik, pubname(ik)))
+            elif anon_at is not None:
+                opens = g.scope_opens(info, vc, m)
+                refs = [i for i in vc.idents or [] if i['role'] == 'ref']
+                if not any(self._gone(i['name'], vc, m, have, opens) for i in refs):
+                    out.append(leanedit.text(info, vi).strip() + '\n')
         return ''.join(out)
 
     def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=()):
