@@ -63,6 +63,9 @@ def _workspace():
 
 
 WS = _workspace()
+# The box-wide Lean cap (3 processes, 28 GiB): its `lake`/`lean` wrappers queue for a slot. A
+# session's shell may predate it and resolve `lake` to elan's, so the probe names it itself.
+LEAN_CAP = os.path.expanduser('~/claude/claude-private/tools/lean-cap')
 LIBS = os.path.join(WS, '.lake', 'packages')
 
 def _toolchain():
@@ -169,9 +172,10 @@ def stage(slug, statement, extras, force=False):
         f.write('#!/bin/sh\n'
                 '# usage: ./probe scratch/p.lean   -- elaborates the file, prints Lean output\n'
                 'set -e\n'
+                'export PATH="%s:$PATH"\n'
                 'test -n "$1" || { echo "usage: ./probe <file.lean>" >&2; exit 2; }\n'
                 'exec sh -c \'cd "%s" && exec lake env lean "$1"\' _ "$(cd "$(dirname "$0")" '
-                '&& pwd)/$1"\n' % WS)
+                '&& pwd)/$1"\n' % (LEAN_CAP, WS))
     os.chmod(probe, 0o755)
     print(f"STAGED {d}  ({roots} library roots, {REV})\n")
     # Name the artifact and its imports separately. Listed together as "task files", an

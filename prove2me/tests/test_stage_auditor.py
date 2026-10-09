@@ -50,6 +50,17 @@ def test_stage_strips_and_refuses_restaging(root, capsys):
         SA.stage('s1', art, [])
 
 
+def test_probe_runs_lean_through_the_cap(root):
+    """The probe's `lake` is the lean-cap wrapper, not whatever PATH a session inherited: shells
+    started before the cap existed resolve `lake` to elan's, and six auditors probing at once then
+    run six uncapped Lean processes (2026-10-09)."""
+    tmp, art, _ = root
+    SA.stage('s3', art, [])
+    text = open(os.path.join(SA.ROOT, 's3', 'probe')).read()
+    export = 'export PATH="%s:$PATH"' % SA.LEAN_CAP
+    assert export in text and text.index(export) < text.index('exec ')
+
+
 def test_stage_refuses_shared_basenames(root):
     tmp, art, _ = root
     other = tmp / 'sub'
