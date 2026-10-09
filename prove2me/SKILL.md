@@ -1249,6 +1249,12 @@ size first from the record: a 102KB solution had been accepted, so a 70KB one is
 
 **Two publish timeouts, two remedies.** "FAILED: Compilation timed out after 300s" means the item itself is too slow: split it, with pieces of about 60–70 s or less single-threaded locally (a 102 s Erdős 3 bundle failed three times, and its 69 s and 33 s halves passed). "ERROR: Internal error while publishing: Module compilation timed out" means the server is building imported bundles on a cold worker. It grows more frequent the deeper the item sits in a bundle chain, but every one so far has eventually passed on an unchanged retry (Erdős 3, 2026-10-08), so retry it and never split it.
 
+**Proof submissions time out the same way.** A solution's verify can return `ERROR` with "Verification
+timed out after 300s". Measure the solution file single-threaded (`lake env lean -j1 FILE`; the default
+parallel wall time hides the cost): Artin's (10.10) solution took 81 s single-threaded (17 s wall) and
+timed out twice, while 18 s and 40 s ones passed. Over about 60 s single-threaded, split it into
+published cuts before the second retry.
+
 **Retry or split according to how easy the split is** (dbenbenn, 2026-10-08). When the carver can cut an item cleanly into parts that are each much faster, split early, after an own-compile timeout or a slow local check, because a split costs little. Dependency timeouts ("Module compilation timed out") do not depend on the item's own size, so they never justify a split: a 14 s Erdős 3 bundle got four in a row while its 42 s sibling passed first try. When one heavy declaration dominates, or the best cut barely changes the time, keep retrying much longer instead. Never loop re-splitting for a marginal gain: a 76 s bundle that the scheduler kept "splitting" to stay under a 75 s cutoff went through unsplit on a retry.
 
 **Carried-over `local notation` lines cost about 1 s each to elaborate.** A carved bundle that keeps every module section's notations can be dominated by them. Erdős 3 B132 had 166 notations for 36 declarations: 161 s at -j1 and 25 own-compile timeouts, though no declaration took more than 5 s. Dropping the unused notations brought it to 73 s, and it published. Prune unused notations when carving.
