@@ -1267,7 +1267,9 @@ class Carver:
                     # auto-named instCountableO in a bundle, a piece keeping the port's
                     # `local instance instCountableO`), and a consumer re-activates a local one
                     # by name
-                    edits.append((at, at, ' ' + pubname(key).rsplit('.', 1)[-1]))
+                    # (a private one under its collision rename: deprivatized in a bundle, two
+                    # modules' `private instance : Countable O` share one public name)
+                    edits.append((at, at, ' ' + rename.get(key, pubname(key).rsplit('.', 1)[-1])))
                 pre = self._reactivate(info, c, m, drop, reactivated, inst_names, have, c.index in sorry)
             elif c.short_kind in NOTATION:
                 edits += self._rename_edits(info, c, m, opens, rename)
