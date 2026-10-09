@@ -186,7 +186,9 @@ def _key(path, parse_only, ws, candidates=(), idents=False):
     if os.path.exists(tc):
         h.update(open(tc, 'rb').read())
     # a changed imported workspace module changes the result; Mathlib is pinned by the toolchain
-    for mod in re.findall(r'^import\s+(\S+)', open(path, encoding='utf-8').read(), re.M):
+    # ... and of the candidates imported beside them (copies.find: a statement published minutes
+    # ago may not be built yet, Artin 2026-10-09)
+    for mod in re.findall(r'^import\s+(\S+)', open(path, encoding='utf-8').read(), re.M) + list(candidates):
         f = os.path.join(ws, mod.replace('.', os.sep) + '.lean')
         if os.path.exists(f):
             st = os.stat(f)

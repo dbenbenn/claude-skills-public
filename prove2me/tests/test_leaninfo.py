@@ -146,3 +146,20 @@ def test_cache_key_changes_when_an_import_is_built(tmp_path):
     olean.parent.mkdir(parents=True)
     olean.write_bytes(b'built')
     assert LI._key(str(f), False, str(ws)) != before
+
+
+def test_cache_key_changes_when_a_candidate_is_built(tmp_path):
+    # Artin 2026-10-09: copies.find imports every published statement as a candidate; one
+    # published minutes earlier had no .olean yet, the run failed with "object file ... does not
+    # exist", and the key (built-ness of the file's own imports only) kept serving that failure
+    # after `lake build`. Candidates' built state is part of the key too.
+    ws = tmp_path / 'ws'
+    (ws / 'Theorems').mkdir(parents=True)
+    (ws / 'Theorems' / 'Cand.lean').write_text('theorem c : True := trivial\n')
+    f = ws / 'Use.lean'
+    f.write_text('theorem u : True := trivial\n')
+    before = LI._key(str(f), False, str(ws), candidates=['Theorems.Cand'])
+    olean = ws / '.lake' / 'build' / 'lib' / 'lean' / 'Theorems' / 'Cand.olean'
+    olean.parent.mkdir(parents=True)
+    olean.write_bytes(b'built')
+    assert LI._key(str(f), False, str(ws), candidates=['Theorems.Cand']) != before
