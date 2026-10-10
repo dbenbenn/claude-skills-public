@@ -56,6 +56,27 @@ def test_draft_stubs_are_candidates_only_when_asked(ws):
     assert copies.candidates(ws, text, with_drafts=True) == ['Theorems.Thm_M_d', 'Theorems.Thm_X_a']
 
 
+def test_unbuilt_candidates_are_built_before_elaboration(ws):
+    # 2026-10-10: a stub fetched with --no-build had no olean, and every later rewire that loaded the
+    # candidates failed with "object file ... does not exist" (four Artin solutions, one cause).
+    import time
+    lib = os.path.join(ws, '.lake', 'build', 'lib', 'lean', 'Theorems')
+    os.makedirs(lib)
+    open(os.path.join(lib, 'Thm_X_a.olean'), 'w').close()           # current
+    stale = os.path.join(lib, 'Thm_M_d.olean')
+    open(stale, 'w').close()
+    old = time.time() - 3600
+    os.utime(stale, (old, old))                                       # older than its source
+    mods = ['Theorems.Thm_M_d', 'Theorems.Thm_X_a', 'Theorems.Thm_X_b']
+    assert copies.unbuilt(ws, mods) == ['Theorems.Thm_M_d', 'Theorems.Thm_X_b']
+    calls = []
+    copies.ensure_built(ws, mods, run=lambda cmd, **k: calls.append((cmd, k.get('cwd'))))
+    assert calls == [(['lake', 'build', 'Theorems.Thm_M_d', 'Theorems.Thm_X_b'], ws)]
+    calls.clear()
+    copies.ensure_built(ws, ['Theorems.Thm_X_a'], run=lambda cmd, **k: calls.append(cmd))
+    assert calls == []
+
+
 @pytest.mark.lean
 def test_find_by_statement_not_name():
     _, found = copies.find(os.path.join(FIX, 'Copies.lean'))

@@ -15,6 +15,7 @@ qualifies), except one whose full name the file declares itself: importing it wo
 import functools
 import os
 import re
+import subprocess
 
 from . import leaninfo
 from .leantext import strip
@@ -62,11 +63,36 @@ def candidates(ws, text, declared=(), with_drafts=False):
                   if full not in declared and reachable_definitions(ws, [p.module]) <= visible)
 
 
+def _olean(ws, mod):
+    return os.path.join(ws, '.lake', 'build', 'lib', 'lean', *mod.split('.')) + '.olean'
+
+
+def unbuilt(ws, mods):
+    """The modules of `mods` whose olean is missing or older than their source."""
+    out = []
+    for m in mods:
+        src, ol = _module_file(ws, m), _olean(ws, m)
+        if not os.path.exists(ol) or (os.path.exists(src) and os.path.getmtime(ol) < os.path.getmtime(src)):
+            out.append(m)
+    return out
+
+
+def ensure_built(ws, mods, run=subprocess.run):
+    """Build the candidates that have no current olean. LeanInfo imports every candidate, so one
+    unbuilt stub (fetch_theorems --no-build, 2026-10-10) made every elaboration fail with "object
+    file ... does not exist" instead of only that candidate being unusable."""
+    missing = unbuilt(ws, mods)
+    if missing:
+        run(['lake', 'build'] + missing, cwd=ws)
+
+
 def find(path, ws=None, with_drafts=False):
     """(info, {local full name: [published full names]}) for the theorems of `path` that state a
     published theorem. `info` is LeanInfo's elaboration with the candidates imported."""
     ws = ws or workspace()
     text = open(path, encoding='utf-8').read()
     declared = {n for c in leaninfo.run(path, parse_only=True, ws=ws).commands for n in c.names}
-    info = leaninfo.run(path, ws=ws, candidates=candidates(ws, text, declared, with_drafts))
+    cands = candidates(ws, text, declared, with_drafts)
+    ensure_built(ws, cands)
+    info = leaninfo.run(path, ws=ws, candidates=cands)
     return info, {d.name: list(d.same_statement_as) for d in info.decls if d.same_statement_as}
