@@ -20,6 +20,17 @@ import json, os, sys, time
 SK = os.path.dirname(os.path.abspath(__file__))
 
 
+TITLE_MAX = 200
+
+
+def long_titles(payloads, defs, limit=TITLE_MAX):
+    """Names whose title the platform would refuse ('must be at most 200 characters'). Checked
+    before anything is sent: 2026-10-10 a bundle published and its statement was then refused."""
+    out = [p['theorem_name'] for p in payloads if len(p.get('theorem_title') or '') > limit]
+    out += ['Def_' + d['definition_name'] for d in defs if len(d.get('definition_title') or '') > limit]
+    return sorted(out)
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     if len(args) != 1:
@@ -71,6 +82,9 @@ def main():
            if '\\"' in (x.get(k) or '')]
     if bad:
         sys.exit('escaped quote (\\") in the prose of: ' + ', '.join(sorted(set(bad))))
+    long = long_titles(payloads, defs)
+    if long:
+        sys.exit('title over %d characters: %s' % (TITLE_MAX, ', '.join(long)))
     if '--dry' in sys.argv:
         return
     ids_path = os.path.join(here, 'published_ids.json')
