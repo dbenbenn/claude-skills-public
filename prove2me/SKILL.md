@@ -1291,6 +1291,19 @@ back WA. The lessons:
   needs (Erdős 3 B006 `A.space`, B024 `coord`), or in which a bundle or piece rests on `sorry`
   (B022). Compile every bundle locally before publishing it. A published bundle is frozen
   (`frozen` in the config), so a later re-plan keeps it as it is.
+- **Extending a split whose bundle another carver made** (the zero-divisor K(G,1) clause,
+  2026-10-10): `carve.py` with a `frozen` bundle from the old per-mission carver produced pieces
+  that imported none of the new bundles (its dependency edges missed names a `simp only` or `rw`
+  uses). What worked instead: merge the whole port (`build_solution.py`), drop by exact full name
+  every declaration the published bundles define (list them with a Lean `#eval` over
+  `env.constants` filtered by module) and every published statement, import those, rename OpenAI's
+  copy of the target, then `prune_solution.py`. Two traps: a bundle name can capture a bare name
+  the port meant at the root (`GraphPresentation.Group` captured `[Group G]`; write
+  `[_root_.Group G]`), and `prune_solution.py` drops `include` lines after kept `variable` lines
+  and keeps `variable` binders that mention pruned variables (repair script:
+  `p2m-standalone/openai-tfzd-kg1/fixup.py`; fold it into prune_solution next time it bites).
+  When two pieces redo the same generic modules, move those modules whole into definitions
+  bundles: 95 s became bundles of 20 s and 27 s plus pieces of 36 s and 59 s, all accepted.
 
 ### Find an inlined sibling by its statement, never by its name
 
