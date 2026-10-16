@@ -1638,7 +1638,12 @@ class Carver:
                 dead += 1
                 edits.append((i['start'], _skip_ws(info.text_bytes, i['end']), ''))
                 continue
-            if any(x not in orig for x in now):
+            # a reading the original did not take is a project namespace somewhere: say which one
+            # is meant, since a statement is appended to its solution by the verifier and may land
+            # after that namespace (Erdős 3 v2: `open MvPolynomial` read as
+            # OAI.Erdos3.MvPolynomial, "Unknown identifier `eval`")
+            shadow = not tok.startswith('_root_.') and any(x in g.proj_ns and x not in orig for x in cands)
+            if any(x not in orig for x in now) or shadow:
                 meant = [x for x in now if x in orig]
                 if not meant:
                     dead += 1

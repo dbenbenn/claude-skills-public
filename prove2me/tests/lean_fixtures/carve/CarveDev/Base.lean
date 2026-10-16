@@ -38,6 +38,14 @@ def Space.big (B : Space) : Prop := B.size = 0
 structure Wide where
   w : Nat
 
+section
+open Nat
+/-- `open Nat` means Lean's `Nat` here; the project's `CD.Nat` (declared in Mid) does not exist yet,
+but a file this statement is appended to may have it (Erdős 3 v2: `open MvPolynomial` read as
+`OAI.Erdos3.MvPolynomial` after the solution, "Unknown identifier `eval`"). -/
+theorem succ_pos_cd (n : Nat) : 0 < succ n := Nat.succ_pos n
+end
+
 end CD
 
 namespace CD.Aux

@@ -73,4 +73,9 @@ stub: `local notation "hamin" => … B` kept `variable (B : LayerSamplerAxis I n
 theorem note_free (k : Nat) : k + 0 = k := rfl
 end UnusedNote
 
+namespace Nat
+/-- A project namespace with the name of Lean's `Nat`. -/
+def cdTwice (n : Nat) : Nat := n + n
+end Nat
+
 end CD

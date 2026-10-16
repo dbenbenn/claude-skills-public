@@ -237,8 +237,10 @@ def test_open_that_would_see_a_later_module_namespace_is_pinned_to_root(g):
     txt = carve(g, {'CD.List.headOr', 'CD.double_zero', 'CD.double_eq'}, {'CD.double'})
     assert txt.index('-- module CarveDev.Alt') < txt.index('-- module CarveDev.Mid')
     assert 'open _root_.List' in txt
+    # without Alt in the file it is rooted too: CD.List exists in the project, and a statement is
+    # read after its solution, which may declare it (Erdős 3 v2, `open MvPolynomial`)
     txt2 = carve(g, {'CD.double_zero', 'CD.double_eq'}, {'CD.double'})
-    assert 'open List' in txt2 and '_root_.List' not in txt2
+    assert 'open _root_.List' in txt2
 
 
 def test_macro_commands_are_refused(g):
@@ -648,3 +650,11 @@ def test_repaired_declarations_take_the_dependencies_of_their_patched_proofs():
     C.mark_repaired(g2, ['CD.sorried'])                      # the plain list form still works
     with pytest.raises(C.CarveError):
         C.mark_repaired(g2, {'CD.sorried': ['CD.nonexistent']})
+
+
+def test_an_open_shadowed_by_a_project_namespace_elsewhere_is_rooted(g):
+    # Base's `open Nat` meant Lean's Nat; CD.Nat exists in Mid. A statement is appended to its
+    # solution by the verifier, after whatever namespaces the solution declares, so the open must
+    # say which Nat it means wherever it lands
+    out = C.Carver(g).carve({'CD.succ_pos_cd'}, g.have_names({'CD.succ_pos_cd'}), sorry={'CD.succ_pos_cd'})
+    assert re.search(r'^open _root_\.Nat$', out, re.M), out
