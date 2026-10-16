@@ -28,6 +28,10 @@ CONFIG.json (paths may use ~):
    "time_scale": 1.5,                         # verifier time / local build time
    "frozen": {"plan": "old_plan.json", "bundles": ["OAIErdos3B000"]},  # published: keep as is
    "collapse_mathlib": true,                  # `import Mathlib` instead of the module list
+   "external_defs": {"OAI.Erdos3.HasAP": "Definitions.Def_ErdosReciprocal"},  # declarations
+                                              # someone else's published bundle provides
+   "statement_suffix": "_s2",                 # published names <name>_s2 (a fresh split of a
+                                              # development whose earlier split took the names)
    "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
                                               # anonymous local instances a frozen bundle kept
                                               # unnamed (Lean's name there differs from the
@@ -121,7 +125,10 @@ def main(argv):
         P = C.make_plan(g, cfg['targets'], cfg.get('forced', ()), cfg.get('budget', 60),
                         cfg.get('piece_size', 700_000), cfg.get('bundle_budget', 90),
                         cfg.get('bundle_size', 650_000), cfg.get('band_width', 4), costs(cfg, g),
-                        frozen, cfg.get('bundle_prefix', 'Bundle'))
+                        frozen, cfg.get('bundle_prefix', 'Bundle'),
+                        external_defs=cfg.get('external_defs'),
+                        statement_suffix=cfg.get('statement_suffix', ''),
+                        external=cfg.get('external', ()))
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)
         json.dump(P, open(out, 'w'), indent=1, sort_keys=True)
         worst = sorted(((p['cost'], n) for n, p in P['pieces'].items()), reverse=True)[:5]

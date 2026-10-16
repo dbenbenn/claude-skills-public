@@ -804,7 +804,8 @@ def _order_chunks(g, chunks, nfrozen):
 
 
 def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_budget=90.0,
-              bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle'):
+              bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
+              external_defs=None, statement_suffix='', external=()):
     """The split: bundles, nodes (published statements) and each node's piece.
 
     - Bundle material B: every reachable non-theorem, what reachable statements need, their
@@ -814,7 +815,13 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     - Nodes: targets and `forced`, plus theorems promoted greedily, bottom-up, until each piece
       (its closure over non-node theorems) costs at most `budget` seconds and `piece_size` bytes.
       A node needs an ASCII public name and a statement that only uses bundle material.
-    - `frozen`: (old plan, [bundle names]) of bundles already published, kept as they are."""
+    - `frozen`: (old plan, [bundle names]) of bundles already published, kept as they are.
+    - `external_defs`: {declaration: module} provided by someone else's published Definitions bundle
+      (Erdős 3: the target's own definitions in marwahaha's Def_ErdosReciprocal). They stay out of
+      bundles and pieces; files that use them import the module.
+    - `statement_suffix`: published statement names are `<name><suffix>` (a fresh split of a
+      development whose first split already took the names), except `external` statements,
+      published by someone else under their own names."""
     cost = cost if cost is not None else size_costs(g)
     targets, forced = list(targets), list(forced)
     for t in targets + forced:
@@ -829,9 +836,14 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         old, names = frozen
         byname = {b['name']: b for b in old['bundles']}
         fz_chunks = [[k for k in byname[n]['nodes'] if k in g.nodes] for n in names]
+    ext = {g.owner.get(k, k): m for k, m in (external_defs or {}).items()}
+    for k in ext:
+        if k not in g.nodes:
+            raise CarveError('unknown external definition %s' % k)
     B = g.closure(seeds) | {k for ch in fz_chunks for k in ch}
     B |= g.extra_roots(B, set())
-    T = reach - B
+    B -= set(ext)
+    T = reach - B - set(ext)
     kids = {k: [d for d in g.nodes[k].deps if d in T] for k in T}
     order, seen = [], set()
     for r in sorted(T):
@@ -853,13 +865,13 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
 
     def ok_node(k):
         nd = g.nodes[k]
-        return nd.theorem and not nd.private and ascii_ok(k) and nd.sig <= B and k not in renames
+        return nd.theorem and not nd.private and ascii_ok(k) and nd.sig <= B | set(ext) and k not in renames
 
     for t in sorted(nodes):
-        if not g.nodes[t].theorem or g.nodes[t].sig - B:
+        if not g.nodes[t].theorem or g.nodes[t].sig - B - set(ext):
             raise CarveError('%s cannot be a published statement: %s' % (
                 t, 'not a theorem' if not g.nodes[t].theorem else
-                'its statement needs %s' % sorted(g.nodes[t].sig - B)))
+                'its statement needs %s' % sorted(g.nodes[t].sig - B - set(ext))))
 
     def fresh(n):
         s, todo = set(), [n]
@@ -933,6 +945,8 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     return {'version': 1, 'targets': targets, 'forced': forced, 'bundle_prefix': bundle_prefix,
             'budget': budget, 'bundles': bundles, 'nodes': sorted(nodes), 'pieces': pieces,
             'stubs': stubs, 'over': sorted(set(over)),
+            'external_defs': dict(sorted(ext.items())), 'statement_suffix': statement_suffix,
+            'external': sorted(external),
             'sorry': sorted(k for k in reach | B if g.nodes[k].sorry)}
 
 
@@ -1505,6 +1519,27 @@ def header(g, mods, bundles=(), thms=(), collapse_mathlib=True, extra=()):
     return ''.join('import %s\n' % x for x in dict.fromkeys(ext))
 
 
+def statement_name(plan, node):
+    """The published name of a node: `<name><suffix>`, or the name itself for an external statement."""
+    if node in plan.get('external', ()) or not plan.get('statement_suffix'):
+        return pubname(node)
+    return pubname(node) + plan['statement_suffix']
+
+
+def _stmt_renames(g, plan, nodes):
+    """{node: new short name} for the suffix rename of these nodes."""
+    return {n: statement_name(plan, n).rsplit('.', 1)[-1] for n in nodes
+            if statement_name(plan, n) != pubname(n)}
+
+
+def _ext_imports(g, plan, keys):
+    """Modules of the external definitions these declarations (or their statements) use."""
+    ext = plan.get('external_defs') or {}
+    if not ext:
+        return []
+    return sorted({ext[d] for k in keys for d in g.nodes[k].deps | g.nodes[k].sig if d in ext})
+
+
 def _bundle_have(g, plan, names):
     pos, bimp, _ = _plan_index(plan)
     cl = _bundle_closure(bimp, [pos[n] for n in names])
@@ -1517,29 +1552,32 @@ def gen_bundle(g, plan, name, collapse_mathlib=True):
     bad = sorted(k for k in keep if g.nodes[k].sorry)
     if bad:
         raise CarveError('bundle %s would contain sorry: %s (repair the port first)' % (name, bad))
-    avail = _bundle_have(g, plan, b['imports'])
+    avail = _bundle_have(g, plan, b['imports']) | set(plan.get('external_defs') or {})
     body = Carver(g).carve(keep, g.have_names(keep | avail), deprivatize=True,
                            rename=collision_renames(g))
-    hdr = header(g, {g.nodes[k].module for k in keep}, b['imports'], (), collapse_mathlib)
+    hdr = header(g, {g.nodes[k].module for k in keep}, b['imports'], (), collapse_mathlib,
+                 extra=_ext_imports(g, plan, keep))
     return hdr + '\n' + body.rstrip('\n') + '\n'
 
 
 def gen_stub(g, plan, node, collapse_mathlib=True):
     bs = plan['stubs'][node]['bundles']
-    avail = _bundle_have(g, plan, bs)
-    body = Carver(g).carve({node}, g.have_names({node} | avail), sorry={node},
-                           rename=collision_renames(g))
+    avail = _bundle_have(g, plan, bs) | set(plan.get('external_defs') or {})
+    ren = collision_renames(g)
+    ren.update(_stmt_renames(g, plan, [node]))
+    body = Carver(g).carve({node}, g.have_names({node} | avail), sorry={node}, rename=ren)
     # no comments: a statement's formal_statement freezes at publish and api.call refuses one
     # carrying a comment (the `-- module` markers, OpenAI's comments in kept context lines)
     body = re.sub(r'\n\s*\n(\s*\n)+', '\n\n', '\n'.join(l.rstrip() for l in strip(body).split('\n')))
-    hdr = header(g, {g.nodes[node].module}, bs, (), collapse_mathlib)
+    hdr = header(g, {g.nodes[node].module}, bs, (), collapse_mathlib,
+                 extra=_ext_imports(g, plan, [node]))
     return hdr + '\n' + body.strip('\n') + '\n'
 
 
-def solution_tail(g, node):
+def solution_tail(g, node, plan=None):
     nd = g.nodes[node]
     lv = '.{%s}' % ', '.join(nd.univ) if nd.univ else ''
-    full = pubname(node) + '_oai'
+    full = (statement_name(plan, node) if plan else pubname(node)) + '_oai'
     return 'theorem solution%s : type_of%% @%s%s := @%s%s\n' % (lv, full, lv, full, lv)
 
 
@@ -1553,14 +1591,17 @@ def gen_piece(g, plan, node, collapse_mathlib=True):
     bad = sorted(k for k in keep if g.nodes[k].sorry)
     if bad:
         raise CarveError('piece %s would contain sorry: %s (repair the port first)' % (node, bad))
-    avail = _bundle_have(g, plan, p['bundles']) | set(p['imports'])
+    avail = _bundle_have(g, plan, p['bundles']) | set(p['imports']) | set(plan.get('external_defs') or {})
     for i in p['imports']:
         avail |= _bundle_have(g, plan, plan['stubs'][i]['bundles'])
     ren = collision_renames(g)
-    ren[node] = pubname(node).rsplit('.', 1)[-1] + '_oai'
+    ren.update(_stmt_renames(g, plan, p['imports']))
+    ren[node] = statement_name(plan, node).rsplit('.', 1)[-1] + '_oai'
     body = Carver(g).carve(keep, g.have_names(keep | avail), rename=ren)
-    hdr = header(g, {g.nodes[k].module for k in keep}, p['bundles'], p['imports'], collapse_mathlib)
-    return hdr + '\n' + body.rstrip('\n') + '\n\n' + solution_tail(g, node)
+    hdr = header(g, {g.nodes[k].module for k in keep}, p['bundles'],
+                 [statement_name(plan, i) for i in p['imports']], collapse_mathlib,
+                 extra=_ext_imports(g, plan, keep))
+    return hdr + '\n' + body.rstrip('\n') + '\n\n' + solution_tail(g, node, plan)
 
 
 def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, external=(),
@@ -1584,10 +1625,12 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
     for n in plan['nodes']:
         if names is not None and n not in names:
             continue
+        external = set(external) | set(plan.get('external', ()))
         if 'stubs' in what and n not in external:
-            put(os.path.join(out, 'lib', 'Thm_%s.lean' % slug(n)), gen_stub(g, plan, n, collapse_mathlib))
+            put(os.path.join(out, 'lib', 'Thm_%s.lean' % slug(statement_name(plan, n))),
+                gen_stub(g, plan, n, collapse_mathlib))
         if 'pieces' in what:
-            put(os.path.join(out, 'solutions', 'Sol_%s.lean' % slug(n)),
+            put(os.path.join(out, 'solutions', 'Sol_%s.lean' % slug(statement_name(plan, n))),
                 gen_piece(g, plan, n, collapse_mathlib))
     sizes = {f: os.path.getsize(f) for f in files}
     return {'files': files, 'sizes': sizes, 'over_cap': [f for f, s in sizes.items() if s > SIZE_CAP]}

@@ -407,3 +407,53 @@ def test_local_instance_names_go_after_the_keyword():
     assert C._local_instance(i, c) == (True, None)
     i, c = cmd('instance : Bar := x')
     assert C._local_instance(i, c) == (False, None)
+
+
+# ---------------------------------------------------------------- external definitions, statement suffix
+
+@pytest.fixture(scope='module')
+def ext_plan(g):
+    # CD.double is provided by someone else's published bundle (Erdős 3: marwahaha's
+    # Def_ErdosReciprocal defines the target's own definitions)
+    return C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                       bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                       bundle_prefix='CDB', external_defs={'CD.double': 'Definitions.Def_Ext'},
+                       statement_suffix='_s2', external=['CD.main'])
+
+
+def test_external_definitions_stay_out_of_bundles_and_pieces(g, ext_plan):
+    assert ext_plan['external_defs'] == {'CD.double': 'Definitions.Def_Ext'}
+    assert all('CD.double' not in b['nodes'] for b in ext_plan['bundles'])
+    assert all('CD.double' not in p['keep'] for p in ext_plan['pieces'].values())
+
+
+def test_files_using_an_external_definition_import_its_bundle(g, ext_plan, tmp_path):
+    C.generate(g, ext_plan, str(tmp_path))
+    users = []
+    for f in sorted((tmp_path / 'lib').iterdir()) + sorted((tmp_path / 'solutions').iterdir()):
+        t = f.read_text()
+        assert not re.search(r'^\s*(noncomputable\s+)?def\s+double\b', t, re.M), f.name
+        if re.search(r'\bdouble\b', re.sub(r'^import .*$', '', t, flags=re.M)):
+            users.append(f.name)
+            assert 'import Definitions.Def_Ext\n' in t, f.name
+    assert users
+
+
+def test_statements_get_the_suffix_except_external_ones(g, ext_plan, tmp_path):
+    assert C.statement_name(ext_plan, 'CD.top_aux') == 'CD.top_aux_s2'
+    assert C.statement_name(ext_plan, 'CD.main') == 'CD.main'
+    C.generate(g, ext_plan, str(tmp_path))
+    stub = (tmp_path / 'lib' / 'Thm_CD_top_aux_s2.lean').read_text()
+    assert re.search(r'^theorem top_aux_s2\b', stub, re.M)
+    assert not (tmp_path / 'lib' / 'Thm_CD_main.lean').exists()      # external: not ours to publish
+    piece = (tmp_path / 'solutions' / 'Sol_CD_top_aux_s2.lean').read_text()
+    assert re.search(r'^theorem top_aux_s2_oai\b', piece, re.M)
+    assert piece.rstrip().endswith('type_of% @CD.top_aux_s2_oai := @CD.top_aux_s2_oai')
+    main = (tmp_path / 'solutions' / 'Sol_CD_main.lean').read_text()
+    assert main.rstrip().endswith('type_of% @CD.main_oai := @CD.main_oai')
+    for i in ext_plan['pieces']['CD.main']['imports']:
+        s = C.statement_name(ext_plan, i)
+        assert 'import Theorems.Thm_%s\n' % C.slug(s) in main
+        short = i.rsplit('.', 1)[1]
+        if re.search(r'\b%s\b' % short, main):
+            assert re.search(r'\b%s_s2\b' % short, main)
