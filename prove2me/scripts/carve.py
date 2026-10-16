@@ -114,9 +114,14 @@ def main(argv):
     if cmd == 'graph':
         C.run_decl_graph(graph_path(cfg), cfg['prefix'], cfg['roots'])
         mods = sorted(C.load_decl_graph(graph_path(cfg))[1])
-        for i, m in enumerate(mods):
-            C.module_info(cfg['src'], m)
-            print('LeanInfo %d/%d %s' % (i + 1, len(mods), m), flush=True)
+        # LeanInfo runs interpreted (~6 s a module): in parallel, `jobs` at a time (default 3, the
+        # local Lean cap); results are cached, so a rerun only reads the cache
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        with ThreadPoolExecutor(int(cfg.get('jobs', 3))) as ex:
+            futs = {ex.submit(C.module_info, cfg['src'], m): m for m in mods}
+            for i, f in enumerate(as_completed(futs)):
+                f.result()
+                print('LeanInfo %d/%d %s' % (i + 1, len(mods), futs[f]), flush=True)
         g = load_graph(cfg)
         print('%d modules, %d declaration nodes' % (len(g.modules), len(g.nodes)))
     elif cmd == 'plan':
