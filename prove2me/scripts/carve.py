@@ -32,6 +32,8 @@ CONFIG.json (paths may use ~):
                                               # someone else's published bundle provides
    "statement_suffix": "_s2",                 # published names <name>_s2 (a fresh split of a
                                               # development whose earlier split took the names)
+   "patches": "patches.json",                 # [{literal_old, literal_new, why}] applied to every
+                                              # generated file: proof fixes, never source edits
    "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
                                               # anonymous local instances a frozen bundle kept
                                               # unnamed (Lean's name there differs from the
@@ -150,11 +152,14 @@ def main(argv):
         what = rest[0] if rest and rest[0] in ('bundles', 'stubs', 'pieces', 'all') else 'all'
         names = set(rest[1:] if rest and rest[0] == what else rest) or None
         r = C.generate(g, P, cfg['out'], ('bundles', 'stubs', 'pieces') if what == 'all' else (what,),
-                       names, cfg.get('external', ()), cfg.get('collapse_mathlib', True))
+                       names, cfg.get('external', ()), cfg.get('collapse_mathlib', True),
+                       json.load(open(os.path.expanduser(cfg['patches']))) if cfg.get('patches') else ())
         for f in r['files']:
             print('%9d  %s' % (r['sizes'][f], f))
         for f in r['over_cap']:
             print('OVER 1 MiB', f)
+        if r['patches_unused'] and names is None:
+            print('patches matching no generated file:', r['patches_unused'])
         if r['over_cap']:
             sys.exit(1)
     elif cmd == 'order':

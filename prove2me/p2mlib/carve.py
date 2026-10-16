@@ -1605,15 +1605,26 @@ def gen_piece(g, plan, node, collapse_mathlib=True):
 
 
 def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, external=(),
-             collapse_mathlib=True):
+             collapse_mathlib=True, patches=()):
     """Write out/lib/Def_<bundle>.lean, out/lib/Thm_<slug>.lean (not for `external` nodes,
     published by someone else) and out/solutions/Sol_<slug>.lean. Returns {'files', 'sizes',
-    'over_cap'} (files over prove2.me's 1 MiB cap)."""
+    'over_cap'} (files over prove2.me's 1 MiB cap), 'patches_unused'}.
+
+    `patches`: [{'literal_old', 'literal_new'}] text replacements applied to every generated file.
+    Proof fixes (a port's leftover `sorry`, a slow proof) go here, never into the port's source: the
+    carver cuts modules by the command ranges recorded when the port was compiled, so a source edit
+    corrupts every later carve of that module (Erdős 3, 2026-10-16)."""
     os.makedirs(os.path.join(out, 'lib'), exist_ok=True)
     os.makedirs(os.path.join(out, 'solutions'), exist_ok=True)
     files = []
 
+    used = set()
+
     def put(path, txt):
+        for pt in patches:
+            if pt['literal_old'] in txt:
+                txt = txt.replace(pt['literal_old'], pt['literal_new'])
+                used.add(pt['literal_old'])
         with open(path, 'w', encoding='utf-8') as f:
             f.write(txt)
         files.append(path)
@@ -1633,4 +1644,5 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
             put(os.path.join(out, 'solutions', 'Sol_%s.lean' % slug(statement_name(plan, n))),
                 gen_piece(g, plan, n, collapse_mathlib))
     sizes = {f: os.path.getsize(f) for f in files}
-    return {'files': files, 'sizes': sizes, 'over_cap': [f for f, s in sizes.items() if s > SIZE_CAP]}
+    return {'files': files, 'sizes': sizes, 'over_cap': [f for f, s in sizes.items() if s > SIZE_CAP],
+            'patches_unused': [pt['literal_old'] for pt in patches if pt['literal_old'] not in used]}

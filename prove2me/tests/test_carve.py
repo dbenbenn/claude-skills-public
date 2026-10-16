@@ -457,3 +457,15 @@ def test_statements_get_the_suffix_except_external_ones(g, ext_plan, tmp_path):
         short = i.rsplit('.', 1)[1]
         if re.search(r'\b%s\b' % short, main):
             assert re.search(r'\b%s_s2\b' % short, main)
+
+
+def test_patches_apply_to_every_generated_file(g, plan, tmp_path):
+    # proof fixes go in post-carve literal replacements, never in the port's source: the carver
+    # cuts modules by the command ranges recorded when the port was compiled (Erdős 3, 2026-10-16)
+    pat = [{'literal_old': 'theorem double_succ', 'literal_new': '-- patched\ntheorem double_succ'}]
+    res = C.generate(g, plan, str(tmp_path), patches=pat)
+    hit = [f for f in res['files'] if '-- patched\ntheorem double_succ' in open(f).read()]
+    assert hit
+    assert res['patches_unused'] == []
+    res2 = C.generate(g, plan, str(tmp_path), patches=[{'literal_old': 'NO SUCH TEXT', 'literal_new': 'x'}])
+    assert res2['patches_unused'] == ['NO SUCH TEXT']
