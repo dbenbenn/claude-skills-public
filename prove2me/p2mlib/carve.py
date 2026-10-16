@@ -1644,8 +1644,12 @@ class Carver:
                 inside = [i for i in refs if grp['start'] <= i['start'] < grp['end']]
                 gtxt = info.text_bytes[grp['start']:grp['end']].decode('utf-8')
                 if used is not None:
+                    # by name only: the short-name guess for a field of a local (`b.reindex`)
+                    # names an unrelated project declaration (Erdős 3 v2 B107: `(hF' : …
+                    # (b.reindex e) …)` dropped, a project declaration being called `reindex`)
                     names = {self.g.owner.get(h) for i in inside
-                             for h in self.g.resolve_lean(i['name'], c.namespace, opens, m)} - {None}
+                             for h in self.g.lean_hits(i['name'], c.namespace, opens,
+                                                       lambda n: self.g.visible(n, m))[0]} - {None}
                     if names and not names & used:
                         bad.add(j)
                         changed = True

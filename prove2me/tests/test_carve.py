@@ -697,3 +697,9 @@ def test_a_variable_group_a_kept_declaration_uses_stays(g):
     out = C.Carver(g).carve({'CD.uses_hk'}, have, sorry={'CD.uses_hk'})
     assert 'variable (hk : double k0 = k0)' in out
     assert 'k0' in out
+
+
+def test_a_field_of_a_local_does_not_count_as_a_project_constant_for_variable_use(g):
+    have = g.have_names({'CD.uses_hk1'})
+    out = C.Carver(g).carve({'CD.uses_hk1'}, have, sorry={'CD.uses_hk1'})
+    assert '(hk1 : k1.succ = k1 + 1)' in out

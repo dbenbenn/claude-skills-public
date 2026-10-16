@@ -38,6 +38,9 @@ def Space.big (B : Space) : Prop := B.size = 0
 structure Wide where
   w : Nat
 
+/-- A project declaration whose short name is also a field of `Nat` (`k.succ`). -/
+def Wide.succ (x : Wide) : Wide := x
+
 section
 open Nat
 /-- `open Nat` means Lean's `Nat` here; the project's `CD.Nat` (declared in Mid) does not exist yet,

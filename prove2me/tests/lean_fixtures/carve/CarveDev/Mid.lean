@@ -105,6 +105,11 @@ def unused_var_free : Nat := 7
 include hk in
 /-- Uses `hk`: its group stays. -/
 theorem uses_hk : double k0 = k0 := hk
+variable (k1 : Nat) (hk1 : k1.succ = k1 + 1)
+include hk1 in
+/-- `k1.succ` is `Nat.succ`, not the project's `Wide.succ`: the group stays (Erdős 3 v2 B107,
+`(hF' : … (b.reindex e) …)` dropped because a project declaration is also called `reindex`). -/
+theorem uses_hk1 : k1.succ = k1 + 1 := hk1
 end UsedVars
 
 end CD
