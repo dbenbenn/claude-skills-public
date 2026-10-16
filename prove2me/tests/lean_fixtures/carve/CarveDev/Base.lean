@@ -38,6 +38,9 @@ def Space.big (B : Space) : Prop := B.size = 0
 structure Wide where
   w : Nat
 
+/-- A project declaration named like a field of `Nat` (`(k + 1).pred`). -/
+def pred (n : Nat) : Nat := n
+
 /-- A project declaration whose short name is also a field of `Nat` (`k.succ`). -/
 def Wide.succ (x : Wide) : Wide := x
 

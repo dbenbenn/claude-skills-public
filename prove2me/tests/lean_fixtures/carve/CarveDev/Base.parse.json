@@ -1149,58 +1149,146 @@
    ],
    "decl_kind": "Lean.Parser.Command.definition",
    "doc": {
-    "end": 1098,
+    "end": 1090,
     "start": 1016
    },
    "end": {
-    "byte": 1135,
-    "col": 36,
+    "byte": 1120,
+    "col": 29,
     "line": 42
    },
    "heads": [],
    "idents": [
     {
-     "end": 1112,
-     "name": "Wide.succ",
+     "end": 1099,
+     "name": "pred",
      "role": "decl",
-     "start": 1103
+     "start": 1095
+    },
+    {
+     "end": 1102,
+     "name": "n",
+     "role": "binder",
+     "start": 1101
+    },
+    {
+     "end": 1108,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1105
     },
     {
      "end": 1115,
-     "name": "x",
-     "role": "binder",
-     "start": 1114
+     "name": "Nat",
+     "role": "ref",
+     "start": 1112
     },
     {
-     "end": 1122,
-     "name": "Wide",
+     "end": 1120,
+     "name": "n",
      "role": "ref",
-     "start": 1118
-    },
-    {
-     "end": 1130,
-     "name": "Wide",
-     "role": "ref",
-     "start": 1126
-    },
-    {
-     "end": 1135,
-     "name": "x",
-     "role": "ref",
-     "start": 1134
+     "start": 1119
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 1112,
-      "col": 13,
+      "byte": 1099,
+      "col": 8,
       "line": 42
      },
      "start": {
-      "byte": 1103,
+      "byte": 1095,
       "col": 4,
       "line": 42
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.pred"
+   ],
+   "namespace": "CD",
+   "opens": [],
+   "start": {
+    "byte": 1016,
+    "col": 0,
+    "line": 41
+   },
+   "value_start": {
+    "byte": 1116,
+    "col": 25,
+    "line": 42
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 2
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "doc": {
+    "end": 1204,
+    "start": 1122
+   },
+   "end": {
+    "byte": 1241,
+    "col": 36,
+    "line": 45
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1218,
+     "name": "Wide.succ",
+     "role": "decl",
+     "start": 1209
+    },
+    {
+     "end": 1221,
+     "name": "x",
+     "role": "binder",
+     "start": 1220
+    },
+    {
+     "end": 1228,
+     "name": "Wide",
+     "role": "ref",
+     "start": 1224
+    },
+    {
+     "end": 1236,
+     "name": "Wide",
+     "role": "ref",
+     "start": 1232
+    },
+    {
+     "end": 1241,
+     "name": "x",
+     "role": "ref",
+     "start": 1240
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1218,
+      "col": 13,
+      "line": 45
+     },
+     "start": {
+      "byte": 1209,
+      "col": 4,
+      "line": 45
      }
     }
    ],
@@ -1211,14 +1299,14 @@
    "namespace": "CD",
    "opens": [],
    "start": {
-    "byte": 1016,
+    "byte": 1122,
     "col": 0,
-    "line": 41
+    "line": 44
    },
    "value_start": {
-    "byte": 1131,
+    "byte": 1237,
     "col": 32,
-    "line": 42
+    "line": 45
    }
   },
   {
@@ -1236,9 +1324,9 @@
     }
    ],
    "end": {
-    "byte": 1144,
+    "byte": 1250,
     "col": 7,
-    "line": 44
+    "line": 47
    },
    "heads": [],
    "idents": [],
@@ -1248,9 +1336,9 @@
    "namespace": "CD",
    "opens": [],
    "start": {
-    "byte": 1137,
+    "byte": 1243,
     "col": 0,
-    "line": 44
+    "line": 47
    }
   },
   {
@@ -1268,21 +1356,21 @@
     },
     {
      "cmds": [],
-     "opener": 17
+     "opener": 18
     }
    ],
    "end": {
-    "byte": 1153,
+    "byte": 1259,
     "col": 8,
-    "line": 45
+    "line": 48
    },
    "heads": [],
    "idents": [
     {
-     "end": 1153,
+     "end": 1259,
      "name": "Nat",
      "role": "open",
-     "start": 1150
+     "start": 1256
     }
    ],
    "ids": [],
@@ -1291,9 +1379,9 @@
    "namespace": "CD",
    "opens": [],
    "start": {
-    "byte": 1145,
+    "byte": 1251,
     "col": 0,
-    "line": 45
+    "line": 48
    }
   },
   {
@@ -1311,77 +1399,77 @@
     },
     {
      "cmds": [
-      18
+      19
      ],
-     "opener": 17
+     "opener": 18
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "doc": {
-    "end": 1428,
-    "start": 1154
+    "end": 1534,
+    "start": 1260
    },
    "end": {
-    "byte": 1489,
+    "byte": 1595,
     "col": 60,
-    "line": 49
+    "line": 52
    },
    "heads": [],
    "idents": [
     {
-     "end": 1448,
+     "end": 1554,
      "name": "succ_pos_cd",
      "role": "decl",
-     "start": 1437
+     "start": 1543
     },
     {
-     "end": 1451,
+     "end": 1557,
      "name": "n",
      "role": "binder",
-     "start": 1450
+     "start": 1556
     },
     {
-     "end": 1457,
+     "end": 1563,
      "name": "Nat",
      "role": "ref",
-     "start": 1454
+     "start": 1560
     },
     {
-     "end": 1469,
+     "end": 1575,
      "name": "succ",
      "role": "ref",
-     "start": 1465
+     "start": 1571
     },
     {
-     "end": 1471,
+     "end": 1577,
      "name": "n",
      "role": "ref",
-     "start": 1470
+     "start": 1576
     },
     {
-     "end": 1487,
+     "end": 1593,
      "name": "Nat.succ_pos",
      "role": "ref",
-     "start": 1475
+     "start": 1581
     },
     {
-     "end": 1489,
+     "end": 1595,
      "name": "n",
      "role": "ref",
-     "start": 1488
+     "start": 1594
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 1448,
+      "byte": 1554,
       "col": 19,
-      "line": 49
+      "line": 52
      },
      "start": {
-      "byte": 1437,
+      "byte": 1543,
       "col": 8,
-      "line": 49
+      "line": 52
      }
     }
    ],
@@ -1397,14 +1485,14 @@
     }
    ],
    "start": {
-    "byte": 1154,
+    "byte": 1260,
     "col": 0,
-    "line": 46
+    "line": 49
    },
    "value_start": {
-    "byte": 1472,
+    "byte": 1578,
     "col": 43,
-    "line": 49
+    "line": 52
    }
   },
   {
@@ -1422,15 +1510,15 @@
     },
     {
      "cmds": [
-      18
+      19
      ],
-     "opener": 17
+     "opener": 18
     }
    ],
    "end": {
-    "byte": 1493,
+    "byte": 1599,
     "col": 3,
-    "line": 50
+    "line": 53
    },
    "heads": [],
    "idents": [],
@@ -1445,9 +1533,9 @@
     }
    ],
    "start": {
-    "byte": 1490,
+    "byte": 1596,
     "col": 0,
-    "line": 50
+    "line": 53
    }
   },
   {
@@ -1465,17 +1553,17 @@
     }
    ],
    "end": {
-    "byte": 1501,
+    "byte": 1607,
     "col": 6,
-    "line": 52
+    "line": 55
    },
    "heads": [],
    "idents": [
     {
-     "end": 1501,
+     "end": 1607,
      "name": "CD",
      "role": "scope",
-     "start": 1499
+     "start": 1605
     }
    ],
    "ids": [],
@@ -1484,9 +1572,9 @@
    "namespace": "CD",
    "opens": [],
    "start": {
-    "byte": 1495,
+    "byte": 1601,
     "col": 0,
-    "line": 52
+    "line": 55
    }
   },
   {
@@ -1500,17 +1588,17 @@
     }
    ],
    "end": {
-    "byte": 1519,
+    "byte": 1625,
     "col": 16,
-    "line": 54
+    "line": 57
    },
    "heads": [],
    "idents": [
     {
-     "end": 1519,
+     "end": 1625,
      "name": "CD.Aux",
      "role": "scope",
-     "start": 1513
+     "start": 1619
     }
    ],
    "ids": [],
@@ -1519,9 +1607,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 1503,
+    "byte": 1609,
     "col": 0,
-    "line": 54
+    "line": 57
    }
   },
   {
@@ -1535,41 +1623,41 @@
     },
     {
      "cmds": [],
-     "opener": 22
+     "opener": 23
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
    "end": {
-    "byte": 1543,
+    "byte": 1649,
     "col": 22,
-    "line": 56
+    "line": 59
    },
    "heads": [],
    "idents": [
     {
-     "end": 1532,
+     "end": 1638,
      "name": "auxOnly",
      "role": "decl",
-     "start": 1525
+     "start": 1631
     },
     {
-     "end": 1538,
+     "end": 1644,
      "name": "Nat",
      "role": "ref",
-     "start": 1535
+     "start": 1641
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 1532,
+      "byte": 1638,
       "col": 11,
-      "line": 56
+      "line": 59
      },
      "start": {
-      "byte": 1525,
+      "byte": 1631,
       "col": 4,
-      "line": 56
+      "line": 59
      }
     }
    ],
@@ -1580,14 +1668,14 @@
    "namespace": "CD.Aux",
    "opens": [],
    "start": {
-    "byte": 1521,
+    "byte": 1627,
     "col": 0,
-    "line": 56
+    "line": 59
    },
    "value_start": {
-    "byte": 1539,
+    "byte": 1645,
     "col": 18,
-    "line": 56
+    "line": 59
    }
   },
   {
@@ -1601,21 +1689,21 @@
     },
     {
      "cmds": [],
-     "opener": 22
+     "opener": 23
     }
    ],
    "end": {
-    "byte": 1576,
+    "byte": 1682,
     "col": 31,
-    "line": 58
+    "line": 61
    },
    "heads": [],
    "idents": [
     {
-     "end": 1576,
+     "end": 1682,
      "name": "auxOnly",
      "role": "ref",
-     "start": 1569
+     "start": 1675
     }
    ],
    "ids": [],
@@ -1624,9 +1712,9 @@
    "namespace": "CD.Aux",
    "opens": [],
    "start": {
-    "byte": 1545,
+    "byte": 1651,
     "col": 0,
-    "line": 58
+    "line": 61
    }
   },
   {
@@ -1642,27 +1730,27 @@
     },
     {
      "cmds": [],
-     "opener": 22
+     "opener": 23
     }
    ],
    "end": {
-    "byte": 1607,
+    "byte": 1713,
     "col": 29,
-    "line": 60
+    "line": 63
    },
    "heads": [],
    "idents": [
     {
-     "end": 1598,
+     "end": 1704,
      "name": "reducible",
      "role": "attr",
-     "start": 1589
+     "start": 1695
     },
     {
-     "end": 1607,
+     "end": 1713,
      "name": "auxOnly",
      "role": "ref",
-     "start": 1600
+     "start": 1706
     }
    ],
    "ids": [],
@@ -1671,9 +1759,9 @@
    "namespace": "CD.Aux",
    "opens": [],
    "start": {
-    "byte": 1578,
+    "byte": 1684,
     "col": 0,
-    "line": 60
+    "line": 63
    }
   },
   {
@@ -1687,41 +1775,41 @@
     },
     {
      "cmds": [],
-     "opener": 22
+     "opener": 23
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 1640,
+    "byte": 1746,
     "col": 31,
-    "line": 62
+    "line": 65
    },
    "heads": [],
    "idents": [
     {
-     "end": 1623,
+     "end": 1729,
      "name": "aux_eq",
      "role": "decl",
-     "start": 1617
+     "start": 1723
     },
     {
-     "end": 1640,
+     "end": 1746,
      "name": "rfl",
      "role": "ref",
-     "start": 1637
+     "start": 1743
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 1623,
+      "byte": 1729,
       "col": 14,
-      "line": 62
+      "line": 65
      },
      "start": {
-      "byte": 1617,
+      "byte": 1723,
       "col": 8,
-      "line": 62
+      "line": 65
      }
     }
    ],
@@ -1732,14 +1820,14 @@
    "namespace": "CD.Aux",
    "opens": [],
    "start": {
-    "byte": 1609,
+    "byte": 1715,
     "col": 0,
-    "line": 62
+    "line": 65
    },
    "value_start": {
-    "byte": 1634,
+    "byte": 1740,
     "col": 25,
-    "line": 62
+    "line": 65
    }
   },
   {
@@ -1753,21 +1841,21 @@
     },
     {
      "cmds": [],
-     "opener": 22
+     "opener": 23
     }
    ],
    "end": {
-    "byte": 1652,
+    "byte": 1758,
     "col": 10,
-    "line": 64
+    "line": 67
    },
    "heads": [],
    "idents": [
     {
-     "end": 1652,
+     "end": 1758,
      "name": "CD.Aux",
      "role": "scope",
-     "start": 1646
+     "start": 1752
     }
    ],
    "ids": [],
@@ -1776,9 +1864,9 @@
    "namespace": "CD.Aux",
    "opens": [],
    "start": {
-    "byte": 1642,
+    "byte": 1748,
     "col": 0,
-    "line": 64
+    "line": 67
    }
   },
   {
@@ -1792,17 +1880,17 @@
     }
    ],
    "end": {
-    "byte": 1866,
+    "byte": 1972,
     "col": 17,
-    "line": 68
+    "line": 71
    },
    "heads": [],
    "idents": [
     {
-     "end": 1866,
+     "end": 1972,
      "name": "CDScope",
      "role": "scope",
-     "start": 1859
+     "start": 1965
     }
    ],
    "ids": [],
@@ -1811,9 +1899,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 1849,
+    "byte": 1955,
     "col": 0,
-    "line": 68
+    "line": 71
    }
   },
   {
@@ -1827,33 +1915,33 @@
     },
     {
      "cmds": [],
-     "opener": 28
+     "opener": 29
     }
    ],
    "end": {
-    "byte": 1911,
+    "byte": 2017,
     "col": 40,
-    "line": 69
+    "line": 72
    },
    "heads": [],
    "idents": [
     {
-     "end": 1890,
+     "end": 1996,
      "name": "x",
      "role": "ref",
-     "start": 1889
+     "start": 1995
     },
     {
-     "end": 1909,
+     "end": 2015,
      "name": "CD.double",
      "role": "ref",
-     "start": 1900
+     "start": 2006
     },
     {
-     "end": 1911,
+     "end": 2017,
      "name": "x",
      "role": "ref",
-     "start": 1910
+     "start": 2016
     }
    ],
    "ids": [],
@@ -1862,9 +1950,9 @@
    "namespace": "CDScope",
    "opens": [],
    "start": {
-    "byte": 1867,
+    "byte": 1973,
     "col": 0,
-    "line": 69
+    "line": 72
    }
   },
   {
@@ -1878,45 +1966,45 @@
     },
     {
      "cmds": [],
-     "opener": 28
+     "opener": 29
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
    "doc": {
-    "end": 2003,
-    "start": 1912
+    "end": 2109,
+    "start": 2018
    },
    "end": {
-    "byte": 2025,
+    "byte": 2131,
     "col": 21,
-    "line": 71
+    "line": 74
    },
    "heads": [],
    "idents": [
     {
-     "end": 2014,
+     "end": 2120,
      "name": "anchor",
      "role": "decl",
-     "start": 2008
+     "start": 2114
     },
     {
-     "end": 2020,
+     "end": 2126,
      "name": "Nat",
      "role": "ref",
-     "start": 2017
+     "start": 2123
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 2014,
+      "byte": 2120,
       "col": 10,
-      "line": 71
+      "line": 74
      },
      "start": {
-      "byte": 2008,
+      "byte": 2114,
       "col": 4,
-      "line": 71
+      "line": 74
      }
     }
    ],
@@ -1927,14 +2015,14 @@
    "namespace": "CDScope",
    "opens": [],
    "start": {
-    "byte": 1912,
+    "byte": 2018,
     "col": 0,
-    "line": 70
+    "line": 73
    },
    "value_start": {
-    "byte": 2021,
+    "byte": 2127,
     "col": 17,
-    "line": 71
+    "line": 74
    }
   },
   {
@@ -1948,21 +2036,21 @@
     },
     {
      "cmds": [],
-     "opener": 28
+     "opener": 29
     }
    ],
    "end": {
-    "byte": 2037,
+    "byte": 2143,
     "col": 11,
-    "line": 72
+    "line": 75
    },
    "heads": [],
    "idents": [
     {
-     "end": 2037,
+     "end": 2143,
      "name": "CDScope",
      "role": "scope",
-     "start": 2030
+     "start": 2136
     }
    ],
    "ids": [],
@@ -1971,9 +2059,9 @@
    "namespace": "CDScope",
    "opens": [],
    "start": {
-    "byte": 2026,
+    "byte": 2132,
     "col": 0,
-    "line": 72
+    "line": 75
    }
   },
   {
@@ -1987,9 +2075,9 @@
     }
    ],
    "end": {
-    "byte": 2038,
+    "byte": 2144,
     "col": 0,
-    "line": 73
+    "line": 76
    },
    "heads": [],
    "idents": [],
@@ -1999,9 +2087,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 2038,
+    "byte": 2144,
     "col": 0,
-    "line": 73
+    "line": 76
    }
   }
  ],
@@ -2010,29 +2098,29 @@
  "messages": [
   {
    "end": {
-    "byte": 1576,
+    "byte": 1682,
     "col": 31,
-    "line": 58
+    "line": 61
    },
    "severity": "error",
    "start": {
-    "byte": 1569,
+    "byte": 1675,
     "col": 24,
-    "line": 58
+    "line": 61
    },
    "text": "Unknown identifier `auxOnly` at quotation precheck\n\nNote: You can use `set_option quotPrecheck false` to disable this check."
   },
   {
    "end": {
-    "byte": 1909,
+    "byte": 2015,
     "col": 38,
-    "line": 69
+    "line": 72
    },
    "severity": "error",
    "start": {
-    "byte": 1900,
+    "byte": 2006,
     "col": 29,
-    "line": 69
+    "line": 72
    },
    "text": "Unknown identifier `CD.double` at quotation precheck\n\nNote: You can use `set_option quotPrecheck false` to disable this check."
   }

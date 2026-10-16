@@ -703,3 +703,12 @@ def test_a_field_of_a_local_does_not_count_as_a_project_constant_for_variable_us
     have = g.have_names({'CD.uses_hk1'})
     out = C.Carver(g).carve({'CD.uses_hk1'}, have, sorry={'CD.uses_hk1'})
     assert '(hk1 : k1.succ = k1 + 1)' in out
+
+
+def test_a_field_after_a_parenthesis_does_not_count_for_variable_use(g):
+    # CD.pred is in the file (B167: VectorPolynomial.map was), so only the variable-use rule is
+    # tested: with CD.pred absent the short-name field rule of B065 would drop the group, a
+    # known false positive of reading fields by short name
+    out = C.Carver(g).carve({'CD.uses_hk2'}, g.have_names({'CD.uses_hk2', 'CD.pred'}),
+                            sorry={'CD.uses_hk2'})
+    assert '(hk2 : (k1 + 1).pred = k1)' in out

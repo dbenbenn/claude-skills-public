@@ -110,6 +110,11 @@ include hk1 in
 /-- `k1.succ` is `Nat.succ`, not the project's `Wide.succ`: the group stays (Erdős 3 v2 B107,
 `(hF' : … (b.reindex e) …)` dropped because a project declaration is also called `reindex`). -/
 theorem uses_hk1 : k1.succ = k1 + 1 := hk1
+variable (hk2 : (k1 + 1).pred = k1)
+include hk2 in
+/-- `.pred` after a parenthesis is `Nat.pred`, a field, not the project's `CD.pred` (Erdős 3 v2
+B167, `(…).map` read as the project's `VectorPolynomial.map`). -/
+theorem uses_hk2 : (k1 + 1).pred = k1 := hk2
 end UsedVars
 
 end CD
