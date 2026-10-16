@@ -457,10 +457,18 @@ class Graph:
         self.all_pub = set(self.pub)
         # project namespaces, with the modules that bring each into existence
         nsmods = collections.defaultdict(int)
+        first = {}                          # (module, namespace) -> first command creating it
+
+        def note(m, p, i):
+            if i < first.get((m, p), 1 << 30):
+                first[(m, p)] = i
         for n in self.owner:
-            bit = 1 << self.mod_index[self.consts[n]['m']]
+            m = self.consts[n]['m']
+            bit = 1 << self.mod_index[m]
+            i = self.nodes[self.owner[n]].cmd
             for p in ns_prefixes(pubname(n)):
                 nsmods[p] |= bit
+                note(m, p, i)
         for m, info in self.infos.items():
             bit = 1 << self.mod_index[m]
             for c in info.commands:
@@ -469,15 +477,25 @@ class Graph:
                     full = join(c.namespace, tok)
                     for p in ns_prefixes(full + '.x'):
                         nsmods[p] |= bit
+                        note(m, p, c.index)
         for k, x in self.scoped.items():
             for p in ns_prefixes(x + '.x'):
                 nsmods[p] |= 1 << self.mod_index[self.nodes[k].module]
+                note(self.nodes[k].module, p, self.nodes[k].cmd)
         self.ns_mask = dict(nsmods)
+        self.ns_first = first
         self.proj_ns = set(nsmods)
 
-    def ns_existed(self, ns, m):
-        """Did project namespace ns exist when module m was elaborated (from m's imports or m)?"""
-        return bool(self.ns_mask.get(ns, 0) & self.closure_mask[m])
+    def ns_existed(self, ns, m, before=None):
+        """Did project namespace ns exist when module m was elaborated (from m's imports or m)?
+        With `before` (a command index of m): at that command, so m's own contribution counts only
+        if made earlier (Erdős 3 v2 B172: `open MvPolynomial` came before the module's own
+        `namespace OAI.MvPolynomial`, and meant only Lean's)."""
+        mask = self.ns_mask.get(ns, 0) & self.closure_mask[m]
+        if before is None:
+            return bool(mask)
+        own = 1 << self.mod_index[m]
+        return bool(mask & ~own) or self.ns_first.get((m, ns), 1 << 30) < before
 
     def visible(self, n, m):
         """May module m name constant n (a private one only in its own module)?"""
@@ -1694,7 +1712,7 @@ class Carver:
             if not known:
                 continue                      # Mathlib's, say: carving cannot change it
             now = [x for x in cands if x in g.ext_ns or x in alive]
-            orig = [x for x in cands if x in g.ext_ns or g.ns_existed(x, m)]
+            orig = [x for x in cands if x in g.ext_ns or g.ns_existed(x, m, before=c.index)]
             if not now:
                 dead += 1
                 edits.append((i['start'], _skip_ws(info.text_bytes, i['end']), ''))

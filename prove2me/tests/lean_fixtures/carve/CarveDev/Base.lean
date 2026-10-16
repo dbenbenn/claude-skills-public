@@ -52,6 +52,19 @@ but a file this statement is appended to may have it (Erdős 3 v2: `open MvPolyn
 theorem succ_pos_cd (n : Nat) : 0 < succ n := Nat.succ_pos n
 end
 
+section
+open Int
+/-- `open Int` meant Lean's `Int`: the project's `CD.Int` is only created further down this file,
+so a carved file where it comes first must say `_root_.Int` (Erdős 3 v2 B172, `open MvPolynomial`
+before the module's own `namespace OAI.MvPolynomial`, "Unknown identifier `eval`"). -/
+theorem natAbs_cd (a : Int) : natAbs a = Int.natAbs a := rfl
+end
+
+namespace Int
+/-- The project namespace created after the `open`. -/
+def cdId (a : _root_.Int) : _root_.Int := a
+end Int
+
 end CD
 
 namespace CD.Aux
