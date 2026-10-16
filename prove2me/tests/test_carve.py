@@ -504,11 +504,12 @@ def test_schedule_chunker_depth_is_the_longest_dependency_chain(g, sched_plan):
     # dependency chain of bundle material; list scheduling reaches it (here Space -> size -> size_eq).
     # (The band chunker keeps a module whole and so may exceed the budget instead.)
     B = {k for b in sched_plan['bundles'] for k in b['nodes']}
+    ex = C.implicit_deps(g, B, B)          # silent simp lemmas order bundles too
     memo = {}
 
     def chain(k):
         if k not in memo:
-            memo[k] = 1 + max([chain(d) for d in g.nodes[k].deps if d in B and d != k], default=0)
+            memo[k] = 1 + max([chain(d) for d in g.nodes[k].deps | ex.get(k, set()) if d in B and d != k], default=0)
         return memo[k]
     assert _bundle_depth(sched_plan) == max(chain(k) for k in B)
 
@@ -526,3 +527,25 @@ def test_repaired_declarations_need_their_patch(tmp_path):
     assert res['patches_unused'] == []
     with pytest.raises(C.CarveError, match='sorry'):
         C.generate(g2, p, str(tmp_path / 'nopatch'), what=('bundles',))
+
+
+def test_schedule_chunker_keeps_silent_simp_lemmas_visible(g):
+    # sizedZero's embedded `by simp` uses the rfl simp lemma Space.size_eq with no trace in the term:
+    # list scheduling by recorded dependencies alone may put the lemma in a bundle the definition's
+    # bundle does not import (Erdős 3 v2, 2026-10-16: six bundles failed "simp made no progress")
+    p = C.make_plan(g, ['CD.uses_sized'], budget=0.05, piece_size=10**6, bundle_budget=0.0001,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='S', chunker='schedule')
+    where = {k: b['name'] for b in p['bundles'] for k in b['nodes']}
+    assert 'CD.sizedZero' in where and 'CD.Space.size_eq' in where
+    imps = {b['name']: set(b['imports']) for b in p['bundles']}
+
+    def closure(n, seen=None):
+        seen = set() if seen is None else seen
+        for i in imps[n]:
+            if i not in seen:
+                seen.add(i)
+                closure(i, seen)
+        return seen
+    b = where['CD.sizedZero']
+    assert where['CD.Space.size_eq'] == b or where['CD.Space.size_eq'] in closure(b)

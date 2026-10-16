@@ -696,18 +696,127 @@
      "opener": 1
     }
    ],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 544,
-    "col": 6,
+    "byte": 599,
+    "col": 61,
     "line": 25
    },
    "heads": [],
    "idents": [
     {
-     "end": 544,
+     "end": 556,
+     "name": "uses_sized",
+     "role": "decl",
+     "start": 546
+    },
+    {
+     "end": 559,
+     "name": "B",
+     "role": "binder",
+     "start": 558
+    },
+    {
+     "end": 567,
+     "name": "Space",
+     "role": "ref",
+     "start": 562
+    },
+    {
+     "end": 572,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 572
+    },
+    {
+     "end": 581,
+     "name": "sizedZero",
+     "role": "ref",
+     "start": 572
+    },
+    {
+     "end": 583,
+     "name": "B",
+     "role": "ref",
+     "start": 582
+    },
+    {
+     "end": 588,
+     "name": "val",
+     "role": "ref",
+     "start": 585
+    },
+    {
+     "end": 599,
+     "name": "rfl",
+     "role": "ref",
+     "start": 596
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 556,
+      "col": 18,
+      "line": 25
+     },
+     "start": {
+      "byte": 546,
+      "col": 8,
+      "line": 25
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.uses_sized"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "CD.Aux"
+    }
+   ],
+   "start": {
+    "byte": 538,
+    "col": 0,
+    "line": 25
+   },
+   "value_start": {
+    "byte": 593,
+    "col": 55,
+    "line": 25
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      3
+     ],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 607,
+    "col": 6,
+    "line": 27
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 607,
      "name": "CD",
      "role": "scope",
-     "start": 542
+     "start": 605
     }
    ],
    "ids": [],
@@ -721,9 +830,9 @@
     }
    ],
    "start": {
-    "byte": 538,
+    "byte": 601,
     "col": 0,
-    "line": 25
+    "line": 27
    }
   },
   {
@@ -737,9 +846,9 @@
     }
    ],
    "end": {
-    "byte": 545,
+    "byte": 608,
     "col": 0,
-    "line": 26
+    "line": 28
    },
    "heads": [],
    "idents": [],
@@ -749,9 +858,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 545,
+    "byte": 608,
     "col": 0,
-    "line": 26
+    "line": 28
    }
   }
  ],

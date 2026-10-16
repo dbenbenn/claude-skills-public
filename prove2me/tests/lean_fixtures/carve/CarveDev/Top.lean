@@ -22,4 +22,6 @@ theorem top_aux : auxOnly = 1 := aux_eq
 
 theorem uses_sorry : usesSorried = 0 := rfl
 
+theorem uses_sized (B : Space) : (sizedZero B).val = 0 := rfl
+
 end CD

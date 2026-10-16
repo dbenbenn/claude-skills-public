@@ -48,4 +48,8 @@ theorem double_succ : double (n + 1) = double n + 2 := by
 
 #check double_succ
 
+/-- A definition whose embedded proof uses the rfl simp lemma `Space.size_eq` with no trace in the
+term (the schedule chunker must still put that lemma where this definition's bundle sees it). -/
+def sizedZero (B : Space) : {n : Nat // n = B.size} := ⟨0, by simp⟩
+
 end CD

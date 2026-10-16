@@ -781,7 +781,57 @@ def chunk_bundles(g, B, cost, bundle_budget, bundle_size, band_width=4.0, frozen
     return _order_chunks(g, chunks, len(frozen))
 
 
-def chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, frozen=()):
+def implicit_deps(g, keys, B):
+    """{k: attributed bundle declarations k may use with no trace in its term}: those of B visible
+    from k's module (an imported module, or earlier in its own) whose statement mentions a constant
+    k uses, and that do not themselves need k. `simp`/`dsimp` use rfl lemmas and `@[simps]` lemmas
+    silently, so list scheduling by recorded dependencies alone could put such a lemma where k's
+    bundle cannot see it (Erdős 3 v2: six bundles failed with "simp made no progress")."""
+    B = set(B)
+    attr = [a for a in B if g.nodes[a].attributed and not g.nodes[a].instance]
+    about = collections.defaultdict(set)
+    for a in attr:
+        for x in g.nodes[a].sig:
+            about[x].add(a)
+    needs = {}
+
+    def closure_in_b(a):
+        if a not in needs:
+            seen, todo = set(), [a]
+            while todo:
+                c = todo.pop()
+                for d in g.nodes[c].deps:
+                    if d in B and d not in seen:
+                        seen.add(d)
+                        todo.append(d)
+            needs[a] = seen
+        return needs[a]
+    out = {}
+    for k in keys:
+        nd = g.nodes[k]
+        mask = g.closure_mask[nd.module]
+        cand = set()
+        for x in nd.deps | nd.sig:
+            cand |= about.get(x, set())
+        got = set()
+        for a in cand:
+            if a == k or a in nd.deps:
+                continue
+            an = g.nodes[a]
+            if an.module == nd.module:
+                if an.cmd >= nd.cmd:
+                    continue
+            elif not (mask >> g.mod_index[an.module] & 1):
+                continue
+            if k in closure_in_b(a):
+                continue
+            got.add(a)
+        if got:
+            out[k] = got
+    return out
+
+
+def chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, frozen=(), extra=None):
     """Cut bundle material B into bundles by list scheduling at the declaration level.
 
     Declarations go in DFS post-order (a dependency first, and a module's material mostly
@@ -794,7 +844,8 @@ def chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, frozen=()):
     chunks = [list(f) for f in frozen]
     done = {k for f in frozen for k in f}
     rest = set(B) - done
-    deps = {k: sorted(d for d in g.nodes[k].deps if d in rest and d != k) for k in rest}
+    extra = extra or {}
+    deps = {k: sorted(d for d in g.nodes[k].deps | extra.get(k, set()) if d in rest and d != k) for k in rest}
     order, seen = [], set()
     for r in sorted(rest):
         if r in seen:
@@ -960,8 +1011,10 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             nodes.add(k)
             s = fresh(n)
         memo[n] = s
+    extra = {}
     if chunker == 'schedule':
-        chunks = chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, fz_chunks)
+        extra = implicit_deps(g, B, B)
+        chunks = chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, fz_chunks, extra)
     else:
         chunks = chunk_bundles(g, B, cost, bundle_budget, bundle_size, band_width, fz_chunks)
     if frozen:
@@ -980,7 +1033,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     bimp = [set() for _ in chunks]
     for j, ch in enumerate(chunks):
         for k in ch:
-            for d in g.nodes[k].deps:
+            for d in g.nodes[k].deps | extra.get(k, set()):
                 if d in bidx and bidx[d] != j:
                     bimp[j].add(bidx[d])
     red = [_reduce(bimp, bimp[j]) for j in range(len(chunks))]
@@ -989,7 +1042,8 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
                for j in range(len(chunks))]
 
     def need(keys):
-        return {bidx[d] for x in keys for d in g.nodes[x].deps | {x} if d in bidx}
+        ex = implicit_deps(g, keys, B) if chunker == 'schedule' else {}
+        return {bidx[d] for x in keys for d in g.nodes[x].deps | ex.get(x, set()) | {x} if d in bidx}
     pieces, stubs = {}, {}
     for n in sorted(nodes):
         keep = fresh(n)
