@@ -1560,4 +1560,5 @@ script prints its usage when run with no arguments.
 | `wait_published.py` | Wait until named statements or definitions are published, or until a proposal's queue drains. |
 | `watch_proposal.py` | Watch mission proposals until their status changes (e.g. `In review` -> approved). |
 | `watch_targets.py` | Watch published theorems you are about to prove, or are proving, and report status changes. |
+| `workspace_audit.py` | Which untracked files in the prove2me workspace exist nowhere we keep work. |
 <!-- scripts-index:end -->

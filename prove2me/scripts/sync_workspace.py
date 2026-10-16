@@ -12,6 +12,8 @@ usage: sync_workspace.py [--no-live]
    the API assumptions that once broke scripts: paging, the solution endpoint, sketch-node shape,
    deprecated_at. They run here so they never depend on remembering (dbenbenn, 2026-10-02: "of
    course then it's up to you to remember to rerun them sometimes").
+5. Run workspace_audit.py --quiet (also with --no-live): one line on which untracked workspace files
+   have no copy on GitHub. Informational; it never changes the exit status.
 
 Exit status 1 if the fast-forward fails or a contract test fails.
 """
@@ -47,6 +49,9 @@ def main():
         print('fast-forwarded to', git(ws, 'log', '--oneline', '-1').stdout.strip())
     else:
         print('workspace at head:', git(ws, 'log', '--oneline', '-1').stdout.strip())
+    audit = subprocess.run([sys.executable, os.path.join(HERE, 'workspace_audit.py'), '--quiet'],
+                           capture_output=True, text=True)
+    print((audit.stdout or audit.stderr[-1500:]).rstrip())
     if '--no-live' in sys.argv:
         return
     tests = os.path.join(os.path.dirname(HERE), 'tests', 'test_live_contract.py')
