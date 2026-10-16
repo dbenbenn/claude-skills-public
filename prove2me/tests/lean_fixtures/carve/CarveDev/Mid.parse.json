@@ -4231,18 +4231,103 @@
      "opener": 1
     }
    ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "doc": {
+    "end": 4195,
+    "start": 3929
+   },
    "end": {
-    "byte": 3935,
-    "col": 6,
-    "line": 120
+    "byte": 4259,
+    "col": 21,
+    "line": 124
    },
    "heads": [],
    "idents": [
     {
-     "end": 3935,
+     "end": 4224,
+     "name": "Space.cd_unused_simp",
+     "role": "decl",
+     "start": 4204
+    },
+    {
+     "end": 4231,
+     "name": "True",
+     "role": "ref",
+     "start": 4227
+    },
+    {
+     "end": 4258,
+     "name": "size_eq",
+     "role": "ref",
+     "start": 4251
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 4224,
+      "col": 28,
+      "line": 123
+     },
+     "start": {
+      "byte": 4204,
+      "col": 8,
+      "line": 123
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.Space.cd_unused_simp"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 3929,
+    "col": 0,
+    "line": 120
+   },
+   "value_start": {
+    "byte": 4232,
+    "col": 36,
+    "line": 123
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 4267,
+    "col": 6,
+    "line": 126
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 4267,
      "name": "CD",
      "role": "scope",
-     "start": 3933
+     "start": 4265
     }
    ],
    "ids": [],
@@ -4256,9 +4341,9 @@
     }
    ],
    "start": {
-    "byte": 3929,
+    "byte": 4261,
     "col": 0,
-    "line": 120
+    "line": 126
    }
   },
   {
@@ -4272,9 +4357,9 @@
     }
    ],
    "end": {
-    "byte": 3936,
+    "byte": 4268,
     "col": 0,
-    "line": 121
+    "line": 127
    },
    "heads": [],
    "idents": [],
@@ -4284,9 +4369,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 3936,
+    "byte": 4268,
     "col": 0,
-    "line": 121
+    "line": 127
    }
   }
  ],

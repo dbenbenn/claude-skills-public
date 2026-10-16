@@ -117,4 +117,10 @@ B167, `(…).map` read as the project's `VectorPolynomial.map`). -/
 theorem uses_hk2 : (k1 + 1).pred = k1 := hk2
 end UsedVars
 
+/-- Declared as `Space.…`, so its body reads `size_eq` as `Space.size_eq`; the simp lemma leaves no
+trace in the term (Erdős 3 v2 B188: `simp only [tensorPower_eval]` in
+`NativeMultidegreeNilcharacter.mixedPermutationProduct_tensorPower`, bundle not imported). -/
+theorem Space.cd_unused_simp : True := by
+  simp only [size_eq]
+
 end CD

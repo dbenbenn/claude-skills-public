@@ -294,6 +294,18 @@ def _uses_token(text, tok):
     return tok in text
 
 
+def decl_ns(c):
+    """The namespace a command's body is read in: declaring `A.B.f` in namespace N reads the body
+    in N.A.B (Erdős 3 v2 B188: `simp only [tensorPower_eval]` inside
+    `NativeMultidegreeNilcharacter.mixedPermutationProduct_tensorPower`, declared in namespace
+    Erdos3, named NativeMultidegreeNilcharacter.tensorPower_eval)."""
+    if c.names and '.' in c.names[0]:
+        p = c.names[0].rsplit('.', 1)[0]
+        if not c.namespace or p == c.namespace or p.startswith(c.namespace + '.'):
+            return p
+    return c.namespace
+
+
 def _head_kind(h):
     return h['kind'].rsplit('.', 1)[-1]
 
@@ -600,7 +612,7 @@ class Graph:
         for idn in c.idents or []:
             if idn['role'] != 'ref' or (before is not None and idn['start'] >= before):
                 continue
-            for n in self.resolve(idn['name'], c.namespace, opens, m):
+            for n in self.resolve(idn['name'], decl_ns(c), opens, m):
                 o = self.owner.get(n)
                 if not o or o == me:
                     continue

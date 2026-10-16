@@ -717,3 +717,7 @@ def test_a_field_after_a_parenthesis_does_not_count_for_variable_use(g):
 def test_an_open_before_its_namespace_is_created_in_the_same_module_is_rooted(g):
     out = C.Carver(g).carve({'CD.natAbs_cd'}, g.have_names({'CD.natAbs_cd'}), sorry={'CD.natAbs_cd'})
     assert re.search(r'^open _root_\.Int$', out, re.M), out
+
+
+def test_a_dotted_declaration_reads_its_body_in_its_own_namespace(g):
+    assert 'CD.Space.size_eq' in g.nodes['CD.Space.cd_unused_simp'].deps
