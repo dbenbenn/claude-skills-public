@@ -266,7 +266,10 @@ def shapesParsing (k : Name) : Bool :=
        `Lean.Parser.Command.noncomputableSection, `Lean.Parser.Command.notation,
        `Lean.Parser.Command.mixfix, `Lean.Parser.Command.macro, `Lean.Parser.Command.syntax,
        `Lean.Parser.Command.macro_rules, `Lean.Parser.Command.syntaxAbbrev,
-       `Lean.Parser.Command.syntaxCat] ||
+       `Lean.Parser.Command.syntaxCat,
+       -- Mathlib's `scoped[NS] notation …`: unread, every later use of the notation truncated its
+       -- command at the notation (Erdős 3 v2: `f ○ 𝟭_[s] = … /ℚ …` ended at `f`)
+       `Mathlib.Tactic.scopedNS] ||
   (k.toString.endsWith "notation3")
 
 def kindOf (env : Environment) (n : Name) : ConstantInfo → String

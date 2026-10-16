@@ -1385,11 +1385,16 @@ class Carver:
         return ''.join(out)
 
     # ---------------------------------------------------------- what goes
-    def _gone(self, tok, c, m, have, opens, bound=()):
-        """Does identifier tok, read in command c's scope, name only gone project declarations?"""
+    def _gone(self, tok, c, m, have, opens, bound=(), field=False):
+        """Does identifier tok, read in command c's scope, name only gone project declarations?
+        `field`: tok follows a `.` (`(e a).Bounds`), a projection read by its short name (Erdős 3
+        v2 B065)."""
         if tok.split('.')[0] in bound:
             return False
         hits = self.g.resolve_lean(tok, c.namespace, opens, m)
+        if not hits and field:
+            hits = [n for n in self.g.short.get(tok, ()) if self.g.visible(n, m)]
+            hits = hits if len(hits) <= 2 else []
         return bool(hits) and all(pubname(h) not in have for h in hits)
 
     def _drops(self, m, kept, have):
@@ -1432,11 +1437,20 @@ class Carver:
             if not toks:
                 continue
             used = any(c2.index not in drop and _in_scope(info, c.index, c2) and
-                       any(_uses_token(strip(leanedit.text(info, c2.index)), tk) for tk in toks)
+                       any(_uses_token(strip(info.slice(*info.command_span(c2.index))), tk) for tk in toks)
                        for c2 in info.commands[c.index + 1:])
             if not used:
                 drop.add(c.index)
                 keep_global.discard(c.index)
+        # a `variable` (or `include`/`omit`) with no kept declaration after it in its scope serves
+        # nothing, and a `variable` may not
+        # even elaborate: its binders can need instances only the left-out declarations brought in
+        # (Erdős 3 v2 B038: a trailing `variable [∀ j, IsZLattice …]`, DiscreteTopology missing)
+        decls = [c2 for c2 in info.commands if c2.index in kept]
+        for c in info.commands:
+            if c.short_kind in ('variable', 'include', 'omit') and c.index not in drop and \
+                    not any(_in_scope(info, c.index, c2) for c2 in decls):
+                drop.add(c.index)
         # blocks left without a kept declaration (or a global notation/attribute) go whole
         blocks = collections.defaultdict(set)
         for c in info.commands:
@@ -1619,7 +1633,8 @@ class Carver:
                 inside = [i for i in refs if grp['start'] <= i['start'] < grp['end']]
                 gtxt = info.text_bytes[grp['start']:grp['end']].decode('utf-8')
                 if any(_uses_token(gtxt, tk) for tk in dead_tokens) or any(i['name'].split('.')[0] in lost - set(grp['names']) or
-                       self._gone(i['name'], c, m, have, opens, bound - lost) for i in inside):
+                       self._gone(i['name'], c, m, have, opens, bound - lost,
+                                  field=info.text_bytes[i['start'] - 1:i['start']] == b'.') for i in inside):
                     bad.add(j)
                     changed = True
         # a name bound again here is a new variable, not the dropped one

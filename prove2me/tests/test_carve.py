@@ -671,3 +671,15 @@ def test_measured_bundle_times_rescale_the_estimates_of_their_declarations():
     assert out['c'] == pytest.approx(0.5 * 1.5)                # floor: never below 0.5 s local
     assert out['d'] == 5.0                                     # failed: estimate unchanged
     assert cost['a'] == 1.0                                    # input not mutated
+
+
+def test_a_variable_with_nothing_kept_after_it_goes(g):
+    out = C.Carver(g).carve({'CD.trail_kept'}, g.have_names({'CD.trail_kept'}))
+    assert 'variable (q : Nat)' in out
+    assert 'Inhabited Wide' not in out
+
+
+def test_a_field_after_a_parenthesized_application_is_resolved(g):
+    out = C.Carver(g).carve({'CD.Space.paren_free'}, g.have_names({'CD.Space.paren_free', 'CD.Space'}),
+                            sorry={'CD.Space.paren_free'})
+    assert '(F k).big' not in out

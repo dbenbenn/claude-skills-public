@@ -78,4 +78,21 @@ namespace Nat
 def cdTwice (n : Nat) : Nat := n + n
 end Nat
 
+section Trailing
+variable (q : Nat)
+def trail_kept : Nat := q
+variable [Inhabited Wide]
+/-- Nothing kept follows the second `variable`: it goes (Erdős 3 v2 B038, a trailing
+`variable [∀ j, IsZLattice …]` whose instance no kept declaration brought in). -/
+theorem trail_dropped : (1 : Nat) = 1 := rfl
+end Trailing
+
+namespace Space
+variable (F : Nat → Space)
+variable (hF : ∀ k, (F k).big)
+/-- The field after a parenthesized application names CD.Space.big too (Erdős 3 v2 B065,
+`variable (h : ∀ a, (e a).Bounds …)`). -/
+theorem paren_free (k : Nat) : k = k := rfl
+end Space
+
 end CD
