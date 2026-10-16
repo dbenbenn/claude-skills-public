@@ -1551,6 +1551,7 @@ script prints its usage when run with no arguments.
 | `resolve_imports.py` | Make a merged solution file self-contained: import what is published, inline what is not. |
 | `rewire.py` | Make a solution import the published theorems it re-derives, so each is a graph edge. |
 | `source_audit.py` | Source-side audit: what does the source sentence claim, and does the formalization say it? |
+| `split_run.py` | Publish a carved split in waves (p2mlib.splitrun). |
 | `stage_auditor.py` | Stage a sealed working directory for one blind auditor, and tear it down after. |
 | `stubs.py` | Install a mission's draft statements in the workspace as the modules the platform will publish. |
 | `submit_all.py` | Build and submit each of a mission's statements as it is published, once each, until all are done. |
