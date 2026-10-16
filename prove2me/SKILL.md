@@ -1214,9 +1214,12 @@ statement; pin its objects by pointwise hypotheses rather than a new definition,
 
 ### A solution must not redeclare the target's name with a different signature
 
-A `/verify` submission is compiled in an environment that already declares the target theorem.
-If your solution file declares that **same full name** with a signature that is not identical,
-the verdict is `WA` with
+A `/verify` submission is compiled **without** the target in scope; the platform then checks
+`solution` against the published statement. So the solution file may not mention the target's
+name at all: `theorem solution : type_of% @Target := @Target_dev` gets `CE` "Unknown constant
+`Target`" (Erdős 3, 2026-10-16), while `theorem solution : type_of% @Target_dev := @Target_dev`
+is accepted. And if your solution file declares that **same full name** with a signature that is
+not identical, the verdict is `WA` with
 
     expected token
     Unknown identifier `<your target's full name>`
