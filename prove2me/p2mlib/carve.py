@@ -781,6 +781,64 @@ def chunk_bundles(g, B, cost, bundle_budget, bundle_size, band_width=4.0, frozen
     return _order_chunks(g, chunks, len(frozen))
 
 
+def chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, frozen=()):
+    """Cut bundle material B into bundles by list scheduling at the declaration level.
+
+    Declarations go in DFS post-order (a dependency first, and a module's material mostly
+    together). A declaration joins the bundle of its dependencies when they all sit in one bundle
+    of the highest level that still has room; otherwise it goes one level up, into the fullest
+    bundle there with room, or a new one. A bundle's level is its import depth, so the depth stays
+    near the dependency critical path divided by the budget instead of following the module DAG
+    (Erdős 3: bands over modules gave depth 92; this gives about 16 on the same material,
+    2026-10-16). `frozen` bundles come first, unchanged."""
+    chunks = [list(f) for f in frozen]
+    done = {k for f in frozen for k in f}
+    rest = set(B) - done
+    deps = {k: sorted(d for d in g.nodes[k].deps if d in rest and d != k) for k in rest}
+    order, seen = [], set()
+    for r in sorted(rest):
+        if r in seen:
+            continue
+        seen.add(r)
+        stack = [(r, iter(deps[r]))]
+        while stack:
+            n, it = stack[-1]
+            nx = next(it, None)
+            if nx is None:
+                order.append(n)
+                stack.pop()
+            elif nx not in seen:
+                seen.add(nx)
+                stack.append((nx, iter(deps[nx])))
+    level, bcost, bsize, members = [], [], [], []
+    where = {}
+    room = collections.defaultdict(list)          # level -> bundles that may still take more
+    for k in order:
+        c, sz = cost.get(k, 0.0), g.nodes[k].size
+        ds = {where[d] for d in deps[k] if d in where}
+        top = max((level[b] for b in ds), default=0)
+        tops = [b for b in ds if level[b] == top]
+        b = None
+        if len(tops) == 1 and bcost[tops[0]] + c <= bundle_budget and bsize[tops[0]] + sz <= bundle_size:
+            b = tops[0]
+        if b is None:
+            lv = top + 1
+            fits = [x for x in room[lv] if bcost[x] + c <= bundle_budget and bsize[x] + sz <= bundle_size]
+            if fits:
+                b = max(fits, key=lambda x: (bcost[x], -x))
+            else:
+                level.append(lv); bcost.append(0.0); bsize.append(0); members.append([])
+                b = len(level) - 1
+                room[lv].append(b)
+        where[k] = b
+        bcost[b] += c
+        bsize[b] += sz
+        members[b].append(k)
+    for b in sorted(range(len(members)), key=lambda b: (level[b], b)):
+        chunks.append(sorted(members[b]))
+    return _order_chunks(g, chunks, len(frozen))
+
+
 def _order_chunks(g, chunks, nfrozen):
     """Chunks topologically sorted by their dependencies (frozen ones first, as given)."""
     where = {k: i for i, ch in enumerate(chunks) for k in ch}
@@ -805,7 +863,7 @@ def _order_chunks(g, chunks, nfrozen):
 
 def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_budget=90.0,
               bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
-              external_defs=None, statement_suffix='', external=()):
+              external_defs=None, statement_suffix='', external=(), chunker='bands'):
     """The split: bundles, nodes (published statements) and each node's piece.
 
     - Bundle material B: every reachable non-theorem, what reachable statements need, their
@@ -902,7 +960,10 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             nodes.add(k)
             s = fresh(n)
         memo[n] = s
-    chunks = chunk_bundles(g, B, cost, bundle_budget, bundle_size, band_width, fz_chunks)
+    if chunker == 'schedule':
+        chunks = chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, fz_chunks)
+    else:
+        chunks = chunk_bundles(g, B, cost, bundle_budget, bundle_size, band_width, fz_chunks)
     if frozen:
         names = list(frozen[1]) + [None] * (len(chunks) - len(frozen[1]))
     else:

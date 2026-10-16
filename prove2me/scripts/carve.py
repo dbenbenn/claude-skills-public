@@ -32,6 +32,8 @@ CONFIG.json (paths may use ~):
                                               # someone else's published bundle provides
    "statement_suffix": "_s2",                 # published names <name>_s2 (a fresh split of a
                                               # development whose earlier split took the names)
+   "chunker": "schedule",                     # bundles by declaration-level list scheduling
+                                              # (shallow); "bands" (default) cuts along modules
    "patches": "patches.json",                 # [{literal_old, literal_new, why}] applied to every
                                               # generated file: proof fixes, never source edits
    "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
@@ -135,7 +137,8 @@ def main(argv):
                         frozen, cfg.get('bundle_prefix', 'Bundle'),
                         external_defs=cfg.get('external_defs'),
                         statement_suffix=cfg.get('statement_suffix', ''),
-                        external=cfg.get('external', ()))
+                        external=cfg.get('external', ()),
+                        chunker=cfg.get('chunker', 'bands'))
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)
         json.dump(P, open(out, 'w'), indent=1, sort_keys=True)
         worst = sorted(((p['cost'], n) for n, p in P['pieces'].items()), reverse=True)[:5]

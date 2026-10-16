@@ -469,3 +469,45 @@ def test_patches_apply_to_every_generated_file(g, plan, tmp_path):
     assert res['patches_unused'] == []
     res2 = C.generate(g, plan, str(tmp_path), patches=[{'literal_old': 'NO SUCH TEXT', 'literal_new': 'x'}])
     assert res2['patches_unused'] == ['NO SUCH TEXT']
+
+
+# ---------------------------------------------------------------- the schedule chunker
+
+def _bundle_depth(plan):
+    pos = {b['name']: i for i, b in enumerate(plan['bundles'])}
+    d = {}
+    for b in plan['bundles']:
+        assert all(pos[i] < pos[b['name']] for i in b['imports']), 'imports must come first'
+        d[b['name']] = 1 + max([d[i] for i in b['imports']], default=0)
+    return max(d.values())
+
+
+@pytest.fixture(scope='module')
+def sched_plan(g):
+    return C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.01,
+                       bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                       bundle_prefix='CDB', chunker='schedule')
+
+
+def test_schedule_chunker_covers_bundle_material_once_and_fits(g, plan, sched_plan):
+    allb = [k for b in sched_plan['bundles'] for k in b['nodes']]
+    assert sorted(allb) == sorted(k for b in plan['bundles'] for k in b['nodes'])
+    assert len(allb) == len(set(allb))
+    cost = C.size_costs(g, bytes_per_second=10000)
+    for b in sched_plan['bundles']:
+        assert len(b['nodes']) == 1 or sum(cost[k] for k in b['nodes']) <= 0.01 + 1e-9
+    C.check_plan(g, sched_plan)
+
+
+def test_schedule_chunker_depth_is_the_longest_dependency_chain(g, sched_plan):
+    # with every declaration about a full budget, the import depth can be no less than the longest
+    # dependency chain of bundle material; list scheduling reaches it (here Space -> size -> size_eq).
+    # (The band chunker keeps a module whole and so may exceed the budget instead.)
+    B = {k for b in sched_plan['bundles'] for k in b['nodes']}
+    memo = {}
+
+    def chain(k):
+        if k not in memo:
+            memo[k] = 1 + max([chain(d) for d in g.nodes[k].deps if d in B and d != k], default=0)
+        return memo[k]
+    assert _bundle_depth(sched_plan) == max(chain(k) for k in B)
