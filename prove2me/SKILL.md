@@ -1313,6 +1313,36 @@ back WA. The lessons:
   When two pieces redo the same generic modules, move those modules whole into definitions
   bundles: 95 s became bundles of 20 s and 27 s plus pieces of 36 s and 59 s, all accepted.
 
+- **Lessons of the abandoned first Erdős 3 split (2026-10-08..16; archive
+  `p2m-standalone/openai-erdos3-split-v1`, README).** It published 244 bundles and proved 304 of 440
+  pieces, then stalled: its deepest bundles never published (every attempt a cold "Module
+  compilation timed out") because the bundle import chain was 92 levels deep (178 bundles in one
+  closure, ~5,200 s of compile on the critical path). What to do instead:
+  - **Rebuild the port before `carve.py graph`.** DeclGraph reads `.olean`s; proofs repaired in the
+    source but never rebuilt still read as `sorry` with no dependencies, so helpers went missing
+    one layer at a time. `lake build` the port's root first.
+  - **Shallow bundles: `"chunker": "schedule"`.** Bands over modules follow the module DAG (163
+    levels of bundle material); declaration-level list scheduling gives about 16 for the same
+    material. Depth is what a cold verifier pays.
+  - **Bundles hold only what definitions need.** The carver already keeps helper theorems out of
+    bundles except those a definition uses (a definition cannot import a `sorry`d statement); an
+    earlier per-mission carver also put 68% theorems and ~17,000 dead `variable` commands into
+    them. The shared carver drops scopes left without a kept declaration.
+  - **Measure before publishing.** Build every bundle locally (`-j1`), re-pack any over budget, and
+    only then publish; v1's scheduler split bundles while publishing, re-carved published bundles
+    (two published chains then re-declared 169 names), and looped 1,112 times isolating one
+    declaration that alone exceeded the budget.
+  - **Retries: `p2mlib.verdicts`.** Transient failures retry (≤ 30); own timeouts split after 2
+    (v1 retried one piece 740 times); CE/WA stop for a person.
+  - **Local checks: `p2mlib.localcheck`.** Key each result by content (stale cached passes sent
+    broken pieces) and compile the emulated verifier check (solution, published statement,
+    `theorem _check : type_of% @T := @solution`): it reproduces the locationless WA.
+  - The verifier compiles a solution **without its target in scope**; carved pieces must also
+    re-activate local instances (`attribute [local instance] x` when the bundle exports `x`),
+    avoid tokens full Mathlib adds (`Δ_[1]^[n]` → `Δ_[1] ^[n]`), and drop a theorem a published
+    bundle already declares. Config `external_defs`, `statement_suffix`, `patches` (post-carve
+    proof fixes) support a fresh split beside an abandoned one.
+
 ### Find an inlined sibling by its statement, never by its name
 
 An edge in the mission graph exists only when a *solution* carries `import Theorems.Thm_<name>`.
