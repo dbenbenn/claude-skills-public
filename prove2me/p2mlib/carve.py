@@ -513,19 +513,19 @@ class Graph:
         """The project constants (env names) identifier `tok` may denote in module m, namespace ns,
         with project namespaces `opens` open. Over-approximates: every reading Lean could take,
         and when none, the reading with trailing fields (`h.mp`, `foo.1`) stripped."""
-        if tok.startswith('_root_.'):
-            cands = [tok[len('_root_.'):]]
-        else:
-            cands = [join(p, tok) for p in prefixes(ns)] + [join(o, tok) for o in opens]
+        root = tok.startswith('_root_.')
+        body = tok[len('_root_.'):] if root else tok
         for strip in range(3):
-            hits = []
-            for c in cands:
-                if strip:
-                    parts = c.split('.')
-                    if len(parts) <= strip:
-                        continue
-                    c = '.'.join(parts[:-strip])
-                hits += [n for n in self.pub.get(c, ()) if self.visible(n, m)]
+            # strip the token's own trailing fields, never the namespace's: inside namespace
+            # `…Niltest`, `T.UnitIntervalValued` stripped as a whole name read as the structure
+            # `Niltest` itself, so a binder needing a gone declaration looked satisfied (Erdős 3
+            # v2 B109, B170)
+            parts = body.split('.')
+            if strip and len(parts) <= strip:
+                break
+            t = '.'.join(parts[:len(parts) - strip])
+            cands = [t] if root else [join(p, t) for p in prefixes(ns)] + [join(o, t) for o in opens]
+            hits = [n for c in cands for n in self.pub.get(c, ()) if self.visible(n, m)]
             if hits:
                 return list(dict.fromkeys(hits))
         # dot notation on a local (`A.coord_eq` with `A : Space`, Erdős 3 B024): the head names no
@@ -1396,6 +1396,26 @@ class Carver:
                     drop.add(c.index)
                 elif not _is_local(leanedit.text(info, c.index)):
                     keep_global.add(c.index)
+        # a local notation nothing kept in its scope uses goes: kept, it would keep the variables
+        # it names (Erdős 3 v2 stub: `local notation "hamin" => … B` kept `variable (B :
+        # LayerSamplerAxis I n → Type*)`), or name variables already gone (B169 "Unknown
+        # identifier `active` at quotation precheck"). Comments do not count as uses; last first, so
+        # chains resolve.
+        for c in reversed(info.commands):
+            if c.index in drop or c.short_kind not in NOTATION:
+                continue
+            txt = leanedit.text(info, c.index)
+            if not re.match(r'\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?local\b', txt, re.S):
+                continue
+            toks = _notation_tokens(txt)
+            if not toks:
+                continue
+            used = any(c2.index not in drop and _in_scope(info, c.index, c2) and
+                       any(_uses_token(strip(leanedit.text(info, c2.index)), tk) for tk in toks)
+                       for c2 in info.commands[c.index + 1:])
+            if not used:
+                drop.add(c.index)
+                keep_global.discard(c.index)
         # blocks left without a kept declaration (or a global notation/attribute) go whole
         blocks = collections.defaultdict(set)
         for c in info.commands:
@@ -1747,12 +1767,23 @@ def header(g, mods, bundles=(), thms=(), collapse_mathlib=True, extra=()):
 
 def mark_repaired(g, names):
     """Treat these declarations as sorry-free: a post-carve patch supplies the proof the port
-    stubbed (generate then refuses any bundle or piece that still contains `sorry`)."""
-    for n in names:
+    stubbed (generate then refuses any bundle or piece that still contains `sorry`). `names` is a
+    list, or {name: [declarations the patched proof uses]}: the graph read the stub, so it has none
+    of the patched proof's dependencies (Erdős 3 v2: a piece kept
+    `polynomialVectorMap_second_fderiv_bound` without `polynomialOperator_fderiv_norm_le`)."""
+    extra = names if isinstance(names, dict) else {n: [] for n in names}
+    for n, deps in extra.items():
         k = g.owner.get(n, n)
         if k not in g.nodes:
             raise CarveError('unknown repaired declaration %s' % n)
         g.nodes[k].sorry = False
+        for d in deps or ():
+            o = g.owner.get(d)
+            if o is None:
+                raise CarveError('repaired declaration %s: unknown dependency %s' % (n, d))
+            g.nodes[k].term.add(o)
+            g.nodes[k].sdeps.add(o)
+            g.nodes[k].deps.add(o)
 
 
 def statement_name(plan, node):

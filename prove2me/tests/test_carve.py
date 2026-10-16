@@ -614,3 +614,37 @@ def test_a_scoped_notation_is_emitted_in_exactly_one_bundle(g, tmp_path):
         return seen
     b = where['CD.viaScoped']
     assert where[k] == b or where[k] in closure(b)
+
+
+def test_a_binder_using_a_field_of_another_variable_goes_with_its_declaration(g):
+    # `variable (hS : S.big)`: field notation on the variable S names CD.Space.big; a file without
+    # it must drop the group (Erdős 3 v2 B109/B170 "Invalid field `UnitIntervalValued`")
+    out = C.Carver(g).carve({'CD.Space.field_free'}, g.have_names({'CD.Space.field_free', 'CD.Space'}),
+                            sorry={'CD.Space.field_free'})
+    assert 'S.big' not in out
+    assert 'theorem field_free' in out
+
+
+def test_an_unused_local_notation_keeps_no_variable_alive(g):
+    out = C.Carver(g).carve({'CD.note_free'}, g.have_names({'CD.note_free'}), sorry={'CD.note_free'})
+    assert '"WZ"' not in out
+    assert 'Wide' not in out
+    assert 'theorem note_free' in out
+
+
+def test_a_used_local_notation_stays(g):
+    # the existing fixture: `local notation "DE" => double_eq` used by double_succ's proof
+    out = C.Carver(g).carve({'CD.double_succ'}, g.have_names(set(g.closure({'CD.double_succ'}))))
+    if re.search(r'\bDE\b', out.split('local notation "DE"')[-1]):
+        assert 'local notation "DE"' in out
+
+
+def test_repaired_declarations_take_the_dependencies_of_their_patched_proofs():
+    g2 = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    assert g2.nodes['CD.sorried'].sorry
+    C.mark_repaired(g2, {'CD.sorried': ['CD.double_eq']})
+    nd = g2.nodes['CD.sorried']
+    assert not nd.sorry and 'CD.double_eq' in nd.deps
+    C.mark_repaired(g2, ['CD.sorried'])                      # the plain list form still works
+    with pytest.raises(C.CarveError):
+        C.mark_repaired(g2, {'CD.sorried': ['CD.nonexistent']})

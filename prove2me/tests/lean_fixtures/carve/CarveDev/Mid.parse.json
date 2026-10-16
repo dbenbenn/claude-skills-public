@@ -1647,21 +1647,21 @@
     }
    ],
    "end": {
-    "byte": 1479,
-    "col": 6,
+    "byte": 1488,
+    "col": 15,
     "line": 60
    },
    "heads": [],
    "idents": [
     {
-     "end": 1479,
-     "name": "CD",
+     "end": 1488,
+     "name": "Space",
      "role": "scope",
-     "start": 1477
+     "start": 1483
     }
    ],
    "ids": [],
-   "kind": "Lean.Parser.Command.end",
+   "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "CD",
    "opens": [
@@ -1678,6 +1678,687 @@
   },
   {
    "attrs": [],
+   "binders": [
+    {
+     "end": 1509,
+     "names": [
+      "S"
+     ],
+     "start": 1498
+    }
+   ],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 22
+    }
+   ],
+   "end": {
+    "byte": 1509,
+    "col": 20,
+    "line": 61
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1500,
+     "name": "S",
+     "role": "binder",
+     "start": 1499
+    },
+    {
+     "end": 1508,
+     "name": "Space",
+     "role": "ref",
+     "start": 1503
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.variable",
+   "names": [],
+   "namespace": "CD.Space",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1489,
+    "col": 0,
+    "line": 61
+   }
+  },
+  {
+   "attrs": [],
+   "binders": [
+    {
+     "end": 1531,
+     "names": [
+      "hS"
+     ],
+     "start": 1519
+    }
+   ],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      23
+     ],
+     "opener": 22
+    }
+   ],
+   "end": {
+    "byte": 1531,
+    "col": 21,
+    "line": 62
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1522,
+     "name": "hS",
+     "role": "binder",
+     "start": 1520
+    },
+    {
+     "end": 1530,
+     "name": "S.big",
+     "role": "ref",
+     "start": 1525
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.variable",
+   "names": [],
+   "namespace": "CD.Space",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1510,
+    "col": 0,
+    "line": 62
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      23,
+      24
+     ],
+     "opener": 22
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "doc": {
+    "end": 1772,
+    "start": 1532
+   },
+   "end": {
+    "byte": 1816,
+    "col": 43,
+    "line": 65
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1791,
+     "name": "field_free",
+     "role": "decl",
+     "start": 1781
+    },
+    {
+     "end": 1794,
+     "name": "k",
+     "role": "binder",
+     "start": 1793
+    },
+    {
+     "end": 1800,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1797
+    },
+    {
+     "end": 1805,
+     "name": "k",
+     "role": "ref",
+     "start": 1804
+    },
+    {
+     "end": 1809,
+     "name": "k",
+     "role": "ref",
+     "start": 1808
+    },
+    {
+     "end": 1816,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1813
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1791,
+      "col": 18,
+      "line": 65
+     },
+     "start": {
+      "byte": 1781,
+      "col": 8,
+      "line": 65
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.Space.field_free"
+   ],
+   "namespace": "CD.Space",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1532,
+    "col": 0,
+    "line": 63
+   },
+   "value_start": {
+    "byte": 1810,
+    "col": 37,
+    "line": 65
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      23,
+      24
+     ],
+     "opener": 22
+    }
+   ],
+   "end": {
+    "byte": 1826,
+    "col": 9,
+    "line": 66
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1826,
+     "name": "Space",
+     "role": "scope",
+     "start": 1821
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "CD.Space",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1817,
+    "col": 0,
+    "line": 66
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 1846,
+    "col": 18,
+    "line": 68
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1846,
+     "name": "UnusedNote",
+     "role": "scope",
+     "start": 1836
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.section",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1828,
+    "col": 0,
+    "line": 68
+   }
+  },
+  {
+   "attrs": [],
+   "binders": [
+    {
+     "end": 1866,
+     "names": [
+      "w"
+     ],
+     "start": 1856
+    }
+   ],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 27
+    }
+   ],
+   "end": {
+    "byte": 1866,
+    "col": 19,
+    "line": 69
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1858,
+     "name": "w",
+     "role": "binder",
+     "start": 1857
+    },
+    {
+     "end": 1865,
+     "name": "Wide",
+     "role": "ref",
+     "start": 1861
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.variable",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1847,
+    "col": 0,
+    "line": 69
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      28
+     ],
+     "opener": 27
+    }
+   ],
+   "end": {
+    "byte": 1891,
+    "col": 24,
+    "line": 70
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1891,
+     "name": "w",
+     "role": "ref",
+     "start": 1890
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.notation",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1867,
+    "col": 0,
+    "line": 70
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      28
+     ],
+     "opener": 27
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "doc": {
+    "end": 2085,
+    "start": 1892
+   },
+   "end": {
+    "byte": 2132,
+    "col": 46,
+    "line": 73
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 2103,
+     "name": "note_free",
+     "role": "decl",
+     "start": 2094
+    },
+    {
+     "end": 2106,
+     "name": "k",
+     "role": "binder",
+     "start": 2105
+    },
+    {
+     "end": 2112,
+     "name": "Nat",
+     "role": "ref",
+     "start": 2109
+    },
+    {
+     "end": 2117,
+     "name": "k",
+     "role": "ref",
+     "start": 2116
+    },
+    {
+     "end": 2125,
+     "name": "k",
+     "role": "ref",
+     "start": 2124
+    },
+    {
+     "end": 2132,
+     "name": "rfl",
+     "role": "ref",
+     "start": 2129
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 2103,
+      "col": 17,
+      "line": 73
+     },
+     "start": {
+      "byte": 2094,
+      "col": 8,
+      "line": 73
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.note_free"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1892,
+    "col": 0,
+    "line": 71
+   },
+   "value_start": {
+    "byte": 2126,
+    "col": 40,
+    "line": 73
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      28
+     ],
+     "opener": 27
+    }
+   ],
+   "end": {
+    "byte": 2147,
+    "col": 14,
+    "line": 74
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 2147,
+     "name": "UnusedNote",
+     "role": "scope",
+     "start": 2137
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 2133,
+    "col": 0,
+    "line": 74
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 2155,
+    "col": 6,
+    "line": 76
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 2155,
+     "name": "CD",
+     "role": "scope",
+     "start": 2153
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 2149,
+    "col": 0,
+    "line": 76
+   }
+  },
+  {
+   "attrs": [],
    "context": [
     {
      "cmds": [
@@ -1687,9 +2368,9 @@
     }
    ],
    "end": {
-    "byte": 1480,
+    "byte": 2156,
     "col": 0,
-    "line": 61
+    "line": 77
    },
    "heads": [],
    "idents": [],
@@ -1699,14 +2380,29 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 1480,
+    "byte": 2156,
     "col": 0,
-    "line": 61
+    "line": 77
    }
   }
  ],
  "decls": [],
  "file": "CarveDev/Mid.lean",
- "messages": [],
+ "messages": [
+  {
+   "end": {
+    "byte": 1891,
+    "col": 24,
+    "line": 70
+   },
+   "severity": "error",
+   "start": {
+    "byte": 1890,
+    "col": 23,
+    "line": 70
+   },
+   "text": "Unknown identifier `w` at quotation precheck\n\nNote: You can use `set_option quotPrecheck false` to disable this check."
+  }
+ ],
  "mode": "parse"
 }

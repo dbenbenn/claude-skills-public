@@ -36,7 +36,7 @@ CONFIG.json (paths may use ~):
                                               # (shallow); "bands" (default) cuts along modules
    "patches": "patches.json",                 # [{literal_old, literal_new, why}] applied to every
                                               # generated file: proof fixes, never source edits
-   "repaired": ["OAI.Erdos3.x"],              # declarations whose stubbed sorry a patch replaces
+   "repaired": {"OAI.Erdos3.x": ["OAI.Erdos3.y"]},  # stubbed sorry a patch replaces: name -> what the patched proof uses (or a plain list)
                                               # (generation refuses a file still containing sorry)
    "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
                                               # anonymous local instances a frozen bundle kept

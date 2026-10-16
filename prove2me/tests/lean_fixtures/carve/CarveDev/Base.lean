@@ -31,6 +31,13 @@ def usesSorried : Nat := (fun (_ : double 2 = 4) => 0) sorried
 
 example : double 1 = 2 := rfl
 
+/-- A predicate reached by field notation on a variable (`variable (hS : S.big)`). -/
+def Space.big (B : Space) : Prop := B.size = 0
+
+/-- A type only a variable mentions. -/
+structure Wide where
+  w : Nat
+
 end CD
 
 namespace CD.Aux

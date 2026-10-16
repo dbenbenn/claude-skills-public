@@ -57,4 +57,20 @@ open scoped CDScope
 def viaScoped (n : Nat) : Nat := ⟪n⟫
 end
 
+namespace Space
+variable (S : Space)
+variable (hS : S.big)
+/-- Uses no variable: a carved file without `Space.big` must drop `hS`'s group, whose type is
+field notation on the variable `S`, inside a namespace that is itself a declaration (Erdős 3 v2 B109: `variable (hT : T.UnitIntervalValued)`). -/
+theorem field_free (k : Nat) : k = k := rfl
+end Space
+
+section UnusedNote
+variable (w : Wide)
+local notation "WZ" => w
+/-- Uses neither `w` nor `WZ`: the unused notation must not keep `w`'s group alive (Erdős 3 v2
+stub: `local notation "hamin" => … B` kept `variable (B : LayerSamplerAxis I n → Type*)`). -/
+theorem note_free (k : Nat) : k + 0 = k := rfl
+end UnusedNote
+
 end CD
