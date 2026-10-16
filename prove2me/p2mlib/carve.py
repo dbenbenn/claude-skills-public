@@ -775,6 +775,27 @@ def module_costs(g, times, scale=1.5, default=2.0, overhead=0.5):
     return cost
 
 
+def calibrate_costs(cost, bundles, times, scale=1.5, overhead=5.0, floor=0.5):
+    """Estimates corrected by measurement: each bundle built locally at -j1 in `secs` gets its
+    declarations' costs rescaled (shares kept) to (secs - overhead) * scale, the import overhead
+    being what an empty file of the same imports takes. Failed or unmeasured bundles keep their
+    estimates. A re-plan on these costs splits exactly what measured heavy (Erdős 3 v2: build-log
+    estimates put every bundle at 60 s; measured, 5 of 132 ran over 40 s local, up to 69 s)."""
+    out = dict(cost)
+    for b in bundles:
+        t = times.get(b['name'])
+        if not t or not t.get('ok'):
+            continue
+        est = sum(cost.get(k, 0.0) for k in b['nodes'])
+        target = max(t['secs'] - overhead, floor) * scale
+        for k in b['nodes']:
+            if est > 0:
+                out[k] = cost.get(k, 0.0) * target / est
+            else:
+                out[k] = target / len(b['nodes'])
+    return out
+
+
 def size_costs(g, bytes_per_second=2000):
     """Cost by size alone, when there are no build times."""
     return {k: nd.size / bytes_per_second for k, nd in g.nodes.items()}

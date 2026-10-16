@@ -36,6 +36,9 @@ CONFIG.json (paths may use ~):
                                               # (shallow); "bands" (default) cuts along modules
    "patches": "patches.json",                 # [{literal_old, literal_new, why}] applied to every
                                               # generated file: proof fixes, never source edits
+   "measured": {"plan": "work/plan_measured.json", "bundle_times": "work/bundle_times.json",
+                "overhead": 5.0},                # local -j1 times of that plan's bundles: costs
+                                                 # rescaled to them, so a re-plan splits the heavy
    "repaired": {"OAI.Erdos3.x": ["OAI.Erdos3.y"]},  # stubbed sorry a patch replaces: name -> what the patched proof uses (or a plain list)
                                               # (generation refuses a file still containing sorry)
    "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
@@ -108,7 +111,15 @@ def costs(cfg, g):
     if not times:
         print('no build logs: costs by size (%d bytes/s)' % cfg.get('bytes_per_second', 2000))
         return C.size_costs(g, cfg.get('bytes_per_second', 2000))
-    return C.module_costs(g, times, cfg.get('time_scale', 1.5))
+    cost = C.module_costs(g, times, cfg.get('time_scale', 1.5))
+    m = cfg.get('measured')
+    if m:
+        mp = json.load(open(os.path.expanduser(m['plan'])))
+        mt = json.load(open(os.path.expanduser(m['bundle_times'])))
+        cost = C.calibrate_costs(cost, mp['bundles'], mt, cfg.get('time_scale', 1.5),
+                                 m.get('overhead', 5.0))
+        print('costs calibrated by %d measured bundles' % sum(1 for v in mt.values() if v.get('ok')))
+    return cost
 
 
 def main(argv):

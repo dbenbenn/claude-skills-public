@@ -658,3 +658,16 @@ def test_an_open_shadowed_by_a_project_namespace_elsewhere_is_rooted(g):
     # say which Nat it means wherever it lands
     out = C.Carver(g).carve({'CD.succ_pos_cd'}, g.have_names({'CD.succ_pos_cd'}), sorry={'CD.succ_pos_cd'})
     assert re.search(r'^open _root_\.Nat$', out, re.M), out
+
+
+def test_measured_bundle_times_rescale_the_estimates_of_their_declarations():
+    cost = {'a': 1.0, 'b': 3.0, 'c': 2.0, 'd': 5.0}
+    bundles = [{'name': 'X0', 'nodes': ['a', 'b']}, {'name': 'X1', 'nodes': ['c']}, {'name': 'X2', 'nodes': ['d']}]
+    times = {'X0': {'secs': 25.0, 'ok': True}, 'X1': {'secs': 4.0, 'ok': True},
+             'X2': {'secs': 0, 'ok': False}}
+    out = C.calibrate_costs(cost, bundles, times, scale=1.5, overhead=5.0)
+    assert out['a'] + out['b'] == pytest.approx((25.0 - 5.0) * 1.5)
+    assert out['a'] / out['b'] == pytest.approx(1 / 3)       # shares within a bundle kept
+    assert out['c'] == pytest.approx(0.5 * 1.5)                # floor: never below 0.5 s local
+    assert out['d'] == 5.0                                     # failed: estimate unchanged
+    assert cost['a'] == 1.0                                    # input not mutated
