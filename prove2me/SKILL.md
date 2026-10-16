@@ -1288,6 +1288,11 @@ back WA. The lessons:
   statement after its bundles, then each piece after the statements it imports. Erdős 3 first
   published its bundles as a chain, one at a time, and then re-planned them as a DAG
   (2026-10-08).
+- **Never edit the port's source after the graph is built.** The carver cuts each module by the
+  command positions recorded when the port was compiled, so changing a proof in the source (even to
+  speed it up) corrupts every later carve of that module: on Erdős 3 a five-line proof fix spliced
+  text into two unpublished bundles (2026-10-16). Apply such fixes as post-carve text replacements
+  to the generated files instead.
 - **No `macro` or `syntax` commands.** The soundness guard refuses them, and the carver refuses to
   keep one. `notation` is fine.
 - `carve.py plan` refuses a plan in which a bundle misses a definition that one of its members
