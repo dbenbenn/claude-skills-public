@@ -683,3 +683,17 @@ def test_a_field_after_a_parenthesized_application_is_resolved(g):
     out = C.Carver(g).carve({'CD.Space.paren_free'}, g.have_names({'CD.Space.paren_free', 'CD.Space'}),
                             sorry={'CD.Space.paren_free'})
     assert '(F k).big' not in out
+
+
+def test_a_variable_group_no_kept_declaration_uses_goes(g):
+    have = g.have_names({'CD.unused_var_free', 'CD.double'})
+    out = C.Carver(g).carve({'CD.unused_var_free'}, have)
+    assert 'def unused_var_free' in out
+    assert '(hq :' not in out and '(hk :' not in out
+
+
+def test_a_variable_group_a_kept_declaration_uses_stays(g):
+    have = g.have_names({'CD.uses_hk', 'CD.double'})
+    out = C.Carver(g).carve({'CD.uses_hk'}, have, sorry={'CD.uses_hk'})
+    assert 'variable (hk : double k0 = k0)' in out
+    assert 'k0' in out

@@ -95,4 +95,16 @@ variable (hF : ∀ k, (F k).big)
 theorem paren_free (k : Nat) : k = k := rfl
 end Space
 
+section UsedVars
+variable (k0 : Nat) (hq : double 0 = 0)
+variable (hk : double k0 = k0)
+/-- Lean includes neither `hq` nor `hk` here: the compiled declaration mentions no `double`, so a
+carved file drops both groups (Erdős 3 v2 B066: `variable [∀ j, IsZLattice ℝ (latticeSection …)]`
+before a definition that does not use it, needing an instance nothing kept brought in). -/
+def unused_var_free : Nat := 7
+include hk in
+/-- Uses `hk`: its group stays. -/
+theorem uses_hk : double k0 = k0 := hk
+end UsedVars
+
 end CD

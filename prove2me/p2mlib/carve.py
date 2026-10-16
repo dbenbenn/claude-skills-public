@@ -1347,6 +1347,7 @@ class Carver:
     def carve(self, keep, have, deprivatize=False, sorry=(), rename=None):
         g = self.g
         keep = set(keep)
+        self.keep = keep
         have = set(have) | g.have_names(keep)
         self.keep_names = g.have_names(keep)
         # names for local instances emitted again in this file: unique to the file, since an
@@ -1491,6 +1492,7 @@ class Carver:
                     if c.index in drop and c.short_kind in NOTATION}
         inst_names = getattr(g, 'instance_names', None) or {}
         reactivated = set()
+        mine = [kk for kk in getattr(self, 'keep', ()) if g.nodes[kk].module == m]
         for c in info.commands:
             if c.index in drop:
                 continue
@@ -1500,8 +1502,13 @@ class Carver:
             if k == 'variable':
                 toks = set().union(*[v for vi, v in dead_tok.items() if _in_scope(info, vi, c)]) \
                     if dead_tok else set()
+                used = set()
+                for kk in mine:
+                    if _in_scope(info, c.index, info.commands[g.nodes[kk].cmd]):
+                        used |= g.nodes[kk].term | g.nodes[kk].tdeps
                 r = self._variable(info, c, m, have, opens, dropped_vars, protect.get(c.index, set()),
-                                   toks, self._pin_edits(info, c, m, have, opens, c.end.byte, set()))
+                                   toks, self._pin_edits(info, c, m, have, opens, c.end.byte, set()),
+                                   used)
                 if r is None:
                     drop.add(c.index)
                 elif r is not False:
@@ -1617,9 +1624,13 @@ class Carver:
                     out.append(_cmd_text(info, vc, [(anon_at, anon_at, name)]).strip() + '\n')
         return ''.join(out)
 
-    def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=(), pins=None):
+    def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=(), pins=None,
+                  used=None):
         """The `variable` command without its gone binder groups: False (unchanged), None (none
-        left) or the new text."""
+        left) or the new text. `used`: the project declarations the kept declarations in its scope
+        use, as compiled; a group naming project declarations none of which is among them was not
+        included in any of them, and goes (it may not even elaborate: Erdős 3 v2 B066, `variable
+        [∀ j, IsZLattice ℝ (latticeSection …)]` needing an instance nothing kept brought in)."""
         groups = c.binders or []
         bound = {n for grp in groups for n in grp['names']}
         refs = [i for i in c.idents or [] if i['role'] == 'ref']
@@ -1632,6 +1643,13 @@ class Carver:
                     continue
                 inside = [i for i in refs if grp['start'] <= i['start'] < grp['end']]
                 gtxt = info.text_bytes[grp['start']:grp['end']].decode('utf-8')
+                if used is not None:
+                    names = {self.g.owner.get(h) for i in inside
+                             for h in self.g.resolve_lean(i['name'], c.namespace, opens, m)} - {None}
+                    if names and not names & used:
+                        bad.add(j)
+                        changed = True
+                        continue
                 if any(_uses_token(gtxt, tk) for tk in dead_tokens) or any(i['name'].split('.')[0] in lost - set(grp['names']) or
                        self._gone(i['name'], c, m, have, opens, bound - lost,
                                   field=info.text_bytes[i['start'] - 1:i['start']] == b'.') for i in inside):

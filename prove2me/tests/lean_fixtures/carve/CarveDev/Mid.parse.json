@@ -3336,21 +3336,21 @@
     }
    ],
    "end": {
-    "byte": 2861,
-    "col": 6,
+    "byte": 2871,
+    "col": 16,
     "line": 98
    },
    "heads": [],
    "idents": [
     {
-     "end": 2861,
-     "name": "CD",
+     "end": 2871,
+     "name": "UsedVars",
      "role": "scope",
-     "start": 2859
+     "start": 2863
     }
    ],
    "ids": [],
-   "kind": "Lean.Parser.Command.end",
+   "kind": "Lean.Parser.Command.section",
    "names": [],
    "namespace": "CD",
    "opens": [
@@ -3367,6 +3367,479 @@
   },
   {
    "attrs": [],
+   "binders": [
+    {
+     "end": 2891,
+     "names": [
+      "k0"
+     ],
+     "start": 2881
+    },
+    {
+     "end": 2911,
+     "names": [
+      "hq"
+     ],
+     "start": 2892
+    }
+   ],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 46
+    }
+   ],
+   "end": {
+    "byte": 2911,
+    "col": 39,
+    "line": 99
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 2884,
+     "name": "k0",
+     "role": "binder",
+     "start": 2882
+    },
+    {
+     "end": 2890,
+     "name": "Nat",
+     "role": "ref",
+     "start": 2887
+    },
+    {
+     "end": 2895,
+     "name": "hq",
+     "role": "binder",
+     "start": 2893
+    },
+    {
+     "end": 2904,
+     "name": "double",
+     "role": "ref",
+     "start": 2898
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.variable",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 2872,
+    "col": 0,
+    "line": 99
+   }
+  },
+  {
+   "attrs": [],
+   "binders": [
+    {
+     "end": 2942,
+     "names": [
+      "hk"
+     ],
+     "start": 2921
+    }
+   ],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      47
+     ],
+     "opener": 46
+    }
+   ],
+   "end": {
+    "byte": 2942,
+    "col": 30,
+    "line": 100
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 2924,
+     "name": "hk",
+     "role": "binder",
+     "start": 2922
+    },
+    {
+     "end": 2933,
+     "name": "double",
+     "role": "ref",
+     "start": 2927
+    },
+    {
+     "end": 2936,
+     "name": "k0",
+     "role": "ref",
+     "start": 2934
+    },
+    {
+     "end": 2941,
+     "name": "k0",
+     "role": "ref",
+     "start": 2939
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.variable",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 2912,
+    "col": 0,
+    "line": 100
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      47,
+      48
+     ],
+     "opener": 46
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "doc": {
+    "end": 3236,
+    "start": 2943
+   },
+   "end": {
+    "byte": 3267,
+    "col": 30,
+    "line": 104
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 3256,
+     "name": "unused_var_free",
+     "role": "decl",
+     "start": 3241
+    },
+    {
+     "end": 3262,
+     "name": "Nat",
+     "role": "ref",
+     "start": 3259
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 3256,
+      "col": 19,
+      "line": 104
+     },
+     "start": {
+      "byte": 3241,
+      "col": 4,
+      "line": 104
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.unused_var_free"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 2943,
+    "col": 0,
+    "line": 101
+   },
+   "value_start": {
+    "byte": 3263,
+    "col": 26,
+    "line": 104
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      47,
+      48
+     ],
+     "opener": 46
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "doc": {
+    "end": 3316,
+    "start": 3282
+   },
+   "end": {
+    "byte": 3355,
+    "col": 38,
+    "line": 107
+   },
+   "heads": [
+    {
+     "end": 3282,
+     "kind": "Lean.Parser.Command.include",
+     "start": 3268
+    }
+   ],
+   "idents": [
+    {
+     "end": 3278,
+     "name": "hk",
+     "role": "ref",
+     "start": 3276
+    },
+    {
+     "end": 3332,
+     "name": "uses_hk",
+     "role": "decl",
+     "start": 3325
+    },
+    {
+     "end": 3341,
+     "name": "double",
+     "role": "ref",
+     "start": 3335
+    },
+    {
+     "end": 3344,
+     "name": "k0",
+     "role": "ref",
+     "start": 3342
+    },
+    {
+     "end": 3349,
+     "name": "k0",
+     "role": "ref",
+     "start": 3347
+    },
+    {
+     "end": 3355,
+     "name": "hk",
+     "role": "ref",
+     "start": 3353
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 3332,
+      "col": 15,
+      "line": 107
+     },
+     "start": {
+      "byte": 3325,
+      "col": 8,
+      "line": 107
+     }
+    }
+   ],
+   "inner_kind": "Lean.Parser.Command.declaration",
+   "kind": "Lean.Parser.Command.in",
+   "names": [
+    "CD.uses_hk"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 3268,
+    "col": 0,
+    "line": 105
+   },
+   "value_start": {
+    "byte": 3350,
+    "col": 33,
+    "line": 107
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      47,
+      48
+     ],
+     "opener": 46
+    }
+   ],
+   "end": {
+    "byte": 3368,
+    "col": 12,
+    "line": 108
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 3368,
+     "name": "UsedVars",
+     "role": "scope",
+     "start": 3360
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 3356,
+    "col": 0,
+    "line": 108
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 3376,
+    "col": 6,
+    "line": 110
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 3376,
+     "name": "CD",
+     "role": "scope",
+     "start": 3374
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 3370,
+    "col": 0,
+    "line": 110
+   }
+  },
+  {
+   "attrs": [],
    "context": [
     {
      "cmds": [
@@ -3376,9 +3849,9 @@
     }
    ],
    "end": {
-    "byte": 2862,
+    "byte": 3377,
     "col": 0,
-    "line": 99
+    "line": 111
    },
    "heads": [],
    "idents": [],
@@ -3388,9 +3861,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 2862,
+    "byte": 3377,
     "col": 0,
-    "line": 99
+    "line": 111
    }
   }
  ],

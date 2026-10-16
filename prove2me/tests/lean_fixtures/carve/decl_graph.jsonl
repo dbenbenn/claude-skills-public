@@ -35,6 +35,7 @@
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.quad","p":false,"r":[20,0,21,45],"s":false,"t":[],"u":[],"v":["CD.double"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.sizedZero","p":false,"r":[51,0,53,67],"s":false,"t":["CD.Space","CD.Space.size"],"u":[],"v":["CD.Space","CD.Space.size"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.trail_kept","p":false,"r":[83,0,83,25],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.unused_var_free","p":false,"r":[101,0,104,30],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.viaScoped","p":false,"r":[57,0,57,36],"s":false,"t":[],"u":[],"v":["CD.double"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD._aux_CarveDev_Mid___macroRules__private_CarveDev_Mid_0_CD_termDE_1","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD._aux_CarveDev_Mid___macroRules__private_CarveDev_Mid_0_CD_termWZ_1","p":false,"r":[70,0,70,24],"s":false,"t":[],"u":[],"v":[]}
@@ -68,6 +69,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.size_via_coord","p":true,"r":[14,0,18,6],"s":false,"t":["CD.Space","CD.Space.coord","CD.Space.size"],"u":[],"v":["CD.Space","CD.Space.coord","CD.Space.size"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.size_zero","p":true,"r":[42,0,42,41],"s":false,"t":["CD.Space","CD.Space.size"],"u":[],"v":["CD.Space"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.trail_dropped","p":true,"r":[85,0,87,44],"s":false,"t":["CD.Wide","CD.Aux.auxOnly"],"u":[],"v":["CD.Wide","CD.Aux.auxOnly"]}
+{"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_hk","p":true,"r":[106,0,107,38],"s":false,"t":["CD.double","CD.Aux.auxOnly"],"u":[],"v":["CD.double","CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_hx","p":true,"r":[38,0,38,39],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.helper","p":true,"r":[30,0,30,40],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.main","p":true,"r":[14,0,18,53],"s":false,"t":["CD.Space","CD.double","CD.List.headOr","CD.Space.size"],"u":[],"v":["CD.Space","CD.double","CD.double_succ","CD.quad","CD.size_via_coord","CD.size_zero","_private.CarveDev.Top.0.CD.helper","CD.List.headOr","CD.List.headOr_nil","CD.Space.coord","CD.Space.size"]}
