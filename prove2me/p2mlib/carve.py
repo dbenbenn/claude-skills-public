@@ -1580,6 +1580,16 @@ def header(g, mods, bundles=(), thms=(), collapse_mathlib=True, extra=()):
     return ''.join('import %s\n' % x for x in dict.fromkeys(ext))
 
 
+def mark_repaired(g, names):
+    """Treat these declarations as sorry-free: a post-carve patch supplies the proof the port
+    stubbed (generate then refuses any bundle or piece that still contains `sorry`)."""
+    for n in names:
+        k = g.owner.get(n, n)
+        if k not in g.nodes:
+            raise CarveError('unknown repaired declaration %s' % n)
+        g.nodes[k].sorry = False
+
+
 def statement_name(plan, node):
     """The published name of a node: `<name><suffix>`, or the name itself for an external statement."""
     if node in plan.get('external', ()) or not plan.get('statement_suffix'):
@@ -1686,6 +1696,8 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
             if pt['literal_old'] in txt:
                 txt = txt.replace(pt['literal_old'], pt['literal_new'])
                 used.add(pt['literal_old'])
+        if os.path.basename(path).startswith(('Def_', 'Sol_')) and re.search(r'\bsorry\b', strip(txt)):
+            raise CarveError('%s still contains sorry (a repaired declaration whose patch did not apply?)' % path)
         with open(path, 'w', encoding='utf-8') as f:
             f.write(txt)
         files.append(path)

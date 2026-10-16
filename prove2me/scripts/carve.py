@@ -36,6 +36,8 @@ CONFIG.json (paths may use ~):
                                               # (shallow); "bands" (default) cuts along modules
    "patches": "patches.json",                 # [{literal_old, literal_new, why}] applied to every
                                               # generated file: proof fixes, never source edits
+   "repaired": ["OAI.Erdos3.x"],              # declarations whose stubbed sorry a patch replaces
+                                              # (generation refuses a file still containing sorry)
    "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
                                               # anonymous local instances a frozen bundle kept
                                               # unnamed (Lean's name there differs from the
@@ -91,6 +93,7 @@ def load_graph(cfg):
     if not os.path.exists(graph_path(cfg)):
         sys.exit('no %s: run `carve.py graph` first' % graph_path(cfg))
     g = C.Graph.load(graph_path(cfg), cfg['src'])
+    C.mark_repaired(g, cfg.get('repaired') or [])
     names = cfg.get('instance_names') or {}
     if isinstance(names, str):
         names = json.load(open(os.path.expanduser(names), encoding='utf-8'))

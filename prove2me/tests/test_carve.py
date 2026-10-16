@@ -511,3 +511,18 @@ def test_schedule_chunker_depth_is_the_longest_dependency_chain(g, sched_plan):
             memo[k] = 1 + max([chain(d) for d in g.nodes[k].deps if d in B and d != k], default=0)
         return memo[k]
     assert _bundle_depth(sched_plan) == max(chain(k) for k in B)
+
+
+def test_repaired_declarations_need_their_patch(tmp_path):
+    # the port stubbed a proof with sorry and a post-carve patch supplies it (Erdős 3 v2:
+    # booleanSelectedDerivative_contDiff): mark it repaired, and generation refuses a file that
+    # still contains sorry, so a patch that stops applying cannot slip a sorry through
+    g2 = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    C.mark_repaired(g2, ['CD.sorried'])
+    p = C.make_plan(g2, ['CD.uses_sorry'], cost=C.size_costs(g2), bundle_prefix='X')
+    assert p['sorry'] == [] and C.check_plan(g2, p) == []
+    fix = [{'literal_old': 'theorem sorried : double 2 = 4 := sorry', 'literal_new': 'theorem sorried : double 2 = 4 := rfl'}]
+    res = C.generate(g2, p, str(tmp_path), what=('bundles',), patches=fix)
+    assert res['patches_unused'] == []
+    with pytest.raises(C.CarveError, match='sorry'):
+        C.generate(g2, p, str(tmp_path / 'nopatch'), what=('bundles',))
