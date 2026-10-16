@@ -805,18 +805,97 @@
      "opener": 1
     }
    ],
+   "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 607,
-    "col": 6,
+    "byte": 645,
+    "col": 44,
     "line": 27
    },
    "heads": [],
    "idents": [
     {
-     "end": 607,
+     "end": 620,
+     "name": "uses_scoped",
+     "role": "decl",
+     "start": 609
+    },
+    {
+     "end": 632,
+     "name": "viaScoped",
+     "role": "ref",
+     "start": 623
+    },
+    {
+     "end": 645,
+     "name": "rfl",
+     "role": "ref",
+     "start": 642
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 620,
+      "col": 19,
+      "line": 27
+     },
+     "start": {
+      "byte": 609,
+      "col": 8,
+      "line": 27
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.uses_scoped"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "CD.Aux"
+    }
+   ],
+   "start": {
+    "byte": 601,
+    "col": 0,
+    "line": 27
+   },
+   "value_start": {
+    "byte": 639,
+    "col": 38,
+    "line": 27
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      3
+     ],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 653,
+    "col": 6,
+    "line": 29
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 653,
      "name": "CD",
      "role": "scope",
-     "start": 605
+     "start": 651
     }
    ],
    "ids": [],
@@ -830,9 +909,9 @@
     }
    ],
    "start": {
-    "byte": 601,
+    "byte": 647,
     "col": 0,
-    "line": 27
+    "line": 29
    }
   },
   {
@@ -846,9 +925,9 @@
     }
    ],
    "end": {
-    "byte": 608,
+    "byte": 654,
     "col": 0,
-    "line": 28
+    "line": 30
    },
    "heads": [],
    "idents": [],
@@ -858,9 +937,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 608,
+    "byte": 654,
     "col": 0,
-    "line": 28
+    "line": 30
    }
   }
  ],

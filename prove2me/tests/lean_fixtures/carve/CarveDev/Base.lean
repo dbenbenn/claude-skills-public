@@ -44,3 +44,11 @@ attribute [reducible] auxOnly
 theorem aux_eq : AUX = 1 := rfl
 
 end CD.Aux
+
+/- A scoped notation: its namespace exists only once this module's text is in force, so whatever
+opens it must see the bundle that carries the notation (Erdős 3 v2: `open scoped Indicator`). -/
+namespace CDScope
+scoped notation "⟪" x "⟫" => CD.double x
+/-- The first declaration after the notation in its scope: the notation travels with it. -/
+def anchor : Nat := 0
+end CDScope

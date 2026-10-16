@@ -1408,21 +1408,14 @@
     }
    ],
    "end": {
-    "byte": 1405,
-    "col": 6,
+    "byte": 1406,
+    "col": 7,
     "line": 55
    },
    "heads": [],
-   "idents": [
-    {
-     "end": 1405,
-     "name": "CD",
-     "role": "scope",
-     "start": 1403
-    }
-   ],
+   "idents": [],
    "ids": [],
-   "kind": "Lean.Parser.Command.end",
+   "kind": "Lean.Parser.Command.section",
    "names": [],
    "namespace": "CD",
    "opens": [
@@ -1445,12 +1438,258 @@
       0
      ],
      "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 18
     }
    ],
    "end": {
-    "byte": 1406,
+    "byte": 1426,
+    "col": 19,
+    "line": 56
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1426,
+     "name": "CDScope",
+     "role": "open",
+     "start": 1419
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.open",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1407,
     "col": 0,
     "line": 56
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      19
+     ],
+     "opener": 18
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "end": {
+    "byte": 1467,
+    "col": 36,
+    "line": 57
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1440,
+     "name": "viaScoped",
+     "role": "decl",
+     "start": 1431
+    },
+    {
+     "end": 1443,
+     "name": "n",
+     "role": "binder",
+     "start": 1442
+    },
+    {
+     "end": 1449,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1446
+    },
+    {
+     "end": 1456,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1453
+    },
+    {
+     "end": 1464,
+     "name": "n",
+     "role": "ref",
+     "start": 1463
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1440,
+      "col": 13,
+      "line": 57
+     },
+     "start": {
+      "byte": 1431,
+      "col": 4,
+      "line": 57
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.viaScoped"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1427,
+    "col": 0,
+    "line": 57
+   },
+   "value_start": {
+    "byte": 1457,
+    "col": 30,
+    "line": 57
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      19
+     ],
+     "opener": 18
+    }
+   ],
+   "end": {
+    "byte": 1471,
+    "col": 3,
+    "line": 58
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1468,
+    "col": 0,
+    "line": 58
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 1479,
+    "col": 6,
+    "line": 60
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1479,
+     "name": "CD",
+     "role": "scope",
+     "start": 1477
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 1473,
+    "col": 0,
+    "line": 60
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 1480,
+    "col": 0,
+    "line": 61
    },
    "heads": [],
    "idents": [],
@@ -1460,9 +1699,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 1406,
+    "byte": 1480,
     "col": 0,
-    "line": 56
+    "line": 61
    }
   }
  ],

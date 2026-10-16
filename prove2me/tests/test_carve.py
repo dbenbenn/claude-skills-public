@@ -327,6 +327,20 @@ def test_tools_reproduce_the_recordings(tmp_path):
 
 @pytest.mark.lean
 def test_generated_files_compile_in_publish_order(g, plan, tmp_path):
+    _compile_in_publish_order(g, plan, tmp_path)
+
+
+@pytest.mark.lean
+def test_scoped_notations_and_silent_simp_lemmas_compile(g, tmp_path):
+    # one-declaration bundles: a scoped notation and an rfl simp lemma land apart from their users
+    p = C.make_plan(g, ['CD.uses_scoped', 'CD.uses_sized'], budget=0.05, piece_size=10**6,
+                    bundle_budget=0.0001, bundle_size=10**6,
+                    cost=C.size_costs(g, bytes_per_second=10000), bundle_prefix='N',
+                    chunker='schedule')
+    _compile_in_publish_order(g, p, tmp_path)
+
+
+def _compile_in_publish_order(g, plan, tmp_path):
     out = str(tmp_path / 'out')
     C.generate(g, plan, out)
     olean = str(tmp_path / 'olean')
@@ -549,3 +563,54 @@ def test_schedule_chunker_keeps_silent_simp_lemmas_visible(g):
         return seen
     b = where['CD.sizedZero']
     assert where['CD.Space.size_eq'] == b or where['CD.Space.size_eq'] in closure(b)
+
+
+def test_scoped_notation_scope_is_read_from_both_forms():
+    # Mathlib `scoped[X] cmd` names X from the root; core `scoped notation` uses the current namespace
+    assert C.scoped_scope('scoped[Indicator] notation3 "𝟭_[" s "]" => s', 'OAI', 'scopedNS') == 'Indicator'
+    assert C.scoped_scope("scoped[Combinatorics.Additive'] notation3:max \"E[\" s \"]\" => s",
+                          'OAI.Finset', 'scopedNS') == "Combinatorics.Additive'"
+    assert C.scoped_scope('scoped notation "⟪" x "⟫" => f x', 'CDScope', 'notation') == 'CDScope'
+    assert C.scoped_scope('/-- doc -/ scoped infixl:71 " ○ " => f', 'A.B', 'mixfix') == 'A.B'
+    assert C.scoped_scope('local notation "AUX" => auxOnly', 'CD.Aux', 'notation') is None
+    assert C.scoped_scope('notation "AUX" => auxOnly', 'CD.Aux', 'notation') is None
+
+
+def _scoped_key(g):
+    ks = [k for k, nd in g.nodes.items() if nd.kind == 'notation']
+    assert len(ks) == 1, ks
+    return ks[0]
+
+
+def test_a_scoped_notation_is_a_node_its_openers_depend_on(g):
+    # a scoped notation lives in exactly one bundle, and whatever opens its scope must see that
+    # bundle: `open scoped X` fails with "unknown namespace" otherwise (Erdős 3 v2, 2026-10-16)
+    k = _scoped_key(g)
+    nd = g.nodes[k]
+    assert nd.module == 'CarveDev.Base' and not nd.theorem and nd.names == []
+    assert 'CD.double' in nd.deps
+    assert k in g.nodes['CD.viaScoped'].deps
+    assert k not in g.nodes['CD.sizedZero'].deps          # same module, not in the scope
+
+
+def test_a_scoped_notation_is_emitted_in_exactly_one_bundle(g, tmp_path):
+    p = C.make_plan(g, ['CD.uses_scoped'], budget=0.05, piece_size=10**6, bundle_budget=0.0001,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='N', chunker='schedule')
+    k = _scoped_key(g)
+    where = {n: b['name'] for b in p['bundles'] for n in b['nodes']}
+    assert k in where and 'CD.viaScoped' in where
+    C.generate(g, p, str(tmp_path), what=('bundles',))
+    carriers = [f.name for f in (tmp_path / 'lib').iterdir() if '"⟪"' in f.read_text()]
+    assert carriers == ['Def_%s.lean' % where[k]]
+    imps = {b['name']: set(b['imports']) for b in p['bundles']}
+
+    def closure(n, seen=None):
+        seen = set() if seen is None else seen
+        for i in imps[n]:
+            if i not in seen:
+                seen.add(i)
+                closure(i, seen)
+        return seen
+    b = where['CD.viaScoped']
+    assert where[k] == b or where[k] in closure(b)

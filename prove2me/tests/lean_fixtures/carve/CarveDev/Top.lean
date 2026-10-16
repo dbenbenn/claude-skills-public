@@ -24,4 +24,6 @@ theorem uses_sorry : usesSorried = 0 := rfl
 
 theorem uses_sized (B : Space) : (sizedZero B).val = 0 := rfl
 
+theorem uses_scoped : viaScoped 1 = 2 := rfl
+
 end CD

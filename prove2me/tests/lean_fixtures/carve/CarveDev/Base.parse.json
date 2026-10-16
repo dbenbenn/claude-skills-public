@@ -1322,9 +1322,204 @@
     }
    ],
    "end": {
-    "byte": 967,
-    "col": 10,
-    "line": 46
+    "byte": 1181,
+    "col": 17,
+    "line": 50
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1181,
+     "name": "CDScope",
+     "role": "scope",
+     "start": 1174
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 1164,
+    "col": 0,
+    "line": 50
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 21
+    }
+   ],
+   "end": {
+    "byte": 1226,
+    "col": 40,
+    "line": 51
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1205,
+     "name": "x",
+     "role": "ref",
+     "start": 1204
+    },
+    {
+     "end": 1224,
+     "name": "CD.double",
+     "role": "ref",
+     "start": 1215
+    },
+    {
+     "end": 1226,
+     "name": "x",
+     "role": "ref",
+     "start": 1225
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.notation",
+   "names": [],
+   "namespace": "CDScope",
+   "opens": [],
+   "start": {
+    "byte": 1182,
+    "col": 0,
+    "line": 51
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 21
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "doc": {
+    "end": 1318,
+    "start": 1227
+   },
+   "end": {
+    "byte": 1340,
+    "col": 21,
+    "line": 53
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1329,
+     "name": "anchor",
+     "role": "decl",
+     "start": 1323
+    },
+    {
+     "end": 1335,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1332
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1329,
+      "col": 10,
+      "line": 53
+     },
+     "start": {
+      "byte": 1323,
+      "col": 4,
+      "line": 53
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CDScope.anchor"
+   ],
+   "namespace": "CDScope",
+   "opens": [],
+   "start": {
+    "byte": 1227,
+    "col": 0,
+    "line": 52
+   },
+   "value_start": {
+    "byte": 1336,
+    "col": 17,
+    "line": 53
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 21
+    }
+   ],
+   "end": {
+    "byte": 1352,
+    "col": 11,
+    "line": 54
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1352,
+     "name": "CDScope",
+     "role": "scope",
+     "start": 1345
+    }
+   ],
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "CDScope",
+   "opens": [],
+   "start": {
+    "byte": 1341,
+    "col": 0,
+    "line": 54
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 1353,
+    "col": 0,
+    "line": 55
    },
    "heads": [],
    "idents": [],
@@ -1334,9 +1529,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 967,
-    "col": 10,
-    "line": 46
+    "byte": 1353,
+    "col": 0,
+    "line": 55
    }
   }
  ],
@@ -1356,6 +1551,20 @@
     "line": 40
    },
    "text": "Unknown identifier `auxOnly` at quotation precheck\n\nNote: You can use `set_option quotPrecheck false` to disable this check."
+  },
+  {
+   "end": {
+    "byte": 1224,
+    "col": 38,
+    "line": 51
+   },
+   "severity": "error",
+   "start": {
+    "byte": 1215,
+    "col": 29,
+    "line": 51
+   },
+   "text": "Unknown identifier `CD.double` at quotation precheck\n\nNote: You can use `set_option quotPrecheck false` to disable this check."
   }
  ],
  "mode": "parse"

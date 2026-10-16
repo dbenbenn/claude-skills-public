@@ -222,6 +222,21 @@ def _is_decl_command(c):
         (bool(c.names) and c.short_kind not in NOTATION | REFUSED)
 
 
+SCOPED_NS = re.compile(r'\s*(?:/--.*?-/\s*)?scoped\[\s*(?:_root_\.)?([^\]\s]+)\s*\]', re.S)
+SCOPED_CORE = re.compile(r'\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?scoped\s', re.S)
+
+
+def scoped_scope(text, namespace, short_kind):
+    """The namespace a scoped notation lives in, or None for any other command: Mathlib's
+    `scoped[X] cmd` names X from the root, core `scoped notation` uses the current namespace."""
+    if short_kind == 'scopedNS':
+        m = SCOPED_NS.match(text)
+        return m.group(1) if m else None
+    if short_kind in NOTATION and SCOPED_CORE.match(text):
+        return namespace
+    return None
+
+
 def _is_local(text):
     """A `local`/`scoped` notation, or an `attribute [local …]`: it lasts to the end of its scope."""
     return bool(re.match(r'\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?(?:local|scoped)\b', text, re.S)) or \
@@ -411,6 +426,21 @@ class Graph:
                     self.nodes[self.owner[p]].names.append(n)
                     self.nodes[self.owner[p]].sorry |= x['s']
                     break
+        # a scoped notation is a node of its own: it must sit in exactly one bundle, which every
+        # file opening its scope imports (Erdős 3 v2, 2026-10-16: "unknown namespace `Indicator`")
+        self.scoped = {}                                 # pseudo-node key -> scope namespace
+        for m, info in self.infos.items():
+            for c in info.commands:
+                x = scoped_scope(leanedit.text(info, c.index), c.namespace, c.short_kind)
+                if x is None:
+                    continue
+                key = '«notation»:%s:%d' % (m, c.index)
+                a, b = info.command_span(c.index)
+                self.nodes[key] = Node(key, m, c.index, [], 'notation', False, False, False, [],
+                                       b - a, False)
+                self.cmd_node[(m, c.index)] = key
+                self.scoped[key] = x
+        self._scoped_cmds = {(self.nodes[k].module, self.nodes[k].cmd) for k in self.scoped}
         self.by_module = collections.defaultdict(list)
         for k, nd in self.nodes.items():
             self.by_module[nd.module].append(k)
@@ -439,6 +469,9 @@ class Graph:
                     full = join(c.namespace, tok)
                     for p in ns_prefixes(full + '.x'):
                         nsmods[p] |= bit
+        for k, x in self.scoped.items():
+            for p in ns_prefixes(x + '.x'):
+                nsmods[p] |= 1 << self.mod_index[self.nodes[k].module]
         self.ns_mask = dict(nsmods)
         self.proj_ns = set(nsmods)
 
@@ -563,6 +596,9 @@ class Graph:
         for k, nd in self.nodes.items():
             info = self.infos[nd.module]
             c = info.commands[nd.cmd]
+            if k in self.scoped:
+                nd.sdeps = nd.sig = self._source_refs(info, c, nd.module, k)
+                continue
             declared = set(c.names)
             for n in nd.names:
                 x = self.consts[n]
@@ -579,7 +615,7 @@ class Graph:
                 if c.short_kind == 'attribute':
                     for o in self._source_refs(info, c, m, None):
                         self.nodes[o].attributed = True
-                elif c.short_kind in NOTATION:
+                elif c.short_kind in NOTATION and (m, c.index) not in self._scoped_cmds:
                     inner = c.context[-1][0] if c.context else None
                     notations.append((inner, self._source_refs(info, c, m, None)))
                 key = self.cmd_node.get((m, c.index))
@@ -590,6 +626,77 @@ class Graph:
                             self.nodes[key].ndeps |= refs - {key}
         for k, nd in self.nodes.items():
             nd.deps = nd.term | nd.sdeps | nd.ndeps
+        self._build_scoped_deps()
+
+    def _scope_targets(self, tok, ns):
+        """The namespaces `open tok`, written in namespace ns, may name (no existence check: a
+        scope holding only notations has no constants)."""
+        if tok.startswith('_root_.'):
+            return {tok[len('_root_.'):]}
+        return {join(p, tok) for p in prefixes(ns)}
+
+    def _build_scoped_deps(self):
+        """Every node that opens a scoped notation's scope (an `open` in its scopes or block, an
+        `open … in` head, being inside the namespace, or following a core `scoped notation` in its
+        block) and can see its module depends on it, statement included: the carved file repeats
+        the `open`, which fails without the notation's bundle."""
+        if not self.scoped:
+            return
+        by_scope = collections.defaultdict(list)
+        for s, x in self.scoped.items():
+            by_scope[x].append(s)
+
+        def reach(a):
+            seen, todo = set(), [a]
+            while todo:
+                for d in self.nodes[todo.pop()].deps:
+                    if d not in seen and d in self.nodes:
+                        seen.add(d)
+                        todo.append(d)
+            return seen
+        reaches = {s: reach(s) for s in self.scoped}
+
+        def sees(k, s):
+            a, b = self.nodes[k], self.nodes[s]
+            return a.cmd > b.cmd if a.module == b.module else self.sees(a.module, b.module)
+        for m, info in self.infos.items():
+            keys = [k for k in self.by_module.get(m, []) if k not in self.scoped]
+            if not keys:
+                continue
+            blocks = collections.defaultdict(set)        # opener -> scopes opened somewhere in it
+            for c in info.commands:
+                if c.short_kind != 'open':
+                    continue
+                inner = c.context[-1][0] if c.context else None
+                for idn in c.idents or []:
+                    if idn['role'] == 'open':
+                        blocks[inner] |= self._scope_targets(idn['name'], c.namespace) & set(by_scope)
+            for k in keys:
+                nd = self.nodes[k]
+                c = info.commands[nd.cmd]
+                want = set()
+                for o, _ in c.context:
+                    want |= blocks.get(o, set())
+                want |= blocks.get(None, set())
+                for h in c.heads or []:
+                    if _head_kind(h) == 'open':
+                        for idn in c.idents or []:
+                            if idn['role'] == 'open' and h['start'] <= idn['start'] < h['end']:
+                                want |= self._scope_targets(idn['name'], c.namespace) & set(by_scope)
+                want |= {x for x in by_scope if c.namespace == x or c.namespace.startswith(x + '.')}
+                got = {s for x in want for s in by_scope[x]}
+                openers = {o for o, _ in c.context}
+                for s in self.scoped:
+                    sn = self.nodes[s]
+                    sc = self.infos[sn.module].commands[sn.cmd]
+                    if sn.module == m and sc.short_kind != 'scopedNS' and sc.context and \
+                            sc.context[-1][0] in openers:
+                        got.add(s)
+                got = {s for s in got if sees(k, s) and k not in reaches[s]}
+                if got:
+                    nd.ndeps |= got
+                    nd.sig |= got
+                    nd.deps |= got
 
     # ---------------------------------------------------------- queries
     def closure(self, roots, stop=()):
@@ -628,7 +735,9 @@ class Graph:
 
     def have_names(self, keys):
         """The public names a set of nodes declares (what a file keeping or importing them has)."""
-        return {pubname(n) for k in keys for n in self.nodes[k].names}
+        out = {pubname(n) for k in keys for n in self.nodes[k].names}
+        # a scoped notation's scope exists where the notation does (`open scoped X` needs it)
+        return out | {self.scoped[k] + '.«notation»' for k in keys if k in self.scoped}
 
 
 def collision_renames(g):
@@ -1239,8 +1348,8 @@ class Carver:
             alive.update(ns_prefixes(p))
         by_mod = collections.defaultdict(set)
         for k in keep:
-            for n in g.nodes[k].names:
-                by_mod[g.nodes[k].module].update(ns_prefixes(pubname(n)))
+            for n in g.have_names([k]):
+                by_mod[g.nodes[k].module].update(ns_prefixes(n))
         out = []
         for m in mods:
             info = g.infos[m]
@@ -1270,6 +1379,8 @@ class Carver:
                 drop.add(c.index)
             elif c.short_kind in DIAGNOSTIC or c.decl_kind == 'example':
                 drop.add(c.index)
+            elif (m, c.index) in g._scoped_cmds and c.index not in kept:
+                drop.add(c.index)                        # it lives in its own node's file only
         # notations and attributes that name gone declarations
         keep_global = set()
         for c in info.commands:

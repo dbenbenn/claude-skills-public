@@ -52,4 +52,9 @@ theorem double_succ : double (n + 1) = double n + 2 := by
 term (the schedule chunker must still put that lemma where this definition's bundle sees it). -/
 def sizedZero (B : Space) : {n : Nat // n = B.size} := ⟨0, by simp⟩
 
+section
+open scoped CDScope
+def viaScoped (n : Nat) : Nat := ⟪n⟫
+end
+
 end CD

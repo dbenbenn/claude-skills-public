@@ -16,12 +16,15 @@
 {"i":false,"k":"def","m":"CarveDev.Base","n":"CD.pick","p":false,"r":[7,0,8,38],"s":false,"t":[],"u":["u"],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"CD.unusedDef","p":false,"r":[23,0,23,24],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"CD.usesSorried","p":false,"r":[30,0,30,62],"s":false,"t":[],"u":[],"v":["CD.double","CD.sorried"]}
+{"i":false,"k":"def","m":"CarveDev.Base","n":"CDScope.anchor","p":false,"r":[52,0,53,21],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.Base","n":"CDScope.«term⟪_⟫»","p":false,"r":[51,0,51,40],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"_private.CarveDev.Base.0.CD.Aux._aux_CarveDev_Base___macroRules__private_CarveDev_Base_0_CD_Aux_termAUX_1","p":false,"r":[40,0,40,31],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"_private.CarveDev.Base.0.CD.Aux._aux_CarveDev_Base___unexpand_CD_Aux_auxOnly_1","p":false,"r":[40,0,40,31],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"_private.CarveDev.Base.0.CD.Aux.termAUX","p":false,"r":[40,0,40,31],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.Space.coord","p":false,"r":[9,0,10,39],"s":false,"t":["CD.Space"],"u":[],"v":["CD.Space"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.quad","p":false,"r":[20,0,21,45],"s":false,"t":[],"u":[],"v":["CD.double"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.sizedZero","p":false,"r":[51,0,53,67],"s":false,"t":["CD.Space","CD.Space.size"],"u":[],"v":["CD.Space","CD.Space.size"]}
+{"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.viaScoped","p":false,"r":[57,0,57,36],"s":false,"t":[],"u":[],"v":["CD.double"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD._aux_CarveDev_Mid___macroRules__private_CarveDev_Mid_0_CD_termDE_1","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD._aux_CarveDev_Mid___unexpand_CD_double_eq_1","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.termDE","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
@@ -47,6 +50,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.main","p":true,"r":[14,0,18,53],"s":false,"t":["CD.Space","CD.double","CD.List.headOr","CD.Space.size"],"u":[],"v":["CD.Space","CD.double","CD.double_succ","CD.quad","CD.size_via_coord","CD.size_zero","_private.CarveDev.Top.0.CD.helper","CD.List.headOr","CD.List.headOr_nil","CD.Space.coord","CD.Space.size"]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.top_aux","p":true,"r":[21,0,21,39],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.aux_eq"]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.top_pick","p":true,"r":[8,0,8,85],"s":false,"t":["CD.pick"],"u":["u"],"v":["CD.pick","CD.pick_eq"]}
+{"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.uses_scoped","p":true,"r":[27,0,27,44],"s":false,"t":["CD.viaScoped"],"u":[],"v":["CD.viaScoped"]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.uses_sized","p":true,"r":[25,0,25,61],"s":false,"t":["CD.Space","CD.sizedZero","CD.Space.size"],"u":[],"v":["CD.Space","CD.sizedZero","CD.Space.size"]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.uses_sorry","p":true,"r":[23,0,23,43],"s":false,"t":["CD.usesSorried"],"u":[],"v":["CD.usesSorried"]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"_private.CarveDev.Top.0.CD.helper","p":true,"r":[12,0,12,37],"s":false,"t":[],"u":[],"v":[]}
