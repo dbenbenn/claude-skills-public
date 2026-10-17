@@ -164,6 +164,7 @@ def test_own_timeouts_end_in_split_and_block_dependents(split):
     assert ('thm', 'A.mid_s2') not in api.posted
     assert st['piece:A.low']['state'] == 'live'                # independent work went ahead
     assert 'bundle:XB001' in summary['stopped']
+    assert 'NEEDS A PERSON: own compile timeout' in (d / 'PROGRESS.log').read_text()
 
 
 def test_a_wrong_answer_stops_for_a_person(split):

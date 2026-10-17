@@ -132,7 +132,13 @@ class Runner:
         else:
             st['state'] = 'todo' if dec == 'retry' else dec
             st['last'] = (rec.get('error_message') or rec.get('error') or '')[:500]
-            self.log(item, action, '%s %s  -> %s' % (rec.get('status'), st['last'][:200], dec))
+            # nothing is ever split here: a terminal state waits for a person (v1's automatic
+            # splitter re-split items for days)
+            why = {'split': 'NEEDS A PERSON: own compile timeout %d times; consider splitting' % (
+                       st['history'].get('own_timeout', 0)),
+                   'stop': 'NEEDS A PERSON: %s' % kind, 'give_up': 'NEEDS A PERSON: transient cap reached',
+                   'raise_heartbeats': 'NEEDS A PERSON: heartbeat timeout'}.get(dec, dec)
+            self.log(item, action, '%s %s  -> %s' % (rec.get('status'), st['last'][:200], why))
         self.save()
 
     def poll(self):
