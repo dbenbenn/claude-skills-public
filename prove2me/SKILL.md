@@ -1252,6 +1252,8 @@ size first from the record: a 102KB solution had been accepted, so a 70KB one is
 
 **Two publish timeouts, two remedies.** "FAILED: Compilation timed out after 300s" means the item itself is too slow: split it, with pieces of about 60–70 s or less single-threaded locally (a 102 s Erdős 3 bundle failed three times, and its 69 s and 33 s halves passed). "ERROR: Internal error while publishing: Module compilation timed out" means the server is building imported bundles on a cold worker. It grows more frequent the deeper the item sits in a bundle chain, but every one so far has eventually passed on an unchanged retry (Erdős 3, 2026-10-08), so retry it and never split it.
 
+**A heartbeat timeout the local build never shows: replace the `rfl`, do not raise the limit.** Erdős 3 v2 bundle B122 (2026-10-17) failed on the verifier with "(deterministic) timeout at `whnf`, maximum number of heartbeats (200000)" and again at `set_option maxHeartbeats 400000`, on a one-line `rfl` proof that locally passes under 5,000 heartbeats, with every imported bundle on the platform byte-identical to the local files. Reproving it without the deep unfolding (extensionality on the structure, then the definitions' own `@[simp]` coordinate lemmas, then a small `rfl`) published at once. So for a verifier-only heartbeat timeout, rewrite the proof to avoid the reduction; raising `maxHeartbeats` is not a reliable remedy there.
+
 **Proof submissions time out the same way.** A solution's verify can return `ERROR` with "Verification
 timed out after 300s". Measure the solution file single-threaded (`lake env lean -j1 FILE`; the default
 parallel wall time hides the cost): Artin's (10.10) solution took 81 s single-threaded (17 s wall) and
