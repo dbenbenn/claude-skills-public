@@ -44,6 +44,11 @@ class Runner:
         self.items = [x for w in order['waves'] for x in w]
         self.state = json.load(open(cfg['state'])) if os.path.exists(cfg['state']) else {}
         self.blocked = {}
+        # `kinds`: only these item kinds are sent (say ['bundle'] for a first wave); `max_items`:
+        # stop sending new items after this many in one run (in-flight ones are still followed)
+        self.kinds = set(cfg.get('kinds') or ('bundle', 'statement', 'piece'))
+        self.max_items = cfg.get('max_items')
+        self.sent = 0
 
     # ------------------------------------------------------------------ items and their files
     def info(self, item):
@@ -104,7 +109,8 @@ class Runner:
         out = []
         for x in self.items:
             s = self.state.get(x, {}).get('state', 'todo')
-            if s != 'todo' or not all(self.live(d) for d in self.deps[x]):
+            if s != 'todo' or x.split(':', 1)[0] not in self.kinds or \
+                    not all(self.live(d) for d in self.deps[x]):
                 continue
             why = self.check(x)
             if why:
@@ -161,7 +167,10 @@ class Runner:
 
     def submit(self, items):
         room = self.cfg.get('jobs', 8) - self.inflight()
+        if self.max_items is not None:
+            room = min(room, self.max_items - self.sent)
         items = items[:max(room, 0)]
+        self.sent += len(items)
         stmts = []
         for x in items:
             try:

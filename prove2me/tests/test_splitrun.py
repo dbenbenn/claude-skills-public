@@ -238,3 +238,14 @@ def test_command_line_is_a_dry_run_without_go(split, capsys):
     out = capsys.readouterr().out
     assert 'DRY RUN' in out and 'bundle:XB000' in out
     assert not (d / 'run_state.json').exists()
+
+
+def test_kinds_and_max_items_limit_a_run(split):
+    d, cfg = split
+    api = FakeApi()
+    r, summary = run(dict(cfg, kinds=['bundle'], max_items=1), api)
+    assert api.posted == [('def', 'XB000')]                   # one bundle, then stop sending
+    api2 = FakeApi(published=dict(api.published))
+    run(dict(cfg, kinds=['bundle']), api2)
+    assert [p for p in api2.posted if p[0] != 'def'] == []    # only bundles
+    assert ('def', 'XB001') in api2.posted
