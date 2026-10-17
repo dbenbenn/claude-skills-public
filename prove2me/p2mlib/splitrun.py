@@ -117,7 +117,10 @@ class Runner:
                 self.blocked[x] = why
             else:
                 out.append(x)
-        return out
+        # bundles first: their chain is the critical path, so they never wait for a slot behind
+        # statements or pieces
+        rank = {'bundle': 0, 'statement': 1, 'piece': 2}
+        return sorted(out, key=lambda x: rank[x.split(':', 1)[0]])
 
     def reset(self, item):
         self.state.pop(item, None)

@@ -249,3 +249,13 @@ def test_kinds_and_max_items_limit_a_run(split):
     run(dict(cfg, kinds=['bundle']), api2)
     assert [p for p in api2.posted if p[0] != 'def'] == []    # only bundles
     assert ('def', 'XB001') in api2.posted
+
+
+def test_bundles_go_before_statements_and_pieces(split):
+    # the bundle chain is the critical path: a ready bundle never waits behind statements or pieces
+    d, cfg = split
+    api = FakeApi()
+    r = R.Runner(dict(cfg, jobs=1), api, sleep=lambda s: None)
+    r.step()                                                  # XB000
+    r.step()                                                  # XB000 live; XB001 and A.low_s2 ready
+    assert api.posted[-1] == ('def', 'XB001')
