@@ -1644,8 +1644,13 @@ class Carver:
                                    toks, self._pin_edits(info, c, m, have, opens, c.end.byte, set()))
                 if r is None:
                     drop.add(c.index)
-                elif r is not False:
-                    reps[c.index] = r
+                    continue
+                # local instances its binders may need come back before it, not only before the
+                # next declaration (Erdős 3 v2: `variable (hread : … W.cover …)` after
+                # `local instance … : NeZero W.cover`; cut by the repair, the statement lost it)
+                pre = self._reactivate(info, c, m, drop, reactivated, inst_names, have)
+                if r is not False or pre:
+                    reps[c.index] = pre + (r if r is not False else leanedit.text(info, c.index))
                 continue
             if k in ('include', 'omit'):
                 ids = [i for i in c.idents or [] if i['role'] in ('ref', 'binder')]

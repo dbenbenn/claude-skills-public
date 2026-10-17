@@ -86,7 +86,9 @@ def _is_context(cmd):
     return bool(CONTEXT.match(cmd)) and not cmd.startswith('scoped[')
 
 
-def repair(text, output):
+def repair(text, output, statement=False):
+    """statement: the file states a theorem to publish; an `include`/`omit` decides its hypotheses,
+    so it is never cut (the proof's type check is what judges any other cut)."""
     errs = _errors(output)
     if not errs:
         return None
@@ -95,6 +97,8 @@ def repair(text, output):
     for ln, col in errs:
         hit = next((c for c in cmds if c[0] <= ln <= c[1]), None)
         if hit is None or not _is_context(hit[2]):
+            return None
+        if statement and re.match(r'(?:include|omit)\b', hit[2]):
             return None
         a, _, cmd = hit
         if cmd.startswith('variable'):

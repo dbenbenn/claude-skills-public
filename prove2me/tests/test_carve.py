@@ -764,3 +764,11 @@ def test_split_bundles_cuts_only_the_slow_ones_and_keeps_the_rest(g):
     assert C.check_plan(g, q) == []
     pos = {b['name']: i for i, b in enumerate(q['bundles'])}
     assert all(pos[i] < pos[b['name']] for b in q['bundles'] for i in b['imports'])
+
+
+def test_a_local_instance_comes_back_before_a_variable_that_needs_it(g):
+    out = C.Carver(g).carve({'CD.uses_hdef'}, g.have_names({'CD.uses_hdef', 'CD.Wide'}),
+                            sorry={'CD.uses_hdef'})
+    i = out.find('local instance cdLocalInst_r')
+    j = out.find('variable (hdef')
+    assert i >= 0 and j >= 0 and i < j, out

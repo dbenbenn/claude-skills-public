@@ -113,3 +113,11 @@ def test_a_local_instance_that_does_not_elaborate_is_context():
     new, cut = R.repair(f, ['Def_X.lean:3:39: error(lean.unknownIdentifier): Unknown identifier `N`'])
     assert cut == ['local instance modNeZero_r1_1 : NeZero N :=\n  ⟨by simp⟩']
     assert 'local instance' not in new and 'def keep' in new
+
+
+def test_a_statement_never_loses_an_include():
+    # in a statement file `include h in` decides the statement's hypotheses: cutting it changes the
+    # statement (Erdős 3 v2: five statements lost hypotheses this way; their proofs then failed)
+    f = 'variable (h : 1 = 1)\n\ninclude h in\ntheorem t : True := trivial\n'
+    assert R.repair(f, ['Def_X.lean:3:8: error: unknown'], statement=True) is None
+    assert R.repair(f, ['Def_X.lean:3:8: error: unknown'])[1] == ['include h in']
