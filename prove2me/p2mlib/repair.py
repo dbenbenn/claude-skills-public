@@ -26,6 +26,41 @@ def error_lines(output):
     return [int(m.group(1)) for m in ERROR.finditer(output)]
 
 
+def _errors(output):
+    """[(line, column)] of the errors (Lean columns count code points, as Python strings do)."""
+    if isinstance(output, str):
+        return [(int(m.group(1)), int(m.group(2))) for m in ERROR.finditer(output)]
+    return [(int(m.group(1)), int(m.group(2))) for o in output for m in [ERROR.match(o)] if m]
+
+
+OPEN, CLOSE = '([{⦃', ')]}⦄'
+
+
+def _groups(cmd):
+    """[(start, end)] of the top-level binder groups of a `variable` command's text."""
+    out, depth, start = [], 0, None
+    for i, ch in enumerate(cmd):
+        if ch in OPEN:
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch in CLOSE and depth:
+            depth -= 1
+            if depth == 0:
+                out.append((start, i + 1))
+    return out
+
+
+def _without(cmd, a, b):
+    """cmd without cmd[a:b] and the blanks it leaves (a line left empty goes)."""
+    left, right = cmd[:a].rstrip(' '), cmd[b:].lstrip(' ')
+    if left.endswith('\n') and (right.startswith('\n') or not right):
+        left = left[:-1]
+    elif not left.endswith('\n') and not right.startswith('\n') and right:
+        left += ' '
+    return left + right
+
+
 def _commands(text):
     """[(first line, last line, text)] of the top-level commands: a command starts at column 0 and
     runs until the next line that starts one (blank lines end it too)."""
@@ -51,29 +86,53 @@ def _is_context(cmd):
 
 
 def repair(text, output):
-    lines = error_lines(output) if isinstance(output, str) else \
-        [int(m.group(1)) for o in output for m in [ERROR.match(o)] if m]
-    if not lines:
+    errs = _errors(output)
+    if not errs:
         return None
     cmds = _commands(text)
-    cut = []
-    for ln in lines:
+    whole, parts = [], []                 # whole commands; (command text, group text) to cut
+    for ln, col in errs:
         hit = next((c for c in cmds if c[0] <= ln <= c[1]), None)
         if hit is None or not _is_context(hit[2]):
             return None
-        if hit[2] not in cut:
-            cut.append(hit[2])
+        a, _, cmd = hit
+        if cmd.startswith('variable'):
+            lines = cmd.split('\n')
+            off = sum(len(l) + 1 for l in lines[:ln - a]) + col
+            gs = _groups(cmd)
+            g = next(((x, y) for x, y in gs if x <= off < y), None)
+            if g and len(gs) > 1:
+                if (cmd, cmd[g[0]:g[1]]) not in parts:
+                    parts.append((cmd, cmd[g[0]:g[1]]))
+                continue
+        if cmd not in whole:
+            whole.append(cmd)
+    cut = list(whole) + [grp for cmd, grp in parts if cmd not in whole]
     new, applied, _ = apply_cuts(text, cut)
     return new, applied
 
 
 def apply_cuts(text, cuts):
+    """Re-apply recorded cuts: a whole command where its exact text stands as a command, a binder
+    group (text starting with a bracket) where it stands as a group of a `variable` command."""
     applied, stale = [], []
     for c in cuts:
         pat = re.compile(r'(^|\n)' + re.escape(c) + r'\n(\n?)')
         if pat.search(text):
             text = pat.sub(lambda m: m.group(1), text, count=1)
             applied.append(c)
-        else:
-            stale.append(c)
+            continue
+        done = False
+        if c[:1] in OPEN:
+            for a, b, cmd in _commands(text):
+                if not cmd.startswith('variable'):
+                    continue
+                g = next(((x, y) for x, y in _groups(cmd) if cmd[x:y] == c), None)
+                if g:
+                    new_cmd = _without(cmd, *g)
+                    i = text.index(cmd)
+                    text = text[:i] + new_cmd + text[i + len(cmd):]
+                    done = True
+                    break
+        (applied if done else stale).append(c)
     return text, applied, stale

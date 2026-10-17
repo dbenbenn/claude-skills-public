@@ -41,10 +41,10 @@ def test_a_failing_local_notation_is_cut():
     assert 'def keep' in new and 'variable {m : ℕ}' in new
 
 
-def test_a_multiline_variable_is_cut_whole():
+def test_a_group_on_a_continuation_line_is_cut_alone():
     new, cut = R.repair(FILE, [err(7, 4)])                    # the continuation line
-    assert 'variable {m' not in new and '[∀ j, Fintype (J j)]' not in new
-    assert cut[0].startswith('variable {m : ℕ}') and cut[0].endswith('[∀ j, Fintype (J j)]')
+    assert cut == ['[∀ j, Fintype (J j)]']
+    assert 'variable {m : ℕ} (J : Fin m → Type*)\n\nlocal notation' in new
 
 
 def test_an_error_inside_a_declaration_is_not_repaired():
@@ -72,3 +72,34 @@ def test_recorded_cuts_reapply_only_where_their_text_still_is():
     assert applied == [cuts[0]] and stale == [cuts[1]]
     again, applied2, _ = R.apply_cuts(new, cuts)
     assert again == new and applied2 == []                    # idempotent
+
+
+VARS = """import Mathlib
+
+variable {D I J : Type*} [Fintype D]
+  (W : Submodule ℝ D) [∀ j, IsZLattice ℝ (latticeSection W)]
+  (o : OrthonormalBasis I ℝ W)
+
+def keep : ℕ := 1
+"""
+
+
+def test_only_the_failing_binder_group_of_a_variable_is_cut():
+    # the error column points into `[∀ j, IsZLattice …]` (Erdős 3 v2 B066): its neighbours stay
+    new, cut = R.repair(VARS, ['Def_X.lean:4:22: error: failed to synthesize instance'])
+    assert '[∀ j, IsZLattice ℝ (latticeSection W)]' not in new
+    assert '(W : Submodule ℝ D)' in new and '(o : OrthonormalBasis I ℝ W)' in new
+    assert '{D I J : Type*} [Fintype D]' in new
+    assert cut == ['[∀ j, IsZLattice ℝ (latticeSection W)]']
+
+
+def test_a_variable_whose_only_group_fails_goes_whole():
+    f = 'variable (out : P.Conclusion a b)\n\ndef keep : ℕ := 1\n'
+    new, cut = R.repair(f, ['Def_X.lean:1:16: error: unknown'])
+    assert new == 'def keep : ℕ := 1\n' and cut == ['variable (out : P.Conclusion a b)']
+
+
+def test_recorded_group_cuts_reapply():
+    cut = ['[∀ j, IsZLattice ℝ (latticeSection W)]']
+    new, applied, stale = R.apply_cuts(VARS, cut)
+    assert applied == cut and '(W : Submodule ℝ D)' in new and 'IsZLattice' not in new

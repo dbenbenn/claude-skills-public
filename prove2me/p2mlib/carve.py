@@ -1416,16 +1416,14 @@ class Carver:
         return ''.join(out)
 
     # ---------------------------------------------------------- what goes
-    def _gone(self, tok, c, m, have, opens, bound=(), field=False):
+    def _gone(self, tok, c, m, have, opens, bound=()):
         """Does identifier tok, read in command c's scope, name only gone project declarations?
-        `field`: tok follows a `.` (`(e a).Bounds`), a projection read by its short name (Erdős 3
-        v2 B065)."""
+        No guessing for fields of locals: a binder that does not elaborate is cut by
+        p2mlib.repair from Lean's own error (guessing dropped needed binders: Erdős 3 v2 B107,
+        B167, B248)."""
         if tok.split('.')[0] in bound:
             return False
         hits = self.g.resolve_lean(tok, c.namespace, opens, m)
-        if not hits and field:
-            hits = [n for n in self.g.short.get(tok, ()) if self.g.visible(n, m)]
-            hits = hits if len(hits) <= 2 else []
         return bool(hits) and all(pubname(h) not in have for h in hits)
 
     def _drops(self, m, kept, have):
@@ -1522,7 +1520,6 @@ class Carver:
                     if c.index in drop and c.short_kind in NOTATION}
         inst_names = getattr(g, 'instance_names', None) or {}
         reactivated = set()
-        mine = [kk for kk in getattr(self, 'keep', ()) if g.nodes[kk].module == m]
         for c in info.commands:
             if c.index in drop:
                 continue
@@ -1532,13 +1529,8 @@ class Carver:
             if k == 'variable':
                 toks = set().union(*[v for vi, v in dead_tok.items() if _in_scope(info, vi, c)]) \
                     if dead_tok else set()
-                used = set()
-                for kk in mine:
-                    if _in_scope(info, c.index, info.commands[g.nodes[kk].cmd]):
-                        used |= g.nodes[kk].term | g.nodes[kk].tdeps
                 r = self._variable(info, c, m, have, opens, dropped_vars, protect.get(c.index, set()),
-                                   toks, self._pin_edits(info, c, m, have, opens, c.end.byte, set()),
-                                   used)
+                                   toks, self._pin_edits(info, c, m, have, opens, c.end.byte, set()))
                 if r is None:
                     drop.add(c.index)
                 elif r is not False:
@@ -1654,13 +1646,9 @@ class Carver:
                     out.append(_cmd_text(info, vc, [(anon_at, anon_at, name)]).strip() + '\n')
         return ''.join(out)
 
-    def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=(), pins=None,
-                  used=None):
+    def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=(), pins=None):
         """The `variable` command without its gone binder groups: False (unchanged), None (none
-        left) or the new text. `used`: the project declarations the kept declarations in its scope
-        use, as compiled; a group naming project declarations none of which is among them was not
-        included in any of them, and goes (it may not even elaborate: Erdős 3 v2 B066, `variable
-        [∀ j, IsZLattice ℝ (latticeSection …)]` needing an instance nothing kept brought in)."""
+        left) or the new text."""
         groups = c.binders or []
         bound = {n for grp in groups for n in grp['names']}
         refs = [i for i in c.idents or [] if i['role'] == 'ref']
@@ -1671,25 +1659,12 @@ class Carver:
             for j, grp in enumerate(groups):
                 if j in bad or set(grp['names']) & protected:
                     continue
-                inside = [i for i in refs if grp['start'] <= i['start'] < grp['end']]
+                # a token right after `.` is a field (`(e a).Bounds`): never read as a name
+                inside = [i for i in refs if grp['start'] <= i['start'] < grp['end'] and
+                          info.text_bytes[i['start'] - 1:i['start']] != b'.']
                 gtxt = info.text_bytes[grp['start']:grp['end']].decode('utf-8')
-                if used is not None:
-                    # by name only: the short-name guess for a field of a local (`b.reindex`)
-                    # names an unrelated project declaration (Erdős 3 v2 B107: `(hF' : …
-                    # (b.reindex e) …)` dropped, a project declaration being called `reindex`)
-                    # and never a field (`(…).map` is LieSubalgebra.map, not the project's
-                    # VectorPolynomial.map: B167)
-                    names = {self.g.owner.get(h) for i in inside
-                             if info.text_bytes[i['start'] - 1:i['start']] != b'.'
-                             for h in self.g.lean_hits(i['name'], c.namespace, opens,
-                                                       lambda n: self.g.visible(n, m))[0]} - {None}
-                    if names and not names & used:
-                        bad.add(j)
-                        changed = True
-                        continue
                 if any(_uses_token(gtxt, tk) for tk in dead_tokens) or any(i['name'].split('.')[0] in lost - set(grp['names']) or
-                       self._gone(i['name'], c, m, have, opens, bound - lost,
-                                  field=info.text_bytes[i['start'] - 1:i['start']] == b'.') for i in inside):
+                       self._gone(i['name'], c, m, have, opens, bound - lost) for i in inside):
                     bad.add(j)
                     changed = True
         # a name bound again here is a new variable, not the dropped one

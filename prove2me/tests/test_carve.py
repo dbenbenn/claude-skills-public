@@ -679,17 +679,16 @@ def test_a_variable_with_nothing_kept_after_it_goes(g):
     assert 'Inhabited Wide' not in out
 
 
-def test_a_field_after_a_parenthesized_application_is_resolved(g):
+def test_binders_are_not_dropped_by_guessing(g):
+    # the carver no longer guesses from text whether a binder group is needed (a field read by its
+    # short name, B065; project names in it that no kept declaration uses, B066): both guesses
+    # dropped binders a declaration needed (B107, B167, B248). A group that does not elaborate is
+    # cut by p2mlib.repair from Lean's error instead
     out = C.Carver(g).carve({'CD.Space.paren_free'}, g.have_names({'CD.Space.paren_free', 'CD.Space'}),
                             sorry={'CD.Space.paren_free'})
-    assert '(F k).big' not in out
-
-
-def test_a_variable_group_no_kept_declaration_uses_goes(g):
-    have = g.have_names({'CD.unused_var_free', 'CD.double'})
-    out = C.Carver(g).carve({'CD.unused_var_free'}, have)
-    assert 'def unused_var_free' in out
-    assert '(hq :' not in out and '(hk :' not in out
+    assert '(F k).big' in out
+    out = C.Carver(g).carve({'CD.unused_var_free'}, g.have_names({'CD.unused_var_free', 'CD.double'}))
+    assert '(hq :' in out and '(hk :' in out
 
 
 def test_a_variable_group_a_kept_declaration_uses_stays(g):
