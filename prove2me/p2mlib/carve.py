@@ -1576,7 +1576,11 @@ class Carver:
             toks = _notation_tokens(txt)
             if not toks:
                 continue
-            used = any(c2.index not in drop and _in_scope(info, c.index, c2) and
+            # a local instance counts even when dropped: the file may re-emit it for a kept
+            # declaration in its scope (Erdős 3 v2: `local instance … : NeZero Ncrt` came back,
+            # `local notation "Ncrt"` had gone)
+            used = any((c2.index not in drop or _local_instance(info, c2)[0]) and
+                       _in_scope(info, c.index, c2) and
                        any(_uses_token(strip(info.slice(*info.command_span(c2.index))), tk) for tk in toks)
                        for c2 in info.commands[c.index + 1:])
             if not used:
@@ -1867,13 +1871,27 @@ class Carver:
         g, edits = self.g, []
         if not rename:
             return edits
+        # a field-style use (`D.localize`, `(…).f`) of a renamed declaration: its short name, when
+        # exactly one renamed declaration has it (Erdős 3 v2: pieces kept `D.localize` for the
+        # imported statement `localize_s2`, "Invalid field")
+        by_short = collections.defaultdict(list)
+        for n in rename:
+            by_short[pubname(n).rsplit('.', 1)[-1]].append(n)
+        t = info.text_bytes
         for i in c.idents or []:
             if i['role'] == 'decl':
                 full = i['name'][len('_root_.'):] if i['name'].startswith('_root_.') else \
                     join(c.namespace, i['name'])
                 hits = [n for n in g.pub.get(full, ()) if g.consts[n]['m'] == m and n in rename]
             elif i['role'] == 'ref':
-                hits = [n for n in g.resolve(i['name'], c.namespace, opens, m) if n in rename]
+                hits = [n for n in g.resolve(i['name'], decl_ns(c), opens, m) if n in rename]
+                if not hits:
+                    field = t[i['start'] - 1:i['start']] == b'.'
+                    head = i['name'].split('.')[0]
+                    dotted = '.' in i['name'] and not g.resolve_lean(head, decl_ns(c), opens, m)
+                    cand = by_short.get(i['name'].rsplit('.', 1)[-1], [])
+                    if (field or dotted) and len(cand) == 1:
+                        hits = cand
             else:
                 continue
             if hits:

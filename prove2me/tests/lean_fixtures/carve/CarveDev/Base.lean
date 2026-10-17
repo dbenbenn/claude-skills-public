@@ -78,6 +78,16 @@ include hdef in
 theorem uses_hdef : (default : Wide).w = 0 := hdef
 end
 
+section
+local notation "WD" => (⟨0⟩ : Wide)
+/- The notation is used only by the local instance, which a carved file re-emits: the notation must
+stay (Erdős 3 v2: `local instance … : NeZero Ncrt` re-emitted, `local notation "Ncrt"` dropped). -/
+local instance cdLocalInst2 : Inhabited Wide := ⟨WD⟩
+variable (hdef2 : (default : Wide).w = 0)
+include hdef2 in
+theorem uses_hdef2 : (default : Wide).w = 0 := hdef2
+end
+
 end CD
 
 namespace CD.Aux

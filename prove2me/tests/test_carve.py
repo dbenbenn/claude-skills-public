@@ -772,3 +772,16 @@ def test_a_local_instance_comes_back_before_a_variable_that_needs_it(g):
     i = out.find('local instance cdLocalInst_r')
     j = out.find('variable (hdef')
     assert i >= 0 and j >= 0 and i < j, out
+
+
+def test_dot_notation_uses_of_a_renamed_statement_are_renamed(g):
+    have = g.have_names({'CD.uses_dot_thm', 'CD.Space.coord_eq', 'CD.Space.coord', 'CD.Space'})
+    out = C.Carver(g).carve({'CD.uses_dot_thm'}, have, rename={'CD.Space.coord_eq': 'coord_eq_s2'})
+    assert 'A.coord_eq_s2' in out and '(id A).coord_eq_s2' in out, out
+
+
+def test_a_notation_used_by_a_re_emitted_local_instance_stays(g):
+    out = C.Carver(g).carve({'CD.uses_hdef2'}, g.have_names({'CD.uses_hdef2', 'CD.Wide'}),
+                            sorry={'CD.uses_hdef2'})
+    i, j = out.find('local notation "WD"'), out.find('local instance cdLocalInst2_r')
+    assert i >= 0 and j >= 0 and i < j, out

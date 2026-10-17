@@ -4316,18 +4316,145 @@
      "opener": 1
     }
    ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "doc": {
+    "end": 4503,
+    "start": 4261
+   },
    "end": {
-    "byte": 4267,
-    "col": 6,
-    "line": 126
+    "byte": 4603,
+    "col": 93,
+    "line": 129
    },
    "heads": [],
    "idents": [
     {
-     "end": 4267,
+     "end": 4524,
+     "name": "uses_dot_thm",
+     "role": "decl",
+     "start": 4512
+    },
+    {
+     "end": 4527,
+     "name": "A",
+     "role": "binder",
+     "start": 4526
+    },
+    {
+     "end": 4535,
+     "name": "Space",
+     "role": "ref",
+     "start": 4530
+    },
+    {
+     "end": 4546,
+     "name": "A.coord",
+     "role": "ref",
+     "start": 4539
+    },
+    {
+     "end": 4562,
+     "name": "A.coord",
+     "role": "ref",
+     "start": 4555
+    },
+    {
+     "end": 4583,
+     "name": "A.coord_eq",
+     "role": "ref",
+     "start": 4573
+    },
+    {
+     "end": 4586,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 4586
+    },
+    {
+     "end": 4588,
+     "name": "id",
+     "role": "ref",
+     "start": 4586
+    },
+    {
+     "end": 4590,
+     "name": "A",
+     "role": "ref",
+     "start": 4589
+    },
+    {
+     "end": 4600,
+     "name": "coord_eq",
+     "role": "ref",
+     "start": 4592
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 4524,
+      "col": 20,
+      "line": 129
+     },
+     "start": {
+      "byte": 4512,
+      "col": 8,
+      "line": 129
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.uses_dot_thm"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 4261,
+    "col": 0,
+    "line": 126
+   },
+   "value_start": {
+    "byte": 4567,
+    "col": 61,
+    "line": 129
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 4611,
+    "col": 6,
+    "line": 131
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 4611,
      "name": "CD",
      "role": "scope",
-     "start": 4265
+     "start": 4609
     }
    ],
    "ids": [],
@@ -4341,9 +4468,9 @@
     }
    ],
    "start": {
-    "byte": 4261,
+    "byte": 4605,
     "col": 0,
-    "line": 126
+    "line": 131
    }
   },
   {
@@ -4357,9 +4484,9 @@
     }
    ],
    "end": {
-    "byte": 4268,
+    "byte": 4612,
     "col": 0,
-    "line": 127
+    "line": 132
    },
    "heads": [],
    "idents": [],
@@ -4369,9 +4496,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 4268,
+    "byte": 4612,
     "col": 0,
-    "line": 127
+    "line": 132
    }
   }
  ],

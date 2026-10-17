@@ -123,4 +123,9 @@ trace in the term (Erdős 3 v2 B188: `simp only [tensorPower_eval]` in
 theorem Space.cd_unused_simp : True := by
   simp only [size_eq]
 
+/-- Uses a theorem by dot notation, as a name and after a parenthesis: a carved file renaming
+`Space.coord_eq` must rename both (Erdős 3 v2: `D.localize` and `(…).relativePatchSliceConclusion_…`
+kept their old names, "Invalid field"). -/
+theorem uses_dot_thm (A : Space) : A.coord = 0 ∧ A.coord = 0 := ⟨A.coord_eq, (id A).coord_eq⟩
+
 end CD
