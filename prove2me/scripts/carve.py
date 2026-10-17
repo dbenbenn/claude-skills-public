@@ -150,9 +150,10 @@ def main(argv):
         slow = [b['name'] for b in P['bundles']
                 if times.get(b['name'], {}).get('ok') and times[b['name']]['secs'] > limit]
         scale = cfg.get('time_scale', 1.5)
-        cost = C.calibrate_costs(costs(cfg, g), P['bundles'], times, scale,
-                                 cfg.get('import_overhead', 5.0))
-        Q = C.split_bundles(g, P, slow, cost, limit * scale, cfg.get('bundle_prefix'))
+        overhead = cfg.get('import_overhead', 5.0)
+        cost = C.calibrate_costs(costs(cfg, g), P['bundles'], times, scale, overhead)
+        # calibrated costs leave out the import overhead, so the budget does too
+        Q = C.split_bundles(g, P, slow, cost, (limit - overhead) * scale, cfg.get('bundle_prefix'))
         probs = C.check_plan(g, Q)
         if probs:
             sys.exit('split plan inconsistent:\n' + '\n'.join(probs[:20]))
