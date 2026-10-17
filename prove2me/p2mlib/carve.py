@@ -1225,6 +1225,117 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             'sorry': sorted(k for k in reach | B if g.nodes[k].sorry)}
 
 
+def split_bundles(g, plan, names, cost, budget, bundle_prefix=None):
+    """The plan with each bundle in `names` cut into balanced parts of cost at most about `budget`
+    (in dependency order, so a part rests only on earlier parts), and every other bundle kept as
+    it is: same declarations, same name; only import lists and the bundles statements and pieces
+    import are recomputed. The first part keeps the bundle's name, the others take new names.
+    A measured re-plan reshuffles every bundle; this touches only the slow ones (Erdős 3 v2,
+    2026-10-17: 11 of 298 bundles over 60 s local)."""
+    prefix = bundle_prefix or plan.get('bundle_prefix', 'Bundle')
+    B = {k for b in plan['bundles'] for k in b['nodes']}
+    extra = implicit_deps(g, B, B)
+    used = {b['name'] for b in plan['bundles']}
+    nxt = [0]
+
+    def fresh_name():
+        while bundle_name(prefix, nxt[0]) in used:
+            nxt[0] += 1
+        used.add(bundle_name(prefix, nxt[0]))
+        return bundle_name(prefix, nxt[0])
+    chunks, cnames = [], []
+    for b in plan['bundles']:
+        if b['name'] not in names:
+            chunks.append(list(b['nodes']))
+            cnames.append(b['name'])
+            continue
+        mine = list(b['nodes'])
+        inside = set(mine)
+        total = sum(cost.get(k, 0.0) for k in mine)
+        k = max(1, -(-int(total * 1000) // int(budget * 1000)))
+        if k == 1:
+            chunks.append(mine)
+            cnames.append(b['name'])
+            continue
+        target = total / k
+        # dependency order (stable): a declaration after everything of this bundle it needs
+        order, seen = [], set()
+
+        def visit(x):
+            if x in seen:
+                return
+            seen.add(x)
+            for d in sorted(g.nodes[x].deps | extra.get(x, set())):
+                if d in inside:
+                    visit(d)
+            order.append(x)
+        for x in mine:
+            visit(x)
+        parts, cur, cc = [], [], 0.0
+        for x in order:
+            c = cost.get(x, 0.0)
+            if cur and cc + c > target * 1.1 and len(parts) < k - 1:
+                parts.append(cur)
+                cur, cc = [], 0.0
+            cur.append(x)
+            cc += c
+        parts.append(cur)
+        for i, part in enumerate(parts):
+            chunks.append(part)
+            cnames.append(b['name'] if i == 0 else fresh_name())
+    bidx = {k: j for j, ch in enumerate(chunks) for k in ch}
+    bimp = [set() for _ in chunks]
+    for j, ch in enumerate(chunks):
+        for k in ch:
+            for d in g.nodes[k].deps | extra.get(k, set()):
+                if d in bidx and bidx[d] != j:
+                    bimp[j].add(bidx[d])
+    # a part may now be needed by a bundle listed before it: order the chunks topologically,
+    # keeping the plan's order wherever it is already valid
+    order, state = [], {}
+
+    def place(j):
+        if state.get(j) == 2:
+            return
+        if state.get(j) == 1:
+            raise CarveError('bundle split made an import cycle at %s' % cnames[j])
+        state[j] = 1
+        for i in sorted(bimp[j]):
+            place(i)
+        state[j] = 2
+        order.append(j)
+    for j in range(len(chunks)):
+        place(j)
+    remap = {j: i for i, j in enumerate(order)}
+    chunks = [chunks[j] for j in order]
+    cnames = [cnames[j] for j in order]
+    bimp = [{remap[i] for i in bimp[j]} for j in order]
+    bidx = {k: j for j, ch in enumerate(chunks) for k in ch}
+    red = [_reduce(bimp, bimp[j]) for j in range(len(chunks))]
+    old = {b['name']: b for b in plan['bundles']}
+    bundles = []
+    for j, ch in enumerate(chunks):
+        bundles.append({'name': cnames[j], 'nodes': ch, 'imports': [cnames[i] for i in sorted(red[j])],
+                        'cost': round(sum(cost.get(k, 0.0) for k in ch), 2),
+                        'size': sum(g.nodes[k].size for k in ch)})
+    out = dict(plan)
+    out['bundles'] = bundles
+
+    def need(keys):
+        ex = implicit_deps(g, keys, B)
+        return {bidx[d] for x in keys for d in g.nodes[x].deps | ex.get(x, set()) | {x} if d in bidx}
+    pieces = {}
+    for n, pc in plan['pieces'].items():
+        keep = set(pc['keep'])
+        pieces[n] = dict(pc, bundles=[cnames[i] for i in sorted(_reduce(bimp, need(keep - B)))])
+    stubs = {}
+    for n in plan['stubs']:
+        sb = {bidx[d] for d in g.nodes[n].sig if d in bidx}
+        stubs[n] = {'bundles': [cnames[i] for i in sorted(_reduce(bimp, sb))]}
+    out['pieces'], out['stubs'] = pieces, stubs
+    return out
+
+
 def _bundle_closure(bimp, ks):
     out, todo = set(), list(ks)
     while todo:

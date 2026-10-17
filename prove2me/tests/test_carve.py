@@ -397,6 +397,18 @@ def test_command_line_plan_gen_order(tmp_path):
     assert not (tmp_path / 'out' / 'lib' / 'Thm_CD_main.lean').exists()      # external
     waves = run('order', str(cfg))
     assert waves.startswith('wave 0') and 'statement:CD.main' not in waves
+    # split: only the bundle measured over the limit is cut, the old plan is kept as a backup
+    P = json.loads((work / 'plan.json').read_text())
+    big = max(P['bundles'], key=lambda b: len(b['nodes']))
+    times = {b['name']: {'secs': 99.0 if b is big else 1.0, 'ok': True} for b in P['bundles']}
+    (tmp_path / 'times.json').write_text(json.dumps(times))
+    assert len(big['nodes']) > 1
+    out = run('split', str(cfg), str(tmp_path / 'times.json'), '--limit', '60')
+    assert 'split %s' % big['name'] in out
+    Q = json.loads((work / 'plan.json').read_text())
+    assert len(Q['bundles']) > len(P['bundles'])
+    assert json.loads((work / 'plan.pre_split.json').read_text()) == P
+    assert 'plan OK' in run('check', str(cfg))
 
 
 def test_notation_tokens_and_their_uses():
@@ -728,3 +740,27 @@ def test_a_named_local_instance_not_imported_is_emitted_again_under_a_unique_nam
     m = re.search(r'^local instance (cdLocalInst_r\w+) : Inhabited Wide', out, re.M)
     assert m, out
     assert not re.search(r'^local instance cdLocalInst :', out, re.M)
+
+
+def test_split_bundles_cuts_only_the_slow_ones_and_keeps_the_rest(g):
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=10.0,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='S', chunker='schedule')
+    big = max(p['bundles'], key=lambda b: len(b['nodes']))
+    assert len(big['nodes']) >= 2
+    times = {b['name']: {'secs': 100.0 if b is big else 10.0, 'ok': True} for b in p['bundles']}
+    cost = C.calibrate_costs(C.size_costs(g, bytes_per_second=10000), p['bundles'], times,
+                             scale=1.5, overhead=5.0)
+    q = C.split_bundles(g, p, [big['name']], cost, budget=90.0, bundle_prefix='S')
+    old = {b['name']: b for b in p['bundles']}
+    new = {b['name']: b for b in q['bundles']}
+    for n, b in old.items():                       # the others: same declarations, same names
+        if n != big['name']:
+            assert new[n]['nodes'] == b['nodes']
+    parts = [b for b in q['bundles'] if b['name'] not in old or b['name'] == big['name']]
+    assert len(parts) >= 2 and big['name'] in new
+    assert sorted(k for b in parts for k in b['nodes']) == sorted(big['nodes'])
+    assert all(sum(cost[k] for k in b['nodes']) <= 90.0 * 1.15 for b in parts)
+    assert C.check_plan(g, q) == []
+    pos = {b['name']: i for i, b in enumerate(q['bundles'])}
+    assert all(pos[i] < pos[b['name']] for b in q['bundles'] for i in b['imports'])

@@ -6,6 +6,8 @@ usage: carve.py graph CONFIG.json                  # DeclGraph + LeanInfo of eve
        carve.py check CONFIG.json                  # re-check the plan against the graph
        carve.py gen   CONFIG.json [bundles|stubs|pieces|all] [NAME ...]
        carve.py order CONFIG.json                  # the publish DAG, as concurrent waves
+       carve.py split CONFIG.json TIMES.json [--limit 60]   # cut only the bundles measured over
+                                                   # LIMIT s local (-j1); the rest stay as they are
 
 Use it when a port's closure is far over prove2.me's 1 MiB cap or 300 s verifier (Erdős 3: 4136
 modules, 52 MB). It replaces the five per-mission carvers of 2026-10-07/08 (Kaplansky,
@@ -140,6 +142,29 @@ def main(argv):
                 print('LeanInfo %d/%d %s' % (i + 1, len(mods), futs[f]), flush=True)
         g = load_graph(cfg)
         print('%d modules, %d declaration nodes' % (len(g.modules), len(g.nodes)))
+    elif cmd == 'split':
+        g = load_graph(cfg)
+        P = json.load(open(plan_path(cfg)))
+        times = json.load(open(os.path.expanduser(rest[0])))
+        limit = float(rest[rest.index('--limit') + 1]) if '--limit' in rest else 60.0
+        slow = [b['name'] for b in P['bundles']
+                if times.get(b['name'], {}).get('ok') and times[b['name']]['secs'] > limit]
+        scale = cfg.get('time_scale', 1.5)
+        cost = C.calibrate_costs(costs(cfg, g), P['bundles'], times, scale,
+                                 cfg.get('import_overhead', 5.0))
+        Q = C.split_bundles(g, P, slow, cost, limit * scale, cfg.get('bundle_prefix'))
+        probs = C.check_plan(g, Q)
+        if probs:
+            sys.exit('split plan inconsistent:\n' + '\n'.join(probs[:20]))
+        backup = plan_path(cfg)[:-5] + '.pre_split.json'
+        json.dump(P, open(backup, 'w'), indent=1)
+        json.dump(Q, open(plan_path(cfg), 'w'), indent=1)
+        old = {b['name'] for b in P['bundles']}
+        for n in slow:
+            print('split %s (%.0f s): %s' % (n, times[n]['secs'], ' '.join(
+                b['name'] for b in Q['bundles'] if b['name'] == n or
+                (b['name'] not in old and set(b['nodes']) <= set(next(x for x in P['bundles'] if x['name'] == n)['nodes'])))))
+        print('%d bundles -> %d; old plan saved as %s' % (len(P['bundles']), len(Q['bundles']), backup))
     elif cmd == 'plan':
         g = load_graph(cfg)
         frozen = None
