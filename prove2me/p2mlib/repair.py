@@ -4,7 +4,8 @@ A carved file keeps or drops each context command (`variable`, `local notation`,
 `include`, `omit`, `attribute [local …]`) by reading source text, and each sharpened rule exposed
 the edge of another (Erdős 3 v2, 2026-10-16/17: a notation kept for a one-letter token match whose
 variables were rightly dropped, a variable needing an instance nothing kept brought in, …). Lean's
-error points at the exact line. A context command that does not elaborate cannot be what a kept
+error points at the exact line. A context command (including a `local instance`, which the carver
+re-emits for every kept declaration in its scope) that does not elaborate cannot be what a kept
 declaration needs (if it were, that declaration fails next, and an error inside a declaration is
 never repaired), so cutting it is safe.
 
@@ -17,7 +18,7 @@ never repaired), so cutting it is safe.
 import re
 
 ERROR = re.compile(r'^\S*?:(\d+):(\d+): error\b', re.M)
-CONTEXT = re.compile(r'(?:variable|include|omit|open|local\s+(?:notation3?|infixl?|infixr|prefix|postfix)|'
+CONTEXT = re.compile(r'(?:variable|include|omit|open|local\s+(?:notation3?|infixl?|infixr|prefix|postfix|instance)|'
                      r'attribute\s*\[\s*local\b)')
 STARTS = re.compile(r'^(?:/--|@\[|[A-Za-z_#])')
 

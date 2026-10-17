@@ -103,3 +103,13 @@ def test_recorded_group_cuts_reapply():
     cut = ['[∀ j, IsZLattice ℝ (latticeSection W)]']
     new, applied, stale = R.apply_cuts(VARS, cut)
     assert applied == cut and '(W : Submodule ℝ D)' in new and 'IsZLattice' not in new
+
+
+def test_a_local_instance_that_does_not_elaborate_is_context():
+    # Erdős 3 v2 B232: a local instance re-emitted for its scope names `N`, a local notation the
+    # carved file does not keep ("Unknown identifier `N`")
+    f = ('variable (primes : ℕ → ℕ)\n\nlocal instance modNeZero_r1_1 : NeZero N :=\n  ⟨by simp⟩\n\n'
+         'def keep : ℕ := 1\n')
+    new, cut = R.repair(f, ['Def_X.lean:3:39: error(lean.unknownIdentifier): Unknown identifier `N`'])
+    assert cut == ['local instance modNeZero_r1_1 : NeZero N :=\n  ⟨by simp⟩']
+    assert 'local instance' not in new and 'def keep' in new
