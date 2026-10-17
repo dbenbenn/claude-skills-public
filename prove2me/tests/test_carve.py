@@ -720,3 +720,11 @@ def test_an_open_before_its_namespace_is_created_in_the_same_module_is_rooted(g)
 
 def test_a_dotted_declaration_reads_its_body_in_its_own_namespace(g):
     assert 'CD.Space.size_eq' in g.nodes['CD.Space.cd_unused_simp'].deps
+
+
+def test_a_named_local_instance_not_imported_is_emitted_again_under_a_unique_name(g):
+    out = C.Carver(g).carve({'CD.uses_local_inst'}, g.have_names({'CD.uses_local_inst', 'CD.Wide'}),
+                            sorry={'CD.uses_local_inst'})
+    m = re.search(r'^local instance (cdLocalInst_r\w+) : Inhabited Wide', out, re.M)
+    assert m, out
+    assert not re.search(r'^local instance cdLocalInst :', out, re.M)

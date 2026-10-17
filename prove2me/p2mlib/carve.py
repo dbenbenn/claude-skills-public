@@ -1636,14 +1636,22 @@ class Carver:
             done.add((vi, chain))
             if pubname(ik) in have:
                 out.append('attribute [local instance] %s\n' % inst_names.get(ik, pubname(ik)))
-            elif anon_at is not None:
-                opens = g.scope_opens(info, vc, m)
-                refs = [i for i in vc.idents or [] if i['role'] == 'ref']
-                if not any(self._gone(i['name'], vc, m, have, opens) for i in refs):
-                    short = pubname(ik).rsplit('.', 1)[-1]
-                    self.re_count[short] += 1
-                    name = ' %s_r%s_%d' % (short, self.tag, self.re_count[short])
-                    out.append(_cmd_text(info, vc, [(anon_at, anon_at, name)]).strip() + '\n')
+                continue
+            # not imported: its command again under a name unique to this file, anonymous or
+            # named (Erdős 3 v2: `local instance forecastModulusNeZero (Pr) (A) : NeZero …`, which
+            # makes `ZMod (∏ …)` finite in a statement's binders, was named and so left out)
+            decl = next((i for i in vc.idents or [] if i['role'] == 'decl'), None)
+            if anon_at is None and decl is None:
+                continue
+            opens = g.scope_opens(info, vc, m)
+            refs = [i for i in vc.idents or [] if i['role'] == 'ref']
+            if any(self._gone(i['name'], vc, m, have, opens) for i in refs):
+                continue
+            short = pubname(ik).rsplit('.', 1)[-1]
+            self.re_count[short] += 1
+            name = '%s_r%s_%d' % (short, self.tag, self.re_count[short])
+            edit = (anon_at, anon_at, ' ' + name) if anon_at is not None else (decl['start'], decl['end'], name)
+            out.append(_cmd_text(info, vc, [edit]).strip() + '\n')
         return ''.join(out)
 
     def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=(), pins=None):

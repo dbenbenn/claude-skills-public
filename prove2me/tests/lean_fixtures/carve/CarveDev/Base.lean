@@ -65,6 +65,13 @@ namespace Int
 def cdId (a : _root_.Int) : _root_.Int := a
 end Int
 
+section
+/-- A named local instance (Erdős 3 v2: `local instance forecastModulusNeZero (Pr) (A) : NeZero …`,
+which a carved statement needs to make `ZMod (∏ …)` finite, and which no bundle carries). -/
+local instance cdLocalInst : Inhabited Wide := ⟨⟨0⟩⟩
+theorem uses_local_inst : (default : Wide).w = 0 := rfl
+end
+
 end CD
 
 namespace CD.Aux
