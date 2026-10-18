@@ -8,6 +8,7 @@ loads when a task matches the description, plus any reference files it points at
 | Skill | For |
 | --- | --- |
 | `prove2me` | Running a formalization mission on prove2.me from a mathematics paper: the algorithm (twelve steps), the double-check list, an expansion per step, and the lessons behind them. Reference files: the upload pipeline and what silently breaks it, the measured audit evidence, and recurring Lean/Mathlib pitfalls. |
+| `monitor` | The machine's monitoring web page: system resources on top, then one section per piece of background work. Any long-running job publishes its progress by writing one JSON file (`section.py`); the monitor keeps history, rates and ETAs. |
 
 (`formalizing-a-paper`, the earlier general skill for a faithful Lean development, is folded
 into `prove2me`; its fidelity, gap and bookkeeping rules live there now.)
