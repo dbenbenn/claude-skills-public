@@ -44,6 +44,9 @@ CONFIG.json (paths may use ~):
                                               # bundle first (after frozen ones), closed under
                                               # dependencies: statements using only them import
                                               # only them; a non-definition is refused
+   "bundles_import_statements": true,         # default: a target/forced theorem that definitions
+                                              # need is published as a statement and the bundles
+                                              # needing it import it (false: a CarveError)
    "patches": "patches.json",                 # [{literal_old, literal_new, why}] applied to every
                                               # generated file: proof fixes, never source edits
    "measured": {"plan": "work/plan_measured.json", "bundle_times": "work/bundle_times.json",
@@ -200,7 +203,8 @@ def main(argv):
                         statement_suffix=cfg.get('statement_suffix', ''),
                         external=cfg.get('external', ()),
                         chunker=cfg.get('chunker', 'bands'),
-                        pinned=cfg.get('pinned'))
+                        pinned=cfg.get('pinned'),
+                        bundles_import_statements=cfg.get('bundles_import_statements', True))
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)
         json.dump(P, open(out, 'w'), indent=1, sort_keys=True)
         worst = sorted(((p['cost'], n) for n, p in P['pieces'].items()), reverse=True)[:5]

@@ -54,6 +54,7 @@ class FakeApi:
         self.script = {k: list(v) for k, v in (script or {}).items()}
         self.published = dict(published or {'A.top': 'TOP'})    # name -> id
         self.posted, self.jobs, self.subs, self.n = [], {}, {}, 0
+        self.proved = set()
 
     def _next(self, name, ok):
         s = self.script.get(name)
@@ -64,6 +65,11 @@ class FakeApi:
 
     def submit_definition(self, body):
         assert body['definition'].startswith('import') and body['definition_title']
+        # prove.md: a definition may import a platform theorem only once it is Proved
+        for imp in body['definition'].split('\n'):
+            if imp.startswith('import Theorems.Thm_'):
+                assert imp[len('import Theorems.Thm_'):] in self.proved, \
+                    'Imported platform theorems must be Proved at submission time'
         self.posted.append(('def', body['definition_name']))
         self.n += 1
         self.jobs['j%d' % self.n] = ('def', body['definition_name'])
@@ -101,6 +107,8 @@ class FakeApi:
 
     def verdict(self, sid):
         st, err = self._next('verify:' + self.subs[sid], ('ACCEPTED', None))
+        if st == 'ACCEPTED':
+            self.proved.add(self.subs[sid].replace('.', '_'))
         return {'status': st, 'error_message': err}
 
 
@@ -259,3 +267,19 @@ def test_bundles_go_before_statements_and_pieces(split):
     r.step()                                                  # XB000
     r.step()                                                  # XB000 live; XB001 and A.low_s2 ready
     assert api.posted[-1] == ('def', 'XB001')
+
+
+def test_a_bundle_importing_a_statement_waits_for_its_accepted_proof(split):
+    # carve's bundles_import_statements: XB001 imports the statement A.low, which the platform
+    # allows only once A.low is Proved (2026-10-18). publish_order makes the bundle wait for the
+    # piece, and the runner follows it.
+    d, cfg = split
+    plan = json.loads(json.dumps(PLAN))
+    plan['bundles'][1]['statements'] = ['A.low']
+    (d / 'plan.json').write_text(json.dumps(plan))
+    (d / 'out' / 'lib' / 'Def_XB001.lean').write_text(
+        'import Mathlib\nimport Definitions.Def_XB000\nimport Theorems.Thm_A_low_s2\n\ndef XB001.k : Nat := 1\n')
+    api = FakeApi()
+    r, s = run(cfg, api)
+    assert s['live'] == len(r.items)
+    assert api.posted.index(('verify', 'A.low_s2')) < api.posted.index(('def', 'XB001'))

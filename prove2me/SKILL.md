@@ -1333,7 +1333,10 @@ back WA. The lessons:
     levels of bundle material); declaration-level list scheduling gives about 16 for the same
     material. Depth is what a cold verifier pays.
   - **Bundles hold only what definitions need.** The carver already keeps helper theorems out of
-    bundles except those a definition uses (a definition cannot import a `sorry`d statement); an
+    bundles except those a definition uses (a definitions bundle may import a published statement,
+    `import Theorems.Thm_…`, per prove.md's Platform Imports: config `bundles_import_statements`,
+    on by default, publishes a forced theorem that definitions need as a statement and has their
+    bundles import it; otherwise the bundle proves it itself); an
     earlier per-mission carver also put 68% theorems and ~17,000 dead `variable` commands into
     them. The shared carver drops scopes left without a kept declaration.
   - **Measure before publishing.** Build every bundle locally (`-j1`), re-pack any over budget, and

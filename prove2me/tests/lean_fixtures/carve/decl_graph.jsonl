@@ -40,6 +40,7 @@
 {"i":false,"k":"def","m":"CarveDev.Base","n":"_private.CarveDev.Base.0.CD.termWD","p":false,"r":[82,0,82,35],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.Nat.cdTwice","p":false,"r":[77,0,78,36],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.Space.coord","p":false,"r":[9,0,10,39],"s":false,"t":["CD.Space"],"u":[],"v":["CD.Space"]}
+{"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.doubleWitness","p":false,"r":[145,0,148,79],"s":false,"t":[],"u":[],"v":["CD.double","CD.double_eq"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.quad","p":false,"r":[20,0,21,45],"s":false,"t":[],"u":[],"v":["CD.double"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.sizedZero","p":false,"r":[51,0,53,67],"s":false,"t":["CD.Space","CD.Space.size"],"u":[],"v":["CD.Space","CD.Space.size"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.trail_kept","p":false,"r":[83,0,83,25],"s":false,"t":[],"u":[],"v":[]}
@@ -90,6 +91,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_hk1","p":true,"r":[110,0,112,42],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_hk2","p":true,"r":[115,0,117,44],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_hx","p":true,"r":[38,0,38,39],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
+{"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_witness","p":true,"r":[150,0,150,55],"s":false,"t":["CD.doubleWitness","CD.Aux.auxOnly"],"u":[],"v":["CD.doubleWitness","CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.helper","p":true,"r":[30,0,30,40],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.main","p":true,"r":[14,0,18,53],"s":false,"t":["CD.Space","CD.double","CD.List.headOr","CD.Space.size"],"u":[],"v":["CD.Space","CD.double","CD.double_succ","CD.quad","CD.size_via_coord","CD.size_zero","_private.CarveDev.Top.0.CD.helper","CD.List.headOr","CD.List.headOr_nil","CD.Space.coord","CD.Space.size"]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.top_aux","p":true,"r":[21,0,21,39],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.aux_eq"]}

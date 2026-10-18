@@ -4913,18 +4913,250 @@
      "opener": 1
     }
    ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "doc": {
+    "end": 5753,
+    "start": 5473
+   },
    "end": {
-    "byte": 5479,
-    "col": 6,
-    "line": 145
+    "byte": 5837,
+    "col": 79,
+    "line": 148
    },
    "heads": [],
    "idents": [
     {
-     "end": 5479,
+     "end": 5771,
+     "name": "doubleWitness",
+     "role": "decl",
+     "start": 5758
+    },
+    {
+     "end": 5774,
+     "name": "n",
+     "role": "binder",
+     "start": 5773
+    },
+    {
+     "end": 5780,
+     "name": "Nat",
+     "role": "ref",
+     "start": 5777
+    },
+    {
+     "end": 5786,
+     "name": "m",
+     "role": "ref",
+     "start": 5785
+    },
+    {
+     "end": 5792,
+     "name": "Nat",
+     "role": "ref",
+     "start": 5789
+    },
+    {
+     "end": 5797,
+     "name": "m",
+     "role": "ref",
+     "start": 5796
+    },
+    {
+     "end": 5801,
+     "name": "n",
+     "role": "ref",
+     "start": 5800
+    },
+    {
+     "end": 5805,
+     "name": "n",
+     "role": "ref",
+     "start": 5804
+    },
+    {
+     "end": 5819,
+     "name": "double",
+     "role": "ref",
+     "start": 5813
+    },
+    {
+     "end": 5821,
+     "name": "n",
+     "role": "ref",
+     "start": 5820
+    },
+    {
+     "end": 5832,
+     "name": "double_eq",
+     "role": "ref",
+     "start": 5823
+    },
+    {
+     "end": 5834,
+     "name": "n",
+     "role": "ref",
+     "start": 5833
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 5771,
+      "col": 17,
+      "line": 148
+     },
+     "start": {
+      "byte": 5758,
+      "col": 4,
+      "line": 148
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.doubleWitness"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 5473,
+    "col": 0,
+    "line": 145
+   },
+   "value_start": {
+    "byte": 5807,
+    "col": 53,
+    "line": 148
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 5894,
+    "col": 55,
+    "line": 150
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 5859,
+     "name": "uses_witness",
+     "role": "decl",
+     "start": 5847
+    },
+    {
+     "end": 5863,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 5863
+    },
+    {
+     "end": 5876,
+     "name": "doubleWitness",
+     "role": "ref",
+     "start": 5863
+    },
+    {
+     "end": 5883,
+     "name": "val",
+     "role": "ref",
+     "start": 5880
+    },
+    {
+     "end": 5894,
+     "name": "rfl",
+     "role": "ref",
+     "start": 5891
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 5859,
+      "col": 20,
+      "line": 150
+     },
+     "start": {
+      "byte": 5847,
+      "col": 8,
+      "line": 150
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.uses_witness"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "List"
+    }
+   ],
+   "start": {
+    "byte": 5839,
+    "col": 0,
+    "line": 150
+   },
+   "value_start": {
+    "byte": 5888,
+    "col": 49,
+    "line": 150
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      7,
+      11,
+      12
+     ],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 5902,
+    "col": 6,
+    "line": 152
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 5902,
      "name": "CD",
      "role": "scope",
-     "start": 5477
+     "start": 5900
     }
    ],
    "ids": [],
@@ -4938,9 +5170,9 @@
     }
    ],
    "start": {
-    "byte": 5473,
+    "byte": 5896,
     "col": 0,
-    "line": 145
+    "line": 152
    }
   },
   {
@@ -4954,9 +5186,9 @@
     }
    ],
    "end": {
-    "byte": 5480,
+    "byte": 5903,
     "col": 0,
-    "line": 146
+    "line": 153
    },
    "heads": [],
    "idents": [],
@@ -4966,9 +5198,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 5480,
+    "byte": 5903,
     "col": 0,
-    "line": 146
+    "line": 153
    }
   }
  ],

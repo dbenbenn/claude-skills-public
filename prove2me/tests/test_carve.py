@@ -137,15 +137,77 @@ def test_check_plan_flags_a_definition_missing_from_the_bundles(g, plan):
     assert probs and any('CD.Space' in p for p in probs)
 
 
-def test_forced_theorem_a_definition_needs_is_a_clear_error(g):
+def test_forced_theorem_a_definition_needs_is_a_clear_error_without_statement_imports(g):
     # StrictInverseFirstPower (2026-10-18): forcing Bieberbach's |a₂| ≤ 2, which the instance
     # `CompactSpace DiskFamily` needs, crashed make_plan with KeyError. `CD.double_eq` is a theorem
-    # the definition `CD.sizedZero` uses, so it is bundle material once `CD.uses_sized` is a target
+    # the definition `CD.sizedZero` uses, so it is bundle material once `CD.uses_sized` is a target.
+    # With bundles_import_statements off (the default is on) that stays a clear error.
     with pytest.raises(C.CarveError, match=r'CD\.double_eq.*bundle.*CD\.sizedZero'):
-        C.make_plan(g, ['CD.uses_sized'], forced=['CD.double_eq'], cost=C.size_costs(g))
+        C.make_plan(g, ['CD.uses_sized'], forced=['CD.double_eq'], cost=C.size_costs(g),
+                    bundles_import_statements=False)
     # a target pulled into a bundle the same way gets the same error
     with pytest.raises(C.CarveError, match=r'CD\.double_eq.*bundle'):
-        C.make_plan(g, ['CD.uses_sized', 'CD.double_eq'], cost=C.size_costs(g))
+        C.make_plan(g, ['CD.uses_sized', 'CD.double_eq'], cost=C.size_costs(g),
+                    bundles_import_statements=False)
+
+
+def _stmt_plan(g, **kw):
+    return C.make_plan(g, ['CD.uses_witness', 'CD.main', 'CD.uses_sized'], forced=['CD.double_eq'],
+                       budget=0.05, piece_size=10**6, bundle_budget=1.0, bundle_size=10**6,
+                       cost=C.size_costs(g, bytes_per_second=10000), bundle_prefix='S',
+                       chunker='schedule', **kw)
+
+
+def test_a_forced_theorem_definitions_need_is_published_and_their_bundles_import_it(g, tmp_path):
+    # prove2.me's /submit-definition may import `Theorems.Thm_…` (a definition built by
+    # Classical.choose from AGT.brouwer_fixed_point published, 2026-10-18), so a theorem that
+    # definitions need need not be re-proved inside a bundle: forced, it is published as a
+    # statement and the bundles that need it import that statement
+    p = _stmt_plan(g)
+    assert 'CD.double_eq' in p['nodes']
+    assert all('CD.double_eq' not in b['nodes'] for b in p['bundles'])
+    wit = next(b for b in p['bundles'] if 'CD.doubleWitness' in b['nodes'])
+    assert wit['statements'] == ['CD.double_eq']
+    assert C.check_plan(g, p) == []
+    # the order: the statement's own bundles, the statement, its proof, then the bundles importing
+    # it (a bundle may import a theorem only once it is Proved: "Imported platform theorems must be
+    # Proved at submission time", 2026-10-18)
+    order = C.publish_order(p)
+    wave = {x: i for i, w in enumerate(order['waves']) for x in w}
+    st, pc = 'statement:CD.double_eq', 'piece:CD.double_eq'
+    assert wave[st] < wave[pc] < wave['bundle:' + wit['name']]
+    for b in p['stubs']['CD.double_eq']['bundles'] + p['pieces']['CD.double_eq']['bundles']:
+        assert wave['bundle:' + b] < wave[pc]
+        assert 'CD.double_eq' not in next(x for x in p['bundles'] if x['name'] == b).get('statements', ())
+    assert pc in order['deps']['bundle:' + wit['name']]
+    out = tmp_path / 'out'
+    C.generate(g, p, str(out))
+    bundle = (out / 'lib' / ('Def_%s.lean' % wit['name'])).read_text()
+    assert 'import Theorems.Thm_CD_double_eq\n' in bundle
+    for f in (out / 'lib').glob('Def_*.lean'):
+        assert not re.search(r'^theorem double_eq\b', f.read_text(), re.M), f.name
+    assert re.search(r'^theorem double_eq_oai\b', (out / 'solutions' / 'Sol_CD_double_eq.lean').read_text(), re.M)
+
+
+def test_split_keeps_the_statements_a_bundle_imports(g):
+    p = _stmt_plan(g)
+    wit = next(b for b in p['bundles'] if 'CD.doubleWitness' in b['nodes'])
+    q = C.split_bundles(g, p, [wit['name']], C.size_costs(g, bytes_per_second=10000), 0.002)
+    parts = [b for b in q['bundles'] if 'CD.doubleWitness' in b['nodes']]
+    assert parts and parts[0].get('statements') == ['CD.double_eq']
+    assert C.check_plan(g, q) == []
+
+
+@pytest.mark.lean
+def test_bundles_importing_a_statement_compile_and_show_its_sorry(g, tmp_path):
+    # sorry-safe locally: a bundle member resting on the imported statement shows sorryAx, as a
+    # piece importing a statement does
+    p = _stmt_plan(g)
+    _compile_in_publish_order(g, p, tmp_path)
+    wit = next(b for b in p['bundles'] if 'CD.doubleWitness' in b['nodes'])
+    chk = tmp_path / 'Axioms.lean'
+    chk.write_text('import Definitions.Def_%s\n#print axioms CD.doubleWitness\n' % wit['name'])
+    assert 'sorryAx' in C.compile_file(str(chk), None, str(tmp_path / 'olean'))
 
 
 def test_sorry_never_reaches_a_bundle_or_piece(g, plan):

@@ -142,4 +142,11 @@ project's one must leave Lean's alone (Kaplansky 2026-10-18: the `_oai` rename o
 `MultipleHNN.of_injective` turned `HNNExtension.of_injective` into `HNNExtension.of_injective_oai`). -/
 theorem uses_core_succ (n m : Nat) (h : n ≤ m) : n.succ ≤ m.succ := Nat.succ_le_succ h
 
+/-- A definition whose value uses a theorem: forced, `double_eq` is published as a statement and
+this definition's bundle imports it (prove2.me's /submit-definition may import `Theorems.Thm_…`;
+UniversalFInfinity's `Milnor.ghostMap` rests on cellular approximation this way). -/
+def doubleWitness (n : Nat) : {m : Nat // m = n + n} := ⟨double n, double_eq n⟩
+
+theorem uses_witness : (doubleWitness 1).val = 2 := rfl
+
 end CD

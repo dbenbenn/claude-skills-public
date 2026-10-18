@@ -1077,9 +1077,10 @@ def _order_chunks(g, chunks, nfrozen):
 
 def _bundle_reason(g, seeds, t):
     """Why theorem `t` is bundle material: the definition (a bundle seed) whose dependency chain
-    reaches it, with the chain. A definition cannot import a published (sorry) statement, so the
-    bundle has to prove `t` itself (StrictInverseFirstPower: the instance CompactSpace DiskFamily
-    that several definitions need rests on the distortion theorem and Bieberbach's |a₂| ≤ 2)."""
+    reaches it, with the chain (StrictInverseFirstPower: the instance CompactSpace DiskFamily that
+    several definitions need rests on the distortion theorem and Bieberbach's |a₂| ≤ 2). Only an
+    error with `bundles_import_statements` off: on, `t` is published as a statement and the
+    bundles import it."""
     parent, todo = {}, []
     for s in sorted(seeds):
         if not g.nodes[s].theorem and s not in parent:
@@ -1100,9 +1101,9 @@ def _bundle_reason(g, seeds, t):
     chain = [t]
     while parent[chain[-1]] is not None:
         chain.append(parent[chain[-1]])
-    return ('it is bundle material, because the definition %s needs it (%s); a definitions bundle '
-            'cannot import a statement, so it proves it itself. Publish it from a separate carve '
-            'whose targets do not need that definition' % (chain[-1], ' -> '.join(reversed(chain))))
+    return ('it is bundle material, because the definition %s needs it (%s); with '
+            'bundles_import_statements off the bundle proves it itself. Turn that on (the default) '
+            'to publish it as a statement the bundles import' % (chain[-1], ' -> '.join(reversed(chain))))
 
 
 def _pin_chunks(g, pinned, B, taken, extra):
@@ -1139,12 +1140,14 @@ def _pin_chunks(g, pinned, B, taken, extra):
 
 def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_budget=90.0,
               bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
-              external_defs=None, statement_suffix='', external=(), chunker='bands', pinned=None):
+              external_defs=None, statement_suffix='', external=(), chunker='bands', pinned=None,
+              bundles_import_statements=True):
     """The split: bundles, nodes (published statements) and each node's piece.
 
     - Bundle material B: every reachable non-theorem, what reachable statements need, their
-      closure (a definition cannot import a theorem statement, so a theorem a definition uses is
-      proved inside the bundle), and the instances and attributed declarations whose dependencies
+      closure (a theorem a definition uses is proved inside the bundle, unless it is a target or
+      forced and `bundles_import_statements` makes it a statement the bundle imports), and the
+      instances and attributed declarations whose dependencies
       are then present.
     - Nodes: targets and `forced`, plus theorems promoted greedily, bottom-up, until each piece
       (its closure over non-node theorems) costs at most `budget` seconds and `piece_size` bytes.
@@ -1163,7 +1166,17 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
       and frozen bundles excepted). A statement whose definitions are all pinned imports only those
       small bundles (UniversalFInfinity: Higman's, Whitehead's and Milnor's statements, which the
       scheduler had put into an 850-declaration bundle). A name that is not bundle material is
-      refused."""
+      refused.
+    - `bundles_import_statements` (default on): a target or forced theorem that definitions need
+      (bundle material) is published as a statement, and the bundles whose members need it import
+      that statement (`statements` in the bundle) instead of proving it: prove.md's Platform
+      Imports allow `import Theorems.Thm_…` in /submit-definition (a definition built by
+      Classical.choose from an imported statement published, 2026-10-18), but only once that
+      theorem is Proved ("Imported platform theorems must be Proved at submission time"). So what
+      its statement and proof need from the bundles is pinned into bundles of its own, and the
+      order is: those bundles, the statement, its proof (accepted), then the bundles importing it.
+      The stub's `sorry` shows in those bundles' axioms locally, as in a piece's. Off, such a
+      theorem is a CarveError, as before."""
     cost = cost if cost is not None else size_costs(g)
     targets, forced = list(targets), list(forced)
     for t in targets + forced:
@@ -1185,11 +1198,40 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     B = g.closure(seeds) | {k for ch in fz_chunks for k in ch}
     B |= g.extra_roots(B, set())
     B -= set(ext)
-    extra = implicit_deps(g, B, B) if chunker == 'schedule' else {}
-    pin_chunks = _pin_chunks(g, pinned, B, {k for ch in fz_chunks for k in ch}, extra)
+    stmts = set()
     for t in targets + forced:
         if t in B:
-            raise CarveError('%s cannot be a published statement: %s' % (t, _bundle_reason(g, seeds, t)))
+            if not bundles_import_statements or not g.nodes[t].theorem:
+                raise CarveError('%s cannot be a published statement: %s' % (t, _bundle_reason(g, seeds, t)))
+            stmts.add(t)
+    if stmts:
+        # the bundles import these statements instead of proving them
+        B = g.closure(seeds, stop=stmts) | {k for ch in fz_chunks for k in ch}
+        B |= g.extra_roots(B, set())
+        B -= set(ext) | stmts
+    extra = implicit_deps(g, B, B) if chunker == 'schedule' else {}
+    pin_chunks = _pin_chunks(g, pinned, B, {k for ch in fz_chunks for k in ch}, extra)
+    if stmts:
+        taken = {k for ch in fz_chunks + pin_chunks for k in ch}
+        groups = []
+        for t in sorted(stmts):
+            # what t's statement and its whole proof need from the bundles: a bundle may import t
+            # only once t is Proved ("Imported platform theorems must be Proved at submission
+            # time", 2026-10-18), so t's piece must not need a bundle that imports t
+            reach_t = g.closure([t], stop=B | (stmts - {t}))
+            need_t = set(g.nodes[t].sig)
+            for x in reach_t:
+                need_t |= g.nodes[x].sig if x in stmts and x != t else g.nodes[x].deps
+            need_t = sorted(d for d in need_t if d in B and d not in taken)
+            grp = _pin_chunks(g, [need_t], B, taken, extra)[0] if need_t else []
+            bad = sorted(k for k in grp if t in g.nodes[k].deps)
+            if bad:
+                raise CarveError('%s cannot be proved before the bundles importing it: its '
+                                 'statement or proof uses %s, which needs it' % (t, bad))
+            taken |= set(grp)
+            if grp:
+                groups.append(grp)
+        pin_chunks = pin_chunks + groups
     T = reach - B - set(ext)
     kids = {k: [d for d in g.nodes[k].deps if d in T] for k in T}
     order, seen = [], set()
@@ -1276,6 +1318,10 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     bundles = [{'name': names[j], 'nodes': chunks[j], 'imports': [names[i] for i in sorted(red[j])],
                 'cost': round(pcost(chunks[j]), 2), 'size': psize(chunks[j])}
                for j in range(len(chunks))]
+    for j, b in enumerate(bundles):
+        sts = sorted({d for k in chunks[j] for d in g.nodes[k].deps if d in stmts})
+        if sts:
+            b['statements'] = sts
 
     def need(keys):
         ex = implicit_deps(g, keys, B) if chunker == 'schedule' else {}
@@ -1394,6 +1440,12 @@ def split_bundles(g, plan, names, cost, budget, bundle_prefix=None):
         bundles.append({'name': cnames[j], 'nodes': ch, 'imports': [cnames[i] for i in sorted(red[j])],
                         'cost': round(sum(cost.get(k, 0.0) for k in ch), 2),
                         'size': sum(g.nodes[k].size for k in ch)})
+    # statements the bundles import (bundles_import_statements): each part keeps those its members need
+    sts_all = {s for b in plan['bundles'] for s in b.get('statements', ())}
+    for b in bundles:
+        sts = sorted({d for k in b['nodes'] for d in g.nodes[k].deps if d in sts_all})
+        if sts:
+            b['statements'] = sts
     out = dict(plan)
     out['bundles'] = bundles
 
@@ -1537,8 +1589,11 @@ def check_plan(g, plan):
         if any(pos.get(x, len(pos)) >= i for x in b['imports']):
             probs.append('bundle %s imports a later or unknown bundle' % b['name'])
         cl = _bundle_closure(bimp, [i])
+        sts = set(b.get('statements', ()))
+        for st in sts:
+            cl |= _bundle_closure(bimp, [pos[x] for x in plan['stubs'].get(st, {}).get('bundles', ())])
         for k in b['nodes']:
-            for d in sorted(g.nodes[k].deps - ext):
+            for d in sorted(g.nodes[k].deps - ext - sts):
                 if d not in bidx:
                     probs.append('bundle %s: %s needs %s, which is in no bundle' % (b['name'], k, d))
                 elif bidx[d] not in cl:
@@ -1568,12 +1623,15 @@ def check_plan(g, plan):
 
 def publish_order(plan, external=()):
     """The import DAG as waves: every item of a wave can publish concurrently once the earlier
-    waves are published. Items: `bundle:NAME`, `statement:NODE` (after its bundles; none for
-    `external` nodes, published by someone else), `piece:NODE` (after its own statement, the
-    statements it imports and its bundles)."""
+    waves are published. Items: `bundle:NAME` (after the bundles it imports and the pieces of the
+    statements it imports: a bundle may import only a Proved theorem), `statement:NODE` (after
+    its bundles; none for `external` nodes, published by someone else), `piece:NODE` (after its
+    own statement, the statements it imports and its bundles)."""
     deps = {}
     for b in plan['bundles']:
-        deps['bundle:' + b['name']] = ['bundle:' + x for x in b['imports']]
+        # a bundle may import a statement only once it is Proved: after its piece is accepted
+        deps['bundle:' + b['name']] = ['bundle:' + x for x in b['imports']] + \
+            ['piece:' + x for x in b.get('statements', ())]
     for n, s in plan['stubs'].items():
         if n not in external:
             deps['statement:' + n] = ['bundle:' + x for x in s['bundles']]
@@ -1583,12 +1641,16 @@ def publish_order(plan, external=()):
         if n not in external:
             d.append('statement:' + n)
         deps['piece:' + n] = d
-    level = {}
+    level, busy = {}, set()
 
     def lv(x):
         if x not in level:
-            level[x] = 0
+            if x in busy:
+                raise CarveError('publish order: %s depends on itself (an import cycle through %s)'
+                                 % (x, ', '.join(sorted(busy))))
+            busy.add(x)
             level[x] = 1 + max([lv(y) for y in deps[x]], default=-1)
+            busy.discard(x)
         return level[x]
     for x in deps:
         lv(x)
@@ -2233,10 +2295,15 @@ def gen_bundle(g, plan, name, collapse_mathlib=True):
     bad = sorted(k for k in keep if g.nodes[k].sorry)
     if bad:
         raise CarveError('bundle %s would contain sorry: %s (repair the port first)' % (name, bad))
-    avail = _bundle_have(g, plan, b['imports']) | set(plan.get('external_defs') or {})
-    body = Carver(g).carve(keep, g.have_names(keep | avail), deprivatize=True,
-                           rename=collision_renames(g))
-    hdr = header(g, {g.nodes[k].module for k in keep}, b['imports'], (), collapse_mathlib,
+    sts = list(b.get('statements', ()))
+    avail = _bundle_have(g, plan, b['imports']) | set(plan.get('external_defs') or {}) | set(sts)
+    for st in sts:
+        avail |= _bundle_have(g, plan, plan['stubs'][st]['bundles'])
+    ren = collision_renames(g)
+    ren.update(_stmt_renames(g, plan, sts))
+    body = Carver(g).carve(keep, g.have_names(keep | avail), deprivatize=True, rename=ren)
+    hdr = header(g, {g.nodes[k].module for k in keep}, b['imports'],
+                 [statement_name(plan, st) for st in sts], collapse_mathlib,
                  extra=_ext_imports(g, plan, keep))
     return hdr + '\n' + body.rstrip('\n') + '\n'
 
