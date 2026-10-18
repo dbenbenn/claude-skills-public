@@ -32,3 +32,11 @@ def test_attributed_declarations_are_roots():
 def test_refuses_without_solution():
     with pytest.raises(SystemExit):
         P.prune('theorem foo : True := trivial\n', verbose=False)
+
+
+def test_local_and_scoped_instances_are_declarations():
+    # 2026-10-18: `noncomputable local instance hsNorm` was invisible to the parser, so it
+    # folded into the declaration above and a bundle copy of it was never dropped (ThorpNine)
+    src = ('namespace X\nnoncomputable local instance hsNorm : Norm Nat := ⟨id⟩\n'
+           'scoped instance hsFinite : Inhabited Nat := ⟨0⟩\ntheorem t : True := trivial\nend X')
+    assert [d[0] for d in P.parse(src.split('\n'))] == ['hsNorm', 'hsFinite', 't']

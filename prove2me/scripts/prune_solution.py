@@ -42,7 +42,7 @@ KINDS = r'(?:lemma|theorem|def|abbrev|instance|structure|inductive|class|alias)'
 # an attribute may sit on the declaration's own line (`@[simp] theorem foo …`); such a
 # declaration is attributed exactly as if the attribute were on the line above
 DECL = re.compile(r'^(?P<attr>(?:@\[[^\]]*\]\s*)*)'
-                  r'(?P<mods>(?:private\s+|protected\s+|noncomputable\s+|partial\s+|unsafe\s+)*)'
+                  r'(?P<mods>(?:private\s+|protected\s+|noncomputable\s+|partial\s+|unsafe\s+|local\s+|scoped\s+)*)'
                   # Lean identifiers are Unicode (`φ`, `ψₙ`) or «guillemeted»; an ASCII-only
                   # pattern missed `def φ`, folded its body into the lemma above, and pruned
                   # everything only φ used (two CFP replacements failed --check on it)
