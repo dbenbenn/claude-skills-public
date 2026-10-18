@@ -12,10 +12,12 @@ matter `title:`, optional `source:`), `explanations/<slug>.md` for a piece (chec
 
 State (`state` file, written after every post and result) makes a run resumable: live items are
 never re-posted, in-flight jobs and submissions are polled again, and a bundle or statement that is
-already on the platform under its name is adopted. Terminal states (`split`, `stop`, `give_up`,
+already on the platform under its name is adopted when its text is the one we generated. Terminal states (`split`, `stop`, `give_up`,
 `raise_heartbeats`) wait for a person; `reset(item)` clears one.
 
-The platform is an object with `theorem_id(name)`, `submit_definition(body) -> job`,
+The platform is an object with `theorem_id(name)`, `existing(kind, name)` (the live statement or
+bundle under that name: adopted only when its text is ours, whitespace aside, else the item stops
+as "name taken"), `submit_definition(body) -> job`,
 `submit_problems([problem]) -> [job]`, `job(id) -> record`, `verify(theorem_id, path, explanation)
 -> submission`, `verdict(submission) -> record`; `LiveApi` is the real one, tests pass a fake.
 Erdős 3 v1 (2026-10-08..16) is why: per-mission loops retried one piece 740 times and re-carved
@@ -32,6 +34,29 @@ from .mission import front_matter
 FINAL_JOB = {'PUBLISHED', 'FAILED', 'ERROR'}
 TERMINAL = {'split', 'stop', 'give_up', 'raise_heartbeats'}
 BATCH = 10
+
+
+def _ws(s):
+    return ' '.join((s or '').split())
+
+
+def split_statement(text):
+    """(import lines as a set, the rest whitespace-normalized) of a statement file or record."""
+    lines = (text or '').split('\n')
+    return ({l.strip() for l in lines if l.strip().startswith('import ')},
+            _ws('\n'.join(l for l in lines if not l.strip().startswith('import '))))
+
+
+def same_as_ours(kind, rec, text):
+    """Is the live record `rec` the item we generated as `text` (whitespace aside)? A fake's
+    {'same': True} stands for a record known to be ours."""
+    if rec.get('same'):
+        return True
+    if kind == 'bundle':
+        return _ws(rec.get('definition')) == _ws(text)
+    ours = split_statement(text)
+    theirs = (split_statement(rec.get('preamble'))[0], _ws(rec.get('formal_statement')))
+    return ours == theirs
 
 
 class Runner:
@@ -109,8 +134,13 @@ class Runner:
         out = []
         for x in self.items:
             s = self.state.get(x, {}).get('state', 'todo')
-            if s != 'todo' or x.split(':', 1)[0] not in self.kinds or \
-                    not all(self.live(d) for d in self.deps[x]):
+            if s != 'todo' or x.split(':', 1)[0] not in self.kinds:
+                continue
+            stopped = [d for d in self.deps[x] if self.state.get(d, {}).get('state') in TERMINAL]
+            if stopped:
+                self.blocked[x] = 'waits on stopped ' + ', '.join(stopped)
+                continue
+            if not all(self.live(d) for d in self.deps[x]):
                 continue
             why = self.check(x)
             if why:
@@ -197,10 +227,20 @@ class Runner:
     def _submit_one(self, x, stmts):
         f, st = self.info(x), self.st(x)
         if f['kind'] in ('bundle', 'statement'):
-            tid = self.api.theorem_id(f['name'])
-            if tid:                                  # on the platform already: adopt it
-                st.update(state='live', id=tid)
-                self.log(x, 'adopt', tid)
+            rec = self.api.existing(f['kind'], f['name'])
+            if rec:
+                text = open(f['file'], encoding='utf-8').read()
+                if same_as_ours(f['kind'], rec, text):      # ours from an earlier run: adopt it
+                    st.update(state='live', id=rec['id'])
+                    self.log(x, 'adopt', rec['id'])
+                else:
+                    # KervaireMixing 2026-10-18: someone else's statement under our name was
+                    # adopted by name, and our pieces imported it
+                    what = 'statement' if f['kind'] == 'statement' else 'definitions bundle'
+                    st.update(state='stop', last='name taken by a different %s (author %s, id %s); '
+                              'use statement_suffix (or another bundle_prefix) for a fresh name' % (
+                                  what, rec.get('author') or '?', rec.get('id')))
+                    self.log(x, 'name-taken', st['last'])
                 self.save()
                 return
         if f['kind'] == 'bundle':
@@ -293,6 +333,25 @@ class LiveApi:
 
     def theorem_id(self, name):
         return self._api.theorem_id(name, call=self._call)
+
+    def existing(self, kind, name):
+        """The live statement or definitions bundle named exactly `name`: {id, author, preamble,
+        formal_statement} or {id, author, definition}; None if there is none."""
+        if kind == 'statement':
+            r = self._call('GET', '/theorems?theorem_name=%s&limit=5' % name)
+            hit = [x for x in (r.get('theorems') or []) if x.get('theorem_name') == name]
+            if not hit:
+                return None
+            h = hit[0]
+            return {'id': h.get('theorem_id') or h.get('id'), 'author': h.get('created_by_username'),
+                    'preamble': h.get('preamble'), 'formal_statement': h.get('formal_statement')}
+        r = self._call('GET', '/definitions?q=%s&limit=20' % name)
+        hit = [x for x in (r.get('definitions') or []) if x.get('definition_name') == name]
+        if not hit:
+            return None
+        h = hit[0]
+        return {'id': h.get('definition_id'), 'author': h.get('created_by_username'),
+                'definition': h.get('definition')}
 
     def submit_definition(self, body):
         return self._ok(self._call('POST', '/submit-definition', body), 'submit-definition')['job_id']

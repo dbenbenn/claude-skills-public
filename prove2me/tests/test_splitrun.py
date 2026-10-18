@@ -55,6 +55,7 @@ class FakeApi:
         self.published = dict(published or {'A.top': 'TOP'})    # name -> id
         self.posted, self.jobs, self.subs, self.n = [], {}, {}, 0
         self.proved = set()
+        self.foreign, self.texts = {}, {}
 
     def _next(self, name, ok):
         s = self.script.get(name)
@@ -62,6 +63,16 @@ class FakeApi:
 
     def theorem_id(self, name):
         return self.published.get(name)
+
+    def existing(self, kind, name):
+        """The live record under `name` (kind 'statement' or 'bundle'), or None. An item published
+        by name without recorded text (`published`) reads as exactly ours; `foreign` holds someone
+        else's records."""
+        if name in self.foreign:
+            return dict(self.foreign[name])
+        if name not in self.published:
+            return None
+        return dict(self.texts.get(name, {'same': True}), id=self.published[name], author='dbenbenn')
 
     def submit_definition(self, body):
         assert body['definition'].startswith('import') and body['definition_title']
@@ -283,3 +294,50 @@ def test_a_bundle_importing_a_statement_waits_for_its_accepted_proof(split):
     r, s = run(cfg, api)
     assert s['live'] == len(r.items)
     assert api.posted.index(('verify', 'A.low_s2')) < api.posted.index(('def', 'XB001'))
+
+
+def test_a_statement_name_taken_by_a_different_statement_stops_with_its_dependents(split):
+    # KervaireMixing 2026-10-18: `phase_upper_of_fixed` was Shuze Chen's, with their own bundles;
+    # split_run adopted it by name and our pieces imported it, colliding with our bundle
+    d, cfg = split
+    api = FakeApi()
+    api.foreign['A.low_s2'] = {'id': 'theirs', 'author': 'Shuze Chen',
+                               'preamble': 'import Mathlib\nimport Definitions.Def_Theirs',
+                               'formal_statement': 'theorem A_low_s2 : True := by\n  sorry\n'}
+    r, summary = run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['statement:A.low']['state'] == 'stop'
+    assert 'name taken by a different statement' in st['statement:A.low']['last']
+    assert 'Shuze Chen' in st['statement:A.low']['last'] and 'theirs' in st['statement:A.low']['last']
+    assert 'statement_suffix' in st['statement:A.low']['last']
+    assert ('verify', 'A.low_s2') not in api.posted and ('thm', 'A.low_s2') not in api.posted
+    # its dependents are reported blocked, not silently waiting
+    assert any('statement:A.low' in why for x, why in summary['blocked'].items() if x == 'piece:A.low')
+
+
+def test_an_exact_match_is_adopted_whitespace_aside(split):
+    d, cfg = split
+    api = FakeApi()
+    api.foreign['A.low_s2'] = {'id': 'ours-before', 'author': 'dbenbenn',
+                               'preamble': 'import Definitions.Def_XB000\nimport Mathlib\n',
+                               'formal_statement': 'theorem A_low_s2 :   True := by\n    sorry'}
+    run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['statement:A.low']['state'] == 'live' and st['statement:A.low']['id'] == 'ours-before'
+
+
+def test_a_bundle_name_taken_by_a_different_definition_stops(split):
+    d, cfg = split
+    api = FakeApi()
+    api.foreign['XB000'] = {'id': 'd1', 'author': 'Someone', 'definition': 'import Mathlib\n\ndef other : Nat := 2\n'}
+    r, summary = run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['bundle:XB000']['state'] == 'stop'
+    assert 'name taken by a different definitions bundle' in st['bundle:XB000']['last']
+    assert ('def', 'XB000') not in api.posted and ('def', 'XB001') not in api.posted
+    api2 = FakeApi()
+    api2.foreign['XB000'] = {'id': 'd0', 'author': 'dbenbenn', 'definition': 'import Mathlib\n\ndef  XB000.k : Nat := 1'}
+    (d / 'run_state.json').unlink()
+    run(cfg, api2)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['bundle:XB000']['state'] == 'live' and st['bundle:XB000']['id'] == 'd0'
