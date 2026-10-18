@@ -40,6 +40,10 @@ CONFIG.json (paths may use ~):
                                               # development whose earlier split took the names)
    "chunker": "schedule",                     # bundles by declaration-level list scheduling
                                               # (shallow); "bands" (default) cuts along modules
+   "pinned": {"benign": ["OAI.Higman.IsBenign"]},  # groups of definitions, each its own small
+                                              # bundle first (after frozen ones), closed under
+                                              # dependencies: statements using only them import
+                                              # only them; a non-definition is refused
    "patches": "patches.json",                 # [{literal_old, literal_new, why}] applied to every
                                               # generated file: proof fixes, never source edits
    "measured": {"plan": "work/plan_measured.json", "bundle_times": "work/bundle_times.json",
@@ -195,7 +199,8 @@ def main(argv):
                         external_defs=external_map(cfg),
                         statement_suffix=cfg.get('statement_suffix', ''),
                         external=cfg.get('external', ()),
-                        chunker=cfg.get('chunker', 'bands'))
+                        chunker=cfg.get('chunker', 'bands'),
+                        pinned=cfg.get('pinned'))
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)
         json.dump(P, open(out, 'w'), indent=1, sort_keys=True)
         worst = sorted(((p['cost'], n) for n, p in P['pieces'].items()), reverse=True)[:5]

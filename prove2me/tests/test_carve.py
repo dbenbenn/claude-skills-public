@@ -180,6 +180,42 @@ def test_check_plan_reports_bundle_import_cycles_as_cycles(g):
     assert not [p for p in C.check_plan(g, plan) if 'cycle' in p]
 
 
+def _pinned_plan(g, pinned, targets=('CD.main', 'CD.size_zero')):
+    return C.make_plan(g, list(targets), forced=['CD.size_zero'], budget=0.05, piece_size=10**6,
+                       bundle_budget=1.0, bundle_size=10**6,
+                       cost=C.size_costs(g, bytes_per_second=10000), bundle_prefix='P',
+                       chunker='schedule', pinned=pinned)
+
+
+def test_pinned_definitions_get_their_own_small_bundle_closed_under_dependencies(g):
+    # UniversalFInfinity (2026-10-18): named statements (Higman, Whitehead, Milnor) should import a
+    # few definitions, not the 850-declaration bundle the scheduler put them in; the split pinned
+    # them by hand through `frozen`, and a missed dependency made an import cycle.
+    p = _pinned_plan(g, {'space': ['CD.Space.size']})
+    first = p['bundles'][0]
+    # the pinned group is the first bundle, closed under dependencies (CD.Space came in itself)
+    assert first['name'] == 'P000' and set(first['nodes']) == {'CD.Space', 'CD.Space.size'}
+    assert first['imports'] == []
+    assert C.check_plan(g, p) == []
+    # a statement using only pinned definitions imports only the pinned bundle
+    assert p['stubs']['CD.size_zero']['bundles'] == ['P000']
+    # nothing pinned twice; later groups take what earlier ones left
+    p2 = _pinned_plan(g, [['CD.Space'], ['CD.Space.size', 'CD.Space.coord']])
+    assert p2['bundles'][0]['nodes'] == ['CD.Space']
+    # Space.coord's module sees the rfl simp lemma Space.size_eq, which simp may use silently: the
+    # closure takes implicit dependencies too
+    assert set(p2['bundles'][1]['nodes']) == {'CD.Space.size', 'CD.Space.coord', 'CD.Space.size_eq'}
+    assert p2['bundles'][1]['imports'] == ['P000']
+    assert C.check_plan(g, p2) == []
+
+
+def test_pinning_refuses_what_is_not_bundle_material(g):
+    with pytest.raises(C.CarveError, match='CD.double_succ'):
+        _pinned_plan(g, [['CD.double_succ']])
+    with pytest.raises(C.CarveError, match='CD.nonexistent'):
+        _pinned_plan(g, [['CD.nonexistent']])
+
+
 def test_publish_order_puts_statements_after_bundles_and_pieces_last(plan):
     order = C.publish_order(plan, external=['CD.main'])
     wave = {x: i for i, w in enumerate(order['waves']) for x in w}
@@ -372,6 +408,12 @@ def test_scoped_notations_and_silent_simp_lemmas_compile(g, tmp_path):
     _compile_in_publish_order(g, p, tmp_path)
 
 
+@pytest.mark.lean
+def test_pinned_bundles_compile(g, tmp_path):
+    # a pinned bundle carries everything its members need: it compiles on its own, first
+    _compile_in_publish_order(g, _pinned_plan(g, [['CD.Space'], ['CD.Space.size', 'CD.Space.coord']]), tmp_path)
+
+
 def _compile_in_publish_order(g, plan, tmp_path):
     out = str(tmp_path / 'out')
     C.generate(g, plan, out)
@@ -439,6 +481,28 @@ def test_command_line_plan_gen_order(tmp_path):
     assert len(Q['bundles']) > len(P['bundles'])
     assert json.loads((work / 'plan.pre_split.json').read_text()) == P
     assert 'plan OK' in run('check', str(cfg))
+
+
+def test_command_line_pinned(tmp_path):
+    import shutil
+    import subprocess
+    import sys
+    work = tmp_path / 'work'
+    work.mkdir()
+    shutil.copy(os.path.join(FIX, 'decl_graph.jsonl'), work / 'decl_graph.jsonl')
+    cfg = tmp_path / 'carve.json'
+    cfg.write_text(json.dumps({'src': FIX, 'prefix': 'CarveDev', 'roots': ['CarveDev.Top'],
+                               'targets': ['CD.main'], 'forced': ['CD.size_zero'],
+                               'external': ['CD.main'], 'work': str(work), 'out': str(tmp_path / 'out'),
+                               'bundle_prefix': 'CDP', 'budget': 0.05, 'bundle_budget': 1.0,
+                               'bytes_per_second': 10000, 'chunker': 'schedule',
+                               'pinned': {'space': ['CD.Space.size']}}))
+    script = os.path.join(os.path.dirname(HERE), 'scripts', 'carve.py')
+    r = subprocess.run([sys.executable, script, 'plan', str(cfg)], capture_output=True, text=True)
+    assert r.returncode == 0 and 'PROBLEM' not in r.stdout, r.stdout + r.stderr
+    P = json.loads((work / 'plan.json').read_text())
+    assert set(P['bundles'][0]['nodes']) == {'CD.Space', 'CD.Space.size'}
+    assert P['stubs']['CD.size_zero']['bundles'] == ['CDP000']
 
 
 def test_notation_tokens_and_their_uses():

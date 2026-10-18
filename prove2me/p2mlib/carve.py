@@ -1105,9 +1105,41 @@ def _bundle_reason(g, seeds, t):
             'whose targets do not need that definition' % (chain[-1], ' -> '.join(reversed(chain))))
 
 
+def _pin_chunks(g, pinned, B, taken, extra):
+    """make_plan's `pinned` groups as bundle chunks: each group's names (owners), closed under
+    dependencies and implicit dependencies within B, less what frozen bundles and earlier groups
+    hold. Refuses an unknown name or one that is not bundle material."""
+    if not pinned:
+        return []
+    groups = list(pinned.items()) if isinstance(pinned, dict) else [(str(i), grp) for i, grp in enumerate(pinned)]
+    taken = set(taken)
+    out = []
+    for label, grp in groups:
+        keys = []
+        for x in grp:
+            k = g.owner.get(x, x)
+            if k not in g.nodes:
+                raise CarveError('pinned group %s: unknown declaration %s' % (label, x))
+            if k not in B:
+                raise CarveError('pinned group %s: %s is not bundle material (%s)' % (
+                    label, x, 'a theorem no definition needs' if g.nodes[k].theorem else
+                    'not reachable from the targets'))
+            keys.append(k)
+        cl, todo = set(), list(keys)
+        while todo:
+            k = todo.pop()
+            if k in cl or k in taken or k not in B:
+                continue
+            cl.add(k)
+            todo += [d for d in g.nodes[k].deps | extra.get(k, set()) if d in g.nodes]
+        taken |= cl
+        out.append(sorted(cl))
+    return out
+
+
 def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_budget=90.0,
               bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
-              external_defs=None, statement_suffix='', external=(), chunker='bands'):
+              external_defs=None, statement_suffix='', external=(), chunker='bands', pinned=None):
     """The split: bundles, nodes (published statements) and each node's piece.
 
     - Bundle material B: every reachable non-theorem, what reachable statements need, their
@@ -1125,7 +1157,13 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
       never carved or republished, available everywhere, imported where used.
     - `statement_suffix`: published statement names are `<name><suffix>` (a fresh split of a
       development whose first split already took the names), except `external` statements,
-      published by someone else under their own names."""
+      published by someone else under their own names.
+    - `pinned`: groups of definitions ([[names]] or {label: [names]}), each its own bundle right
+      after the frozen ones, closed under dependencies within the bundle material (earlier groups
+      and frozen bundles excepted). A statement whose definitions are all pinned imports only those
+      small bundles (UniversalFInfinity: Higman's, Whitehead's and Milnor's statements, which the
+      scheduler had put into an 850-declaration bundle). A name that is not bundle material is
+      refused."""
     cost = cost if cost is not None else size_costs(g)
     targets, forced = list(targets), list(forced)
     for t in targets + forced:
@@ -1147,6 +1185,8 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     B = g.closure(seeds) | {k for ch in fz_chunks for k in ch}
     B |= g.extra_roots(B, set())
     B -= set(ext)
+    extra = implicit_deps(g, B, B) if chunker == 'schedule' else {}
+    pin_chunks = _pin_chunks(g, pinned, B, {k for ch in fz_chunks for k in ch}, extra)
     for t in targets + forced:
         if t in B:
             raise CarveError('%s cannot be a published statement: %s' % (t, _bundle_reason(g, seeds, t)))
@@ -1209,12 +1249,10 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             nodes.add(k)
             s = fresh(n)
         memo[n] = s
-    extra = {}
     if chunker == 'schedule':
-        extra = implicit_deps(g, B, B)
-        chunks = chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, fz_chunks, extra)
+        chunks = chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, fz_chunks + pin_chunks, extra)
     else:
-        chunks = chunk_bundles(g, B, cost, bundle_budget, bundle_size, band_width, fz_chunks)
+        chunks = chunk_bundles(g, B, cost, bundle_budget, bundle_size, band_width, fz_chunks + pin_chunks)
     if frozen:
         names = list(frozen[1]) + [None] * (len(chunks) - len(frozen[1]))
     else:
