@@ -1392,6 +1392,86 @@ def _plan_index(plan):
     return pos, bimp, bidx
 
 
+def bundle_cycles(g, plan):
+    """The import cycles among the plan's bundles, read from what their members need (not from
+    their recorded imports, which `_reduce` empties on a cycle): one entry per cyclic strongly
+    connected component, [(bundle, member, needed declaration, needed bundle), …] along a cycle
+    through it. A cycle cannot be published in any order (UniversalFInfinity 2026-10-18: a pinned
+    bundle missed one dependency, and the check said only "not imported")."""
+    names = [b['name'] for b in plan['bundles']]
+    where = {k: i for i, b in enumerate(plan['bundles']) for k in b['nodes']}
+    why = {}
+    for i, b in enumerate(plan['bundles']):
+        for k in b['nodes']:
+            for d in sorted(g.nodes[k].deps):
+                j = where.get(d)
+                if j is not None and j != i and (i, j) not in why:
+                    why[(i, j)] = (k, d)
+    succ = collections.defaultdict(list)
+    for i, j in sorted(why):
+        succ[i].append(j)
+    # Tarjan's strongly connected components, iteratively
+    index, low, on, stack, comps, counter = {}, {}, set(), [], [], [0]
+    for root in range(len(names)):
+        if root in index:
+            continue
+        work = [(root, iter(succ[root]))]
+        index[root] = low[root] = counter[0]
+        counter[0] += 1
+        stack.append(root)
+        on.add(root)
+        while work:
+            v, it = work[-1]
+            w = next(it, None)
+            if w is None:
+                work.pop()
+                if work:
+                    low[work[-1][0]] = min(low[work[-1][0]], low[v])
+                if low[v] == index[v]:
+                    comp = []
+                    while True:
+                        x = stack.pop()
+                        on.discard(x)
+                        comp.append(x)
+                        if x == v:
+                            break
+                    if len(comp) > 1:
+                        comps.append(sorted(comp))
+            elif w not in index:
+                index[w] = low[w] = counter[0]
+                counter[0] += 1
+                stack.append(w)
+                on.add(w)
+                work.append((w, iter(succ[w])))
+            elif w in on:
+                low[v] = min(low[v], index[w])
+    out = []
+    for comp in comps:
+        inside = set(comp)
+        # one cycle through the component's first bundle, by breadth-first search back to it
+        start = comp[0]
+        prev, todo = {start: None}, [start]
+        end = None
+        while todo and end is None:
+            v = todo.pop(0)
+            for w in succ[v]:
+                if w not in inside:
+                    continue
+                if w == start:
+                    end = v
+                    break
+                if w not in prev:
+                    prev[w] = v
+                    todo.append(w)
+        path = [end]
+        while prev[path[-1]] is not None:
+            path.append(prev[path[-1]])
+        path.reverse()
+        cyc = path + [start]
+        out.append([(names[a], why[(a, b)][0], why[(a, b)][1], names[b]) for a, b in zip(cyc, cyc[1:])])
+    return out
+
+
 def check_plan(g, plan):
     """What would not compile: every dependency of a bundle member in its bundle or one it
     imports; of a piece, in the piece, an imported statement or its bundles; of a statement, in
@@ -1411,6 +1491,10 @@ def check_plan(g, plan):
         for k in p['keep']:
             if g.nodes[k].sorry:
                 probs.append('piece %s: %s uses sorry' % (n, k))
+    for cyc in bundle_cycles(g, plan):
+        probs.append('bundle import cycle %s: %s' % (
+            ' -> '.join([c[0] for c in cyc] + [cyc[0][0]]),
+            '; '.join('%s in %s needs %s from %s' % (k, a, d, b) for a, k, d, b in cyc)))
     for i, b in enumerate(plan['bundles']):
         if any(pos.get(x, len(pos)) >= i for x in b['imports']):
             probs.append('bundle %s imports a later or unknown bundle' % b['name'])

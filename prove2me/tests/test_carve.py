@@ -161,6 +161,25 @@ def test_sorry_never_reaches_a_bundle_or_piece(g, plan):
         C.gen_bundle(g, bad, b)
 
 
+def test_check_plan_reports_bundle_import_cycles_as_cycles(g):
+    # UniversalFInfinity (2026-10-18): a hand-pinned bundle missed one dependency, so it and a
+    # later bundle needed each other; the imports were silently reduced away and the check only
+    # said "needs … from bundle …, not imported". A cycle can never be published: say so.
+    plan = {'bundles': [{'name': 'Y0', 'nodes': ['CD.Space.size'], 'imports': []},
+                        {'name': 'Y1', 'nodes': ['CD.Space', 'CD.Space.size_eq'], 'imports': []}],
+            'nodes': [], 'pieces': {}, 'stubs': {}}
+    probs = C.check_plan(g, plan)
+    cyc = [p for p in probs if 'cycle' in p]
+    assert len(cyc) == 1
+    assert 'Y0' in cyc[0] and 'Y1' in cyc[0]
+    # the witnesses: which member needs which declaration across the cycle
+    assert 'CD.Space.size' in cyc[0] and 'CD.Space.size_eq' in cyc[0]
+    # an acyclic plan reports none
+    plan['bundles'] = [{'name': 'Y0', 'nodes': ['CD.Space'], 'imports': []},
+                       {'name': 'Y1', 'nodes': ['CD.Space.size', 'CD.Space.size_eq'], 'imports': ['Y0']}]
+    assert not [p for p in C.check_plan(g, plan) if 'cycle' in p]
+
+
 def test_publish_order_puts_statements_after_bundles_and_pieces_last(plan):
     order = C.publish_order(plan, external=['CD.main'])
     wave = {x: i for i, w in enumerate(order['waves']) for x in w}
