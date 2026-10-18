@@ -109,6 +109,17 @@ def paginate_numbered(path, key, call=None):
         page += 1
 
 
+def live_proofs(tid, call=None):
+    """The theorem's live proof attempts that already settle it or may: ACCEPTED, SKETCH_ACCEPTED or
+    PENDING, not deprecated, from GET /theorems/:id/submissions (the per-theorem list; GET
+    /submissions ignores theorem_id). submit_verify.post_verify refuses to add a proof beside these
+    unless told why (2026-10-18: a duplicate erdos_3 proof went up beside one ten days old)."""
+    call = call or globals()['call']
+    r = call('GET', '/theorems/%s/submissions?limit=200' % tid)
+    rows = (r.get('submissions') if isinstance(r, dict) else None) or []
+    return [s for s in rows if not s.get('deprecated_at') and s.get('status') in LIVE + ('PENDING',)]
+
+
 def poll_verdict(sid, minutes=60, every=15, call=None, sleep=time.sleep):
     """The verdict of a submission: its final record, or {'status': 'PENDING', ...} after `minutes`."""
     call = call or globals()['call']

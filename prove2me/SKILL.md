@@ -861,6 +861,10 @@ and prove.md calls it "very IMPORTANT". The backfill for the live missions is in
 **A statement proved meanwhile gets our proof only if ours is meaningfully different**: correct
 edges, or different mathematics (dbenbenn, 2026-10-04). `submit_solution.py` reads the live proofs
 at submission time, since a batch built hours earlier can find the theorem proved in between.
+- `submit_verify.post_verify` itself refuses a theorem with a live proof (accepted, sketch-accepted
+  or pending) unless given `also="<why ours differs or what it replaces>"` (CLI `--also`);
+  `submit_solution.py` passes `checked=True` after its fuller check. Erdős 3, 2026-10-18: a hand
+  call to `post_verify` put a line-for-line duplicate of a ten-day-old `erdos_3` reduction live.
 - The same Lean source is a `DUPLICATE`, never submitted.
 - A proof with an edge that no live proof has goes in, and the log says what it adds. Our edges are
   checked to be used, so this is a different decomposition, or the other proof inlined a milestone.

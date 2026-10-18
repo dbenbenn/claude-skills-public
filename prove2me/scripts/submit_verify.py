@@ -1,14 +1,41 @@
 #!/usr/bin/env python3
 """Submit a solution file to POST /verify (multipart) and poll for the verdict.
 
-usage: submit_verify.py [--disprove] <theorem_id> <solution.lean> [explanation.md]
+usage: submit_verify.py [--disprove] [--also REASON] <theorem_id> <solution.lean> [explanation.md]
+
+It refuses a theorem that already has a live proof (accepted, sketch-accepted or pending) and names
+it: read that proof first (submit_solution.py saves it under others/ and compares edges). Pass
+--also REASON (in code: also=REASON) to submit anyway, the reason saying why ours is meaningfully
+different or what it replaces. submit_solution.py, which runs the fuller check itself, passes
+checked=True.
 """
 import json, os, sys, time, uuid, urllib.request, urllib.error
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from p2m import token, call
 
 
-def post_verify(theorem_id, path, explanation=None, proof_type=None):
+class ExistingProof(RuntimeError):
+    """The theorem already has a live proof; a RuntimeError, so the split runner stops that item."""
+
+
+def guard(theorem_id, also=None):
+    from p2mlib.api import live_proofs
+    if also and also.strip():
+        return
+    live = live_proofs(theorem_id, call=call)
+    if live:
+        raise ExistingProof(
+            'theorem %s already has %d live proof(s): %s. Read it first (submit_solution.py saves it '
+            'under others/ and compares edges); submit only if ours is meaningfully different or '
+            'replaces it, saying why: also="<reason>" (CLI --also REASON).' % (
+                theorem_id, len(live), '; '.join('%s %s %s by %s' % (p['id'], p.get('status'),
+                                                  (p.get('created_at') or '')[:10], p.get('username'))
+                                                  for p in live)))
+
+
+def post_verify(theorem_id, path, explanation=None, proof_type=None, also=None, checked=False):
+    if not checked:
+        guard(theorem_id, also)
     boundary = '----p2m' + uuid.uuid4().hex
     parts = []
 
@@ -50,18 +77,37 @@ def poll(sid, tries=240, delay=15):
     return poll_verdict(sid, minutes=max(1, tries * delay // 60), every=delay, call=call)
 
 
-if __name__ == '__main__':
-    args = [a for a in sys.argv[1:] if not a.startswith('--')]
-    flags = [a for a in sys.argv[1:] if a.startswith('--')]
-    # a mistyped flag (`--disproof`) must not silently submit a proof instead of a disproof
-    if set(flags) - {'--disprove'} or len(args) not in (2, 3):
+def parse_args(argv):
+    """(theorem_id, solution, explanation or None, proof_type or None, also or None)."""
+    args, ptype, also, i = [], None, None, 0
+    while i < len(argv):
+        a = argv[i]
+        if a == '--disprove':
+            ptype = 'disprove'
+        elif a == '--also':
+            if i + 1 >= len(argv) or argv[i + 1].startswith('--') or not argv[i + 1].strip():
+                sys.exit('--also needs a reason\n' + __doc__)
+            also = argv[i + 1]; i += 1
+        elif a.startswith('--'):
+            # a mistyped flag (`--disproof`) must not silently submit a proof instead of a disproof
+            sys.exit(__doc__)
+        else:
+            args.append(a)
+        i += 1
+    if len(args) not in (2, 3):
         sys.exit(__doc__)
+    return args[0], args[1], (args[2] if len(args) > 2 else None), ptype, also
+
+
+if __name__ == '__main__':
     # `--disprove` sends proof_type=disprove: the solution must prove the negation of the whole
     # quantified statement, and may import Definitions.Def_* and Mathlib but not Theorems.Thm_*.
-    ptype = 'disprove' if '--disprove' in flags else None
-    tid, path = args[0], args[1]
-    expl = open(args[2], encoding='utf-8').read() if len(args) > 2 else None
-    r = post_verify(tid, path, expl, ptype)
+    tid, path, epath, ptype, also = parse_args(sys.argv[1:])
+    expl = open(epath, encoding='utf-8').read() if epath else None
+    try:
+        r = post_verify(tid, path, expl, ptype, also=also)
+    except ExistingProof as e:
+        sys.exit('REFUSED: %s' % e)
     print(json.dumps(r, indent=1)[:2000])
     sid = r.get('submission_id')
     if not sid:

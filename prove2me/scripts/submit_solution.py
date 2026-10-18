@@ -308,7 +308,7 @@ def main():
     if not go:
         print('dry run -- pass --go to submit'); return
     from submit_verify import post_verify, poll
-    r = post_verify(tid, path, expl)
+    r = post_verify(tid, path, expl, checked=True)   # the live-proof check ran above
     sid = r.get('submission_id')
     if not sid:
         sys.exit('SUBMIT FAILED: %s' % r)

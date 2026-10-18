@@ -185,7 +185,7 @@ def test_blocking_unit():
 def test_late_verdict_is_pending_not_rejected(ws, tmp_path, monkeypatch):
     # 7da9719: a 21-minute compile was reported as "not accepted: None"; it was ACCEPTED
     import submit_verify
-    monkeypatch.setattr(submit_verify, 'post_verify', lambda *a: {'submission_id': 'new'})
+    monkeypatch.setattr(submit_verify, 'post_verify', lambda *a, **k: {'submission_id': 'new'})
     monkeypatch.setattr(submit_verify, 'poll', lambda sid: {'status': 'PENDING', '__error': 'no verdict after 60 minutes'})
     with pytest.raises(SystemExit) as e:
         run(monkeypatch, fake_platform(live_edges=False), 'N.target', sol(tmp_path, TOP), '--explanation', expl(tmp_path), '--go')
