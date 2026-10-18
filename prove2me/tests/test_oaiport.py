@@ -105,6 +105,10 @@ def test_patches_apply_their_count_and_report_every_mismatch():
         O.apply_patches(files, [{'old': 'x := 1\n', 'new': 'z'}, {'old': 'nowhere', 'new': 'z'}])
     msg = str(e.value)
     assert 'applies 2 times, want 1' in msg and 'applies 0 times, want 1' in msg
+    # a later patch may rewrite an earlier one's output (posteriorreplicas: `infer_instance`, then
+    # its replacement amended): each is counted against the text as the earlier ones left it
+    chain = [{'old': 'y := 2', 'new': 'y := f'}, {'old': 'y := f', 'new': 'y := g'}]
+    assert O.apply_patches({'B.lean': 'y := 2\n'}, chain) == {'B.lean': 'y := g\n'}
     # one text works too
     assert O.apply_patches('y := 2\n', [{'old': 'y := 2', 'new': 'y := 5'}]) == 'y := 5\n'
 

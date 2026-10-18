@@ -209,12 +209,17 @@ def cmd_ext_defs(argv):
 
 def filter_patches(patches, texts):
     """(kept, [(count, patch)] dropped): a patch is kept when its `old` occurs exactly `count`
-    times over all the texts together."""
-    allt = ''.join(texts)
+    times over all the texts together, after the kept patches before it are applied (a later
+    patch may amend an earlier one's output)."""
+    allt = '\x00'.join(texts)
     keep, drop = [], []
     for p in patches:
         n = allt.count(p['old'])
-        (keep if n == p.get('count', 1) else drop).append(p if n == p.get('count', 1) else (n, p))
+        if n == p.get('count', 1):
+            keep.append(p)
+            allt = allt.replace(p['old'], p['new'])
+        else:
+            drop.append((n, p))
     return keep, drop
 
 

@@ -204,8 +204,9 @@ def rename_target(text, target, suffix='_oai'):
 
 
 def apply_patches(files, patches):
-    """`files` ({path: text}, or one text) with each patch {old, new, count=1} applied; each must
-    occur exactly `count` times over all files, and every one that does not is reported."""
+    """`files` ({path: text}, or one text) with each patch {old, new, count=1} applied in order;
+    each must occur exactly `count` times over all files as the earlier patches left them (a later
+    patch may amend an earlier one's output), and every one that does not is reported."""
     single = isinstance(files, str)
     files = {'': files} if single else dict(files)
     bad = []
@@ -213,11 +214,11 @@ def apply_patches(files, patches):
         n = sum(t.count(p['old']) for t in files.values())
         if n != p.get('count', 1):
             bad.append('patch applies %d times, want %d: %r' % (n, p.get('count', 1), p['old'][:100]))
-    if bad:
-        raise PortError('\n'.join(bad))
-    for p in patches:
+            continue
         for f in files:
             files[f] = files[f].replace(p['old'], p['new'])
+    if bad:
+        raise PortError('\n'.join(bad))
     return files[''] if single else files
 
 

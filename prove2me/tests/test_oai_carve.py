@@ -110,6 +110,10 @@ def test_filter_patches_keeps_exact_counts():
                                    ['x\n', 'x z z\n'])
     assert keep == [{'old': 'x', 'new': 'y', 'count': 2}]
     assert drop == [(2, {'old': 'z', 'new': 'w'})]
+    # a chained patch (its `old` is an earlier patch's `new`) counts after the earlier ones
+    chain = [{'old': 'a b', 'new': 'a c'}, {'old': 'a c', 'new': 'a d'}]
+    keep, drop = CP.filter_patches(chain, ['a b\n'])
+    assert keep == chain and drop == []
 
 
 def test_text_check_names_and_stub_comments():
