@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Compile ported modules (oai_port_modules.py) one at a time, -j1, in import order, into the
+workspace build tree, printing one `lake build`-format line per module with its CPU seconds (what
+carve.parse_build_log reads); then write the elaboration log the carve cost model wants.
+
+usage: oai_build_modules.py FOLDER ROOT [--force] [--log BUILD.log] [--elab-log OUT.log]
+                            [--overhead 3.0] [--ws WORKSPACE]
+       oai_build_modules.py --elab-only BUILD.log OUT.log [--overhead 3.0]
+
+  ROOT        the root module's short name (Main for Solutions.FOLDER.Main); dotted names allowed
+              for nested folders
+  --force     rebuild every module (default: only those whose source is newer than its .olean)
+  --log       also write the build lines to this file (what --elab-log reads)
+  --elab-log  the build lines with OVERHEAD seconds (the Mathlib import, about 3 s here) taken off
+              each module (floor 0.1 s), for config `build_logs` (module_costs adds a fixed 0.5 s);
+              replayed modules have no time, so keep the earlier logs too (carve_prep.py config
+              reads every build_elab*.log, later ones winning) or pass --force
+
+One Lean process at a time (the box cap is three, shared). A failed module's outputs are removed
+and the script exits 1 with its first errors."""
+import os
+import re
+import resource
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+
+
+def opt(argv, name, default=None):
+    return argv[argv.index(name) + 1] if name in argv else default
+
+
+def module_order(d, pre, root):
+    """The modules ROOT imports under `pre` (folder `d`), dependencies first, ROOT last."""
+    order, seen = [], set()
+
+    def visit(m):
+        if m in seen:
+            return
+        seen.add(m)
+        t = open(os.path.join(d, *m.split('.')) + '.lean', encoding='utf-8').read()
+        for x in re.findall(r'^import %s\.([\w.]+)' % re.escape(pre), t, re.M):
+            visit(x)
+        order.append(m)
+    visit(root)
+    return order
+
+
+def elab_lines(build_log, overhead=3.0):
+    """`lake build` lines with `overhead` seconds off each module's time (floor 0.1 s)."""
+    out = []
+    for l in build_log.split('\n'):
+        m = re.search(r'Built (\S+) \(([\d.]+)s\)', l)
+        if m:
+            out.append('✔ Built %s (%.2fs)' % (m.group(1), max(float(m.group(2)) - overhead, 0.1)))
+    return '\n'.join(out) + '\n'
+
+
+def build(ws, folder, root, force=False, log=None):
+    pre = 'Solutions.' + folder
+    d = os.path.join(ws, 'Solutions', folder)
+    out_root = os.path.join(ws, '.lake', 'build', 'lib', 'lean')
+    order = module_order(d, pre, root)
+    lines, total = [], 0.0
+
+    def say(s):
+        print(s, flush=True)
+        lines.append(s)
+        if log:
+            open(log, 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
+    for i, m in enumerate(order):
+        mod = pre + '.' + m
+        out = os.path.join(out_root, *mod.split('.'))
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        src = os.path.join(d, *m.split('.')) + '.lean'
+        if not force and os.path.exists(out + '.olean') and \
+                os.path.getmtime(out + '.olean') > os.path.getmtime(src):
+            say('✔ [%d/%d] Replayed %s' % (i + 1, len(order), mod))
+            continue
+        ru0 = resource.getrusage(resource.RUSAGE_CHILDREN)
+        r = subprocess.run(['lake', 'env', 'lean', '-j1', '-DautoImplicit=false', '-R', ws,
+                            '-o', out + '.olean', '-i', out + '.ilean', src], cwd=ws,
+                           capture_output=True, text=True)
+        ru1 = resource.getrusage(resource.RUSAGE_CHILDREN)
+        cpu = (ru1.ru_utime - ru0.ru_utime) + (ru1.ru_stime - ru0.ru_stime)
+        total += cpu
+        o = r.stdout + r.stderr
+        errs = [l for l in o.split('\n') if ': error' in l]
+        if r.returncode or errs:
+            say('✖ [%d/%d] FAILED %s (%.1fs)' % (i + 1, len(order), mod, cpu))
+            print('\n'.join((errs or [o[-2000:]])[:10]))
+            for f in (out + '.olean', out + '.ilean'):
+                if os.path.exists(f):
+                    os.remove(f)
+            return False, lines
+        say('✔ [%d/%d] Built %s (%.1fs)' % (i + 1, len(order), mod, cpu))
+    print('total CPU %.1f s over %d modules' % (total, len(order)))
+    return True, lines
+
+
+def main(argv):
+    oh = float(opt(argv, '--overhead', 3.0))
+    if '--elab-only' in argv:
+        i = argv.index('--elab-only')
+        src, out = argv[i + 1:i + 3]
+        open(out, 'w', encoding='utf-8').write(elab_lines(open(src, encoding='utf-8').read(), oh))
+        return
+    valued = ('--log', '--elab-log', '--overhead', '--ws')
+    skip = {argv.index(o) + 1 for o in valued if o in argv}
+    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and i not in skip]
+    if len(pos) != 2:
+        sys.exit(__doc__)
+    from p2mlib.workspace import workspace
+    ok, lines = build(opt(argv, '--ws') or workspace(), pos[0], pos[1], '--force' in argv,
+                      opt(argv, '--log'))
+    if ok and '--elab-log' in argv:
+        open(opt(argv, '--elab-log'), 'w', encoding='utf-8').write(elab_lines('\n'.join(lines), oh))
+    sys.exit(0 if ok else 1)
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

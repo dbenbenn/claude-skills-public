@@ -1538,6 +1538,8 @@ script prints its usage when run with no arguments.
 | `build_solution.py` | Build the solution file for one published theorem from a Lean development, ready to submit. |
 | `build_solutions.py` | Build a mission's solutions from its development's check files: one file per statement. |
 | `carve.py` | Split a large ported Lean development into published Definitions bundles, intermediate statements and one carved proof piece per statement. |
+| `carve_measure.py` | Compile every generated bundle, statement stub and piece of a carve (carve.py gen), one Lean at a time, -j1, in publish order (p2mlib.carve.publish_order), and record CPU seconds and errors. |
+| `carve_prep.py` | The small steps around carving a ported openai/math result (oai_port_modules.py, oai_build_modules.py, then carve.py graph/plan/gen, carve_measure.py, carve.py split). |
 | `caveat_audit.py` | Audit the prose that explains a source-audit gap: does the natural-language statement's note account for each gap accurately, and does it claim anything the Lean or a citation does not back? |
 | `check_complete.py` | Is a mission's development complete? |
 | `check_description.py` | Run the prove2me skill's description checklist mechanically. |
@@ -1554,8 +1556,10 @@ script prints its usage when run with no arguments.
 | `live_milestones.py` | Add milestones to a live mission, or edit one, from .md files; a dry run unless --go. |
 | `merge.py` | Concatenate a mission's shared modules into one self-contained prove2.me solution file. |
 | `oai_batch.py` | Port and check many published OAI goals locally, one single-file port each (never submits). |
+| `oai_build_modules.py` | Compile ported modules (oai_port_modules.py) one at a time, -j1, in import order, into the workspace build tree, printing one `lake build`-format line per module with its CPU seconds (what carve.parse_build_log reads); then write the elaboration log the carve cost model wants. |
 | `oai_fetch.py` | Fetch an openai/math module's OAI.* import closure at a commit, into DEST/lean/... (files already there are reused). |
 | `oai_port.py` | Port an openai/math result for a published OAI goal into one solution file, then check it the way the verifier does (locally; never submits). |
+| `oai_port_modules.py` | Port openai/math modules into the workspace as Lean modules, for carving (the module route; the single-file route is oai_port.py). |
 | `oai_submit.py` | Submit single-file ports as they are, in order, each once its explanation exists. |
 | `p2m.py` | The prove2.me API client -- now p2mlib.api; this module re-exports it for the scripts. |
 | `patch_explanations.py` | PATCH proof explanations from files named by submission id, checking each one first. |

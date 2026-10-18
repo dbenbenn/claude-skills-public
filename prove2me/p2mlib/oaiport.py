@@ -18,6 +18,7 @@ Every function here pins a behaviour that went wrong on a live port (2026-10-18)
 * `classify_attempt` / `state_from_log`: the submit queue rebuilds each goal from its log, so a
   restart neither repeats nor loses an attempt.
 """
+import os
 import re
 
 
@@ -250,6 +251,69 @@ def core_rewrites(text):
     return re.sub(r'^([ \t]*)(induction \S+ using TensorProduct\.induction_on with\n)(?![ \t]*\| zero)',
                   lambda m: m.group(1) + m.group(2) + m.group(1) + '| zero => simp only [map_zero]\n',
                   text, flags=re.M)
+
+
+LINT = ('set_option linter.all false\nset_option linter.unusedVariables false\n'
+        'set_option linter.unusedTactic false\nset_option linter.unreachableTactic false\n')
+
+
+def module_sources(lean_root, prefixes):
+    """{OpenAI module name: (short name, text)} for every module under the given prefixes of the
+    fetched lean/ tree; the short name is the path below its prefix with `/` -> `_` (a nested
+    Sub/X.lean is Sub_X)."""
+    out, short = {}, {}
+    for pre in prefixes:
+        base = os.path.join(lean_root, *pre.split('.'))
+        if not os.path.isdir(base):
+            raise PortError('no directory for %s: %s' % (pre, base))
+        for dp, _, fs in os.walk(base):
+            for f in sorted(fs):
+                if f.endswith('.lean'):
+                    rel = os.path.relpath(os.path.join(dp, f), base)[:-5]
+                    s = rel.replace(os.sep, '_')
+                    if s in short and short[s] != pre:
+                        raise PortError('two modules flatten to %s (%s, %s)' % (s, short[s], pre))
+                    short[s] = pre
+                    out[pre + '.' + rel.replace(os.sep, '.')] = (
+                        s, open(os.path.join(dp, f), encoding='utf-8').read())
+    return out
+
+
+def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', header=''):
+    """The workspace modules of a module-route port: {file name: text} under Lean prefix `mod`
+    (e.g. Solutions.OAIQW_X). `sources` as module_sources returns. Each module's OAI imports are
+    rewritten to the ported copies (an import of an OpenAI module that is not ported is an error:
+    add its prefix); a module importing none of them imports `<mod>.Compat`; the linter-off lines
+    and `header` go after the imports; core and compat rewrites, then the patches (each exactly
+    its count over all files). Compat.lean holds compat_block(compat_text, compat_ns)."""
+    names = {k: v[0] for k, v in sources.items()}
+    block, rewrites = compat_block(compat_text, compat_ns)
+    files, missing = {}, set()
+    for oai, (short, t) in sources.items():
+        def rep(m):
+            n = m.group(1)
+            if n in names:
+                return 'import %s.%s' % (mod, names[n])
+            if n.split('.')[0] in ('OAI', 'ComparatorChallenges'):
+                missing.add('%s (imported by %s)' % (n, oai))
+            return m.group(0)
+        t = re.sub(r'^import (\S+)', rep, t, flags=re.M)
+        if not re.search(r'^import %s\.' % re.escape(mod), t, re.M):
+            # after `import Mathlib`, else first (Compat imports Mathlib, so a module with narrower
+            # Mathlib imports pays nothing more)
+            t, k = re.subn(r'^import Mathlib[ \t]*\n', 'import Mathlib\nimport %s.Compat\n' % mod, t,
+                           count=1, flags=re.M)
+            if not k:
+                t = 'import %s.Compat\n' % mod + t
+        ls = t.split('\n')
+        k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
+        t = '\n'.join(ls[:k] + [''] + (LINT + header).rstrip().split('\n') + ls[k:])
+        files[short + '.lean'] = apply_rewrites(core_rewrites(t), rewrites)
+    if missing:
+        raise PortError('imports of OpenAI modules that are not ported:\n  ' + '\n  '.join(sorted(missing)))
+    files = apply_patches(files, patches)
+    files['Compat.lean'] = 'import Mathlib\n\n' + block
+    return files
 
 
 def classify_attempt(out):
