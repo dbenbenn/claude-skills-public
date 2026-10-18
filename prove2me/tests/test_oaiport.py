@@ -151,3 +151,27 @@ def test_the_queue_rebuilds_each_goal_from_its_log():
     assert O.classify_attempt('verdict TIMEOUT s9\nnot accepted: timed out')[:2] == ('TIMEOUT', 's9')
     assert O.classify_attempt('verdict WRONG s9\nnot accepted: wrong answer')[0] == 'REJECTED'
     assert O.classify_attempt('submission queued') is None
+
+
+def test_the_submit_queue_reconciles_from_logs_and_limits_retries(tmp_path):
+    import importlib.util
+    import json
+    spec = importlib.util.spec_from_file_location(
+        'oai_submit', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                   'scripts', 'oai_submit.py'))
+    S = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(S)
+    (tmp_path / 'results').mkdir()
+    (tmp_path / 'sub_done.log').write_text(fix('sub_log.txt'))
+    (tmp_path / 'sub_slow.log').write_text('=== t\nverdict TIMEOUT s5\nnot accepted: timed out\n')
+    (tmp_path / 'results' / 'slow.json').write_text(json.dumps({'target': 'OAI.X.slow', 'secs': 120.0}))
+    (tmp_path / 'results' / 'fast.json').write_text(json.dumps({'target': 'OAI.X.fast', 'secs': 30.0}))
+    (tmp_path / 'sub_fast.log').write_text('=== t\nverdict TIMEOUT s6\nnot accepted: timed out\n')
+    q = S.Queue(str(tmp_path))
+    q.reconcile(['done', 'slow', 'fast', 'fresh'])
+    st = q.load()
+    assert st['done'] == {'attempts': 3, 'verdict': 'ACCEPTED', 'id': 's3', 'msg': ''}
+    assert 'fresh' not in st
+    # a file over ~90 s gets one attempt; a faster one gets an unchanged retry
+    assert q.terminal(st['slow'], 'slow') and not q.terminal(st['fast'], 'fast')
+    assert q.terminal(st['done'], 'done')

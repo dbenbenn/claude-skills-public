@@ -1553,6 +1553,10 @@ script prints its usage when run with no arguments.
 | `link_mentions.py` | Link the published theorems that a live mission's texts name by their full Lean names. |
 | `live_milestones.py` | Add milestones to a live mission, or edit one, from .md files; a dry run unless --go. |
 | `merge.py` | Concatenate a mission's shared modules into one self-contained prove2.me solution file. |
+| `oai_batch.py` | Port and check many published OAI goals locally, one single-file port each (never submits). |
+| `oai_fetch.py` | Fetch an openai/math module's OAI.* import closure at a commit, into DEST/lean/... (files already there are reused). |
+| `oai_port.py` | Port an openai/math result for a published OAI goal into one solution file, then check it the way the verifier does (locally; never submits). |
+| `oai_submit.py` | Submit single-file ports as they are, in order, each once its explanation exists. |
 | `p2m.py` | The prove2.me API client -- now p2mlib.api; this module re-exports it for the scripts. |
 | `patch_explanations.py` | PATCH proof explanations from files named by submission id, checking each one first. |
 | `patch_notes.py` | PATCH the natural-language statements of published items from reviewed Markdown files. |
