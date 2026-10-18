@@ -333,6 +333,28 @@ def test_statement_and_solution_compile_together_in_the_verifiers_form(g, tmp_pa
     C.compile_file(str(chk), None, olean)
 
 
+def _kept_here_plan(g):
+    return C.make_plan(g, ['CD.uses_keptHere'], budget=100, piece_size=10**6, bundle_budget=100,
+                       bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                       bundle_prefix='N', chunker='schedule')
+
+
+def test_a_local_notation_with_nothing_kept_after_it_goes_with_its_variable(g):
+    # UniversalFInfinity B005 (2026-10-18): `local notation "hf" => (Fact.out : Function.Injective
+    # f)` stayed for a local instance using it that was never emitted again, while `variable (f :
+    # …)` went (nothing kept followed): "Unknown identifier `f` at quotation precheck". A local
+    # notation with no kept declaration after it in its scope serves nothing, as a variable.
+    p = _kept_here_plan(g)
+    txt = C.gen_bundle(g, p, p['bundles'][0]['name'])
+    assert 'def keptHere' in txt
+    assert '"XW"' not in txt and 'variable (x : Wide)' not in txt
+
+
+@pytest.mark.lean
+def test_a_dropped_variables_notation_does_not_break_the_bundle(g, tmp_path):
+    _compile_in_publish_order(g, _kept_here_plan(g), tmp_path)
+
+
 def test_publish_order_puts_statements_after_bundles_and_pieces_last(plan):
     order = C.publish_order(plan, external=['CD.main'])
     wave = {x: i for i, w in enumerate(order['waves']) for x in w}

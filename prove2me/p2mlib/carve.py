@@ -1835,11 +1835,20 @@ class Carver:
         # nothing, and a `variable` may not
         # even elaborate: its binders can need instances only the left-out declarations brought in
         # (Erdős 3 v2 B038: a trailing `variable [∀ j, IsZLattice …]`, DiscreteTopology missing)
+        # So does a local notation: kept for a local instance using it that is never emitted again
+        # (nothing kept follows), it would name the variables just dropped (UniversalFInfinity
+        # B005: `local notation "hf" => (Fact.out : Function.Injective f)`, "Unknown identifier
+        # `f` at quotation precheck")
         decls = [c2 for c2 in info.commands if c2.index in kept]
         for c in info.commands:
-            if c.short_kind in ('variable', 'include', 'omit') and c.index not in drop and \
-                    not any(_in_scope(info, c.index, c2) for c2 in decls):
+            if c.index in drop:
+                continue
+            ctx = c.short_kind in ('variable', 'include', 'omit') or (
+                c.short_kind in NOTATION and
+                re.match(r'\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?local\b', leanedit.text(info, c.index), re.S))
+            if ctx and not any(_in_scope(info, c.index, c2) for c2 in decls):
                 drop.add(c.index)
+                keep_global.discard(c.index)
         # blocks left without a kept declaration (or a global notation/attribute) go whole
         blocks = collections.defaultdict(set)
         for c in info.commands:

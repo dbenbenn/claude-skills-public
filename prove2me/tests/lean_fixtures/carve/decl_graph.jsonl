@@ -39,6 +39,8 @@
 {"i":false,"k":"def","m":"CarveDev.Base","n":"_private.CarveDev.Base.0.CD._aux_CarveDev_Base___macroRules__private_CarveDev_Base_0_CD_termWD_1","p":false,"r":[82,0,82,35],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"_private.CarveDev.Base.0.CD.termWD","p":false,"r":[82,0,82,35],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.Nat.cdTwice","p":false,"r":[77,0,78,36],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.NoteNs.keptHere","p":false,"r":[153,0,154,23],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.NoteNs.xInst","p":false,"r":[162,0,162,99],"s":false,"t":["CD.Wide","CD.double","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.double","CD.double_zero","CD.Wide.w"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.Space.coord","p":false,"r":[9,0,10,39],"s":false,"t":["CD.Space"],"u":[],"v":["CD.Space"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.doubleWitness","p":false,"r":[145,0,148,79],"s":false,"t":[],"u":[],"v":["CD.double","CD.double_eq"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.quad","p":false,"r":[20,0,21,45],"s":false,"t":[],"u":[],"v":["CD.double"]}
@@ -46,6 +48,8 @@
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.trail_kept","p":false,"r":[83,0,83,25],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.unused_var_free","p":false,"r":[101,0,104,30],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.viaScoped","p":false,"r":[57,0,57,36],"s":false,"t":[],"u":[],"v":["CD.double"]}
+{"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.NoteNs._aux_CarveDev_Mid___macroRules__private_CarveDev_Mid_0_CD_NoteNs_termXW_1","p":false,"r":[156,0,156,24],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.NoteNs.termXW","p":false,"r":[156,0,156,24],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD._aux_CarveDev_Mid___macroRules__private_CarveDev_Mid_0_CD_termDE_1","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD._aux_CarveDev_Mid___macroRules__private_CarveDev_Mid_0_CD_termWZ_1","p":false,"r":[70,0,70,24],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD._aux_CarveDev_Mid___unexpand_CD_double_eq_1","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
@@ -73,6 +77,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.uses_hdef","p":true,"r":[78,0,78,50],"s":false,"t":["CD.Wide","CD.cdLocalInst","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.cdLocalInst","CD.Wide.w"]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.uses_hdef2","p":true,"r":[88,0,88,52],"s":false,"t":["CD.Wide","CD.cdLocalInst2","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.cdLocalInst2","CD.Wide.w"]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.uses_local_inst","p":true,"r":[72,0,72,55],"s":false,"t":["CD.Wide","CD.cdLocalInst","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.cdLocalInst","CD.Wide.w"]}
+{"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.NoteNs.uses_x","p":true,"r":[164,0,164,33],"s":false,"t":["CD.Wide","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.Wide.w"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.Space.cd_unused_simp","p":true,"r":[120,0,124,21],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.Space.coord_eq","p":true,"r":[12,0,12,55],"s":false,"t":["CD.Space","CD.Space.coord"],"u":[],"v":["CD.Space","CD.Space.coord"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.Space.field_free","p":true,"r":[63,0,65,43],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
@@ -91,6 +96,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_hk1","p":true,"r":[110,0,112,42],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_hk2","p":true,"r":[115,0,117,44],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_hx","p":true,"r":[38,0,38,39],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
+{"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_keptHere","p":true,"r":[168,0,168,50],"s":false,"t":["CD.NoteNs.keptHere"],"u":[],"v":["CD.NoteNs.keptHere"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_witness","p":true,"r":[150,0,150,55],"s":false,"t":["CD.doubleWitness","CD.Aux.auxOnly"],"u":[],"v":["CD.doubleWitness","CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.helper","p":true,"r":[30,0,30,40],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.main","p":true,"r":[14,0,18,53],"s":false,"t":["CD.Space","CD.double","CD.List.headOr","CD.Space.size"],"u":[],"v":["CD.Space","CD.double","CD.double_succ","CD.quad","CD.size_via_coord","CD.size_zero","_private.CarveDev.Top.0.CD.helper","CD.List.headOr","CD.List.headOr_nil","CD.Space.coord","CD.Space.size"]}

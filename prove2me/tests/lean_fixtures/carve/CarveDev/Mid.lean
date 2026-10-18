@@ -149,4 +149,22 @@ def doubleWitness (n : Nat) : {m : Nat // m = n + n} := ⟨double n, double_eq n
 
 theorem uses_witness : (doubleWitness 1).val = 2 := rfl
 
+namespace NoteNs
+/-- Kept in a bundle: the namespace block stays. -/
+def keptHere : Nat := 5
+variable (x : Wide)
+local notation "XW" => x
+/- Uses the notation, and rests on a theorem no bundle carries, so it stays out of every bundle;
+nothing kept follows in this scope, so the variable `x` goes. The notation must go too
+(UniversalFInfinity B005: `local notation "hf" => (Fact.out : Function.Injective f)` kept for a
+local instance using it, `variable (f : …)` dropped, "Unknown identifier `f` at quotation
+precheck"). -/
+local instance xInst : Inhabited (PLift ((XW).w = (XW).w ∧ double 0 = 0)) := ⟨⟨⟨rfl, double_zero⟩⟩⟩
+omit hx in
+theorem uses_x : x.w = x.w := rfl
+end NoteNs
+
+omit hx in
+theorem uses_keptHere : NoteNs.keptHere = 5 := rfl
+
 end CD
