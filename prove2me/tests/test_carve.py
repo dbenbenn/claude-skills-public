@@ -455,6 +455,18 @@ def test_external_definitions_stay_out_of_bundles_and_pieces(g, ext_plan):
     assert all('CD.double' not in p['keep'] for p in ext_plan['pieces'].values())
 
 
+def test_check_plan_counts_external_definitions_as_available(g, ext_plan):
+    # StrongThinTree (2026-10-18): every bundle member and piece using one of the published
+    # Def_StrongThinTree declarations was reported "needs …, which is in no bundle", so
+    # `carve.py plan` refused a consistent plan. External definitions are available everywhere.
+    assert C.check_plan(g, ext_plan) == []
+    # without the external_defs entry the same plan is inconsistent, and the check says so
+    bare = json.loads(json.dumps(ext_plan))
+    bare['external_defs'] = {}
+    probs = C.check_plan(g, bare)
+    assert probs and all('CD.double' in p for p in probs)
+
+
 def test_files_using_an_external_definition_import_its_bundle(g, ext_plan, tmp_path):
     C.generate(g, ext_plan, str(tmp_path))
     users = []

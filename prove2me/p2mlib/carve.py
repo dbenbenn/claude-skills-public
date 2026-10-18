@@ -1357,9 +1357,11 @@ def _plan_index(plan):
 def check_plan(g, plan):
     """What would not compile: every dependency of a bundle member in its bundle or one it
     imports; of a piece, in the piece, an imported statement or its bundles; of a statement, in
-    its bundles. A missing definition is Erdős 3 B006 ("Unknown identifier `A.space`"). Returns
-    a list of problems (empty: the plan is consistent)."""
+    its bundles. A missing definition is Erdős 3 B006 ("Unknown identifier `A.space`"). The plan's
+    `external_defs` (someone else's published bundle) are available to every file. Returns a list
+    of problems (empty: the plan is consistent)."""
     pos, bimp, bidx = _plan_index(plan)
+    ext = set(plan.get('external_defs') or {})
     probs = []
     # a bundle or a proof piece may not rest on `sorry` (Erdős 3 B022: a port's stubbed proof in a
     # bundle; "declaration uses `sorry`"); only a statement stub's own proof is `sorry`
@@ -1376,7 +1378,7 @@ def check_plan(g, plan):
             probs.append('bundle %s imports a later or unknown bundle' % b['name'])
         cl = _bundle_closure(bimp, [i])
         for k in b['nodes']:
-            for d in sorted(g.nodes[k].deps):
+            for d in sorted(g.nodes[k].deps - ext):
                 if d not in bidx:
                     probs.append('bundle %s: %s needs %s, which is in no bundle' % (b['name'], k, d))
                 elif bidx[d] not in cl:
@@ -1387,7 +1389,7 @@ def check_plan(g, plan):
         cl = _bundle_closure(bimp, [pos[x] for x in p['bundles']])
         for i in p['imports']:
             cl |= _bundle_closure(bimp, [pos[x] for x in plan['stubs'][i]['bundles']])
-        have = set(p['keep']) | set(p['imports'])
+        have = set(p['keep']) | set(p['imports']) | ext
         for k in p['keep']:
             for d in sorted(g.nodes[k].deps):
                 if d in have or (d in bidx and bidx[d] in cl):
@@ -1398,7 +1400,7 @@ def check_plan(g, plan):
             probs.append('piece %s imports a non-node' % n)
     for n, s in plan['stubs'].items():
         cl = _bundle_closure(bimp, [pos[x] for x in s['bundles']])
-        for d in sorted(g.nodes[n].sig):
+        for d in sorted(g.nodes[n].sig - ext):
             if not (d in bidx and bidx[d] in cl):
                 probs.append('statement %s needs %s, not in its bundles' % (n, d))
     return probs
