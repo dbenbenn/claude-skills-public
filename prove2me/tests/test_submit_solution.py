@@ -204,3 +204,22 @@ def test_an_explanation_without_the_statement_display_is_refused(ws, tmp_path, m
         run(monkeypatch, fake_platform(live_edges=False), 'N.target', sol(tmp_path, TOP),
             '--explanation', expl(tmp_path, 'It follows from the imported statement. ' * 10), '--go')
     assert 'display' in str(e.value)
+
+
+def test_inline_copy_check_compares_the_declared_name_not_just_its_last_part(tmp_path, monkeypatch):
+    # 2026-10-18: OpenAI's matrix-removal port declares `Valid.transfer`; a published theorem
+    # `OAI.DeligneDrinfeld.ExactCountOrdering.transfer` (an unrelated paper) shares the last part,
+    # and the check refused it. A declared name is a copy only if it is a suffix of the full name.
+    import rewire, prune_solution
+    monkeypatch.setattr(prune_solution, '_workspace', lambda: str(tmp_path))
+    monkeypatch.setattr(rewire, 'published', lambda ws: {
+        'transfer': ('OAI.DeligneDrinfeld.ExactCountOrdering.transfer', 'Theorems.Thm_X', [])})
+    monkeypatch.setattr(S, 'call', lambda m, p, b=None: {'theorems': []})
+    ok = sol(tmp_path, 'theorem Valid.transfer : True := trivial\n\ntheorem solution : True := trivial\n')
+    S.check_no_inline_copies(ok, 'N.target', [])
+    bad = sol(tmp_path, 'theorem transfer : True := trivial\n\ntheorem solution : True := trivial\n')
+    with pytest.raises(SystemExit):
+        S.check_no_inline_copies(bad, 'N.target', [])
+    qual = sol(tmp_path, 'theorem ExactCountOrdering.transfer : True := trivial\n\ntheorem solution : True := trivial\n')
+    with pytest.raises(SystemExit):
+        S.check_no_inline_copies(qual, 'N.target', [])

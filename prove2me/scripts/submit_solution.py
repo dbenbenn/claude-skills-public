@@ -224,8 +224,12 @@ def check_no_inline_copies(path, target, allow):
     for name, kind, _, _, _ in parse(text.splitlines()):
         base = name.split('.')[-1].rstrip("'")
         # a rewired copy (proof = call to the published theorem, which is imported) has its edge
+        # the name as declared must be a suffix of the published full name: `Valid.transfer` is not
+        # a copy of `…ExactCountOrdering.transfer` (an unrelated paper; matrix removal, 2026-10-18)
+        declared = name.rstrip("'")
         if base in pub and base != short and base not in allow and name != 'solution' \
-                and pub[base][1] not in imported:
+                and pub[base][1] not in imported \
+                and ('.' + pub[base][0]).endswith('.' + declared):
             hits.append((name, pub[base][0]))
     # a copy of a DEPRECATED theorem is deliberate: importing it would hang the proof off a retired,
     # hidden node (resolve_imports.py copies those in; QFS 2026-09-27, Lemma 5.7 and core_induction)
