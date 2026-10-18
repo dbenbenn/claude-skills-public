@@ -1,0 +1,17 @@
+earlier attempt made outside the queue
+submission s0 queued
+verdict TIMEOUT s0
+not accepted: the verifier timed out after 300 s
+
+=== 2026-10-18 10:00:00
+submission s1 queued
+verdict TIMEOUT s1
+not accepted: Module compilation timed out
+
+=== 2026-10-18 11:00:00
+submission s2 queued
+(killed: no verdict)
+
+=== 2026-10-18 12:00:00
+submission s3 queued
+verdict ACCEPTED s3
