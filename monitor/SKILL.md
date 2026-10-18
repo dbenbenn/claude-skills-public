@@ -83,7 +83,11 @@ section files, and stale sections.
 
 The code is `monitor.py` (sampling, sections, history, the HTTP server), `section.py` (producer
 library and CLI) and `www/index.html` (the page, read fresh on every request, so page edits need no
-restart). Tests: `python3 -m pytest -q ~/.claude/skills/monitor/tests`. After changing `monitor.py`:
+restart). Charts use uPlot 1.6.30 (MIT), vendored in `www/vendor/` and served by the monitor itself so
+the page needs no internet; range buttons, drag-to-zoom and a synced cursor are wired in the page.
+To look at the page headless: Playwright's Chromium needs four libraries this machine lacks
+(libatk1.0-0t64, libatk-bridge2.0-0t64, libxdamage1, libatspi2.0-0t64); `apt-get download` them,
+`dpkg-deb -x` into a folder, and point `LD_LIBRARY_PATH` at its `usr/lib/x86_64-linux-gnu`. Tests: `python3 -m pytest -q ~/.claude/skills/monitor/tests`. After changing `monitor.py`:
 `systemctl --user restart monitor`. The unit file is `monitor.service` in this folder. Copy it to
 `~/.config/systemd/user/` if it changes. Commit and push this skill (claude-skills-public) in the same
 turn.

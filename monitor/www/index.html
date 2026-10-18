@@ -1,14 +1,16 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>careyaibox monitor</title>
+<link rel="stylesheet" href="vendor/uPlot.min.css">
+<script src="vendor/uPlot.iife.min.js"></script>
 <style>
-:root{color-scheme:light;--surface-0:#f5f4f1;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7974;--grid:#e4e3df;--series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#8f5bd6;--series-5:#c99a00;--rest:#b9b8b2;--track:#e9e8e4;--good:#008300;--warn:#b26b00;--alarm:#b42318}
+:root{color-scheme:light;--surface-0:#f5f4f1;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7974;--grid:#e4e3df;--series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#8f5bd6;--series-5:#c99a00;--rest:#c9c8c2;--track:#e9e8e4;--good:#008300;--warn:#b26b00;--alarm:#b42318}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--series-4:#9d6fe0;--series-5:#d4a514;--rest:#4a4a46;--track:#2a2a28;--good:#3fa33f;--warn:#d9922a;--alarm:#c4321f}}
 :root[data-theme="dark"]{color-scheme:dark;--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--series-4:#9d6fe0;--series-5:#d4a514;--rest:#4a4a46;--track:#2a2a28;--good:#3fa33f;--warn:#d9922a;--alarm:#c4321f}
 body{margin:0;background:var(--surface-0);color:var(--text-primary);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
-main{max-width:960px;margin:0 auto;padding:20px 16px 40px}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
 h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14px}
-.card{background:var(--surface-1);border-radius:10px;padding:14px 16px;margin:0 0 14px;position:relative}
+.card{background:var(--surface-1);border-radius:10px;padding:14px 16px;margin:0 0 14px}
 .alarm{background:var(--alarm);color:#fff;padding:10px 14px;border-radius:8px;margin:0 0 14px}
 .alarm b{display:block;margin-bottom:2px}.alarm ul{margin:0;padding-left:18px}
 .ph{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--grid);cursor:pointer}
@@ -21,18 +23,27 @@ h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14
 .run{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto auto;gap:3px 14px;font-variant-numeric:tabular-nums;font-size:14px;margin-top:4px}
 .run .h{color:var(--text-muted);font-size:12px}.run .r{text-align:right;color:var(--text-secondary)}.run .c{color:var(--text-muted);font-size:12px;grid-column:1/6;margin-top:-3px}
 .run span{overflow-wrap:anywhere}
+@media (max-width:560px){.run{grid-template-columns:minmax(7em,1fr) auto auto auto;gap:3px 10px;font-size:13px}.run .sh{display:none}.run .c{grid-column:1/5}}
 .salerts{color:var(--alarm);font-weight:600;margin:6px 0;padding-left:18px}
 h2{font-size:17px;margin:0 0 2px} h3{font-size:14px;margin:0 0 2px} .chart-sub{color:var(--text-secondary);font-size:13px;margin:0 0 6px}
 .meta{color:var(--text-muted);font-size:13px;margin:0 0 6px}.meta a{color:var(--series-1)}
-svg{width:100%;height:auto;display:block;overflow:visible}
-.tick{fill:var(--text-muted);font-size:11px}.gl{stroke:var(--grid);stroke-width:1}
-.tip{position:absolute;pointer-events:none;background:var(--surface-1);color:var(--text-primary);border:1px solid var(--grid);border-radius:6px;padding:6px 8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);display:none;white-space:nowrap;z-index:2}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary);margin:2px 0 8px}
-.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
-details{margin-top:10px;color:var(--text-secondary);font-size:13px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px 20px}
+.chart{min-width:0}
 .empty{color:var(--text-muted);font-size:14px}
+details{margin-top:10px;color:var(--text-secondary);font-size:13px}
 code{font-size:13px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:6px 0 12px}
+.seg{display:inline-flex;border:1px solid var(--grid);border-radius:7px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;background:transparent;color:var(--text-secondary);border:0;border-left:1px solid var(--grid);padding:4px 10px;cursor:pointer}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--series-1);color:#fff}
+.hint{color:var(--text-muted);font-size:12px}
+#zoomed{font:inherit;font-size:13px;background:transparent;color:var(--series-1);border:1px solid var(--series-1);border-radius:7px;padding:3px 10px;cursor:pointer}
+/* uPlot: theme its legend and selection */
+.u-legend{font-size:12px;color:var(--text-secondary);text-align:left}
+.u-legend .u-series th{font-weight:500}.u-legend .u-value{font-variant-numeric:tabular-nums;color:var(--text-primary)}
+.u-legend .u-marker{border-radius:2px}
+.u-select{background:rgba(127,127,127,.18)}
 </style></head>
 <body><main>
 <h1 id="h1">careyaibox monitor</h1>
@@ -41,30 +52,150 @@ code{font-size:13px}
 <section class="card" aria-labelledby="t-sys">
 <h2 id="t-sys">System resources</h2>
 <p class="chart-sub">The whole machine, split by what uses it; sampled every 30 s · times in CEST. Memory: each group's own process memory (file cache excluded); the rest is everything else in use.</p>
-<div class="legend" id="legend" aria-label="Legend"></div>
-<div class="grid2">
-<div><h3 id="t-mem">Memory in use</h3><p class="chart-sub" id="s-mem"></p><svg id="c-mem" viewBox="0 0 420 200" role="img" aria-labelledby="t-mem"></svg></div>
-<div><h3 id="t-cpu">CPU in use</h3><p class="chart-sub" id="s-cpu"></p><svg id="c-cpu" viewBox="0 0 420 200" role="img" aria-labelledby="t-cpu"></svg></div>
-<div><h3 id="t-load">System load (1-min average)</h3><p class="chart-sub" id="s-load"></p><svg id="c-load" viewBox="0 0 420 200" role="img" aria-labelledby="t-load"></svg></div>
-<div><h3 id="t-psi">Stall pressure</h3><p class="chart-sub" id="s-psi"></p><svg id="c-psi" viewBox="0 0 420 200" role="img" aria-labelledby="t-psi"></svg></div>
+<div class="toolbar">
+  <div class="seg" role="group" aria-label="Time range" id="ranges"></div>
+  <button id="zoomed" hidden>Zoomed in · back to range</button>
+  <span class="hint">Drag across a chart to zoom · double-click to reset · hover for values</span>
 </div>
-<h3 style="margin-top:14px">Lean processes</h3><div id="lean"></div>
-<div class="tip"></div>
+<div class="grid2">
+<div class="chart"><h3>Memory in use</h3><p class="chart-sub" id="s-mem"></p><div id="c-mem"></div></div>
+<div class="chart"><h3>CPU in use</h3><p class="chart-sub" id="s-cpu"></p><div id="c-cpu"></div></div>
+<div class="chart"><h3>System load (1-min average)</h3><p class="chart-sub" id="s-load"></p><div id="c-load"></div></div>
+<div class="chart"><h3>Stall pressure</h3><p class="chart-sub" id="s-psi"></p><div id="c-psi"></div></div>
+</div>
+<h3 style="margin-top:16px">Lean processes</h3><div id="lean"></div>
 </section>
 <div id="sections"></div>
 <details><summary>Adding a section</summary><p>Any job can add its own section: write <code>~/claude/monitor/sections/&lt;id&gt;.json</code>, e.g. with
 <code>python3 ~/.claude/skills/monitor/section.py set my-job --title 'My job' --phase 'Items=3/10'</code>. The <code>monitor</code> skill has the details.</p></details>
 </main>
 <script>
-const fmtT = t => new Date(t*1000).toLocaleTimeString('de-DE',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit'});
-const fmtDay = t => new Date(t*1000).toLocaleDateString('en-CA',{timeZone:'Europe/Berlin'});
+const TZ = 'Europe/Berlin';
+const fmtT = t => new Date(t*1000).toLocaleTimeString('de-DE',{timeZone:TZ,hour:'2-digit',minute:'2-digit'});
+const fmtDay = t => new Date(t*1000).toLocaleDateString('en-CA',{timeZone:TZ});
 const fmtAt = t => (fmtDay(t)===fmtDay(Date.now()/1000) ? '' : fmtDay(t)+' ') + fmtT(t) + ' CEST';
 const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ago = s => s<90 ? `${s} s ago` : s<5400 ? `${Math.round(s/60)} min ago` : `${(s/3600).toFixed(1)} h ago`;
-const PALETTE = ['var(--series-2)','var(--series-3)','var(--series-4)','var(--series-5)'];
-const selected = {};   // section id -> phase shown in its chart
-let last = null;
+const fmtWd = t => new Date(t*1000).toLocaleDateString('en-GB',{timeZone:TZ,weekday:'short'});
+const xTicks = (u, splits) => { const span = u.scales.x.max - u.scales.x.min;
+  return splits.map(v => span > 18*3600 ? fmtWd(v) + ' ' + fmtT(v) : fmtT(v)); };
+const lastIdx = u => u.data[0].length - 1;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const PALETTE = ['--series-2','--series-3','--series-4','--series-5'];
+const RANGES = [['30 min',1800],['1 h',3600],['3 h',10800],['12 h',43200],['48 h',172800]];
+const store = {get(k,d){ try { return localStorage.getItem(k) ?? d; } catch(e) { return d; } }, set(k,v){ try { localStorage.setItem(k,v); } catch(e) {} }};
+let range = +store.get('monitor.range', 3600);
+let view = null;            // {min, max} while zoomed in by dragging; null: follow the range
+const selected = {};        // section id -> phase shown in its chart
+let last = null, charts = {}, chartKey = '';
 
+// ---- range buttons ----
+const rbox = document.getElementById('ranges');
+rbox.innerHTML = RANGES.map(([l,s]) => `<button data-s="${s}" aria-pressed="${s===range}">${l}</button>`).join('');
+rbox.onclick = e => { const b = e.target.closest('button'); if (!b) return;
+  range = +b.dataset.s; store.set('monitor.range', range); view = null;
+  rbox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x===b)); applyView(); };
+document.getElementById('zoomed').onclick = () => { view = null; applyView(); };
+
+function applyView(){
+  const now = last ? last.updated : Date.now()/1000;
+  const [min, max] = view ? [view.min, view.max] : [now - range, now];
+  for (const u of Object.values(charts)) u.setScale('x', {min, max});
+  document.getElementById('zoomed').hidden = !view;
+}
+
+// ---- charts ----
+function baseOpts(el, height, series, yRange, fmt){
+  return {
+    width: Math.max(260, el.clientWidth), height,
+    tzDate: ts => uPlot.tzDate(new Date(ts*1e3), TZ),
+    cursor: {y: false, sync: {key: 'sys', setSeries: false}, drag: {x: true, y: false, setScale: false}, points: {size: 6}},
+    select: {show: true},
+    legend: {live: true},
+    scales: {x: {time: true}, y: {range: yRange}},
+    axes: [
+      {stroke: css('--text-muted'), grid: {stroke: css('--grid'), width: 1}, ticks: {stroke: css('--grid')}, font: '11px system-ui', values: xTicks, space: 60},
+      {stroke: css('--text-muted'), grid: {stroke: css('--grid'), width: 1}, ticks: {show: false}, font: '11px system-ui', size: 46,
+       values: (u, vals) => vals.map(v => fmt(v))},
+    ],
+    series: [{value: (u, v, si, idx) => idx == null ? 'latest' : fmtAt(v)}, ...series],
+    hooks: {
+      setSelect: [u => { if (u.select.width < 4) return;
+        const min = u.posToVal(u.select.left, 'x'), max = u.posToVal(u.select.left + u.select.width, 'x');
+        u.setSelect({left: 0, top: 0, width: 0, height: 0}, false);
+        view = {min, max}; applyView(); }],
+      ready: [u => u.over.addEventListener('dblclick', () => { view = null; applyView(); })],
+    },
+  };
+}
+
+// stacked areas: series are drawn top first, each filled down to zero, so lower ones paint over
+function stacked(el, height, x, groups, raw, labelOf, colorOf, fmt, unit, yRange){
+  const cum = []; let acc = x.map(() => 0);
+  for (const g of groups) { acc = acc.map((a, i) => raw[g][i] == null ? null : (a ?? 0) + raw[g][i]); cum.push(acc); }
+  const order = groups.map((g, i) => i).reverse();
+  const series = order.map(i => ({label: labelOf(groups[i]), stroke: css(colorOf(groups[i])), fill: css(colorOf(groups[i])), width: 1,
+    value: (u, v, si, idx) => { const j = idx ?? lastIdx(u), r = raw[groups[i]][j]; return r == null ? '—' : fmt(r) + ' ' + unit; }}));
+  const data = [x, ...order.map(i => cum[i])];
+  return {opts: baseOpts(el, height, series, yRange, fmt), data};
+}
+
+function lines(el, height, x, defs, fmt, unit, yRange){
+  const series = defs.map(d => ({label: d.label, stroke: css(d.color), width: 2,
+    value: (u, v, si, idx) => { const r = idx == null ? u.data[si][lastIdx(u)] : v; return r == null ? '—' : fmt(r) + unit; }}));
+  return {opts: baseOpts(el, height, series, yRange, fmt), data: [x, ...defs.map(d => d.ys)]};
+}
+
+function upsert(id, built){
+  const el = document.getElementById(id);
+  if (charts[id] && charts[id]._key === built.key) { charts[id].setData(built.data, false); return; }
+  if (charts[id]) charts[id].destroy();
+  el.innerHTML = '';
+  charts[id] = new uPlot(built.opts, built.data, el);
+  charts[id]._key = built.key;
+}
+
+
+function drawSystem(sy){
+  const M = sy.machine || [], lastRow = M.length ? M[M.length-1] : null;
+  const seen = []; for (const r of M) for (const g in r.mem) if (g!=='lean' && g!=='rest' && !seen.includes(g)) seen.push(g);
+  const groups = ['lean', ...seen, 'rest'];
+  const labelOf = g => g==='lean' ? 'Lean' : g==='rest' ? 'Rest of the machine' : (sy.labels[g] || g);
+  const colorOf = g => g==='lean' ? '--series-1' : g==='rest' ? '--rest' : PALETTE[seen.indexOf(g) % PALETTE.length];
+  const key = groups.join('|') + '|' + Object.keys(sy.labels).map(k => sy.labels[k]).join('|') + '|' + document.documentElement.clientWidth + '|' + matchMedia('(prefers-color-scheme: dark)').matches;
+  if (key !== chartKey) { for (const u of Object.values(charts)) u.destroy(); charts = {}; chartKey = key; }
+  const x = M.map(r => r.t), memTotal = lastRow ? lastRow.total : 64, cores = sy.cores_total || 32;
+  const memRaw = {}, cpuRaw = {};
+  for (const g of groups) { memRaw[g] = M.map(r => r.mem[g] ?? 0); cpuRaw[g] = M.map(r => r.cpu ? (r.cpu[g] ?? 0) : null); }
+  const H = 220;
+  let b = stacked(document.getElementById('c-mem'), H, x, groups, memRaw, labelOf, colorOf, v => v.toFixed(1), 'GiB', [0, memTotal]); b.key = key; upsert('c-mem', b);
+  // CPU: scaled to what is visible, so a core or two of use is not lost against 32
+  b = stacked(document.getElementById('c-cpu'), H, x, groups, cpuRaw, labelOf, colorOf, v => v.toFixed(1), 'cores',
+              (u, mn, mx) => [0, Math.min(cores, Math.max(1, Math.ceil((mx || 0) * 1.15)))]); b.key = key; upsert('c-cpu', b);
+  b = lines(document.getElementById('c-load'), H, x, [{label: 'load', color: '--series-1', ys: M.map(r => r.load1)}], v => v.toFixed(1), '',
+            (u, mn, mx) => [0, Math.max(1, Math.ceil((mx || 0) * 1.15))]); b.key = key; upsert('c-load', b);
+  const P = sy.psi || [], lp = P.length ? P[P.length-1] : null;
+  b = lines(document.getElementById('c-psi'), H, P.map(r => r[0]), [
+        {label: 'memory (full)', color: '--series-4', ys: P.map(r => r[3])},
+        {label: 'I/O (full)', color: '--series-2', ys: P.map(r => r[5])},
+        {label: 'CPU (some)', color: '--series-1', ys: P.map(r => r[1])}], v => v.toFixed(1), '%',
+        (u, mn, mx) => [0, Math.max(5, Math.ceil((mx || 0) * 1.15))]); b.key = key; upsert('c-psi', b);
+  applyView();
+  if (lp) document.getElementById('s-psi').textContent = `Share of time tasks waited (10 s average). "Full": every task waited, which is what makes the box freeze; the banner fires at memory 5%, I/O 20%. Now: memory ${lp[3].toFixed(1)}%, I/O ${lp[5].toFixed(1)}%, CPU ${lp[1].toFixed(1)}%`;
+  if (lastRow){
+    const used = Object.values(lastRow.mem).reduce((a,b)=>a+b,0);
+    document.getElementById('s-mem').textContent = `now ${used.toFixed(1)} of ${memTotal} GiB in use · ${sy.free_gib} GiB available`;
+    if (lastRow.cpu) document.getElementById('s-cpu').textContent = `now ${Object.values(lastRow.cpu).reduce((a,b)=>a+b,0).toFixed(1)} of ${cores} cores busy (scale fits the visible range)`;
+    document.getElementById('s-load').textContent = `now ${lastRow.load1.toFixed(2)} on ${cores} cores`;
+  }
+  const L = sy.lean || [];
+  document.getElementById('lean').innerHTML = L.length ? `<p class="chart-sub">${L.filter(r=>/^lean\b/.test(r.what)).length} Lean, ${L.filter(r=>/^lake\b/.test(r.what)).length} lake</p>` + procTable(L, true) : '<p class="empty">No Lean running.</p>';
+}
+
+window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(() => { if (last) { chartKey = ''; drawSystem(last.system); drawSections(last.sections || []); } }, 200); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (last) { chartKey = ''; drawSystem(last.system); drawSections(last.sections || []); } });
+
+// ---- page ----
 async function load(){
   let s; try { s = await (await fetch('status.json?'+Date.now())).json(); } catch(e) { return; }
   if (!s.updated) return;
@@ -80,39 +211,20 @@ async function load(){
 
 function procTable(rows, withCwd){
   if (!rows.length) return '';
-  return '<div class="run"><span class="h">Process</span><span class="h r">CPU</span><span class="h r" title="Private memory (Pss_Anon)">Own memory</span><span class="h r" title="Memory-mapped files such as .olean (Pss_File): shared page cache">+ shared files</span><span class="h r">Running for</span>' +
-    rows.map(r => `<span>${esc(r.what)}</span><span class="r">${r.cores==null?'':(r.cores*100).toFixed(0)+'%'}</span><span class="r">${r.own_gib.toFixed(1)} GiB</span><span class="r">${r.shared_gib.toFixed(1)} GiB</span><span class="r">${r.age_min<90?r.age_min.toFixed(0)+' min':(r.age_min/60).toFixed(1)+' h'}</span>` +
+  return '<div class="run"><span class="h">Process</span><span class="h r">CPU</span><span class="h r" title="Private memory (Pss_Anon)">Own memory</span><span class="h r sh" title="Memory-mapped files such as .olean (Pss_File): shared page cache">+ shared files</span><span class="h r">Running for</span>' +
+    rows.map(r => `<span>${esc(r.what)}</span><span class="r">${r.cores==null?'':(r.cores*100).toFixed(0)+'%'}</span><span class="r">${r.own_gib.toFixed(1)} GiB</span><span class="r sh">${r.shared_gib.toFixed(1)} GiB</span><span class="r">${r.age_min<90?r.age_min.toFixed(0)+' min':(r.age_min/60).toFixed(1)+' h'}</span>` +
       (withCwd && r.cwd ? `<span class="c">pid ${r.pid} in ${esc(r.cwd)}</span>` : '')).join('') + '</div>';
 }
 
-function drawSystem(sy){
-  const M = sy.machine||[], tip = document.querySelector('#t-sys').parentElement.querySelector('.tip'), lastRow = M.length?M[M.length-1]:null;
-  // groups: Lean, then the sections (in the order they first appear), then the rest
-  const seen = []; for (const r of M) for (const g in r.mem) if (g!=='lean' && g!=='rest' && !seen.includes(g)) seen.push(g);
-  const groups = ['lean', ...seen, 'rest'];
-  const label = g => g==='lean' ? 'Lean' : g==='rest' ? 'Rest of the machine' : (sy.labels[g]||g);
-  const color = g => g==='lean' ? 'var(--series-1)' : g==='rest' ? 'var(--rest)' : PALETTE[seen.indexOf(g)%PALETTE.length];
-  document.getElementById('legend').innerHTML = groups.map(g=>`<span><i style="background:${color(g)}"></i>${esc(label(g))}</span>`).join('');
-  const names = groups.map(label), colors = groups.map(color);
-  const memTotal = lastRow ? lastRow.total : 64, cores = sy.cores_total||32;
-  stackChart(document.getElementById('c-mem'), tip, M.map(r=>[r.t, ...groups.map(g=>r.mem[g]??0)]), {W:420,H:200,ymax:memTotal,unit:'GiB',fmt:v=>v.toFixed(1),names,colors});
-  stackChart(document.getElementById('c-cpu'), tip, M.filter(r=>r.cpu).map(r=>[r.t, ...groups.map(g=>r.cpu[g]??0)]), {W:420,H:200,ymax:cores,unit:'cores',fmt:v=>v.toFixed(1),names,colors});
-  lineChart(document.getElementById('c-load'), tip, M.map(r=>[r.t, r.load1]), {W:420,H:200,ymax:4,unit:'',fmt:v=>v.toFixed(1)});
-  const P = sy.psi||[], lp = P.length?P[P.length-1]:null;
-  lineChart(document.getElementById('c-psi'), tip, P.map(x=>[x[0], Math.max(x[3],x[5])]), {W:420,H:200,ymax:20,unit:'%',fmt:v=>v.toFixed(1),ref:{v:5,label:'memory alert 5%'}});
-  if (lp) document.getElementById('s-psi').textContent = `Share of time every task waited on memory or disk (the worse of the two, 10 s average). Now: CPU ${lp[1].toFixed(1)}%, memory ${lp[2].toFixed(1)}/${lp[3].toFixed(1)}%, I/O ${lp[4].toFixed(1)}/${lp[5].toFixed(1)}% (some/full)`;
-  if (lastRow){
-    const used = Object.values(lastRow.mem).reduce((a,b)=>a+b,0);
-    document.getElementById('s-mem').textContent = `now ${used.toFixed(1)} of ${memTotal} GiB · ${sy.free_gib} GiB available: ` + groups.map(g=>`${label(g)} ${(lastRow.mem[g]??0).toFixed(1)}`).join(', ');
-    if (lastRow.cpu) document.getElementById('s-cpu').textContent = `now ${Object.values(lastRow.cpu).reduce((a,b)=>a+b,0).toFixed(1)} of ${cores} cores: ` + groups.map(g=>`${label(g)} ${(lastRow.cpu[g]??0).toFixed(1)}`).join(', ');
-    document.getElementById('s-load').textContent = `now ${lastRow.load1.toFixed(2)} on ${cores} cores`;
-  }
-  const L = sy.lean||[];
-  document.getElementById('lean').innerHTML = L.length ? `<p class="chart-sub">${L.filter(r=>/^lean\b/.test(r.what)).length} Lean, ${L.filter(r=>/^lake\b/.test(r.what)).length} lake</p>` + procTable(L, true) : '<p class="empty">No Lean running.</p>';
-}
-
+const secCharts = {}, secZoom = {};   // a progress chart keeps its zoom across refreshes
 function drawSections(secs){
   const box = document.getElementById('sections');
+  for (const k in secCharts) {
+    const u = secCharts[k], xs = u.data[0];
+    if (xs.length && (u.scales.x.min > xs[0] + 1 || u.scales.x.max < xs[xs.length-1] - 1)) secZoom[k] = {min: u.scales.x.min, max: u.scales.x.max};
+    else delete secZoom[k];
+    u.destroy(); delete secCharts[k];
+  }
   if (!secs.length){ box.innerHTML = '<section class="card"><p class="empty">No work in progress has a section right now.</p></section>'; return; }
   box.innerHTML = secs.map(s => {
     const ph = s.phases||[];
@@ -122,9 +234,9 @@ function drawSections(secs){
       <p class="meta">${meta}</p>
       ${s.note?`<p class="chart-sub">${esc(s.note)}</p>`:''}
       ${(s.alerts||[]).length?`<ul class="salerts">${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:''}
-      <div class="phases">${ph.map((p,i) => phaseRow(s, p, i)).join('')}</div>
+      <div class="phases">${ph.map(p => phaseRow(s, p)).join('')}</div>
       ${(s.running||[]).length?'<h3 style="margin-top:10px">Running now</h3>'+procTable(s.running, false):''}
-      <div class="chartbox"></div><div class="tip"></div></section>`; }).join('');
+      <div class="chartbox"></div></section>`; }).join('');
   for (const s of secs) {
     const card = document.getElementById('sec-'+s.id);
     card.querySelectorAll('.ph').forEach(el => el.onclick = () => { selected[s.id] = el.dataset.name; drawSections(last.sections); });
@@ -132,7 +244,7 @@ function drawSections(secs){
   }
 }
 
-function phaseRow(s, p, i){
+function phaseRow(s, p){
   const pct = p.total ? Math.min(100, 100*p.done/p.total) : 0;
   const extra = p.state==='running' && p.rate_per_min ? ` · ${p.rate_per_min}/min${p.eta?' · ETA '+fmtAt(p.eta):''}` : '';
   return `<div class="ph${chosenPhase(s)===p.name?' sel':''}" data-name="${esc(p.name)}" title="Click to chart this phase">
@@ -153,64 +265,25 @@ function sectionChart(s, card){
   const name = chosenPhase(s); if (!name) return;
   const p = s.phases.find(x=>x.name===name), h = s.history[name];
   const box = card.querySelector('.chartbox');
-  box.innerHTML = `<h3 style="margin-top:12px">${esc(name)}: progress over time</h3><p class="chart-sub">${p.done.toLocaleString()} of ${p.total.toLocaleString()} · times in CEST</p><svg viewBox="0 0 900 240" role="img" aria-label="${esc(name)} progress over time"></svg>`;
-  lineChart(box.querySelector('svg'), card.querySelector(':scope > .tip'), h, {W:900,H:240,ymax:p.total,fixed:true,unit:'',fmt:v=>Math.round(v).toLocaleString()});
+  box.innerHTML = `<h3 style="margin-top:12px">${esc(name)}: progress over time</h3><p class="chart-sub">${p.done.toLocaleString()} of ${p.total.toLocaleString()} · drag to zoom, double-click to reset</p><div></div>`;
+  const el = box.querySelector('div');
+  const opts = {
+    width: Math.max(260, el.clientWidth), height: 220,
+    tzDate: ts => uPlot.tzDate(new Date(ts*1e3), TZ),
+    cursor: {y: false, drag: {x: true, y: false}, points: {size: 6}},
+    legend: {live: true},
+    scales: {x: {time: true}, y: {range: [0, p.total || 1]}},
+    axes: [{stroke: css('--text-muted'), grid: {stroke: css('--grid'), width: 1}, ticks: {stroke: css('--grid')}, font: '11px system-ui', values: xTicks, space: 60},
+           {stroke: css('--text-muted'), grid: {stroke: css('--grid'), width: 1}, ticks: {show: false}, font: '11px system-ui', size: 50}],
+    series: [{value: (u, v, si, idx) => idx == null ? 'latest' : fmtAt(v)},
+             {label: name, stroke: css('--series-1'), width: 2,
+              value: (u, v, si, idx) => { const r = idx == null ? u.data[1][lastIdx(u)] : v; return r == null ? '—' : r.toLocaleString() + ' of ' + p.total.toLocaleString(); }}],
+  };
+  // a step line: the count holds until the next change
+  opts.series[1].paths = uPlot.paths.stepped({align: 1});
+  secCharts[s.id] = new uPlot(opts, [h.map(x => x[0]), h.map(x => x[1])], el);
+  if (secZoom[s.id]) secCharts[s.id].setScale('x', secZoom[s.id]);
 }
 
-function lineChart(svg, tip, pts, o){
-  // pts: [[t, v]] (v may be null: a gap); o: {W,H,ymax,fixed,fmt,unit,ref:{v,label}}
-  const W=o.W, H=o.H, L=48, R=10, T=10, B=26;
-  const ok=pts.filter(p=>p[1]!=null); if(ok.length<2){ svg.innerHTML=`<text class="tick" x="${W/2}" y="${H/2}" text-anchor="middle">collecting samples…</text>`; return; }
-  const t0=ok[0][0], t1=Math.max(ok[ok.length-1][0], t0+60);
-  const ymax=o.fixed ? (o.ymax||1) : (Math.max(o.ymax||0, ...ok.map(p=>p[1]))*1.05 || 1);
-  const X=t=>L+(W-L-R)*(t-t0)/(t1-t0), Y=v=>T+(H-T-B)*(1-v/ymax);
-  let g='';
-  for(let i=0;i<=4;i++){ const v=ymax*i/4, y=Y(v); g+=`<line class="gl" x1="${L}" x2="${W-R}" y1="${y}" y2="${y}"/><text class="tick" x="${L-6}" y="${y+4}" text-anchor="end">${o.fmt(v)}</text>`; }
-  const nt=W>600?6:3; for(let i=0;i<=nt;i++){ const t=t0+(t1-t0)*i/nt; g+=`<text class="tick" x="${X(t)}" y="${H-8}" text-anchor="middle">${fmtT(t)}</text>`; }
-  if(o.ref && o.ref.v<ymax){ const y=Y(o.ref.v); g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--text-muted)" stroke-dasharray="4 3"/><text class="tick" x="${W-R}" y="${y-4}" text-anchor="end">${o.ref.label}</text>`; }
-  let d='', pen=false; for(const p of pts){ if(p[1]==null){pen=false;continue;} d+=(pen?'L':'M')+X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1); pen=true; }
-  g+=`<path d="${d}" fill="none" stroke="var(--series-1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
-  g+=`<line class="xh gl" y1="${T}" y2="${H-B}" style="display:none;stroke:var(--text-muted)"/><circle class="dot" r="4.5" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2" style="display:none"/>`;
-  g+=`<rect x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent" class="hit"/>`;
-  svg.innerHTML=g;
-  const hit=svg.querySelector('.hit'), xh=svg.querySelector('.xh'), dot=svg.querySelector('.dot');
-  hit.onmousemove=e=>{ const r=svg.getBoundingClientRect(), sx=(e.clientX-r.left)*W/r.width, t=t0+(sx-L)*(t1-t0)/(W-L-R);
-    let best=ok[0]; for(const p of ok) if(Math.abs(p[0]-t)<Math.abs(best[0]-t)) best=p;
-    const x=X(best[0]), y=Y(best[1]); xh.setAttribute('x1',x); xh.setAttribute('x2',x); xh.style.display=''; dot.setAttribute('cx',x); dot.setAttribute('cy',y); dot.style.display='';
-    const card=svg.closest('.card'), cr=card.getBoundingClientRect();
-    tip.style.display='block'; tip.innerHTML=`<b>${fmtT(best[0])} CEST</b><br>${o.fmt(best[1])} ${o.unit}`;
-    tip.style.left=Math.min(e.clientX-cr.left+12, cr.width-140)+'px'; tip.style.top=(e.clientY-cr.top-44)+'px'; };
-  hit.onmouseleave=()=>{tip.style.display='none'; xh.style.display='none'; dot.style.display='none';};
-}
-
-function stackChart(svg, tip, rows, o){
-  // rows: [[t, v1, v2, ...]]; o: {W,H,ymax,unit,fmt,names,colors}
-  const W=o.W, H=o.H, L=48, R=10, T=10, B=26;
-  const ok=rows.filter(r=>r.slice(1).every(v=>v!=null));
-  if(ok.length<2){ svg.innerHTML=`<text class="tick" x="${W/2}" y="${H/2}" text-anchor="middle">collecting samples…</text>`; return; }
-  const t0=ok[0][0], t1=Math.max(ok[ok.length-1][0], t0+60), ymax=o.ymax;
-  const X=t=>L+(W-L-R)*(t-t0)/(t1-t0), Y=v=>T+(H-T-B)*(1-Math.min(v,ymax)/ymax);
-  let g='';
-  for(let i=0;i<=4;i++){ const v=ymax*i/4, y=Y(v); g+=`<line class="gl" x1="${L}" x2="${W-R}" y1="${y}" y2="${y}"/><text class="tick" x="${L-6}" y="${y+4}" text-anchor="end">${o.fmt(v)}</text>`; }
-  for(let i=0;i<=3;i++){ const t=t0+(t1-t0)*i/3; g+=`<text class="tick" x="${X(t)}" y="${H-8}" text-anchor="middle">${fmtT(t)}</text>`; }
-  const cum=ok.map(r=>{ let a=0; return [r[0], ...r.slice(1).map(v=>a+=v)]; });
-  for(let k=o.names.length;k>=1;k--){
-    const top=cum.map(r=>X(r[0]).toFixed(1)+','+Y(r[k]).toFixed(1)).join('L');
-    const bot=cum.slice().reverse().map(r=>X(r[0]).toFixed(1)+','+Y(k>1?r[k-1]:0).toFixed(1)).join('L');
-    g+=`<path d="M${top}L${bot}Z" fill="${o.colors[k-1]}" stroke="var(--surface-1)" stroke-width="1" stroke-linejoin="round"/>`;
-  }
-  g+=`<line class="xh gl" y1="${T}" y2="${H-B}" style="display:none;stroke:var(--text-muted)"/>`;
-  g+=`<rect x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent" class="hit"/>`;
-  svg.innerHTML=g;
-  const hit=svg.querySelector('.hit'), xh=svg.querySelector('.xh');
-  hit.onmousemove=e=>{ const r=svg.getBoundingClientRect(), sx=(e.clientX-r.left)*W/r.width, t=t0+(sx-L)*(t1-t0)/(W-L-R);
-    let best=ok[0]; for(const p of ok) if(Math.abs(p[0]-t)<Math.abs(best[0]-t)) best=p;
-    const x=X(best[0]); xh.setAttribute('x1',x); xh.setAttribute('x2',x); xh.style.display='';
-    const card=svg.closest('.card'), cr=card.getBoundingClientRect(), tot=best.slice(1).reduce((a,b)=>a+b,0);
-    tip.style.display='block';
-    tip.innerHTML=`<b>${fmtT(best[0])} CEST</b>`+o.names.map((n,i)=>`<br><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${o.colors[i]};margin-right:4px"></i>${esc(n)}: ${o.fmt(best[i+1])} ${o.unit}`).join('')+`<br>Total: ${o.fmt(tot)} ${o.unit}`;
-    tip.style.left=Math.min(e.clientX-cr.left+12, cr.width-220)+'px'; tip.style.top=(e.clientY-cr.top-70)+'px'; };
-  hit.onmouseleave=()=>{tip.style.display='none'; xh.style.display='none';};
-}
 load(); setInterval(load, 30000);
 </script></body></html>

@@ -23,6 +23,7 @@ INTERVAL = 30
 KEEP = 48 * 3600
 CLK = os.sysconf('SC_CLK_TCK')
 G = 2 ** 30
+VENDOR = {'/vendor/uPlot.iife.min.js': 'text/javascript', '/vendor/uPlot.min.css': 'text/css'}   # uPlot 1.6.30, MIT
 HEALTH_FLAGS = os.path.expanduser('~/.local/state/lean-health.flags')
 
 
@@ -332,6 +333,8 @@ class Handler(BaseHTTPRequestHandler):
             body, ctype = open(os.path.join(HERE, 'www', 'index.html'), 'rb').read(), 'text/html; charset=utf-8'
         elif path == '/status.json':
             body, ctype = State.status, 'application/json'
+        elif path in VENDOR:
+            body, ctype = open(os.path.join(HERE, 'www', path.lstrip('/')), 'rb').read(), VENDOR[path]
         else:
             self.send_error(404)
             return
