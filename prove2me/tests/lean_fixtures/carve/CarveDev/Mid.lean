@@ -128,4 +128,18 @@ theorem Space.cd_unused_simp : True := by
 kept their old names, "Invalid field"). -/
 theorem uses_dot_thm (A : Space) : A.coord = 0 ∧ A.coord = 0 := ⟨A.coord_eq, (id A).coord_eq⟩
 
+section PermOpen
+open _root_.List Perm
+/-- `Perm` opens the project's `CD.Perm` and, through the `open _root_.List` just before it, Lean's
+`List.Perm`, whose `length_eq` this uses: a carved file without `CD.Perm` must keep the reading
+(Kaplansky 2026-10-18: ReducedWalks' `open _root_.SimpleGraph _root_.OAI.SimpleGraph Walk` lost
+`Walk`, "Unknown identifier `length_eq_zero_iff`"). -/
+theorem perm_length_cd (l l' : List Nat) (h : l.Perm l') : l.length = l'.length := length_eq h
+end PermOpen
+
+/-- Uses Lean's `Nat.succ_le_succ` while the project has a `CD.Pkg.succ_le_succ`: renaming the
+project's one must leave Lean's alone (Kaplansky 2026-10-18: the `_oai` rename of
+`MultipleHNN.of_injective` turned `HNNExtension.of_injective` into `HNNExtension.of_injective_oai`). -/
+theorem uses_core_succ (n m : Nat) (h : n ≤ m) : n.succ ≤ m.succ := Nat.succ_le_succ h
+
 end CD

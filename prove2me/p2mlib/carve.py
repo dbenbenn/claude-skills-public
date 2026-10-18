@@ -1859,10 +1859,16 @@ class Carver:
         toks = [i for i in c.idents or [] if i['role'] == 'open' and span[0] <= i['start'] < span[1]]
         special = any(i['role'] == 'hiding' and span[0] <= i['start'] < span[1] for i in c.idents or [])
         edits, dead = [], 0
+        # Lean reads an `open` token relative to the current namespaces and to every namespace
+        # already open, including those the same command opened before it (Kaplansky 2026-10-18:
+        # `open _root_.SimpleGraph _root_.OAI.SimpleGraph Walk` also opened SimpleGraph.Walk)
+        prior = list(g.scope_opens(info, c, m))
         for i in toks:
             tok = i['name']
             cands = [tok[len('_root_.'):]] if tok.startswith('_root_.') else \
-                [join(p, tok) for p in prefixes(c.namespace)]
+                list(dict.fromkeys([join(p, tok) for p in prefixes(c.namespace)] +
+                                   [join(o, tok) for o in prior]))
+            prior += cands      # unknown readings only add candidates no namespace matches
             known = [x for x in cands if x in g.proj_ns or x in g.ext_ns]
             if not known:
                 continue                      # Mathlib's, say: carving cannot change it
@@ -1906,6 +1912,20 @@ class Carver:
                 edits.append((i['start'], _skip_ws(t, i['end']), ''))
         return edits
 
+    def _command_uses(self, m, c):
+        """The project declarations the compiled declarations of command c use (with their own
+        names), or None when c declares nothing (a context line)."""
+        cache = self.__dict__.setdefault('_uses_cache', {})
+        if m not in cache:
+            by_cmd = collections.defaultdict(set)
+            for k, nd in self.g.nodes.items():
+                if nd.module == m:
+                    # the compiled terms only: source dependencies over-approximate by these
+                    # same short-name readings
+                    by_cmd[nd.cmd] |= set(nd.term) | set(nd.names) | {k}
+            cache[m] = by_cmd
+        return cache[m].get(c.index)
+
     def _rename_edits(self, info, c, m, opens, rename):
         """Rename references Lean resolves to a renamed declaration, and its declId."""
         g, edits = self.g, []
@@ -1918,6 +1938,11 @@ class Carver:
         for n in rename:
             by_short[pubname(n).rsplit('.', 1)[-1]].append(n)
         t = info.text_bytes
+        # what the command's own declarations use: a reading by short name (dot notation on a
+        # local, or a field) counts only when it is one of them (Kaplansky 2026-10-18: Mathlib's
+        # `HNNExtension.of_injective` became `HNNExtension.of_injective_oai`, read as a field of
+        # the local `HNNExtension` because the renamed `MultipleHNN.of_injective` shares its name)
+        uses = self._command_uses(m, c)
         for i in c.idents or []:
             if i['role'] == 'decl':
                 full = i['name'][len('_root_.'):] if i['name'].startswith('_root_.') else \
@@ -1925,12 +1950,18 @@ class Carver:
                 hits = [n for n in g.pub.get(full, ()) if g.consts[n]['m'] == m and n in rename]
             elif i['role'] == 'ref':
                 hits = [n for n in g.resolve(i['name'], decl_ns(c), opens, m) if n in rename]
+                if hits and '.' in i['name'] and uses is not None:
+                    nm = i['name'][len('_root_.'):] if i['name'].startswith('_root_.') else i['name']
+                    full = [nm] if i['name'].startswith('_root_.') else \
+                        [join(p, nm) for p in prefixes(decl_ns(c))] + [join(o, nm) for o in opens]
+                    exact = [n for f in full for n in g.pub.get(f, ()) if n in rename]
+                    hits = exact or [n for n in hits if n in uses]
                 if not hits:
                     field = t[i['start'] - 1:i['start']] == b'.'
                     head = i['name'].split('.')[0]
                     dotted = '.' in i['name'] and not g.resolve_lean(head, decl_ns(c), opens, m)
                     cand = by_short.get(i['name'].rsplit('.', 1)[-1], [])
-                    if (field or dotted) and len(cand) == 1:
+                    if (field or dotted) and len(cand) == 1 and (uses is None or cand[0] in uses):
                         hits = cand
             else:
                 continue

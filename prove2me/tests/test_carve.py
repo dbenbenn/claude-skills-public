@@ -876,3 +876,20 @@ def test_a_notation_used_by_a_re_emitted_local_instance_stays(g):
                             sorry={'CD.uses_hdef2'})
     i, j = out.find('local notation "WD"'), out.find('local instance cdLocalInst2_r')
     assert i >= 0 and j >= 0 and i < j, out
+
+
+def test_an_open_reading_a_namespace_through_an_earlier_open_keeps_it(g):
+    # Kaplansky 2026-10-18: `open _root_.SimpleGraph _root_.OAI.SimpleGraph Walk` in ReducedWalks
+    # meant (also) SimpleGraph.Walk; carving away OAI.SimpleGraph.Walk dropped the token and the
+    # bundle lost `length_eq_zero_iff`. Here `open _root_.List Perm` also opens List.Perm
+    out = C.Carver(g).carve({'CD.perm_length_cd'}, g.have_names({'CD.perm_length_cd'}))
+    m = re.search(r'^open _root_\.List (\S+)$', out, re.M)
+    assert m and m.group(1) in ('Perm', '_root_.List.Perm'), out
+
+
+def test_renaming_a_declaration_leaves_a_same_named_lean_declaration_alone(g):
+    # Kaplansky 2026-10-18: renaming MultipleHNN.of_injective to of_injective_oai also renamed
+    # Mathlib's HNNExtension.of_injective, read as dot notation on a local by its short name
+    have = g.have_names({'CD.uses_core_succ', 'CD.Pkg.succ_le_succ'})
+    out = C.Carver(g).carve({'CD.uses_core_succ'}, have, rename={'CD.Pkg.succ_le_succ': 'succ_le_succ_oai'})
+    assert 'Nat.succ_le_succ h' in out and 'succ_le_succ_oai' not in out, out

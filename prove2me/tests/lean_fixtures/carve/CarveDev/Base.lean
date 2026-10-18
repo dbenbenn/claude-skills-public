@@ -90,6 +90,16 @@ end
 
 end CD
 
+/- A project namespace whose last component is also a namespace of Lean's (`List.Perm`), and a
+theorem whose short name is also one of Lean's (`Nat.succ_le_succ`). -/
+namespace CD.Perm
+def cdPerm : Nat := 3
+end CD.Perm
+
+namespace CD.Pkg
+theorem succ_le_succ (n : Nat) : n ≤ n.succ := Nat.le_succ n
+end CD.Pkg
+
 namespace CD.Aux
 
 def auxOnly : Nat := 1
