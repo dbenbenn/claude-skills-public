@@ -3,6 +3,7 @@
 
 usage: build_solution.py TARGET MODULE OUT --root REPO --merge-dir DIR [--merge-dir DIR ...]
                          [--drop NAME ...] [--package PKG]   (default: first component of MODULE)
+                         [--args "n hn0 hn F ι"]   (wrapper `exact TARGET ARGS`, not `apply … <;> assumption`)
 
   TARGET     the published theorem, e.g. QFS.theoremOneFour_univ
   MODULE     the development file that proves it (relative to REPO)
@@ -164,6 +165,9 @@ def main():
     ap.add_argument('--merge-dir', action='append', required=True)
     ap.add_argument('--drop', action='append', default=[])
     ap.add_argument('--package', help='default: the first component of MODULE\'s path')
+    ap.add_argument('--args', help='the wrapper proves `solution` by `exact TARGET ARGS` (e.g. "n hn0 hn F ι"); '
+                    'default `apply TARGET <;> assumption`, which fails when an instance argument '
+                    'depends on an explicit one (IsCyclotomicExtension {?n} ℚ F, Artin 2026-10-17)')
     a = ap.parse_args()
     a.package = a.package or package_of(a.module)
     need = missing_statements(a.root, a.drop)
@@ -213,7 +217,8 @@ def main():
     fs2, n = re.subn(r'\btheorem\s+' + re.escape(short) + r'\b', 'theorem solution', fs, count=1)
     if n != 1:
         sys.exit('cannot find `theorem %s` in the published formal_statement' % short)
-    fs2, n = re.subn(r':=\s*by\s+sorry\s*', ':= by\n  apply %s <;> assumption\n' % a.target, fs2, count=1)
+    tactic = ('exact %s %s' % (a.target, a.args)) if a.args else ('apply %s <;> assumption' % a.target)
+    fs2, n = re.subn(r':=\s*by\s+sorry\s*', lambda _: ':= by\n  %s\n' % tactic, fs2, count=1)
     if n != 1:
         sys.exit('cannot find `:= by sorry` in the published formal_statement')
     fs2 = drop_redeclared_universes(text, fs2)
