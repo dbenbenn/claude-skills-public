@@ -75,3 +75,20 @@ def test_undoes_a_deprecation_that_unproves_the_theorem(monkeypatch):
         run(monkeypatch, plat, '--keep', 'k', 'o', '--go')
     assert 'undone' in str(e.value)
     assert not plat.subs['o']['deprecated_at']
+
+
+def test_replaces_a_sketch_on_an_unproved_theorem(monkeypatch):
+    # 2026-10-18 (Artin): replacing one SKETCH_ACCEPTED sketch by another on a theorem that was not Proved
+    # was always undone ("theorem became Open"), because the guard demanded Proved afterwards. The guard
+    # must only refuse to make the status WORSE than it was before the run.
+    plat = FakePlatform([sub('k', status='SKETCH_ACCEPTED'), sub('o', status='SKETCH_ACCEPTED')])
+    run(monkeypatch, plat, '--keep', 'k', 'o', '--go')
+    assert plat.subs['o']['deprecated_at'] and not plat.subs['k']['deprecated_at']
+
+
+def test_still_refuses_to_unprove(monkeypatch):
+    # the original guard: o is the only ACCEPTED proof, k a sketch on open dependencies
+    plat = FakePlatform([sub('k', status='SKETCH_ACCEPTED'), sub('o')])
+    with pytest.raises(SystemExit):
+        run(monkeypatch, plat, '--keep', 'k', 'o', '--go')
+    assert not plat.subs['o']['deprecated_at']

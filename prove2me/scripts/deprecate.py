@@ -16,8 +16,8 @@ each id, the kept one included, is checked against the detail endpoint first:
 
   * KEEP_SID must be ACCEPTED or SKETCH_ACCEPTED, not deprecated, and on the same theorem as every
     OLD_SID; an OLD_SID already deprecated is skipped, never re-patched;
-  * after each deprecation the theorem must still be Proved -- if not, that deprecation is undone
-    and the run stops.
+  * if the theorem was Proved before the run, it must still be Proved after each deprecation -- if
+    not, that deprecation is undone and the run stops (a theorem not Proved has nothing to lose).
 """
 import os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -66,16 +66,19 @@ def main():
     if not go:
         print('dry run -- pass --go to apply')
         return
+    # the guard is "never make the status worse": a theorem that is not Proved (a sketch replaced by
+    # a sketch, Artin 2026-10-18) has nothing to lose, and demanding Proved there undid every replacement
+    before = status(tid)
     for d in plan:
         r = call('PATCH', '/submissions/' + d['id'], {'deprecated': True})
         if isinstance(r, dict) and '__error' in r:
             sys.exit('FAILED to deprecate %s: %s' % (d['id'], r['__error']))
         time.sleep(0.5)
         st = status(tid)
-        if st != 'Proved':
+        if before == 'Proved' and st != 'Proved':
             call('PATCH', '/submissions/' + d['id'], {'deprecated': False})
             sys.exit('STOPPED: theorem became %s after deprecating %s; undone' % (st, d['id']))
-        print('deprecated %s   theorem still Proved' % d['id'])
+        print('deprecated %s   theorem %s' % (d['id'], 'still Proved' if st == 'Proved' else 'status %s (was %s)' % (st, before)))
 
 
 if __name__ == '__main__':
