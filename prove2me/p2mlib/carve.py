@@ -1656,8 +1656,13 @@ class Carver:
         # names for local instances emitted again in this file: unique to the file, since an
         # anonymous copy gets the same generated name in every file of one root (two stubs each
         # declaring `…instMeasurableSingletonClassFreeRow_theorems`, both imported by a piece)
+        # and different in a statement (its `sorry` nodes) from the solution that keeps the same
+        # declarations: the verifier compiles the solution and the statement in one file
+        # (UniversalFInfinity Milnor.contractible: both declared `…_r461751_1`, "has already been
+        # declared")
         import hashlib
-        self.tag = hashlib.sha1('\n'.join(sorted(keep)).encode()).hexdigest()[:6]
+        salt = '\nsorry:' + '\n'.join(sorted(sorry)) if sorry else ''
+        self.tag = hashlib.sha1(('\n'.join(sorted(keep)) + salt).encode()).hexdigest()[:6]
         self.re_count = collections.Counter()
         rename = dict(rename or {})
         mods = g.topo({g.nodes[k].module for k in keep})

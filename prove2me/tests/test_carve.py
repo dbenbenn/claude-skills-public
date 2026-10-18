@@ -216,6 +216,50 @@ def test_pinning_refuses_what_is_not_bundle_material(g):
         _pinned_plan(g, [['CD.nonexistent']])
 
 
+def _local_inst_plan():
+    # the named local instance cdLocalInst stays out of every bundle, so both the statement and its
+    # solution emit it again; the solution keeps only the statement's own declaration
+    t = 'CD.uses_local_inst'
+    return t, {'bundles': [{'name': 'L0', 'nodes': ['CD.Wide', 'CD.Aux.auxOnly'], 'imports': []}],
+               'nodes': [t], 'external_defs': {}, 'external': [],
+               'stubs': {t: {'bundles': ['L0']}},
+               'pieces': {t: {'keep': [t], 'imports': [], 'bundles': ['L0']}}}
+
+
+def test_statement_and_solution_never_declare_the_same_local_instance(g):
+    # UniversalFInfinity Milnor.contractible (2026-10-18): the statement and its solution kept the
+    # same declarations, so both re-emitted `local instance …_r461751_1` under one name, and the
+    # verifier's file (solution, then the statement) said "has already been declared"
+    from p2mlib import localcheck as L
+    t, plan = _local_inst_plan()
+    stub, sol = C.gen_stub(g, plan, t), C.gen_piece(g, plan, t)
+    pre = ''.join(l + '\n' for l in stub.split('\n') if l.startswith('import '))
+    body = '\n'.join(l for l in stub.split('\n') if not l.startswith('import '))
+    chk = L.server_check_text(sol, pre, body, t)
+    names = re.findall(r'^\s*(?:@\[[^\]]*\]\s*)?local instance (?:\([^)]*\)\s*)?([^\s:({\[]+)', chk, re.M)
+    assert names and len(names) == len(set(names)), names
+    # and the statement still has its instance (its binders may need it)
+    assert re.search(r'local instance cdLocalInst_r', stub)
+
+
+@pytest.mark.lean
+def test_statement_and_solution_compile_together_in_the_verifiers_form(g, tmp_path):
+    from p2mlib import localcheck as L
+    t, plan = _local_inst_plan()
+    out = str(tmp_path / 'out')
+    C.generate(g, plan, out)
+    olean = str(tmp_path / 'olean')
+    C.compile_file(os.path.join(out, 'lib', 'Def_L0.lean'), 'Definitions.Def_L0', olean)
+    stub = open(os.path.join(out, 'lib', 'Thm_%s.lean' % C.slug(t))).read()
+    C.compile_file(os.path.join(out, 'lib', 'Thm_%s.lean' % C.slug(t)), 'Theorems.Thm_' + C.slug(t), olean)
+    sol = open(os.path.join(out, 'solutions', 'Sol_%s.lean' % C.slug(t))).read()
+    pre = ''.join(l + '\n' for l in stub.split('\n') if l.startswith('import '))
+    body = '\n'.join(l for l in stub.split('\n') if not l.startswith('import '))
+    chk = tmp_path / 'Chk.lean'
+    chk.write_text(L.server_check_text(sol, pre, body, t))
+    C.compile_file(str(chk), None, olean)
+
+
 def test_publish_order_puts_statements_after_bundles_and_pieces_last(plan):
     order = C.publish_order(plan, external=['CD.main'])
     wave = {x: i for i, w in enumerate(order['waves']) for x in w}
