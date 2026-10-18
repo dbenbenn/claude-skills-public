@@ -98,13 +98,15 @@ def test_machine_row_splits_memory_and_cpu_by_group():
     assert row['cpu']['rest'] == 3.0             # 4 of 8 cores busy in all, minus Lean's 1
 
 
-def test_build_status_merges_alerts(tmp_path):
+def test_banner_is_for_the_machine_only(tmp_path):
+    # the top banner is for machine trouble; a project's own alerts stay in its section
     h = str(tmp_path)
     S.publish('job', title='Job', alerts=['NEEDS A PERSON: B1'], home=h, now=100)
     secs, problems = M.load_sections(os.path.join(h, 'sections'), now=110)
     st = M.build_status(now=110, sections=secs, problems=problems + ['broken.json: bad'],
                         system={'machine': [], 'psi': [[110, 0, 0, 9, 0, 0]], 'free_gib': 20},
                         flags=['FLAG: x'], lean=[])
-    assert st['alerts'] == ['memory stalls 9% (full)', 'Lean health: FLAG: x',
-                            'Job: NEEDS A PERSON: B1', 'broken.json: bad']
+    assert st['alerts'] == ['memory stalls 9% (full)', 'Lean health: FLAG: x']
+    assert st['sections'][0]['alerts'] == ['NEEDS A PERSON: B1']
+    assert st['problems'] == ['broken.json: bad']
     json.dumps(st)

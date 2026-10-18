@@ -257,16 +257,11 @@ def track(hist, sections, now):
 
 
 def build_status(now, sections, problems, system, flags, lean):
+    """alerts: machine trouble only (the page's top banner). A section's own alerts and staleness
+    show in that section; unreadable section files are listed apart as problems."""
     psi = system['psi'][-1][1:] if system.get('psi') else None
-    alerts = pressure_alerts(psi, system.get('free_gib'))
-    alerts += ['Lean health: ' + f for f in flags]
-    for s in sections:
-        alerts += ['%s: %s' % (s['title'], a) for a in s.get('alerts', [])]
-    alerts += problems
-    for s in sections:
-        if s['stale']:
-            alerts.append('%s: no update for %d min (has its producer stopped?)' % (s['title'], s['age_secs'] // 60))
-    return {'updated': now, 'host': socket.gethostname(), 'alerts': alerts,
+    alerts = pressure_alerts(psi, system.get('free_gib')) + ['Lean health: ' + f for f in flags]
+    return {'updated': now, 'host': socket.gethostname(), 'alerts': alerts, 'problems': problems,
             'system': dict(system, lean=lean, health_flags=flags), 'sections': sections}
 
 

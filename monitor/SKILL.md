@@ -7,7 +7,7 @@ description: The careyaibox monitoring page at http://careyaibox:8765/ — syste
 
 http://careyaibox:8765/ is dbenbenn's one place to see what the machine is doing. On top: the whole
 machine's memory and CPU (split into Lean, each section's own processes, and the rest), load, kernel
-stall pressure, every Lean/lake process with its working directory, and a red "Needs attention" banner.
+stall pressure, every Lean/lake process with its working directory, and a red banner for machine trouble.
 Below: **one section per piece of work**, written by whoever runs that work.
 
 It is one process, `monitor.py`, run as the systemd user unit `monitor.service` (linger is on, so it
@@ -48,17 +48,17 @@ section.publish('erdos3-v2', title='Erdős 3 v2: publishing to prove2.me', state
                 owner='Claude session 777b33f5', heartbeat_secs=60)
 ```
 
-**Fields** (`section.validate` checks them; a bad file shows up in the banner instead of the page):
+**Fields** (`section.validate` checks them; a bad file is listed under the sections instead of shown):
 
 | field | meaning |
 |---|---|
 | `title` | the section's heading, also its name in the machine charts |
 | `state` | `running`, `waiting`, `paused`, `done` or `failed` |
 | `phases` | `[{name, done, total, state?, note?}]`, one progress bar each; pick one to chart by clicking it |
-| `alerts` | strings that need a person. They go in the top banner as well, so only real stops belong here, never routine retries |
+| `alerts` | strings that need a person, shown in red in the section. Only real stops belong here, never routine retries. The top banner is reserved for machine trouble, so it never shows these |
 | `processes` | `[{label, match}]`: a Python regex searched in each process's command line. Matching processes count as this section in the memory and CPU charts and are listed under it. Lean and lake always count as Lean |
 | `owner`, `note`, `links` | who runs it (e.g. the Claude session id, the systemd unit); one line of context; `[{label, url}]` |
-| `heartbeat_secs` | how often you update (default 300). A running or waiting section with no update for 3 heartbeats is marked STALE and named in the banner, so set it honestly: a Claude session that updates once per turn wants 900 or more |
+| `heartbeat_secs` | how often you update (default 300). A running or waiting section with no update for 3 heartbeats gets a STALE badge, so set it honestly: a Claude session that updates once per turn wants 900 or more |
 | `expires_secs` | how long a done or failed section stays (default 86400) |
 
 **Keeping it current when you are not there.** A Claude session's updates stop when its turn ends.
@@ -75,9 +75,10 @@ producer unit, and let the section expire.
 `~/claude/monitor/state/status.json` is exactly what the page shows: `alerts`; `system.machine` rows
 `{t, total, mem: {group: GiB}, cpu: {group: cores}, load1}`; `system.psi` rows `[t, cpu some, memory
 some, memory full, io some, io full]` (avg10, %); `system.lean`; and `sections` with history, rates
-and ETAs. The banner fires on memory full > 5%, I/O full > 20%, CPU some > 50%, less than 4 GiB
-available, Lean health flags from `lean-health.timer` (last 24 h), any section's alerts, unreadable
-section files, and stale sections.
+and ETAs. The top banner is for machine trouble only (dbenbenn 2026-10-18): memory full > 5%, I/O full >
+20%, CPU some > 50%, less than 4 GiB available, and Lean health flags from `lean-health.timer` (last
+24 h). Project alerts and STALE badges stay in their sections; unreadable section files are listed
+under the sections (`problems` in status.json).
 
 ## Changing the monitor
 

@@ -66,6 +66,7 @@ code{font-size:13px}
 <h3 style="margin-top:16px">Lean processes</h3><div id="lean"></div>
 </section>
 <div id="sections"></div>
+<p class="meta" id="problems" hidden></p>
 <details><summary>Adding a section</summary><p>Any job can add its own section: write <code>~/claude/monitor/sections/&lt;id&gt;.json</code>, e.g. with
 <code>python3 ~/.claude/skills/monitor/section.py set my-job --title 'My job' --phase 'Items=3/10'</code>. The <code>monitor</code> skill has the details.</p></details>
 </main>
@@ -204,7 +205,9 @@ async function load(){
   document.getElementById('upd').textContent = 'Updated ' + fmtAt(s.updated) + ' · refreshes every 30 s';
   const al = document.getElementById('alarm');
   al.hidden = !s.alerts.length;
-  al.innerHTML = s.alerts.length ? `<b>Needs attention</b><ul>${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>` : '';
+  const pr = document.getElementById('problems'), P = s.problems || [];
+  pr.hidden = !P.length; pr.textContent = P.length ? 'Section files the page could not read: ' + P.join('; ') : '';
+  al.innerHTML = s.alerts.length ? `<b>careyaibox needs attention</b><ul>${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>` : '';
   drawSystem(s.system);
   drawSections(s.sections||[]);
 }
@@ -230,7 +233,7 @@ function drawSections(secs){
     const ph = s.phases||[];
     const meta = [s.owner?esc(s.owner):'', 'updated '+ago(s.age_secs), ...(s.links||[]).map(l=>`<a href="${esc(l.url)}">${esc(l.label)}</a>`)].filter(Boolean).join(' · ');
     return `<section class="card" id="sec-${esc(s.id)}" aria-labelledby="h-${esc(s.id)}">
-      <h2 id="h-${esc(s.id)}">${esc(s.title)}<span class="st ${s.state}">${s.state.toUpperCase()}</span>${s.stale?'<span class="st stale">STALE</span>':''}</h2>
+      <h2 id="h-${esc(s.id)}">${esc(s.title)}<span class="st ${s.state}">${s.state.toUpperCase()}</span>${s.stale?`<span class="st stale" title="No update for ${Math.round(s.age_secs/60)} min: has its producer stopped?">STALE</span>`:''}</h2>
       <p class="meta">${meta}</p>
       ${s.note?`<p class="chart-sub">${esc(s.note)}</p>`:''}
       ${(s.alerts||[]).length?`<ul class="salerts">${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:''}
