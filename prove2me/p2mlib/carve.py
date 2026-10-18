@@ -2014,12 +2014,15 @@ def _stmt_renames(g, plan, nodes):
             if statement_name(plan, n) != pubname(n)}
 
 
-def _ext_imports(g, plan, keys):
-    """Modules of the external definitions these declarations (or their statements) use."""
+def _ext_imports(g, plan, keys, statement_only=False):
+    """Modules of the external definitions these declarations (or their statements) use; with
+    `statement_only` (a stub, whose proof is `sorry`) only what their statements use."""
     ext = plan.get('external_defs') or {}
     if not ext:
         return []
-    return sorted({ext[d] for k in keys for d in g.nodes[k].deps | g.nodes[k].sig if d in ext})
+    return sorted({ext[d] for k in keys
+                   for d in g.nodes[k].sig | (set() if statement_only else g.nodes[k].deps)
+                   if d in ext})
 
 
 def _bundle_have(g, plan, names):
@@ -2052,7 +2055,7 @@ def gen_stub(g, plan, node, collapse_mathlib=True):
     # carrying a comment (the `-- module` markers, OpenAI's comments in kept context lines)
     body = re.sub(r'\n\s*\n(\s*\n)+', '\n\n', '\n'.join(l.rstrip() for l in strip(body).split('\n')))
     hdr = header(g, {g.nodes[node].module}, bs, (), collapse_mathlib,
-                 extra=_ext_imports(g, plan, [node]))
+                 extra=_ext_imports(g, plan, [node], statement_only=True))
     return hdr + '\n' + body.strip('\n') + '\n'
 
 

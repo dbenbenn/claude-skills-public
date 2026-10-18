@@ -479,6 +479,22 @@ def test_files_using_an_external_definition_import_its_bundle(g, ext_plan, tmp_p
     assert users
 
 
+def test_stub_imports_only_external_definitions_its_statement_uses(ext_plan):
+    # Petty projection (2026-10-18): the Mathlib-only statement brunnMinkowski_euclidean imported
+    # the published Def_PettyProjectionVolume because its *proof* uses `Space`; a stub's proof is
+    # `sorry`, so only what the statement needs (`sig`) decides its external imports, as it
+    # already decides its bundle imports
+    g2 = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)   # private copy: mutated
+    assert 'CD.double' not in g2.nodes['CD.top_aux'].sig
+    g2.nodes['CD.top_aux'].deps = g2.nodes['CD.top_aux'].deps | {'CD.double'}
+    assert 'Def_Ext' not in C.gen_stub(g2, ext_plan, 'CD.top_aux')
+    # a statement that does use the external definition still imports it
+    assert 'CD.double' in g2.nodes['CD.double_succ'].sig
+    assert 'import Definitions.Def_Ext\n' in C.gen_stub(g2, ext_plan, 'CD.double_succ')
+    # a piece keeps its proof, so a proof-only use still imports it there
+    assert 'import Definitions.Def_Ext\n' in C.gen_piece(g2, ext_plan, 'CD.top_aux')
+
+
 def test_statements_get_the_suffix_except_external_ones(g, ext_plan, tmp_path):
     assert C.statement_name(ext_plan, 'CD.top_aux') == 'CD.top_aux_s2'
     assert C.statement_name(ext_plan, 'CD.main') == 'CD.main'
