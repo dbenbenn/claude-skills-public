@@ -104,3 +104,14 @@ def test_wrapper_keeps_new_universes_and_ignores_sectioned_ones():
     body = 'universe u\n\nsection\nuniverse w\nend\n'
     stmt = 'universe u v w\n\ntheorem solution : True := trivial\n'
     assert BS.drop_redeclared_universes(body, stmt) == 'universe v w\n\ntheorem solution : True := trivial\n'
+
+
+def test_module_body_keeps_doc_lines_that_start_with_import():
+    # 2026-10-18: a docstring line "import the stub of a7e19a77 nor ... -/" was dropped as an import,
+    # taking the comment's closing -/ with it ("unterminated comment" in the merged solution)
+    src = ('import Mathlib\nimport Solutions.Artin.T12.L3E_MainP\n\n/-! # L3E_DevP\n\nDoes not\n'
+           'import the stub of a7e19a77 nor of the E6 draft. -/\n\ntheorem t : True := trivial\n')
+    body = BS.module_body(src)
+    assert 'import Mathlib' not in body and 'L3E_MainP' not in body
+    assert 'import the stub of a7e19a77 nor of the E6 draft. -/' in body
+    assert body.lstrip().startswith('/-! # L3E_DevP')

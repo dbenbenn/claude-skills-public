@@ -158,6 +158,14 @@ def external_imports(mods, drop=()):
     return out
 
 
+def module_body(text):
+    """A module's text after its header (the `import` lines and the comments among them). Cut at
+    the header's end, not by dropping every line that starts with `import `: a doc comment line
+    reading "import the stub of …" lost the comment's closing `-/` that way (Artin L3E, 2026-10-18)."""
+    from p2mlib.leantext import header_end
+    return text[header_end(text):]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('target'); ap.add_argument('module'); ap.add_argument('out')
@@ -183,8 +191,7 @@ def main():
     mods = closure(a.root, a.package, a.module, a.merge_dir)
     wrapped = []
     for i, p in enumerate(mods):
-        body = '\n'.join(l for l in open(p, encoding='utf-8').read().split('\n')
-                         if not l.startswith('import '))
+        body = module_body(open(p, encoding='utf-8').read())
         w = os.path.join(work, '%02d_%s' % (i, os.path.basename(p)))
         open(w, 'w', encoding='utf-8').write('section\n' + body.strip() + '\n\nend\n')
         wrapped.append(w)
@@ -193,8 +200,7 @@ def main():
     # 2. merge
     merged = os.path.join(work, 'merged.lean')
     subprocess.run([sys.executable, os.path.join(HERE, 'merge.py'), merged] + wrapped, check=True)
-    text = '\n'.join(l for l in open(merged, encoding='utf-8').read().split('\n')
-                     if not l.startswith('import '))
+    text = module_body(open(merged, encoding='utf-8').read())
     # the verifier rejects macro registration; a development's tactic macros are inlined
     from p2mlib.leantext import inline_tactic_macros
     text, macros = inline_tactic_macros(text)
