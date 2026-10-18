@@ -208,6 +208,25 @@ def check_no_metaprogramming(path):
                  '\n  '.join('line %d: %s' % b for b in bad[:5]) + '\ninline the tactic instead.')
 
 
+def _namespaces(lines):
+    """The namespace in force at each line (`noncomputable section` and named sections included)."""
+    stack, out = [], []
+    for l in lines:
+        out.append('.'.join(n for k, n in stack if k == 'ns'))
+        m = re.match(r'^\s*(?:noncomputable\s+)?(namespace|section|end)\b\s*(\S*)', l)
+        if not m:
+            continue
+        if m.group(1) == 'namespace':
+            stack += [('ns', q) for q in m.group(2).split('.')]
+        elif m.group(1) == 'section':
+            stack.append(('sec', m.group(2)))
+        elif stack:
+            for _ in range(m.group(2).count('.') + 1 if m.group(2) else 1):
+                if stack:
+                    stack.pop()
+    return out
+
+
 def check_no_inline_copies(path, target, allow):
     """A declaration named after a *different* published theorem (primes dropped) is an inline copy:
     the proof uses that theorem without importing it, so the graph misses the edge. CFP §5's
@@ -221,15 +240,18 @@ def check_no_inline_copies(path, target, allow):
     text = open(path, encoding='utf-8').read()
     imported = set(re.findall(r'^import (\S+)', text, re.M))
     hits = []
-    for name, kind, _, _, _ in parse(text.splitlines()):
+    lines = text.splitlines()
+    nsl = _namespaces(lines)
+    for name, kind, st, _, _ in parse(lines):
         base = name.split('.')[-1].rstrip("'")
-        # a rewired copy (proof = call to the published theorem, which is imported) has its edge
-        # the name as declared must be a suffix of the published full name: `Valid.transfer` is not
-        # a copy of `…ExactCountOrdering.transfer` (an unrelated paper; matrix removal, 2026-10-18)
-        declared = name.rstrip("'")
+        # a copy keeps the original's FULL name; matching the last part alone refused OpenAI's
+        # `Valid.transfer` and `OAI.C0Absorption.cutoff_nonneg` as copies of unrelated published
+        # theorems (2026-10-18). A rewired copy (its proof calls the imported theorem) has its edge.
+        head = next((q for q in range(st, len(lines)) if name in lines[q]), st)
+        bare = name[len('_root_.'):] if name.startswith('_root_.') else name
+        full = bare.rstrip("'") if name.startswith('_root_.') else '.'.join(x for x in (nsl[head], bare.rstrip("'")) if x)
         if base in pub and base != short and base not in allow and name != 'solution' \
-                and pub[base][1] not in imported \
-                and ('.' + pub[base][0]).endswith('.' + declared):
+                and pub[base][1] not in imported and full == pub[base][0]:
             hits.append((name, pub[base][0]))
     # a copy of a DEPRECATED theorem is deliberate: importing it would hang the proof off a retired,
     # hidden node (resolve_imports.py copies those in; QFS 2026-09-27, Lemma 5.7 and core_induction)

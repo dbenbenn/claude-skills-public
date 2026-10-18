@@ -206,20 +206,21 @@ def test_an_explanation_without_the_statement_display_is_refused(ws, tmp_path, m
     assert 'display' in str(e.value)
 
 
-def test_inline_copy_check_compares_the_declared_name_not_just_its_last_part(tmp_path, monkeypatch):
-    # 2026-10-18: OpenAI's matrix-removal port declares `Valid.transfer`; a published theorem
-    # `OAI.DeligneDrinfeld.ExactCountOrdering.transfer` (an unrelated paper) shares the last part,
-    # and the check refused it. A declared name is a copy only if it is a suffix of the full name.
+def test_inline_copy_check_compares_full_names(tmp_path, monkeypatch):
+    # 2026-10-18: OpenAI ports declare `Valid.transfer` and, in their own namespace, `cutoff_nonneg`;
+    # published theorems `OAI.DeligneDrinfeld.ExactCountOrdering.transfer` and `QFS.cutoff_nonneg`
+    # share the last part, and the check refused both. A copy keeps the original's full name.
     import rewire, prune_solution
     monkeypatch.setattr(prune_solution, '_workspace', lambda: str(tmp_path))
     monkeypatch.setattr(rewire, 'published', lambda ws: {
         'transfer': ('OAI.DeligneDrinfeld.ExactCountOrdering.transfer', 'Theorems.Thm_X', [])})
     monkeypatch.setattr(S, 'call', lambda m, p, b=None: {'theorems': []})
-    ok = sol(tmp_path, 'theorem Valid.transfer : True := trivial\n\ntheorem solution : True := trivial\n')
-    S.check_no_inline_copies(ok, 'N.target', [])
-    bad = sol(tmp_path, 'theorem transfer : True := trivial\n\ntheorem solution : True := trivial\n')
-    with pytest.raises(SystemExit):
-        S.check_no_inline_copies(bad, 'N.target', [])
-    qual = sol(tmp_path, 'theorem ExactCountOrdering.transfer : True := trivial\n\ntheorem solution : True := trivial\n')
-    with pytest.raises(SystemExit):
-        S.check_no_inline_copies(qual, 'N.target', [])
+    tail = '\ntheorem solution : True := trivial\n'
+    for ok in ('theorem Valid.transfer : True := trivial\n',
+               'namespace OAI.C0Absorption\ntheorem transfer : True := trivial\nend OAI.C0Absorption\n',
+               'theorem transfer : True := trivial\n'):
+        S.check_no_inline_copies(sol(tmp_path, ok + tail), 'N.target', [])
+    for bad in ('namespace OAI.DeligneDrinfeld.ExactCountOrdering\ntheorem transfer : True := trivial\nend OAI.DeligneDrinfeld.ExactCountOrdering\n',
+                'namespace OAI\nnoncomputable section\ntheorem DeligneDrinfeld.ExactCountOrdering.transfer\' : True := trivial\nend\nend OAI\n'):
+        with pytest.raises(SystemExit):
+            S.check_no_inline_copies(sol(tmp_path, bad + tail), 'N.target', [])
