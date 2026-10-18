@@ -495,6 +495,58 @@ def test_stub_imports_only_external_definitions_its_statement_uses(ext_plan):
     assert 'import Definitions.Def_Ext\n' in C.gen_piece(g2, ext_plan, 'CD.top_aux')
 
 
+def _cli():
+    import importlib
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'scripts'))
+    return importlib.import_module('carve')
+
+
+def test_external_theorems_are_imported_not_carved(g, tmp_path):
+    # Petty projection (2026-10-18): the port's Brouwer step calls someone else's published
+    # standalone AGT.brouwer_fixed_point (Theorems.Thm_AGT_brouwer_fixed_point). Config
+    # `external_theorems` {name: Theorems module} works like external_defs: the theorem is never
+    # carved or published again, counts as available, and the files using it import its module.
+    # (CD.Aux.aux_eq stands in for the external theorem; DeclGraph reports such a theorem as a
+    # node because carve.py passes its module with --also.)
+    CLI = _cli()
+    cfg = {'external_defs': {'CD.double': 'Definitions.Def_Ext'},
+           'external_theorems': {'CD.Aux.aux_eq': 'Theorems.Thm_Ext'}}
+    ext = CLI.external_map(cfg)
+    assert ext == {'CD.double': 'Definitions.Def_Ext', 'CD.Aux.aux_eq': 'Theorems.Thm_Ext'}
+    P = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='CDB', external_defs=ext, external=['CD.main'])
+    assert 'CD.Aux.aux_eq' not in P['nodes']
+    assert all('CD.Aux.aux_eq' not in b['nodes'] for b in P['bundles'])
+    assert all('CD.Aux.aux_eq' not in p['keep'] for p in P['pieces'].values())
+    assert 'CD.Aux.aux_eq' not in P['sorry']
+    assert C.check_plan(g, P) == []
+    piece = C.gen_piece(g, P, 'CD.top_aux')
+    assert 'import Theorems.Thm_Ext\n' in piece
+    assert not re.search(r'^\s*(theorem|lemma)\s+aux_eq\b', piece, re.M)
+    # the graph step asks DeclGraph for the external theorems' modules too
+    assert CLI.also_modules(cfg) == ['Theorems.Thm_Ext']
+
+
+def test_decl_graph_command_passes_also_modules(monkeypatch, tmp_path):
+    seen = {}
+
+    class R:
+        returncode = 0
+        stdout = stderr = ''
+
+    def run(cmd, **kw):
+        seen['cmd'] = cmd
+        return R()
+    monkeypatch.setattr(C.subprocess, 'run', run)
+    C.run_decl_graph(str(tmp_path / 'g.jsonl'), 'P', ['P.Main'], ws=str(tmp_path),
+                     also=['Theorems.Thm_Ext'])
+    cmd = seen['cmd']
+    assert cmd[cmd.index('--run') + 1:] == [C.DECLGRAPH, '--also', 'Theorems.Thm_Ext',
+                                             str(tmp_path / 'g.jsonl'), 'P', 'P.Main']
+
+
 def test_statements_get_the_suffix_except_external_ones(g, ext_plan, tmp_path):
     assert C.statement_name(ext_plan, 'CD.top_aux') == 'CD.top_aux_s2'
     assert C.statement_name(ext_plan, 'CD.main') == 'CD.main'

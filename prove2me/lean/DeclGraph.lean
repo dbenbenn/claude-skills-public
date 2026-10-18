@@ -4,7 +4,11 @@ import Lean
 # DeclGraph: the declaration graph of a compiled development, for the carver
 
 usage (from the prove2me workspace, after `lake build ROOT`):
-  lake env lean --run DeclGraph.lean OUT.jsonl PREFIX ROOT [ROOT ...]
+  lake env lean --run DeclGraph.lean [--also MODULE ...] OUT.jsonl PREFIX ROOT [ROOT ...]
+
+`--also MODULE` treats that module as part of the project although it is outside PREFIX: the
+Theorems module of someone else's published theorem the development imports (carve.py
+`external_theorems`), so its constant is a node and its users' edges are recorded.
 
 Imports the ROOT modules and writes OUT.jsonl, one JSON object per line:
 * one per user-facing constant of a module under PREFIX (a module name prefix such as
@@ -39,9 +43,15 @@ def valueConsts : ConstantInfo → Array Name
   | .inductInfo i => i.ctors.toArray
   | _ => #[]
 
-unsafe def main (args : List String) : IO UInt32 := do
+/-- Leading `--also MODULE` pairs, and the remaining arguments. -/
+def splitAlso : List String → List Name × List String
+  | "--also" :: m :: rest => let (ms, r) := splitAlso rest; (m.toName :: ms, r)
+  | rest => ([], rest)
+
+unsafe def main (args0 : List String) : IO UInt32 := do
+  let (also, args) := splitAlso args0
   let out :: pfx :: roots@(_ :: _) := args
-    | IO.eprintln "usage: DeclGraph OUT.jsonl PREFIX ROOT [ROOT ...]"; return 2
+    | IO.eprintln "usage: DeclGraph [--also MODULE ...] OUT.jsonl PREFIX ROOT [ROOT ...]"; return 2
   initSearchPath (← findSysroot)
   enableInitializersExecution
   let env ← importModules (roots.map fun r => ({ module := r.toName } : Import)).toArray {}
@@ -49,7 +59,7 @@ unsafe def main (args : List String) : IO UInt32 := do
   let projPrefix := pfx.toName
   let modNames := env.header.moduleNames
   let modOf (n : Name) : Option Name := (env.getModuleIdxFor? n).bind (modNames[·.toNat]?)
-  let isProjMod (m : Name) : Bool := projPrefix.isPrefixOf m
+  let isProjMod (m : Name) : Bool := projPrefix.isPrefixOf m || also.contains m
   let isProj (n : Name) : Bool := (modOf n).any isProjMod
   let keep (n : Name) : Bool := !n.isInternal || (privateToUserName? n).isSome
   let ctx : Core.Context := { fileName := "<DeclGraph>", fileMap := default, maxHeartbeats := 0 }

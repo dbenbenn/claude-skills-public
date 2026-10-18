@@ -76,10 +76,13 @@ def join(p, tok):
 
 # ================================================================ Lean runs
 
-def run_decl_graph(out, prefix, roots, ws=None, timeout=7200):
-    """lean/DeclGraph.lean on the compiled ROOT modules (their .olean must be built)."""
+def run_decl_graph(out, prefix, roots, ws=None, timeout=7200, also=()):
+    """lean/DeclGraph.lean on the compiled ROOT modules (their .olean must be built). `also`:
+    modules outside PREFIX whose constants are reported as nodes too (the Theorems modules of
+    config `external_theorems`), so the carver sees which declarations use them."""
     ws = ws or leaninfo.workspace()
-    r = subprocess.run(['lake', 'env', 'lean', '--run', DECLGRAPH, out, prefix] + list(roots),
+    extra = [a for m in also for a in ('--also', m)]
+    r = subprocess.run(['lake', 'env', 'lean', '--run', DECLGRAPH] + extra + [out, prefix] + list(roots),
                        cwd=ws, capture_output=True, text=True, timeout=timeout)
     if r.returncode:
         raise CarveError('DeclGraph failed:\n' + (r.stdout + r.stderr)[-3000:])
@@ -1087,7 +1090,9 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     - `frozen`: (old plan, [bundle names]) of bundles already published, kept as they are.
     - `external_defs`: {declaration: module} provided by someone else's published Definitions bundle
       (Erdős 3: the target's own definitions in marwahaha's Def_ErdosReciprocal). They stay out of
-      bundles and pieces; files that use them import the module.
+      bundles and pieces; files that use them import the module. Someone else's published
+      standalone *theorems* go here too (carve.py's `external_theorems`, module `Theorems.Thm_…`):
+      never carved or republished, available everywhere, imported where used.
     - `statement_suffix`: published statement names are `<name><suffix>` (a fresh split of a
       development whose first split already took the names), except `external` statements,
       published by someone else under their own names."""
@@ -1222,7 +1227,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             'stubs': stubs, 'over': sorted(set(over)),
             'external_defs': dict(sorted(ext.items())), 'statement_suffix': statement_suffix,
             'external': sorted(external),
-            'sorry': sorted(k for k in reach | B if g.nodes[k].sorry)}
+            'sorry': sorted(k for k in reach | B if g.nodes[k].sorry and k not in ext)}
 
 
 def split_bundles(g, plan, names, cost, budget, bundle_prefix=None):

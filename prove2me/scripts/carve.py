@@ -32,6 +32,10 @@ CONFIG.json (paths may use ~):
    "collapse_mathlib": true,                  # `import Mathlib` instead of the module list
    "external_defs": {"OAI.Erdos3.HasAP": "Definitions.Def_ErdosReciprocal"},  # declarations
                                               # someone else's published bundle provides
+   "external_theorems": {"AGT.brouwer_fixed_point": "Theorems.Thm_AGT_brouwer_fixed_point"},
+                                              # someone else's published standalone theorems the
+                                              # port's modules import (fetch_theorems.py --names):
+                                              # handled like external_defs, never carved again
    "statement_suffix": "_s2",                 # published names <name>_s2 (a fresh split of a
                                               # development whose earlier split took the names)
    "chunker": "schedule",                     # bundles by declaration-level list scheduling
@@ -86,6 +90,19 @@ def load_config(path):
     return cfg
 
 
+def external_map(cfg):
+    """external_defs and external_theorems together: both are someone else's published
+    declarations, kept out of bundles and pieces and imported by the files that use them."""
+    ext = dict(cfg.get('external_defs') or {})
+    ext.update(cfg.get('external_theorems') or {})
+    return ext
+
+
+def also_modules(cfg):
+    """Modules outside the prefix DeclGraph must report: those of the external theorems."""
+    return sorted(set((cfg.get('external_theorems') or {}).values()))
+
+
 def graph_path(cfg):
     return os.path.join(cfg['work'], 'decl_graph.jsonl')
 
@@ -130,7 +147,7 @@ def main(argv):
     cmd, cfg = argv[1], load_config(argv[2])
     rest = argv[3:]
     if cmd == 'graph':
-        C.run_decl_graph(graph_path(cfg), cfg['prefix'], cfg['roots'])
+        C.run_decl_graph(graph_path(cfg), cfg['prefix'], cfg['roots'], also=also_modules(cfg))
         mods = sorted(C.load_decl_graph(graph_path(cfg))[1])
         # LeanInfo runs interpreted (~6 s a module): in parallel, `jobs` at a time (default 3, the
         # local Lean cap); results are cached, so a rerun only reads the cache
@@ -175,7 +192,7 @@ def main(argv):
                         cfg.get('piece_size', 700_000), cfg.get('bundle_budget', 90),
                         cfg.get('bundle_size', 650_000), cfg.get('band_width', 4), costs(cfg, g),
                         frozen, cfg.get('bundle_prefix', 'Bundle'),
-                        external_defs=cfg.get('external_defs'),
+                        external_defs=external_map(cfg),
                         statement_suffix=cfg.get('statement_suffix', ''),
                         external=cfg.get('external', ()),
                         chunker=cfg.get('chunker', 'bands'))
