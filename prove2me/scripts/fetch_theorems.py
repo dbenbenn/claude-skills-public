@@ -18,7 +18,7 @@ Each mission used to carry its own fetch_thms.py reading a hand-kept published_i
 asks the platform for the mission's theorems, so a statement added after launch is not missed.
 --out writes somewhere else (for a comparison, say) and skips the build.
 """
-import os, subprocess, sys
+import os, re, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from p2m import call
 from prune_solution import _workspace
@@ -29,6 +29,12 @@ from p2mlib.workspace import statement_module, statement_text, drafts, update_dr
 def paged(path, key):
     from p2mlib.api import paginate
     return paginate(path, key, call=call)
+
+
+def lookup(name):
+    r = call('GET', '/theorems?theorem_name=%s&limit=5' % name)
+    hit = [t for t in (r.get('theorems') or []) if t.get('theorem_name') == name]
+    return (hit[0].get('id') or hit[0].get('theorem_id')) if hit else None
 
 
 def main():
@@ -51,10 +57,9 @@ def main():
         else:
             wanted = args[1:]           # standalone theorems belong to no mission or proposal
         for n in wanted:
-            r = call('GET', '/theorems?theorem_name=%s&limit=5' % n)
-            hit = [t for t in (r.get('theorems') or []) if t.get('theorem_name') == n]
-            if hit:
-                ids.append(hit[0].get('id') or hit[0].get('theorem_id'))
+            tid = lookup(n)
+            if tid:
+                ids.append(tid)
             else:
                 print('   not published (yet?): %s' % n)
     else:
@@ -65,7 +70,11 @@ def main():
             ids += [t.get('id') or t.get('theorem_id') for t in paged('/theorems?mission_id=%s' % m['id'], 'theorems')]
     written, same, mods, retired = [], 0, [], []
     dr = drafts(ws) if root == ws else {}
-    for tid in ids:
+    # every bundle a written file imports is fetched too, transitively: `--names` once wrote a
+    # statement without the Def_ bundle its preamble imports, and the build failed (2026-10-18)
+    queue, seen = list(ids), set(ids)
+    while queue:
+        tid = queue.pop(0)
         if True:
             d = call('GET', '/theorems/' + tid)
             d = d.get('theorem', d)
@@ -95,6 +104,12 @@ def main():
                 written.append(rel)
                 print('   wrote %-8s %s' % (d.get('status'), rel))
             mods.append(rel[:-5].replace(os.sep, '.'))
+            for b in re.findall(r'^import Definitions\.Def_(\S+)', text, re.M):
+                bid = lookup(b)
+                if bid and bid not in seen:
+                    seen.add(bid); queue.append(bid)
+                elif not bid:
+                    print('   imported bundle not found on the platform: Def_%s' % b)
     if retired:
         update_drafts(remove=retired, ws=ws)
         print('%d draft stub(s) now published' % len(retired))

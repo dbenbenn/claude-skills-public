@@ -36,6 +36,34 @@ def test_fetch_writes_server_shape_and_skips_unchanged(tmp_path, monkeypatch, ca
     assert os.path.getmtime(tmp_path / 'Theorems' / 'Thm_N_t.lean') == before
 
 
+def test_names_also_fetches_the_bundles_its_statements_import(tmp_path, monkeypatch):
+    # 2026-10-18: `--names OAI.Saxl.saxl_conjecture` wrote the statement but not Def_Saxl, so the
+    # build failed with "bad import"; bundles came only with mission mode. Now every
+    # `import Definitions.Def_X` of a written file is fetched too, transitively.
+    def call(m, p, b=None):
+        if p.startswith('/theorems?theorem_name=N.t&'):
+            return {'theorems': [{'theorem_name': 'N.t', 'id': 'T'}]}
+        if p.startswith('/theorems?theorem_name=Outer&'):
+            return {'theorems': [{'theorem_name': 'Outer', 'id': 'O'}]}
+        if p.startswith('/theorems?theorem_name=Inner&'):
+            return {'theorems': [{'theorem_name': 'Inner', 'id': 'I'}]}
+        if p == '/theorems/T':
+            return {'theorem_name': 'N.t', 'status': 'Open', 'preamble': 'import Mathlib\nimport Definitions.Def_Outer',
+                    'formal_statement': 'theorem N.t : N.k = 1 := by\n  sorry'}
+        if p == '/theorems/O':
+            return {'theorem_name': 'Outer', 'status': 'Definition',
+                    'definition': 'import Mathlib\nimport Definitions.Def_Inner\n\ndef N.k := N.j'}
+        if p == '/theorems/I':
+            return {'theorem_name': 'Inner', 'status': 'Definition', 'definition': 'import Mathlib\n\ndef N.j := 1'}
+        raise AssertionError(p)
+    monkeypatch.setattr(F, 'call', call)
+    monkeypatch.setattr(F.sys, 'argv', ['fetch_theorems.py', '--names', 'N.t', '--out', str(tmp_path)])
+    F.main()
+    assert (tmp_path / 'Theorems' / 'Thm_N_t.lean').exists()
+    assert (tmp_path / 'Definitions' / 'Def_Outer.lean').read_text().endswith('def N.k := N.j\n')
+    assert (tmp_path / 'Definitions' / 'Def_Inner.lean').read_text().endswith('def N.j := 1\n')
+
+
 @pytest.fixture
 def folder(tmp_path):
     (tmp_path / 'lib').mkdir()
