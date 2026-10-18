@@ -64,6 +64,30 @@ def test_names_also_fetches_the_bundles_its_statements_import(tmp_path, monkeypa
     assert (tmp_path / 'Definitions' / 'Def_Inner.lean').read_text().endswith('def N.j := 1\n')
 
 
+def test_imported_bundle_found_by_definitions_search(tmp_path, monkeypatch):
+    # 2026-10-18: `--names MilnorDynamics.locally_bounded_holomorphic_subseq_locally_uniform`
+    # reported "imported bundle not found on the platform: Def_MilnorDynamics_NormalFamilies":
+    # /theorems?theorem_name= does not find definition bundles; /definitions?q= does.
+    def call(m, p, b=None):
+        if p.startswith('/theorems?theorem_name=N.t&'):
+            return {'theorems': [{'theorem_name': 'N.t', 'id': 'T'}]}
+        if p.startswith('/theorems?theorem_name='):
+            return {'theorems': [], 'total': 0}
+        if p.startswith('/definitions?q=Bun_defs&'):
+            return {'definitions': [{'definition_name': 'Bun_defs_extra', 'definition_id': 'X'},
+                                    {'definition_name': 'Bun_defs', 'definition_id': 'D'}]}
+        if p == '/theorems/T':
+            return {'theorem_name': 'N.t', 'status': 'Open', 'preamble': 'import Mathlib\nimport Definitions.Def_Bun_defs',
+                    'formal_statement': 'theorem N.t : N.k = 1 := by\n  sorry'}
+        if p == '/theorems/D':
+            return {'theorem_name': 'Bun_defs', 'status': 'Definition', 'definition': 'import Mathlib\n\ndef N.k := 1'}
+        raise AssertionError(p)
+    monkeypatch.setattr(F, 'call', call)
+    monkeypatch.setattr(F.sys, 'argv', ['fetch_theorems.py', '--names', 'N.t', '--out', str(tmp_path)])
+    F.main()
+    assert (tmp_path / 'Definitions' / 'Def_Bun_defs.lean').read_text().endswith('def N.k := 1\n')
+
+
 @pytest.fixture
 def folder(tmp_path):
     (tmp_path / 'lib').mkdir()

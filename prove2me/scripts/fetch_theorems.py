@@ -37,6 +37,18 @@ def lookup(name):
     return (hit[0].get('id') or hit[0].get('theorem_id')) if hit else None
 
 
+def lookup_bundle(name):
+    """The id of the definitions bundle named exactly `name`: /theorems?theorem_name= does not find
+    bundles on the live platform (2026-10-18), /definitions?q= does; its id also serves
+    /theorems/<id>."""
+    tid = lookup(name)
+    if tid:
+        return tid
+    r = call('GET', '/definitions?q=%s&limit=20' % name)
+    hit = [d for d in (r.get('definitions') or []) if d.get('definition_name') == name]
+    return hit[0].get('definition_id') if hit else None
+
+
 def main():
     args = sys.argv[1:]
     out_dir, build = None, '--no-build' not in args
@@ -105,7 +117,7 @@ def main():
                 print('   wrote %-8s %s' % (d.get('status'), rel))
             mods.append(rel[:-5].replace(os.sep, '.'))
             for b in re.findall(r'^import Definitions\.Def_(\S+)', text, re.M):
-                bid = lookup(b)
+                bid = lookup_bundle(b)
                 if bid and bid not in seen:
                     seen.add(bid); queue.append(bid)
                 elif not bid:
