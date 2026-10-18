@@ -68,6 +68,17 @@ def test_dot_notation_on_a_local_is_a_dependency(g):
     assert 'CD.Space.coord_eq' not in sv.term and 'CD.Space.coord_eq' in sv.deps
 
 
+def test_dot_notation_reads_no_unrelated_project_declaration_by_short_name(g):
+    # UniversalFInfinity (2026-10-18): `w.support` (Mathlib's Finsupp.support on a local) was read
+    # as the project's Higman.RecognizingStack.support, and `Subtype.val` as a project structure's
+    # field `val`. Dot notation `x.f` means `T.f` for the head T of x's type, so a short-name
+    # reading in a project-only namespace T needs T among the declaration's constants.
+    # `k1.succ` (k1 : Nat) is Nat.succ, not the project's Wide.succ:
+    assert 'CD.Wide.succ' not in g.nodes['CD.uses_hk1'].deps
+    # while `A.coord_eq` with A : Space still reads Space.coord_eq (Space is in the term)
+    assert 'CD.Space.coord_eq' in g.nodes['CD.size_via_coord'].deps
+
+
 def test_local_notation_names_are_dependencies_of_what_follows(g):
     # `local notation "DE" => double_eq` precedes `size_zero` in Mid's scope: a file keeping
     # size_zero keeps the notation, whose identifiers Lean prechecks

@@ -542,7 +542,7 @@ class Graph:
                         out += self.open_targets(idn['name'], c.namespace, m)
         return list(dict.fromkeys(out))
 
-    def resolve(self, tok, ns, opens, m):
+    def resolve(self, tok, ns, opens, m, used=None):
         """The project constants (env names) identifier `tok` may denote in module m, namespace ns,
         with project namespaces `opens` open. Over-approximates: every reading Lean could take,
         and when none, the reading with trailing fields (`h.mp`, `foo.1`) stripped."""
@@ -562,9 +562,17 @@ class Graph:
             if hits:
                 return list(dict.fromkeys(hits))
         # dot notation on a local (`A.coord_eq` with `A : Space`, Erdős 3 B024): the head names no
-        # declaration, so read the field by its short name when that is (nearly) unambiguous
+        # declaration, so read the field by its short name when that is (nearly) unambiguous.
+        # `x.f` means `T.f` for the head T of x's type: with `used` (the declaration's compiled
+        # constants), a reading in a namespace only the project has needs T among them
+        # (UniversalFInfinity 2026-10-18: `w.support` read as Higman.RecognizingStack.support,
+        # `Subtype.val` as a project structure's field `val`); a namespace that also exists outside
+        # the project (`Finset`) may hold a project lemma about a Mathlib type, and stays as before
         if '.' in tok and not tok.startswith('_root_.'):
             hits = [n for n in self.short.get(tok.rsplit('.', 1)[-1], ()) if self.visible(n, m)]
+            if used is not None:
+                hits = [n for n in hits if '.' in n and
+                        (n.rsplit('.', 1)[0] in self.ext_ns or n.rsplit('.', 1)[0] in used)]
             if 0 < len(hits) <= 2:
                 return hits
         return []
@@ -612,10 +620,18 @@ class Graph:
         what module m could see: imported modules, or earlier commands of m."""
         opens = self.scope_opens(info, c, m)
         out = set()
+        used = None
+        if me in self.nodes:
+            used = set()
+            for n in self.nodes[me].names:
+                x = self.consts.get(n)
+                if x:
+                    used.update(x['t'])
+                    used.update(x['v'])
         for idn in c.idents or []:
             if idn['role'] != 'ref' or (before is not None and idn['start'] >= before):
                 continue
-            for n in self.resolve(idn['name'], decl_ns(c), opens, m):
+            for n in self.resolve(idn['name'], decl_ns(c), opens, m, used):
                 o = self.owner.get(n)
                 if not o or o == me:
                     continue
