@@ -1516,6 +1516,48 @@ job scratch directory is per-session, not per-project: namespace every artifact 
 verify counts against the plan. `merge.py`'s two refusals encode a verifier rejection that once
 took six diagnostic submissions.
 
+## Porting an openai/math result to prove2.me
+
+The published OAI goals were generated from openai/math at `adc7f12`. Use the skill's scripts
+for every port. Never copy them into a job directory: twenty carves each kept a private
+`port_modules.py` / `measure.py`, and their fixes drifted apart (2026-10-18). The shared text
+transformations are in `p2mlib.oaiport`, and `tests/test_oaiport.py` pins the bugs they fixed.
+
+1. **Search first.** Before publishing anything, search prove2.me for the goal and for each
+   named result (`/theorems?theorem_name=`, `/definitions?q=`, by title). Someone else's existing
+   statement is imported or proved, never published a second time.
+2. **The single-file route comes first.** Fetch the import closure with `oai_fetch.py`. Then
+   `oai_port.py` merges it, drops every declaration of the statement's published bundles by full
+   name, renames OpenAI's copy of the target `<name>_oai`, and checks the verifier's form locally
+   with `-j1`. `oai_batch.py --dir JOB` does this for many goals; `oai_submit.py --dir JOB` is
+   the submit queue (restart-safe: each goal's state is rebuilt from its log).
+3. **Submit it as it is.** Don't optimize first. Up to about 70–80 s of local CPU passes the
+   300 s verifier; 90 s and slower timed out (five of six such goals timed out twice). So the
+   queue gives a file over ~90 s one attempt and a faster one an unchanged retry. A port that
+   times out twice is carved.
+4. **Carve with the named results forced.** The module route is `oai_port_modules.py` (the
+   modules into `Solutions/FOLDER`, with the compatibility lemmas in namespace `OAI`), then
+   `oai_build_modules.py --elab-log`, then `carve_prep.py config` with `--def` for each published
+   bundle the goal imports and `--forced` for each theorem the paper names. Then run `carve.py
+   graph`, `carve_prep.py ext-defs`, `carve.py plan/gen/order`, `carve_measure.py`, and `carve.py
+   split` (see **Splitting a large ported proof**). Each forced theorem becomes its own published
+   statement, so others can reuse it.
+5. **A bundle that needs a statement imports it.** With `bundles_import_statements` (the default),
+   a bundle imports a forced theorem that definitions need. That import is allowed only once the
+   theorem is Proved, so `publish_order` puts the bundle after the statement's piece.
+6. **Before publishing:** `carve_prep.py publish-prep`, write the prose and explanations as files,
+   `carve_prep.py bundle-prose`, then `carve_prep.py check-text`. The last checks the explanation
+   rules, that every backticked name exists, and that no stub contains a comment. Credit OpenAI
+   and the result family in every description and explanation.
+
+The compatibility block lives in namespace `OAI` by default (`--root-compat` restores the old
+form). Two bundles that both declared a root-level `ite_eq_left` would clash. A namespaced
+`alias Finset.prod_le_prod₀ := …` would create `OAI.Finset`, which shadows Mathlib's `Finset`
+under `open Finset`, so each alias is rewritten into the sources instead. Two bundles that were
+already published still export root names: UniversalFInfinity's `OAIQWUFI004` (`ite_eq_left`,
+`ite_eq_right`, `dite_eq_left`, `dite_eq_right`) and ESB's `OAIQWESB000` (`alias
+Finset.prod_le_prod₀`). A port that imports either of them must not declare those names again.
+
 ## Contributing outside a mission
 
 Almost every existing mission milestone is proved; the productive seams are milestones whose
