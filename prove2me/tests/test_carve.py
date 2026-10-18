@@ -137,6 +137,17 @@ def test_check_plan_flags_a_definition_missing_from_the_bundles(g, plan):
     assert probs and any('CD.Space' in p for p in probs)
 
 
+def test_forced_theorem_a_definition_needs_is_a_clear_error(g):
+    # StrictInverseFirstPower (2026-10-18): forcing Bieberbach's |a₂| ≤ 2, which the instance
+    # `CompactSpace DiskFamily` needs, crashed make_plan with KeyError. `CD.double_eq` is a theorem
+    # the definition `CD.sizedZero` uses, so it is bundle material once `CD.uses_sized` is a target
+    with pytest.raises(C.CarveError, match=r'CD\.double_eq.*bundle.*CD\.sizedZero'):
+        C.make_plan(g, ['CD.uses_sized'], forced=['CD.double_eq'], cost=C.size_costs(g))
+    # a target pulled into a bundle the same way gets the same error
+    with pytest.raises(C.CarveError, match=r'CD\.double_eq.*bundle'):
+        C.make_plan(g, ['CD.uses_sized', 'CD.double_eq'], cost=C.size_costs(g))
+
+
 def test_sorry_never_reaches_a_bundle_or_piece(g, plan):
     # Erdős 3 B022 ("declaration uses `sorry`"): a port's stubbed proof leaked into a bundle
     assert g.nodes['CD.sorried'].sorry and not g.nodes['CD.double'].sorry

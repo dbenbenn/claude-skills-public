@@ -1075,6 +1075,36 @@ def _order_chunks(g, chunks, nfrozen):
     return [chunks[i] for i in order]
 
 
+def _bundle_reason(g, seeds, t):
+    """Why theorem `t` is bundle material: the definition (a bundle seed) whose dependency chain
+    reaches it, with the chain. A definition cannot import a published (sorry) statement, so the
+    bundle has to prove `t` itself (StrictInverseFirstPower: the instance CompactSpace DiskFamily
+    that several definitions need rests on the distortion theorem and Bieberbach's |a₂| ≤ 2)."""
+    parent, todo = {}, []
+    for s in sorted(seeds):
+        if not g.nodes[s].theorem and s not in parent:
+            parent[s] = None
+            todo.append(s)
+    i = 0
+    while i < len(todo):
+        x = todo[i]
+        i += 1
+        if x == t:
+            break
+        for d in sorted(g.nodes[x].deps):
+            if d in g.nodes and d not in parent:
+                parent[d] = x
+                todo.append(d)
+    if t not in parent:
+        return 'it is bundle material (a definition needs it)'
+    chain = [t]
+    while parent[chain[-1]] is not None:
+        chain.append(parent[chain[-1]])
+    return ('it is bundle material, because the definition %s needs it (%s); a definitions bundle '
+            'cannot import a statement, so it proves it itself. Publish it from a separate carve '
+            'whose targets do not need that definition' % (chain[-1], ' -> '.join(reversed(chain))))
+
+
 def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_budget=90.0,
               bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
               external_defs=None, statement_suffix='', external=(), chunker='bands'):
@@ -1117,6 +1147,9 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     B = g.closure(seeds) | {k for ch in fz_chunks for k in ch}
     B |= g.extra_roots(B, set())
     B -= set(ext)
+    for t in targets + forced:
+        if t in B:
+            raise CarveError('%s cannot be a published statement: %s' % (t, _bundle_reason(g, seeds, t)))
     T = reach - B - set(ext)
     kids = {k: [d for d in g.nodes[k].deps if d in T] for k in T}
     order, seen = [], set()
