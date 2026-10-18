@@ -94,6 +94,15 @@ def merge(mods, scratch=None):
         info = leaninfo.run(tmp, parse_only=True, use_cache=False)
     finally:
         os.remove(tmp)
+    # a syntax error makes Lean resume at the next command keyword, even one inside a term
+    # (`(h …).section x`), and every scope and duplicate decision after it is then wrong
+    # (2026-10-18: modules passed without their `import Mathlib` got four phantom closers)
+    bad = [m for m in info.errors if re.match(r'(unexpected|expected)\b', m.text) or '; expected' in m.text]
+    if bad:
+        m = bad[0]
+        k = next((k for k, (a, b) in enumerate(spans) if a <= m.start.byte < b), None)
+        sys.exit('refusing: Lean could not parse %s: %s (%d syntax errors; are its imports in place?)'
+                 % (mods[k] if k is not None else 'the header', m.text, len(bad)))
 
     def module(c):
         return next((k for k, (a, b) in enumerate(spans) if a <= c.start.byte < b), None)

@@ -85,3 +85,11 @@ def test_comment_and_docstring_lines_are_not_declarations(tmp_path):
                    'theorem t : True := trivial\n')
     assert r.returncode == 0, r.stderr
     assert out.count('theorem t : True') == 1
+
+
+@pytest.mark.lean
+def test_unparsable_module_is_refused(tmp_path):
+    # 2026-10-18: modules handed over without their `import Mathlib` failed to parse; the parser
+    # resumed at a `.section` field access, and the merge closed four scopes that were never open
+    r, out = merge(tmp_path, 'theorem t (s : List Nat) : ∑ i ∈ s, i = 0 := sorry\n')
+    assert r.returncode != 0 and 'could not parse' in (r.stdout + r.stderr)
