@@ -200,6 +200,36 @@ def test_a_forced_theorem_definitions_need_is_published_and_their_bundles_import
     assert re.search(r'^theorem double_eq_oai\b', (out / 'solutions' / 'Sol_CD_double_eq.lean').read_text(), re.M)
 
 
+def test_a_piece_needing_a_bundle_that_imports_its_statement_is_made_self_contained(g, tmp_path):
+    # ZeroTemperatureSK (2026-10-18): a forced statement's piece imported the bundle that imports
+    # that statement; the bundle waits for the statement to be Proved, the proof waits for the
+    # bundle, and publishing deadlocks. Here the piece of CD.double_eq is made to import the
+    # bundle importing it (as an instance or attribute root can pull it in).
+    p = json.loads(json.dumps(_stmt_plan(g)))
+    wit = next(b for b in p['bundles'] if 'CD.doubleWitness' in b['nodes'])
+    pc = p['pieces']['CD.double_eq']
+    pc['bundles'] = [wit['name']]
+    assert any('CD.double_eq' in x and 'cycle' in x for x in C.check_plan(g, p))
+    with pytest.raises(C.CarveError, match='depends on itself'):
+        C.publish_order(p)
+    # the carver resolves it: the piece keeps what its proof needs and imports only bundles that
+    # come before the statement (its stub's), never one importing it
+    q = C.resolve_piece_cycles(g, p)
+    assert q == ['CD.double_eq']
+    pc = p['pieces']['CD.double_eq']
+    assert pc['selfcontained'] and wit['name'] not in pc['bundles']
+    assert C.check_plan(g, p) == []
+    order = C.publish_order(p)
+    wave = {x: i for i, w in enumerate(order['waves']) for x in w}
+    assert wave['piece:CD.double_eq'] < wave['bundle:' + wit['name']]
+    out = tmp_path / 'out'
+    C.generate(g, p, str(out), what=('pieces',), names=['CD.double_eq'])
+    sol = (out / 'solutions' / 'Sol_CD_double_eq.lean').read_text()
+    assert 'Def_%s' % wit['name'] not in sol and re.search(r'^theorem double_eq_oai\b', sol, re.M)
+    # make_plan never returns such a cycle
+    assert C.resolve_piece_cycles(g, _stmt_plan(g)) == []
+
+
 def test_split_keeps_the_statements_a_bundle_imports(g):
     p = _stmt_plan(g)
     wit = next(b for b in p['bundles'] if 'CD.doubleWitness' in b['nodes'])

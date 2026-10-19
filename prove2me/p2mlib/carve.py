@@ -1359,12 +1359,83 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
                      'cost': round(pcost(keep), 2), 'size': psize(keep)}
         sb = {bidx[d] for d in g.nodes[n].sig if d in bidx}
         stubs[n] = {'bundles': [names[i] for i in sorted(_reduce(bimp, sb))]}
-    return {'version': 1, 'targets': targets, 'forced': forced, 'bundle_prefix': bundle_prefix,
+    plan = {'version': 1, 'targets': targets, 'forced': forced, 'bundle_prefix': bundle_prefix,
             'budget': budget, 'bundles': bundles, 'nodes': sorted(nodes), 'pieces': pieces,
             'stubs': stubs, 'over': sorted(set(over)),
             'external_defs': dict(sorted(ext.items())), 'statement_suffix': statement_suffix,
             'external': sorted(external),
             'sorry': sorted(k for k in reach | B if g.nodes[k].sorry and k not in ext)}
+    if stmts:
+        for n in resolve_piece_cycles(g, plan):
+            plan['pieces'][n]['cost'] = round(pcost(set(plan['pieces'][n]['keep'])), 2)
+    return plan
+
+
+def _needs_piece(plan, bimp, n):
+    """Indices of the bundles that wait for piece `n`: those importing statement n, and every
+    bundle importing one of them."""
+    direct = {i for i, b in enumerate(plan['bundles']) if n in b.get('statements', ())}
+    if not direct:
+        return set()
+    return {i for i in range(len(plan['bundles'])) if _bundle_closure(bimp, [i]) & direct}
+
+
+def piece_cycles(plan):
+    """[(node, bundle)]: a piece that imports (directly, through bundle imports or through a
+    statement it imports) a bundle waiting for that piece's own statement to be Proved."""
+    pos, bimp, _ = _plan_index(plan)
+    out = []
+    for n, p in sorted(plan['pieces'].items()):
+        tainted = _needs_piece(plan, bimp, n)
+        if not tainted:
+            continue
+        cl = _bundle_closure(bimp, [pos[x] for x in p['bundles'] if x in pos])
+        for i in p['imports']:
+            cl |= _bundle_closure(bimp, [pos[x] for x in plan['stubs'][i]['bundles'] if x in pos])
+        for j in sorted(cl & tainted):
+            out.append((n, plan['bundles'][j]['name']))
+    return out
+
+
+def resolve_piece_cycles(g, plan):
+    """Make each piece caught in a publish cycle (piece_cycles) self-contained: it imports only
+    its own statement's bundles (published before the statement) and statements whose bundles do
+    not wait for it, and keeps everything else its proof needs, bundle material included
+    (ZeroTemperatureSK 2026-10-18, done by hand there with selfcontained_pieces.py). Edits `plan`
+    in place; returns the nodes changed. A statement whose own bundles wait for its proof cannot
+    be published at all: CarveError."""
+    pos, bimp, _ = _plan_index(plan)
+    names = [b['name'] for b in plan['bundles']]
+    ext = set(plan.get('external_defs') or {})
+    nodes = set(plan['nodes'])
+
+    def cl(bs):
+        return _bundle_closure(bimp, [pos[x] for x in bs if x in pos])
+
+    changed = []
+    for n in sorted({c[0] for c in piece_cycles(plan)}):
+        tainted = _needs_piece(plan, bimp, n)
+        own = plan['stubs'].get(n, {}).get('bundles', [])
+        if cl(own) & tainted:
+            raise CarveError('%s cannot be published: its statement needs bundles that wait for '
+                             'its proof (%s)' % (n, ', '.join(names[j] for j in sorted(cl(own) & tainted))))
+        safe = {x for x in nodes if x != n and not (cl(plan['stubs'][x]['bundles']) & tainted)}
+        have_b = set(cl(own))
+        for x in safe:
+            have_b |= cl(plan['stubs'][x]['bundles'])
+        avail = {k for j in have_b for k in plan['bundles'][j]['nodes']} | ext
+        stop = avail | safe
+        keep = {k for k in g.closure([n], stop=stop) if k == n or k not in stop}
+        keep |= {k for k in g.extra_roots(keep, stop) if k not in stop and k not in nodes}
+        bad = sorted(k for k in keep if g.nodes[k].sorry)
+        if bad:
+            raise CarveError('self-contained piece %s would contain sorry: %s' % (n, bad))
+        imps = sorted({d for k in keep for d in g.nodes[k].deps if d in safe and d not in keep})
+        p = plan['pieces'][n]
+        p.update(keep=sorted(keep), imports=imps, bundles=[names[i] for i in sorted(_reduce(bimp, set(cl(own))))],
+                 size=sum(g.nodes[k].size for k in keep), selfcontained=True)
+        changed.append(n)
+    return changed
 
 
 def split_bundles(g, plan, names, cost, budget, bundle_prefix=None):
@@ -1601,6 +1672,9 @@ def check_plan(g, plan):
         for k in p['keep']:
             if g.nodes[k].sorry:
                 probs.append('piece %s: %s uses sorry' % (n, k))
+    for n, b in piece_cycles(plan):
+        probs.append('publish cycle: piece %s imports bundle %s, which waits for statement %s to be '
+                     'Proved (resolve_piece_cycles makes the piece self-contained)' % (n, b, n))
     for cyc in bundle_cycles(g, plan):
         probs.append('bundle import cycle %s: %s' % (
             ' -> '.join([c[0] for c in cyc] + [cyc[0][0]]),
