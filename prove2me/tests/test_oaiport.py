@@ -15,6 +15,7 @@ import pytest
 from p2mlib import oaiport as O
 
 FIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'oaiport_fixtures')
+O_COMPAT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean', 'compat_4_34.lean')
 
 
 def fix(name):
@@ -136,6 +137,29 @@ def test_compat_block_in_a_namespace_turns_aliases_into_rewrites():
     # the old root-level block, on request
     root, rw = O.compat_block(COMPAT, None)
     assert root == COMPAT and rw == {}
+
+
+def test_the_three_finset_aliases_are_rewritten_in_every_form():
+    # ErdosGallai and RepeatedLocalization (2026-10-19) needed hand renames of
+    # Finset.prod_le_prod₀ / prod_le_one₀ / one_le_prod₀ (they ran a job copy of port_modules that
+    # dropped the aliases without rewriting). Pinned here: qualified uses after `apply`/`exact`, in
+    # parentheses, and bare uses under `open Finset`; never a longer name or another namespace's
+    block, rw = O.compat_block(open(O_COMPAT, encoding='utf-8').read(), 'OAI')
+    assert {'Finset.prod_le_prod₀', 'Finset.prod_le_one₀', 'Finset.one_le_prod₀'} <= set(rw)
+    src = ('      apply Finset.prod_le_prod₀\n'
+           '    exact le_mul (Finset.one_le_prod₀ (fun l _ => h l))\n'
+           '  exact Finset.prod_le_one₀ (fun _ _ => h0 _)\n'
+           'open Finset in\n'
+           'theorem t : x := prod_le_prod₀ h1 h2\n'
+           'theorem u : y := Other.prod_le_prod₀ h\n'
+           'theorem v : z := Finset.prod_le_prod₀_aux\n')
+    out = O.apply_rewrites(src, rw)
+    assert 'apply Finset.prod_le_prod\n' in out and '(Finset.one_le_prod (fun' in out
+    assert 'exact Finset.prod_le_one (fun' in out
+    assert 'theorem t : x := prod_le_prod h1 h2' in out
+    assert 'Other.prod_le_prod₀ h' in out and 'Finset.prod_le_prod₀_aux' in out
+    # without `open Finset` a bare name is someone else's and stays
+    assert O.apply_rewrites('theorem t : x := prod_le_prod₀ h\n', rw) == 'theorem t : x := prod_le_prod₀ h\n'
 
 
 def test_core_rewrites_add_the_zero_case_of_tensor_induction():
