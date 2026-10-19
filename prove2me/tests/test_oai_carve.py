@@ -163,3 +163,22 @@ def test_publish_prep_writes_run_files_and_manifest(tmp_path, monkeypatch):
     assert json.load(open(os.path.join(P, 'run_2_statements.json')))['kinds'] == ['statement']
     assert json.load(open(os.path.join(P, 'run.json')))['tags'] == ['t1', 't2']
     assert man.splitlines()[0].endswith('  out/lib/Def_A.lean') and len(man.splitlines()) == 2
+
+
+def test_ext_defs_ask_lean_for_a_bundle_with_anonymous_instances(tmp_path, monkeypatch):
+    # DiamondDistortion (2026-10-19): Def_DiamondDistortion's anonymous instances have
+    # Lean-generated names (SegmentSystem.instNonemptyFamily) that the source parse cannot see;
+    # missing from external_defs, the port's copies were carved into our bundle and clashed
+    ws = tmp_path / 'ws'
+    (ws / 'Definitions').mkdir(parents=True)
+    (ws / 'Definitions' / 'Def_A.lean').write_text('namespace X\ndef f : Nat := 1\nend X\n')
+    (ws / 'Definitions' / 'Def_B.lean').write_text('namespace X\ninstance : Nonempty Nat := ⟨0⟩\nend X\n')
+    asked = []
+
+    def fake(ws_, m):
+        asked.append(m)
+        return ['X.instNonemptyNat']
+    monkeypatch.setattr(CP, 'lean_constants', fake)
+    names = CP.bundle_constants(str(ws), ['Definitions.Def_A', 'Definitions.Def_B'])
+    assert asked == ['Definitions.Def_B']
+    assert names == {'X.f': 'Definitions.Def_A', 'X.instNonemptyNat': 'Definitions.Def_B'}

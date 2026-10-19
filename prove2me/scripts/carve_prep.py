@@ -15,7 +15,8 @@ usage:
       after `carve.py graph`: external_defs = the bundles' declarations that are graph nodes
       (a field or constructor maps to its owner). --lean lists each bundle's constants with Lean
       (exact, one Lean run per bundle; waits for a lean-cap slot), --names reads them from a file
-      (`NAME` or `NAME MODULE` per line); default: parsed from the bundle sources.
+      (`NAME` or `NAME MODULE` per line); default: parsed from the bundle sources, with Lean asked
+      for a bundle that has an anonymous instance (its name is Lean's to generate).
   carve_prep.py filter-patches PATCHES.json LEAN_ROOT OUT.json PREFIX [PREFIX ...]
       keep the single-file patches (oai_port.py) whose `old` occurs exactly `count` times over the
       modules under the prefixes, for oai_port_modules.py; lists the others.
@@ -99,11 +100,28 @@ def merged_build_log(d, overhead):
 
 
 def bundle_names(ws, defmods):
+    """{full name: module} of what each bundle declares, parsed from its source."""
     ext = {}
     for m in defmods:
         names, _ = O.bundle_decl_names(open(os.path.join(ws, *m.split('.')) + '.lean', encoding='utf-8').read())
         for n in names:
             ext[n] = m
+    return ext
+
+
+def bundle_constants(ws, defmods):
+    """bundle_names, plus, for a bundle with an anonymous instance, every constant Lean lists for
+    it: an anonymous instance's name is Lean's to generate (DiamondDistortion 2026-10-19: the
+    published bundle's `instance : Nonempty T.Family` is SegmentSystem.instNonemptyFamily, which
+    the port also declares)."""
+    ext = {}
+    for m in defmods:
+        names, anon = O.bundle_decl_names(open(os.path.join(ws, *m.split('.')) + '.lean', encoding='utf-8').read())
+        for n in names:
+            ext[n] = m
+        if anon:
+            for n in lean_constants(ws, m):
+                ext.setdefault(n, m)
     return ext
 
 
@@ -197,7 +215,7 @@ def cmd_ext_defs(argv):
     elif '--lean' in argv:
         names = {n: m for m in defmods for n in lean_constants(cfg['src'], m)}
     else:
-        names = bundle_names(cfg['src'], defmods)
+        names = bundle_constants(cfg['src'], defmods)
     g = cv.load_graph(cfg)
     raw = json.load(open(pos[0]))
     raw['external_defs'] = graph_external_defs(names, g.owner, g.nodes)
