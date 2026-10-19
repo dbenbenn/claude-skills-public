@@ -230,6 +230,18 @@ def test_a_piece_needing_a_bundle_that_imports_its_statement_is_made_self_contai
     assert C.resolve_piece_cycles(g, _stmt_plan(g)) == []
 
 
+def test_an_external_attributed_declaration_is_never_kept_by_a_piece(g):
+    # DiamondDistortion (2026-10-19): the published bundle's `@[reducible] def Edge` was an
+    # external definition, yet the extra roots (instances and attributed declarations whose
+    # dependencies are present) put the port's copy back into the piece: "already declared"
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='CDB', external_defs={'CD.Space.size_eq': 'Definitions.Def_X'})
+    assert not any('CD.Space.size_eq' in pc['keep'] for pc in p['pieces'].values())
+    assert not any('CD.Space.size_eq' in b['nodes'] for b in p['bundles'])
+    assert C.check_plan(g, p) == []
+
+
 def test_split_keeps_the_statements_a_bundle_imports(g):
     p = _stmt_plan(g)
     wit = next(b for b in p['bundles'] if 'CD.doubleWitness' in b['nodes'])

@@ -1351,8 +1351,10 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         keep = fresh(n)
         imps = {d for x in keep for d in g.nodes[x].deps if d in nodes and d not in keep}
         bks = need(keep) - {bidx[x] for x in keep if x in bidx}
-        avail = {k for k in B if bidx[k] in _bundle_closure(bimp, bks)} | imps
-        keep |= {k for k in g.extra_roots(keep, avail) if k not in nodes and k not in B}
+        avail = {k for k in B if bidx[k] in _bundle_closure(bimp, bks)} | imps | set(ext)
+        # an external declaration is imported, never kept (DiamondDistortion 2026-10-19: the
+        # published `@[reducible] def Edge` came back as an extra root and clashed)
+        keep |= {k for k in g.extra_roots(keep, avail) if k not in nodes and k not in B and k not in ext}
         bks = need(keep - B)
         pieces[n] = {'keep': sorted(keep), 'imports': sorted(imps),
                      'bundles': [names[i] for i in sorted(_reduce(bimp, bks))],
