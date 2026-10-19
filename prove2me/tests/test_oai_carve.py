@@ -91,12 +91,18 @@ def test_config_keeps_hand_set_keys_and_merges_build_logs(tmp_path):
     (ws / 'Definitions' / 'Def_X.lean').write_text(open(os.path.join(FIX, 'bundle.lean')).read())
     old = {'patches': [{'old': 'a', 'new': 'b'}], 'pinned': ['P'], 'budget': 99}
     cfg = CP.make_config(str(d), 'F', 'Main', 'OAI.Fam.main', ['Definitions.Def_X'], 'FAM',
-                         ['OAI.Fam.b_thm'], 40, 2.8, str(ws), old)
+                         ['OAI.Fam.b_thm'], 40, 0.0, str(ws), old)
     assert cfg['patches'] == old['patches'] and cfg['pinned'] == ['P'] and cfg['budget'] == 40
     assert cfg['external_defs']['OAI.Glob.Hom.id'] == 'Definitions.Def_X'
     assert cfg['roots'] == ['Solutions.F.Main'] and cfg['external'] == ['OAI.Fam.main']
     adj = (d / 'build_adj.log').read_text()
-    assert 'Solutions.F.A (17.2s)' in adj and 'Solutions.F.B (0.6s)' in adj
+    # HenonLaneEmden (2026-10-19): oai_build_modules --elab-log has already taken the import
+    # overhead off; subtracting it again floored nearly every module and the cost model
+    # underestimated pieces 5-7x. By default the times pass through unchanged
+    assert 'Solutions.F.A (20.0s)' in adj and 'Solutions.F.B (1.0s)' in adj
+    CP.make_config(str(d), 'F', 'Main', 'OAI.Fam.main', [], 'FAM', [], 40, 2.8, str(ws), None)
+    adj = (d / 'build_adj.log').read_text()
+    assert 'Solutions.F.A (17.2s)' in adj and 'Solutions.F.B (0.1s)' in adj
 
 
 def test_external_defs_map_children_to_graph_owners():
@@ -154,8 +160,11 @@ def test_publish_prep_writes_run_files_and_manifest(tmp_path, monkeypatch):
         (tmp_path / x).mkdir(parents=True)
     (tmp_path / 'out/lib/Def_A.lean').write_text('a')
     (tmp_path / 'out/solutions/Sol_B.lean').write_text('b')
-    for f in ('plan.json', 'order.json', 'times.json'):
-        (tmp_path / 'work' / f).write_text('{}')
+    plan = {'bundles': [{'name': 'A', 'imports': [], 'nodes': ['x']}], 'stubs': {},
+            'pieces': {'B': {'bundles': ['A'], 'imports': []}}, 'external': ['B']}
+    (tmp_path / 'work' / 'plan.json').write_text(json.dumps(plan))
+    (tmp_path / 'work' / 'times.json').write_text('{}')
+    # HenonLaneEmden (2026-10-19): no work/order.json yet (carve.py order not run): computed here
     monkeypatch.chdir(str(tmp_path))
     P, man = CP.publish_prep('.', 'src', ['t1', 't2'])
     # the run files name absolute paths: split_run runs from anywhere
@@ -163,6 +172,11 @@ def test_publish_prep_writes_run_files_and_manifest(tmp_path, monkeypatch):
     assert json.load(open(os.path.join(P, 'run_2_statements.json')))['kinds'] == ['statement']
     assert json.load(open(os.path.join(P, 'run.json')))['tags'] == ['t1', 't2']
     assert man.splitlines()[0].endswith('  out/lib/Def_A.lean') and len(man.splitlines()) == 2
+    assert json.load(open(os.path.join(P, 'order.json')))['waves'] == [['bundle:A'], ['piece:B']]
+    # an unmeasured carve is refused with the step to run
+    os.remove(str(tmp_path / 'work' / 'times.json'))
+    with pytest.raises(SystemExit, match='carve_measure'):
+        CP.publish_prep('.', 'src', ['t1'])
 
 
 def test_ext_defs_ask_lean_for_a_bundle_with_anonymous_instances(tmp_path, monkeypatch):

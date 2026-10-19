@@ -4,11 +4,14 @@ oai_build_modules.py, then carve.py graph/plan/gen, carve_measure.py, carve.py s
 
 usage:
   carve_prep.py config DIR FOLDER ROOT TARGET [--def Definitions.Def_X ...] [--bundle-prefix P]
-                       [--forced NAME ...] [--budget 37] [--overhead 2.8] [--ws WORKSPACE]
+                       [--forced NAME ...] [--budget 37] [--overhead 0] [--ws WORKSPACE]
       DIR/config.json for the port in Solutions/FOLDER (root module Solutions.FOLDER.ROOT) and the
       published TARGET (an `external` target: its statement is already published), and
-      DIR/build_adj.log: every DIR/build_elab*.log merged (later files win), OVERHEAD more seconds
-      off each module (floor 0.6 s). external_defs: every declaration of each --def bundle, by full
+      DIR/build_adj.log: every DIR/build_elab*.log merged (later files win). Those logs come from
+      oai_build_modules.py --elab-log, which already took the import overhead off, so by default
+      nothing more is subtracted (HenonLaneEmden 2026-10-19: subtracting 2.8 s again floored
+      nearly every module and pieces came out 5-7x over their estimates); --overhead takes off
+      more (floor 0.1 s). external_defs: every declaration of each --def bundle, by full
       name (p2mlib.oaiport.bundle_decl_names); narrow it with `ext-defs` after `carve.py graph`.
       The old config's hand-set keys (patches, external_theorems, frozen, pinned, ...) are kept.
   carve_prep.py ext-defs CONFIG.json [--def Definitions.Def_X ...] [--names FILE] [--lean]
@@ -96,7 +99,7 @@ def merged_build_log(d, overhead):
             m = re.search(r'Built (\S+) \(([0-9.]+)s\)', l)
             if m:
                 times[m.group(1)] = float(m.group(2))
-    return ''.join('✔ [1/1] Built %s (%.1fs)\n' % (m, max(t - overhead, 0.6)) for m, t in times.items())
+    return ''.join('✔ [1/1] Built %s (%.1fs)\n' % (m, max(t - overhead, 0.1)) for m, t in times.items())
 
 
 def bundle_names(ws, defmods):
@@ -126,7 +129,7 @@ def bundle_constants(ws, defmods):
 
 
 def make_config(d, folder, root, target, defmods=(), bundle_prefix=None, forced=(), budget=37,
-                overhead=2.8, ws=None, old=None):
+                overhead=0.0, ws=None, old=None):
     d = os.path.abspath(d)
     open(os.path.join(d, 'build_adj.log'), 'w', encoding='utf-8').write(merged_build_log(d, overhead))
     cfg = {'src': ws, 'roots': ['Solutions.%s.%s' % (folder, root)], 'prefix': 'Solutions.' + folder,
@@ -135,7 +138,9 @@ def make_config(d, folder, root, target, defmods=(), bundle_prefix=None, forced=
            'work': d + '/work', 'out': d + '/out',
            'bundle_prefix': bundle_prefix or re.sub(r'\W', '', folder.upper())[:10],
            'budget': budget, 'piece_size': 700000, 'bundle_budget': budget, 'bundle_size': 650000,
-           'time_scale': 1.0, 'collapse_mathlib': True, 'chunker': 'schedule', 'statement_suffix': '',
+           # measured -j1 piece time / estimate with these logs: 1.09-1.37 on WeakPinned's five
+           # pieces and DiamondDistortion's (2026-10-19)
+           'time_scale': 1.2, 'collapse_mathlib': True, 'chunker': 'schedule', 'statement_suffix': '',
            'build_logs': [d + '/build_adj.log'], 'jobs': 1}
     for k in KEEP_KEYS:
         if old and k in old:
@@ -154,7 +159,7 @@ def cmd_config(argv):
     old = json.load(open(p)) if os.path.exists(p) else None
     cfg = make_config(d, folder, root, target, opts(argv, '--def'), opt(argv, '--bundle-prefix'),
                       opts(argv, '--forced'), float(opt(argv, '--budget', 37)),
-                      float(opt(argv, '--overhead', 2.8)), ws, old)
+                      float(opt(argv, '--overhead', 0.0)), ws, old)
     json.dump(cfg, open(p, 'w'), indent=1, ensure_ascii=False)
     print('%s: %d external definitions, budget %s' % (p, len(cfg['external_defs']), cfg['budget']))
 
@@ -260,11 +265,19 @@ def publish_prep(d, source, tags):
     P = os.path.join(d, 'publish')
     for x in ('prose', 'explanations'):
         os.makedirs(os.path.join(P, x), exist_ok=True)
+    for f in ('plan.json', 'times.json'):
+        if not os.path.exists(os.path.join(d, 'work', f)):
+            sys.exit('no work/%s: run carve.py plan/gen and carve_measure.py first' % f)
     if os.path.exists(os.path.join(P, 'out')):
         shutil.rmtree(os.path.join(P, 'out'))
     shutil.copytree(os.path.join(d, 'out'), os.path.join(P, 'out'))
-    for f in ('plan.json', 'order.json', 'times.json'):
+    for f in ('plan.json', 'times.json'):
         shutil.copy(os.path.join(d, 'work', f), os.path.join(P, f))
+    # the publish order, from the plan itself (HenonLaneEmden 2026-10-19: carve.py order had not
+    # run, and a stale order.json could disagree with the plan)
+    from p2mlib import carve as C
+    plan = json.load(open(os.path.join(d, 'work', 'plan.json')))
+    json.dump(C.publish_order(plan, plan.get('external', ())), open(os.path.join(P, 'order.json'), 'w'), indent=1)
     base = {'plan': P + '/plan.json', 'out': P + '/out', 'prose': P + '/prose',
             'explanations': P + '/explanations', 'state': P + '/run_state.json',
             'log': P + '/PROGRESS.log', 'source': source, 'tags': tags, 'jobs': 4}
