@@ -238,6 +238,7 @@ def cmd_filter_patches(argv):
 # ---------------------------------------------------------------- publishing
 
 def publish_prep(d, source, tags):
+    d = os.path.abspath(d)
     P = os.path.join(d, 'publish')
     for x in ('prose', 'explanations'):
         os.makedirs(os.path.join(P, x), exist_ok=True)

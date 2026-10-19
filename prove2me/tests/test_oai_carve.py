@@ -149,14 +149,17 @@ def test_measure_copies_every_imported_published_module(tmp_path):
         M.copy_published(str(ws), str(ol), ['Definitions.Def_Missing'])
 
 
-def test_publish_prep_writes_run_files_and_manifest(tmp_path):
+def test_publish_prep_writes_run_files_and_manifest(tmp_path, monkeypatch):
     for x in ('out/lib', 'out/solutions', 'work'):
         (tmp_path / x).mkdir(parents=True)
     (tmp_path / 'out/lib/Def_A.lean').write_text('a')
     (tmp_path / 'out/solutions/Sol_B.lean').write_text('b')
     for f in ('plan.json', 'order.json', 'times.json'):
         (tmp_path / 'work' / f).write_text('{}')
-    P, man = CP.publish_prep(str(tmp_path), 'src', ['t1', 't2'])
+    monkeypatch.chdir(str(tmp_path))
+    P, man = CP.publish_prep('.', 'src', ['t1', 't2'])
+    # the run files name absolute paths: split_run runs from anywhere
+    assert os.path.isabs(json.load(open(os.path.join(P, 'run.json')))['plan'])
     assert json.load(open(os.path.join(P, 'run_2_statements.json')))['kinds'] == ['statement']
     assert json.load(open(os.path.join(P, 'run.json')))['tags'] == ['t1', 't2']
     assert man.splitlines()[0].endswith('  out/lib/Def_A.lean') and len(man.splitlines()) == 2
