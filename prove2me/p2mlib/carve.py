@@ -381,7 +381,9 @@ class Graph:
         return [m for m in out if m in want]
 
     def ext_imports(self, mods):
-        """Non-project imports of mods and of the project modules they import."""
+        """Non-project imports of mods and of the project modules they import. An external
+        theorem's module (`Theorems.…`, reported by DeclGraph through --also) is neither walked
+        nor listed: files import it only where they use the theorem (the external map)."""
         seen, out, todo = set(), [], list(mods)
         while todo:
             m = todo.pop()
@@ -389,6 +391,8 @@ class Graph:
                 continue
             seen.add(m)
             for x in self.imports.get(m, []):
+                if x in self.infos and x.startswith('Theorems.'):
+                    continue
                 if x in self.infos:
                     todo.append(x)
                 elif x not in out and x != 'Init':

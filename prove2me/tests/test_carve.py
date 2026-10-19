@@ -762,6 +762,22 @@ def test_external_theorems_are_imported_not_carved(g, tmp_path):
     assert CLI.also_modules(cfg) == ['Theorems.Thm_Ext']
 
 
+def test_external_theorem_modules_do_not_leak_their_imports():
+    # CrouzeixHilbert (2026-10-19): with external_theorems, DeclGraph reports the Theorems module
+    # as a project module (--also), so ext_imports walked into it and every carved file importing
+    # a module that imports it got the theorem's own Definitions bundle
+    # (Def_MilnorDynamics_NormalFamilies), even the Mathlib-only statements. An external theorem's
+    # module is imported only where the theorem is used (the external map), with its own imports.
+    g2 = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)   # private copy: mutated
+    m = sorted(g2.infos)[0]
+    g2.infos['Theorems.Thm_X'] = g2.infos[m]
+    g2.imports['Theorems.Thm_X'] = ['Mathlib', 'Definitions.Def_Other']
+    g2.imports[m] = list(g2.imports.get(m, [])) + ['Theorems.Thm_X']
+    out = g2.ext_imports([m])
+    assert 'Definitions.Def_Other' not in out
+    assert 'Theorems.Thm_X' not in out
+
+
 def test_decl_graph_command_passes_also_modules(monkeypatch, tmp_path):
     seen = {}
 
