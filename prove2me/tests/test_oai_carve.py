@@ -282,3 +282,48 @@ def test_module_port_inlines_tactic_macros_across_modules():
     assert "(word_poly' : Nat)" in files['N.lean']
     # a module that does not import the macro's module keeps its own meaning of the name
     assert 'theorem word_poly : True' in files['P.lean']
+
+
+def _fake_lean(monkeypatch, built):
+    import subprocess
+
+    def run(args, **kw):
+        out = args[args.index('-o') + 1]
+        open(out, 'w').write('olean')
+        open(args[args.index('-i') + 1], 'w').write('ilean')
+        built.append(os.path.basename(out)[:-6])
+        return subprocess.CompletedProcess(args, 0, '', '')
+    monkeypatch.setattr(BM.subprocess, 'run', run)
+
+
+def test_build_rebuilds_the_dependents_of_a_changed_module(tmp_path, monkeypatch):
+    # Problem340 (2026-10-24): a module was rebuilt only when its own source was newer than its
+    # .olean, so after a fix to a module its importers kept stale .oleans (a --force rebuild was
+    # needed). A module is stale when its source or any imported module's .olean is newer.
+    ws = tmp_path
+    d = ws / 'Solutions' / 'F'
+    d.mkdir(parents=True)
+    (d / 'A.lean').write_text('import Mathlib\n')
+    (d / 'B.lean').write_text('import Solutions.F.A\n')
+    (d / 'C.lean').write_text('import Mathlib\n')
+    (d / 'Main.lean').write_text('import Solutions.F.B\nimport Solutions.F.C\n')
+    built = []
+    _fake_lean(monkeypatch, built)
+    assert BM.build(str(ws), 'F', 'Main')[0] and built == ['A', 'B', 'C', 'Main']
+    out = ws / '.lake' / 'build' / 'lib' / 'lean' / 'Solutions' / 'F'
+    t0 = os.path.getmtime(str(out / 'Main.olean'))
+    for m in ('A', 'B', 'C', 'Main'):
+        os.utime(str(out / (m + '.olean')), (t0 - 100, t0 - 100))
+        os.utime(str(d / (m + '.lean')), (t0 - 200, t0 - 200))
+    del built[:]
+    assert BM.build(str(ws), 'F', 'Main')[0] and built == []
+    os.utime(str(d / 'A.lean'), (t0, t0))            # A edited: B and Main import it, C does not
+    del built[:]
+    assert BM.build(str(ws), 'F', 'Main')[0] and built == ['A', 'B', 'Main']
+    # an import rebuilt in an earlier run (its importer's build failed, or ran elsewhere)
+    for m in ('A', 'B', 'C', 'Main'):
+        os.utime(str(out / (m + '.olean')), (t0 - 100, t0 - 100))
+    os.utime(str(d / 'A.lean'), (t0 - 200, t0 - 200))
+    os.utime(str(out / 'C.olean'), (t0, t0))
+    del built[:]
+    assert BM.build(str(ws), 'F', 'Main')[0] and built == ['Main']

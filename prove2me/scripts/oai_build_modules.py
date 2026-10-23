@@ -9,7 +9,8 @@ usage: oai_build_modules.py FOLDER ROOT [--force] [--log BUILD.log] [--elab-log 
 
   ROOT        the root module's short name (Main for Solutions.FOLDER.Main); dotted names allowed
               for nested folders
-  --force     rebuild every module (default: only those whose source is newer than its .olean)
+  --force     rebuild every module (default: a module whose source is newer than its .olean, or
+              one of whose imports was rebuilt or has a newer .olean)
   --log       also write the build lines to this file (what --elab-log reads)
   --elab-log  the build lines with OVERHEAD seconds (the Mathlib import, about 3 s here) taken off
               each module (floor 0.1 s), for config `build_logs` (module_costs adds a fixed 0.5 s);
@@ -32,6 +33,12 @@ def opt(argv, name, default=None):
     return argv[argv.index(name) + 1] if name in argv else default
 
 
+def module_imports(d, pre, m):
+    """The modules under `pre` that module m (folder `d`) imports directly."""
+    t = open(os.path.join(d, *m.split('.')) + '.lean', encoding='utf-8').read()
+    return re.findall(r'^import %s\.([\w.]+)' % re.escape(pre), t, re.M)
+
+
 def module_order(d, pre, root):
     """The modules ROOT imports under `pre` (folder `d`), dependencies first, ROOT last."""
     order, seen = [], set()
@@ -40,12 +47,22 @@ def module_order(d, pre, root):
         if m in seen:
             return
         seen.add(m)
-        t = open(os.path.join(d, *m.split('.')) + '.lean', encoding='utf-8').read()
-        for x in re.findall(r'^import %s\.([\w.]+)' % re.escape(pre), t, re.M):
+        for x in module_imports(d, pre, m):
             visit(x)
         order.append(m)
     visit(root)
     return order
+
+
+def stale(m, src, olean, imports, rebuilt, olean_of):
+    """Must module m be compiled again? Its .olean is missing or older than its source, or an
+    import of it was rebuilt in this run or has a newer .olean (Problem340 2026-10-24: only a
+    module's own source was compared, so its importers kept stale .oleans after a fix)."""
+    if not os.path.exists(olean) or os.path.getmtime(olean) <= os.path.getmtime(src):
+        return True
+    t = os.path.getmtime(olean)
+    return any(x in rebuilt or not os.path.exists(olean_of(x)) or os.path.getmtime(olean_of(x)) > t
+               for x in imports)
 
 
 def elab_lines(build_log, overhead=3.0):
@@ -64,6 +81,10 @@ def build(ws, folder, root, force=False, log=None):
     out_root = os.path.join(ws, '.lake', 'build', 'lib', 'lean')
     order = module_order(d, pre, root)
     lines, total = [], 0.0
+    rebuilt = set()
+
+    def olean_of(m):
+        return os.path.join(out_root, *(pre + '.' + m).split('.')) + '.olean'
 
     def say(s):
         print(s, flush=True)
@@ -75,8 +96,7 @@ def build(ws, folder, root, force=False, log=None):
         out = os.path.join(out_root, *mod.split('.'))
         os.makedirs(os.path.dirname(out), exist_ok=True)
         src = os.path.join(d, *m.split('.')) + '.lean'
-        if not force and os.path.exists(out + '.olean') and \
-                os.path.getmtime(out + '.olean') > os.path.getmtime(src):
+        if not force and not stale(m, src, out + '.olean', module_imports(d, pre, m), rebuilt, olean_of):
             say('✔ [%d/%d] Replayed %s' % (i + 1, len(order), mod))
             continue
         ru0 = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -95,6 +115,7 @@ def build(ws, folder, root, force=False, log=None):
                 if os.path.exists(f):
                     os.remove(f)
             return False, lines
+        rebuilt.add(m)
         say('✔ [%d/%d] Built %s (%.1fs)' % (i + 1, len(order), mod, cpu))
     print('total CPU %.1f s over %d modules' % (total, len(order)))
     return True, lines
