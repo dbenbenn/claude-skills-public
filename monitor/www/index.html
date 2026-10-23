@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>careyaibox monitor</title>
+<title>monitor</title>
 <link rel="stylesheet" href="vendor/uPlot.min.css">
 <script src="vendor/uPlot.iife.min.js"></script>
 <style>
@@ -46,7 +46,7 @@ code{font-size:13px}
 .u-select{background:rgba(127,127,127,.18)}
 </style></head>
 <body><main>
-<h1 id="h1">careyaibox monitor</h1>
+<h1 id="h1">monitor</h1>
 <p class="sub" id="upd">Loading…</p>
 <div class="alarm" id="alarm" role="alert" hidden></div>
 <section class="card" aria-labelledby="t-sys">
@@ -201,13 +201,13 @@ async function load(){
   let s; try { s = await (await fetch('status.json?'+Date.now())).json(); } catch(e) { return; }
   if (!s.updated) return;
   last = s;
-  document.getElementById('h1').textContent = (s.host||'careyaibox') + ' monitor';
+  document.getElementById('h1').textContent = (s.host||'machine') + ' monitor';
   document.getElementById('upd').textContent = 'Updated ' + fmtAt(s.updated) + ' · refreshes every 30 s';
   const al = document.getElementById('alarm');
   al.hidden = !s.alerts.length;
   const pr = document.getElementById('problems'), P = s.problems || [];
   pr.hidden = !P.length; pr.textContent = P.length ? 'Section files the page could not read: ' + P.join('; ') : '';
-  al.innerHTML = s.alerts.length ? `<b>careyaibox needs attention</b><ul>${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>` : '';
+  al.innerHTML = s.alerts.length ? `<b>${esc(s.host||'machine')} needs attention</b><ul>${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>` : '';
   drawSystem(s.system);
   drawSections(s.sections||[]);
 }

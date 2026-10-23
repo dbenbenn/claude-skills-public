@@ -1,8 +1,8 @@
 [Unit]
-Description=careyaibox monitoring page on port 8765 (the monitor skill; no Claude involvement)
+Description=Monitoring page on port 8765 (the monitor skill; no Claude involvement)
 
 [Service]
-ExecStart=/usr/bin/python3 %h/.claude/skills/monitor/monitor.py
+ExecStart=/usr/bin/env python3 %h/.claude/skills/monitor/monitor.py
 Restart=on-failure
 RestartSec=10
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish a section of the careyaibox monitoring page (http://careyaibox:8765/, the `monitor` skill).
+"""Publish a section of the machine monitoring page (http://<hostname>:8765/, the `monitor` skill).
 
 A section is one JSON file, MONITOR_HOME/sections/<id>.json (default ~/claude/monitor). The monitor
 reads every file there every 30 s; it keeps the history of each phase and works out rates and ETAs,

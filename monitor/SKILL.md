@@ -1,18 +1,21 @@
 ---
 name: monitor
-description: The careyaibox monitoring page at http://careyaibox:8765/ — system resources (memory, CPU, load, stall pressure, Lean processes) on top, then one section per piece of work in progress. Use whenever you start background or long-running work on careyaibox (a publisher, a batch of builds or provers, a watcher, anything expected to run more than about 15 minutes or past the end of your turn) so it publishes its progress in its own section; also when asked about the monitoring page, the machine's load or memory, or why careyaibox feels slow.
+description: The machine's monitoring page at http://<hostname>:8765/ (http://nixos:8765/ on dbenbenn's NixOS box) — system resources (memory, CPU, load, stall pressure, Lean processes) on top, then one section per piece of work in progress. Use whenever you start background or long-running work on the machine (a publisher, a batch of builds or provers, a watcher, anything expected to run more than about 15 minutes or past the end of your turn) so it publishes its progress in its own section; also when asked about the monitoring page, the machine's load or memory, or why the machine feels slow.
 ---
 
-# The careyaibox monitoring page
+# The monitoring page
 
-http://careyaibox:8765/ is dbenbenn's one place to see what the machine is doing. On top: the whole
+http://nixos:8765/ (the machine's hostname, port 8765; it was http://careyaibox:8765/ until the
+move to the NixOS box on 2026-10-23) is dbenbenn's one place to see what the machine is doing. On top: the whole
 machine's memory and CPU (split into Lean, each section's own processes, and the rest), load, kernel
 stall pressure, every Lean/lake process with its working directory, and a red banner for machine trouble.
 Below: **one section per piece of work**, written by whoever runs that work.
 
-It is one process, `monitor.py`, run as the systemd user unit `monitor.service` (linger is on, so it
-survives logouts and reboots). It samples every 30 s, keeps 48 h, and serves the page itself. No
-Claude involvement.
+It is one process, `monitor.py`, run as a service that starts at boot and runs as dbenbenn. On the
+NixOS box that is the system unit `monitor.service`, declared in `/etc/nixos/configuration.nix`
+(`systemd.services.monitor`, `User = "dbenbenn"`); on a conventional distro, `monitor.service` in this
+folder works as a systemd user unit with linger on. It samples every 30 s, keeps 48 h, and serves the
+page itself. No Claude involvement.
 
 ## Publishing your work's section
 
@@ -86,9 +89,10 @@ The code is `monitor.py` (sampling, sections, history, the HTTP server), `sectio
 library and CLI) and `www/index.html` (the page, read fresh on every request, so page edits need no
 restart). Charts use uPlot 1.6.30 (MIT), vendored in `www/vendor/` and served by the monitor itself so
 the page needs no internet; range buttons, drag-to-zoom and a synced cursor are wired in the page.
-To look at the page headless: Playwright's Chromium needs four libraries this machine lacks
-(libatk1.0-0t64, libatk-bridge2.0-0t64, libxdamage1, libatspi2.0-0t64); `apt-get download` them,
-`dpkg-deb -x` into a folder, and point `LD_LIBRARY_PATH` at its `usr/lib/x86_64-linux-gnu`. Tests: `python3 -m pytest -q ~/.claude/skills/monitor/tests`. After changing `monitor.py`:
-`systemctl --user restart monitor`. The unit file is `monitor.service` in this folder. Copy it to
-`~/.config/systemd/user/` if it changes. Commit and push this skill (claude-skills-public) in the same
-turn.
+To look at the page headless, use Playwright's Chromium; on careyaibox (Ubuntu) it needed four libraries
+the machine lacked (libatk1.0-0t64, libatk-bridge2.0-0t64, libxdamage1, libatspi2.0-0t64), fetched with
+`apt-get download`, unpacked with `dpkg-deb -x`, and found through `LD_LIBRARY_PATH`; on NixOS ask
+dbenbenn for a `playwright-driver.browsers` package instead. Tests: `python3 -m pytest -q ~/.claude/skills/monitor/tests`.
+After changing `monitor.py` the service must restart: on the NixOS box it is a system unit, so that is
+`sudo systemctl restart monitor`, which dbenbenn runs (ask); with the user unit elsewhere it is
+`systemctl --user restart monitor`. Commit and push this skill (claude-skills-public) in the same turn.

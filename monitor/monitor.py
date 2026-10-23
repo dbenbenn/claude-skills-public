@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The careyaibox monitoring page (the `monitor` skill): one process that samples the machine every
+"""The machine monitoring page (the `monitor` skill): one process that samples the machine every
 30 s, reads the section files projects write (see section.py), and serves the page on port 8765.
 
 State lives in MONITOR_HOME (default ~/claude/monitor): sections/*.json (written by producers),
