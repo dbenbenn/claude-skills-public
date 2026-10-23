@@ -1173,3 +1173,47 @@ def test_renaming_a_declaration_leaves_a_same_named_lean_declaration_alone(g):
     have = g.have_names({'CD.uses_core_succ', 'CD.Pkg.succ_le_succ'})
     out = C.Carver(g).carve({'CD.uses_core_succ'}, have, rename={'CD.Pkg.succ_le_succ': 'succ_le_succ_oai'})
     assert 'Nat.succ_le_succ h' in out and 'succ_le_succ_oai' not in out, out
+
+
+# ---------------------------------------------------------------- fields and same-short-name names
+# (CarveDev/Fields.lean; the three carver bugs of 2026-10-23's plain carves)
+
+def test_a_field_token_is_not_read_as_a_namespace_constant(g):
+    # PosteriorReplicas: `(E.rules ω).fixed_quadratic_memory` gave a false import of the theorem
+    # OAI.PosteriorRegression.fixed_quadratic_memory. Here `(o.inner 0).fqm` is Inner.fqm, not CD.fqm
+    deps = g.nodes['CD.Outer.fqm'].deps
+    assert 'CD.Inner.fqm' in deps and 'CD.fqm' not in deps
+    # `(k1 + 1).pred` is Nat.pred, not the project's CD.pred
+    assert 'CD.pred' not in g.nodes['CD.uses_hk2'].deps
+
+
+def test_dot_notation_needs_the_constant_or_its_type_in_the_term_even_in_a_shared_namespace(g):
+    # PosteriorReplicas: a project namespace that is also a namespace of a published external
+    # bundle (ext_ns) let a short-name reading through without the compiled-constant check
+    g2 = C.Graph(g.consts, g.imports, set(g.ext_ns) | {'CD'}, g.infos)
+    deps = g2.nodes['CD.outer_dot'].deps
+    assert 'CD.Outer.fqm' in deps and 'CD.fqm' not in deps
+    # genuine dot-notation dependencies stay
+    assert 'CD.Outer.cp' in g2.nodes['CD.uses_outer_cp'].deps
+    assert 'CD.Space.coord_eq' in g2.nodes['CD.size_via_coord'].deps
+
+
+def test_renaming_leaves_a_namespaced_reference_to_another_declaration_alone(g):
+    # Problem355: renaming AuxiliaryZeroCount.weighted_count_le_log also renamed the reference
+    # `ZeroGlobalCount.weighted_count_le_log` inside it (the head is a namespace, not a local)
+    have = g.have_names({'CD.AZ.wcl', 'CD.ZG.wcl'})
+    out = C.Carver(g).carve({'CD.AZ.wcl'}, have, rename={'CD.AZ.wcl': 'wcl_oai'})
+    assert 'theorem wcl_oai' in out and 'apply ZG.wcl\n' in out, out
+
+
+def test_renaming_leaves_a_same_short_name_definition_in_the_statement_alone(g):
+    # PermanentBorder: renaming HasBorderDeterminant.coefficientPolynomial also renamed the
+    # definition `coefficientPolynomial` in its own statement, where Lean cannot read the
+    # declaration being declared
+    have = g.have_names({'CD.Outer.cp', 'CD.cp', 'CD.Outer', 'CD.Inner'})
+    out = C.Carver(g).carve({'CD.Outer.cp'}, have, rename={'CD.Outer.cp': 'cp_oai'})
+    assert 'theorem Outer.cp_oai' in out and ': cp (o.inner 0).val' in out, out
+    # a genuine dot-notation use of the renamed declaration is still renamed
+    have = g.have_names({'CD.uses_outer_cp', 'CD.Outer.cp', 'CD.cp', 'CD.Outer', 'CD.Inner'})
+    out = C.Carver(g).carve({'CD.uses_outer_cp'}, have, rename={'CD.Outer.cp': 'cp_oai'})
+    assert ':= o.cp_oai' in out and 'cp (o.inner 0).val = ' in out, out

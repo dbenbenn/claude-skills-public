@@ -309,6 +309,14 @@ def decl_ns(c):
     return c.namespace
 
 
+def is_field(info, idn):
+    """Is identifier idn (a LeanInfo ident) a field, `(e).f`, `e |>.f` or `.f`? Lean's tokenizer
+    reads `a.b` as one identifier, so an identifier starting right after a `.` is the field part
+    of a projection (or a dot-identifier): it names `T.f` for a type T, never what the bare token
+    reads as lexically."""
+    return info.text_bytes[idn['start'] - 1:idn['start']] == b'.'
+
+
 def _head_kind(h):
     return h['kind'].rsplit('.', 1)[-1]
 
@@ -546,13 +554,14 @@ class Graph:
                         out += self.open_targets(idn['name'], c.namespace, m)
         return list(dict.fromkeys(out))
 
-    def resolve(self, tok, ns, opens, m, used=None):
+    def resolve(self, tok, ns, opens, m, used=None, field=False):
         """The project constants (env names) identifier `tok` may denote in module m, namespace ns,
         with project namespaces `opens` open. Over-approximates: every reading Lean could take,
-        and when none, the reading with trailing fields (`h.mp`, `foo.1`) stripped."""
+        and when none, the reading with trailing fields (`h.mp`, `foo.1`) stripped. `field`: the
+        token is a field (`(e).f`, `e |>.f`, `.f`; see is_field), never read lexically."""
         root = tok.startswith('_root_.')
         body = tok[len('_root_.'):] if root else tok
-        for strip in range(3):
+        for strip in range(0 if field else 3):
             # strip the token's own trailing fields, never the namespace's: inside namespace
             # `…Niltest`, `T.UnitIntervalValued` stripped as a whole name read as the structure
             # `Niltest` itself, so a binder needing a gone declaration looked satisfied (Erdős 3
@@ -565,18 +574,19 @@ class Graph:
             hits = [n for c in cands for n in self.pub.get(c, ()) if self.visible(n, m)]
             if hits:
                 return list(dict.fromkeys(hits))
-        # dot notation on a local (`A.coord_eq` with `A : Space`, Erdős 3 B024): the head names no
-        # declaration, so read the field by its short name when that is (nearly) unambiguous.
-        # `x.f` means `T.f` for the head T of x's type: with `used` (the declaration's compiled
-        # constants), a reading in a namespace only the project has needs T among them
-        # (UniversalFInfinity 2026-10-18: `w.support` read as Higman.RecognizingStack.support,
-        # `Subtype.val` as a project structure's field `val`); a namespace that also exists outside
-        # the project (`Finset`) may hold a project lemma about a Mathlib type, and stays as before
-        if '.' in tok and not tok.startswith('_root_.'):
+        # dot notation on a local (`A.coord_eq` with `A : Space`, Erdős 3 B024), or a field
+        # (`(E.rules ω).fixed_quadratic_memory`): read by its short name when that is (nearly)
+        # unambiguous. `x.f` means `T.f` for the head T of x's type, so with `used` (the
+        # declaration's compiled constants) a reading needs T.f or T among them (UniversalFInfinity
+        # 2026-10-18: `w.support` read as Higman.RecognizingStack.support, `Subtype.val` as a
+        # project structure's field `val`). That holds in a namespace shared with an external
+        # bundle too (PosteriorReplicas 2026-10-23: OAI.PosteriorRegression was one, and the field
+        # `fixed_quadratic_memory` became a false import of the theorem of that name); a project
+        # lemma about a Mathlib type (`Finset.foo` on `s : Finset α`) has its type in the term
+        if field or ('.' in tok and not tok.startswith('_root_.')):
             hits = [n for n in self.short.get(tok.rsplit('.', 1)[-1], ()) if self.visible(n, m)]
             if used is not None:
-                hits = [n for n in hits if '.' in n and
-                        (n.rsplit('.', 1)[0] in self.ext_ns or n.rsplit('.', 1)[0] in used)]
+                hits = [n for n in hits if '.' in n and (n in used or n.rsplit('.', 1)[0] in used)]
             if 0 < len(hits) <= 2:
                 return hits
         return []
@@ -635,7 +645,8 @@ class Graph:
         for idn in c.idents or []:
             if idn['role'] != 'ref' or (before is not None and idn['start'] >= before):
                 continue
-            for n in self.resolve(idn['name'], decl_ns(c), opens, m, used):
+            for n in self.resolve(idn['name'], decl_ns(c), opens, m, used,
+                                  field=is_field(info, idn)):
                 o = self.owner.get(n)
                 if not o or o == me:
                     continue
@@ -2123,7 +2134,7 @@ class Carver:
                     continue
                 # a token right after `.` is a field (`(e a).Bounds`): never read as a name
                 inside = [i for i in refs if grp['start'] <= i['start'] < grp['end'] and
-                          info.text_bytes[i['start'] - 1:i['start']] != b'.']
+                          not is_field(info, i)]
                 gtxt = info.text_bytes[grp['start']:grp['end']].decode('utf-8')
                 if any(_uses_token(gtxt, tk) for tk in dead_tokens) or any(i['name'].split('.')[0] in lost - set(grp['names']) or
                        self._gone(i['name'], c, m, have, opens, bound - lost) for i in inside):
@@ -2231,27 +2242,43 @@ class Carver:
         by_short = collections.defaultdict(list)
         for n in rename:
             by_short[pubname(n).rsplit('.', 1)[-1]].append(n)
-        t = info.text_bytes
         # what the command's own declarations use: a reading by short name (dot notation on a
         # local, or a field) counts only when it is one of them (Kaplansky 2026-10-18: Mathlib's
         # `HNNExtension.of_injective` became `HNNExtension.of_injective_oai`, read as a field of
         # the local `HNNExtension` because the renamed `MultipleHNN.of_injective` shares its name)
         uses = self._command_uses(m, c)
+        # the command's own declarations: its signature cannot name them (PermanentBorder
+        # 2026-10-23: in `theorem HasBorderDeterminant.coefficientPolynomial … :
+        # HasBorderDeterminant n (coefficientPolynomial k q θ)` the token is the definition
+        # `coefficientPolynomial`, and was renamed with the theorem)
+        k = g.cmd_node.get((m, c.index))
+        own = set(g.nodes[k].names) | {k} if k else set()
+        vs = c.value_start.byte if c.value_start else None
         for i in c.idents or []:
             if i['role'] == 'decl':
                 full = i['name'][len('_root_.'):] if i['name'].startswith('_root_.') else \
                     join(c.namespace, i['name'])
                 hits = [n for n in g.pub.get(full, ()) if g.consts[n]['m'] == m and n in rename]
             elif i['role'] == 'ref':
-                hits = [n for n in g.resolve(i['name'], decl_ns(c), opens, m) if n in rename]
+                field = is_field(info, i)
+                nm = i['name'][len('_root_.'):] if i['name'].startswith('_root_.') else i['name']
+                full = [nm] if i['name'].startswith('_root_.') else \
+                    [join(p, nm) for p in prefixes(decl_ns(c))] + [join(o, nm) for o in opens]
+                # the project constants the token names as written (no fields stripped)
+                skip = own if vs is None or i['start'] < vs else set()
+                named = [n for f in full for n in g.pub.get(f, ())
+                         if g.visible(n, m) and n not in skip]
+                hits = [] if field else \
+                    [n for n in g.resolve(i['name'], decl_ns(c), opens, m)
+                     if n in rename and n not in skip]
                 if hits and '.' in i['name'] and uses is not None:
-                    nm = i['name'][len('_root_.'):] if i['name'].startswith('_root_.') else i['name']
-                    full = [nm] if i['name'].startswith('_root_.') else \
-                        [join(p, nm) for p in prefixes(decl_ns(c))] + [join(o, nm) for o in opens]
-                    exact = [n for f in full for n in g.pub.get(f, ()) if n in rename]
+                    exact = [n for n in named if n in rename]
                     hits = exact or [n for n in hits if n in uses]
-                if not hits:
-                    field = t[i['start'] - 1:i['start']] == b'.'
+                # a field, or dot notation on a local: by short name, only when the token names
+                # no project constant as written (Problem355 2026-10-23: inside
+                # AuxiliaryZeroCount.weighted_count_le_log, `ZeroGlobalCount.weighted_count_le_log`
+                # is that other theorem, and was renamed with the target)
+                if not hits and not (named and not field):
                     head = i['name'].split('.')[0]
                     dotted = '.' in i['name'] and not g.resolve_lean(head, decl_ns(c), opens, m)
                     cand = by_short.get(i['name'].rsplit('.', 1)[-1], [])

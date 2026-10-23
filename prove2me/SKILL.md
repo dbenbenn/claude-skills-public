@@ -1303,6 +1303,14 @@ back WA. The lessons:
   to the generated files instead.
 - **No `macro` or `syntax` commands.** The soundness guard refuses them, and the carver refuses to
   keep one. `notation` is fine.
+- **Fix a carver bug in `p2mlib/carve.py` with a CarveDev test; don't patch it per carve.** The
+  plain carves of 2026-10-23 hit two bugs, both from reading a short name lexically. The field
+  token in `(E.rules ω).fixed_quadratic_memory` was read as a same-named theorem, which gave a
+  false `import Theorems.*` edge. The `_oai` rename also hit other declarations with the target's
+  short name: a namespaced reference to a sibling theorem, and a definition in the target's own
+  statement. Both are fixed: a field is matched only against the declaration's compiled
+  constants, and a token is renamed only when it denotes the target. The per-carve `patches`
+  for these cases are no longer needed.
 - `carve.py plan` refuses a plan in which a bundle misses a definition that one of its members
   needs (Erdős 3 B006 `A.space`, B024 `coord`), or in which a bundle or piece rests on `sorry`
   (B022). Compile every bundle locally before publishing it. A published bundle is frozen
