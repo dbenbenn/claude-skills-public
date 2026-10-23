@@ -1805,7 +1805,8 @@ class Carver:
     * an `attribute` command loses gone targets; a notation naming a gone declaration goes;
     * a namespace or section block left without a kept declaration goes whole, with its
       notations, attributes and `open`s;
-    * `open X` where X now names no namespace goes (B007); where it would now also open a
+    * `open X` where X now names no namespace goes (B007), and so does `export X (…)` (or the
+      names it lists that are gone); where it would now also open a
       namespace the original module never saw (one from a module it did not import, emitted
       earlier in the file), it is pinned to what it meant: `open _root_.X`;
     * `example` and `#check`-style commands go; a kept `macro`/`syntax` command is refused.
@@ -2040,6 +2041,13 @@ class Carver:
                     else:
                         reps[c.index] = txt
                 continue
+            if k == 'export':
+                r = self._export(info, c, m, have, alive, opens)
+                if r is None:
+                    drop.add(c.index)
+                elif r:
+                    reps[c.index] = _cmd_text(info, c, r)
+                continue
             if k in REFUSED or (c.heads and any(_head_kind(h) in REFUSED for h in c.heads)):
                 raise CarveError('%s keeps a `%s` command (line %d), which prove2.me refuses: no '
                                  'macro or syntax commands' % (m, k, c.start.line))
@@ -2205,6 +2213,32 @@ class Carver:
         if toks and (dead == len(toks) or (special and dead)):
             return None
         return edits
+
+    def _export(self, info, c, m, have, alive, opens):
+        """Edits for `export X (a b)`: None (drop it) when X is a project namespace the file does
+        not have, or none of the names it exports is left; else the names gone removed
+        (RationalHitting 2026-10-24: `export Coding (code)` in a bundle without the class
+        Coding, "unknown namespace `Coding`")."""
+        g, t = self.g, info.text_bytes
+        refs = [i for i in c.idents or [] if i['role'] == 'ref']
+        if not refs:
+            return []
+        tok = refs[0]['name']
+        cands = [tok[len('_root_.'):]] if tok.startswith('_root_.') else \
+            list(dict.fromkeys([join(p, tok) for p in prefixes(c.namespace)] + [join(o, tok) for o in opens]))
+        if not any(x in g.proj_ns or x in g.ext_ns for x in cands):
+            return []                         # Mathlib's: carving cannot change it
+        now = [x for x in cands if x in g.ext_ns or x in alive]
+        if not now:
+            return None
+        gone = []
+        for i in refs[1:]:
+            proj = [n for x in now for n in g.pub.get(join(x, i['name']), ())]
+            if proj and all(pubname(n) not in have for n in proj):
+                gone.append(i)
+        if gone and len(gone) == len(refs) - 1:
+            return None
+        return [(i['start'], _skip_ws(t, i['end']), '') for i in gone]
 
     def _hiding_edits(self, info, c, m, have):
         """Remove from an `open X hiding a b` / `open X (a b)` list the names that were project

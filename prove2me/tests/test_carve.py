@@ -1259,3 +1259,30 @@ def test_an_anonymous_local_instance_whose_name_another_module_took_comes_back(g
 @pytest.mark.lean
 def test_local_instances_sharing_a_name_compile(g, tmp_path):
     _compile_in_publish_order(g, _propc_plan(g), tmp_path)
+
+
+def _export_plan():
+    t = 'CD.Ex.word_len'
+    return {'bundles': [{'name': 'E0', 'nodes': ['CD.Ex.Word', 'CD.Ex.Word.len'], 'imports': []},
+                        {'name': 'E1', 'nodes': ['CD.Ex.Coding', 'CD.Ex.instCodingNat'], 'imports': []}],
+            'nodes': [t], 'external_defs': {}, 'external': [],
+            'stubs': {t: {'bundles': ['E0']}},
+            'pieces': {t: {'keep': [t], 'imports': [], 'bundles': ['E0']}}}
+
+
+def test_an_export_goes_where_its_namespace_exists(g):
+    # RationalHitting (2026-10-24): `export Coding (code)` stayed in bundle OAIQWRHT000 with the rest
+    # of its namespace block, but the class Coding was in OAIQWRHT001, which 000 does not import:
+    # "unknown namespace `Coding`". An export, like an open, needs its namespace in the file.
+    p = _export_plan()
+    assert C.check_plan(g, p) == []
+    e0, e1 = C.gen_bundle(g, p, 'E0'), C.gen_bundle(g, p, 'E1')
+    assert not re.search(r'^export', e0, re.M) and 'structure Word' in e0
+    assert re.search(r'^export Coding \(code\)$', e1, re.M)
+    for txt in (C.gen_stub(g, p, 'CD.Ex.word_len'), C.gen_piece(g, p, 'CD.Ex.word_len')):
+        assert not re.search(r'^export', txt, re.M)
+
+
+@pytest.mark.lean
+def test_exports_compile(g, tmp_path):
+    _compile_in_publish_order(g, _export_plan(), tmp_path)
