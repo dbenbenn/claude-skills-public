@@ -61,7 +61,7 @@ def pressure_alerts(psi, free_gib):
         if psi[0] > 50:
             a.append('CPU stalls %.0f%%' % psi[0])
     if free_gib is not None and free_gib < 4:
-        a.append('only %.1f GiB memory free' % free_gib)
+        a.append('only %.1f GiB of memory and swap free' % free_gib)
     return a
 
 
@@ -260,7 +260,10 @@ def build_status(now, sections, problems, system, flags, lean):
     """alerts: machine trouble only (the page's top banner). A section's own alerts and staleness
     show in that section; unreadable section files are listed apart as problems."""
     psi = system['psi'][-1][1:] if system.get('psi') else None
-    alerts = pressure_alerts(psi, system.get('free_gib')) + ['Lean health: ' + f for f in flags]
+    free = system.get('free_gib')
+    if free is not None:
+        free += system.get('swap_free_gib', 0)   # with swap, low free RAM alone is normal under load
+    alerts = pressure_alerts(psi, free) + ['Lean health: ' + f for f in flags]
     return {'updated': now, 'host': socket.gethostname(), 'alerts': alerts, 'problems': problems,
             'system': dict(system, lean=lean, health_flags=flags), 'sections': sections}
 
@@ -313,7 +316,8 @@ def step(home, now=None):
         s['running'] = [proc_view(p, prev, now, next((l for l, m in pats if re.search(m, p['args'])), '?'))
                         for p in procs if p['group'] == s['id']]
     system = {'machine': res['machine'], 'psi': res.get('psi', []), 'labels': res['labels'],
-              'free_gib': round(mi['MemAvailable'] / G, 1), 'cores_total': os.cpu_count()}
+              'free_gib': round(mi['MemAvailable'] / G, 1), 'cores_total': os.cpu_count(),
+              'swap_free_gib': round(mi.get('SwapFree', 0) / G, 1), 'swap_total_gib': round(mi.get('SwapTotal', 0) / G, 1)}
     status = build_status(now, secs, problems, system, health_flags(HEALTH_FLAGS, now), lean_view(procs, prev, now))
     save_json(os.path.join(st, 'resources.json'), res)
     save_json(os.path.join(st, 'history.json'), hist)

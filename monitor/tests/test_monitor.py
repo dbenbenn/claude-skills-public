@@ -18,7 +18,7 @@ def test_parse_psi():
 def test_pressure_alerts():
     assert M.pressure_alerts([0, 0, 6.25, 0, 0], free_gib=30) == ['memory stalls 6% (full)']
     assert M.pressure_alerts([60, 0, 0, 0, 25], free_gib=2.5) == [
-        'I/O stalls 25% (full)', 'CPU stalls 60%', 'only 2.5 GiB memory free']
+        'I/O stalls 25% (full)', 'CPU stalls 60%', 'only 2.5 GiB of memory and swap free']
     assert M.pressure_alerts(None, free_gib=None) == []
 
 
@@ -110,3 +110,13 @@ def test_banner_is_for_the_machine_only(tmp_path):
     assert st['sections'][0]['alerts'] == ['NEEDS A PERSON: B1']
     assert st['problems'] == ['broken.json: bad']
     json.dumps(st)
+
+
+def test_free_memory_alert_counts_swap():
+    # with swap, little free RAM is normal under load; the alert is for RAM and swap both running out
+    def alerts(**mem):
+        return M.build_status(now=1, sections=[], problems=[], flags=[], lean=[],
+                              system=dict({'machine': [], 'psi': []}, **mem))['alerts']
+    assert alerts(free_gib=1.0, swap_free_gib=20.0) == []
+    assert alerts(free_gib=1.0, swap_free_gib=2.0) == ['only 3.0 GiB of memory and swap free']
+    assert alerts(free_gib=2.5) == ['only 2.5 GiB of memory and swap free']   # no swap

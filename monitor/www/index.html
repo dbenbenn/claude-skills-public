@@ -185,7 +185,8 @@ function drawSystem(sy){
   if (lp) document.getElementById('s-psi').textContent = `Share of time tasks waited (10 s average). "Full": every task waited, which is what makes the box freeze; the banner fires at memory 5%, I/O 20%. Now: memory ${lp[3].toFixed(1)}%, I/O ${lp[5].toFixed(1)}%, CPU ${lp[1].toFixed(1)}%`;
   if (lastRow){
     const used = Object.values(lastRow.mem).reduce((a,b)=>a+b,0);
-    document.getElementById('s-mem').textContent = `now ${used.toFixed(1)} of ${memTotal} GiB in use · ${sy.free_gib} GiB available`;
+    const swap = sy.swap_total_gib ? ` · swap ${(sy.swap_total_gib - sy.swap_free_gib).toFixed(1)} of ${sy.swap_total_gib} GiB used` : '';
+    document.getElementById('s-mem').textContent = `now ${used.toFixed(1)} of ${memTotal} GiB in use · ${sy.free_gib} GiB available${swap}`;
     if (lastRow.cpu) document.getElementById('s-cpu').textContent = `now ${Object.values(lastRow.cpu).reduce((a,b)=>a+b,0).toFixed(1)} of ${cores} cores busy (scale fits the visible range)`;
     document.getElementById('s-load').textContent = `now ${lastRow.load1.toFixed(2)} on ${cores} cores`;
   }
