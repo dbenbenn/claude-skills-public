@@ -152,26 +152,45 @@ def header_end(text):
 
 
 _TACTIC_MACRO = re.compile(r'^[ \t]*(?:(?:local|scoped)[ \t]+)?macro[ \t]+"([A-Za-z_][\w]*)"[ \t]*:[ \t]*tactic[ \t]*=>\s*`\(tactic\|', re.M)
+_DOC_BEFORE = re.compile(r'/--(?:(?!-/).)*-/[ \t]*\n$', re.S)
 
 
-def inline_tactic_macros(text):
-    """(text, [names]): every `macro "name" : tactic => `(tactic| body)` removed and each use of
-    `name` replaced by `(body)`. The verifier rejects all macro registration (CFP §6's `grp`,
-    Lodha-Moore's `gp`, both merged in from development modules); a solution must inline them."""
-    names = []
+def tactic_macros(text):
+    """(text, {name: body}): every `macro "name" : tactic => `(tactic| body)` removed, with the doc
+    comment right above it (left behind, it dangles before the next command: WLIdentification
+    2026-10-23), and its body, whitespace-normalized. Uses are not touched (inline_macro_uses)."""
+    macros = {}
     while True:
         m = _TACTIC_MACRO.search(text)
         if not m:
-            return text, names
+            return text, macros
         name, i, depth = m.group(1), m.end(), 1
         while i < len(text) and depth:
             depth += {'(': 1, ')': -1}.get(text[i], 0)
             i += 1
-        body = ' '.join(text[m.end():i - 1].split())
+        macros[name] = ' '.join(text[m.end():i - 1].split())
         end = text.find('\n', i)
         end = len(text) if end < 0 else end + 1
-        while text[end:end + 1] == '\n' and text[m.start() - 2:m.start()] == '\n\n':
+        start = m.start()
+        d = _DOC_BEFORE.search(text[:start][-20000:])
+        if d:
+            start -= len(text[:start][-20000:]) - d.start()
+        while text[end:end + 1] == '\n' and text[start - 2:start] == '\n\n':
             end += 1                                   # do not leave two blank lines behind
-        text = text[:m.start()] + text[end:]
-        text = re.sub(r"(?<![\w.'])%s(?![\w'!?])" % re.escape(name), lambda _: '(%s)' % body, text)
-        names.append(name)
+        text = text[:start] + text[end:]
+
+
+def inline_macro_uses(text, macros):
+    """Each use of a macro name ({name: body}) replaced by `(body)`."""
+    for name, body in macros.items():
+        text = re.sub(r"(?<![\w.'])%s(?![\w'!?])" % re.escape(name), lambda _, b=body: '(%s)' % b, text)
+    return text
+
+
+def inline_tactic_macros(text):
+    """(text, [names]): every `macro "name" : tactic => `(tactic| body)` removed (tactic_macros)
+    and each use of `name` replaced by `(body)`. The verifier rejects all macro registration (CFP
+    §6's `grp`, Lodha-Moore's `gp`, both merged in from development modules); a solution must
+    inline them. The module route (oaiport.module_texts) inlines across modules the same way."""
+    text, macros = tactic_macros(text)
+    return inline_macro_uses(text, macros), list(macros)

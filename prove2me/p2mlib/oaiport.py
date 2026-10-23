@@ -313,17 +313,42 @@ def module_sources(lean_root, prefixes):
     return out
 
 
+def inline_module_macros(sources):
+    """`sources` with every tactic macro removed and inlined (leantext.inline_tactic_macros) in its
+    own module and in each module that imports it, directly or not (WLIdentification 2026-10-23:
+    the module route kept `macro "word_poly"`, which carve.py gen refuses; oai_port.py inlines)."""
+    from .leantext import tactic_macros, inline_macro_uses
+    stripped, own, imps = {}, {}, {}
+    for oai, (short, t) in sources.items():
+        stripped[oai], own[oai] = tactic_macros(t)
+        imps[oai] = [x for x in re.findall(r'^import (\S+)', t, re.M) if x in sources]
+    seen = {}
+
+    def visible(m, stack=()):
+        if m not in seen:
+            out = dict()
+            for x in imps[m]:
+                if x not in stack:
+                    out.update(visible(x, stack + (m,)))
+            out.update(own[m])
+            seen[m] = out
+        return seen[m]
+    return {oai: (short, inline_macro_uses(stripped[oai], visible(oai)))
+            for oai, (short, _) in sources.items()}
+
+
 def module_texts(sources, mod, compat_text='', compat_ns='OAI', header=''):
     """The workspace modules of a module-route port before the patches: {file name: text} under
     Lean prefix `mod` (e.g. Solutions.OAIQW_X), Compat.lean not included. `sources` as
     module_sources returns. Each module's OAI imports are rewritten to the ported copies (an import
-    of an OpenAI module that is not ported is an error: add its prefix); a module importing none of
-    them imports `<mod>.Compat`; the linter-off lines and `header` go after the imports; then the
-    core and compat rewrites. This is the text the patches are counted against
+    of an OpenAI module that is not ported is an error: add its prefix); tactic macros are inlined
+    (inline_module_macros); a module importing none of them imports `<mod>.Compat`; the linter-off
+    lines and `header` go after the imports; then the core and compat rewrites. This is the text the patches are counted against
     (carve_prep.py filter-patches; ComparatorModel 2026-10-24: counted against the raw source, the
     `| zero` case core_rewrites adds was not there yet)."""
     names = {k: v[0] for k, v in sources.items()}
     block, rewrites = compat_block(compat_text, compat_ns)
+    sources = inline_module_macros(sources)
     files, missing = {}, set()
     for oai, (short, t) in sources.items():
         def rep(m):

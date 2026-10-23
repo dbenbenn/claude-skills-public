@@ -256,3 +256,29 @@ def test_filter_patches_command_line(tmp_path):
     # with the root-level compat block the alias is not rewritten, so the first patch applies
     CP.main(['filter-patches', str(p), LEAN, str(out), 'OAI.Fam', '--compat', str(c), '--root-compat'])
     assert len(json.load(open(str(out)))) == 2
+
+
+MACRO_DEF = ('import Mathlib\n\nnamespace OAI.Fam\n\n/-- Closes word goals.  Each leaf is\nproved. -/\n'
+             'macro "word_poly" : tactic => `(tactic|\n  repeat\' first\n  | rfl\n  | simp)\n\n'
+             'theorem m1 : 1 = 1 := by word_poly\n\nend OAI.Fam\n')
+MACRO_USE = ('import OAI.Fam.M\n\nnamespace OAI.Fam\n\ntheorem m2 : 2 = 2 := by\n  word_poly\n\n'
+             'theorem m3 (word_poly\' : Nat) : True := trivial\n\nend OAI.Fam\n')
+
+
+def test_module_port_inlines_tactic_macros_across_modules():
+    # WLIdentification (2026-10-23): the module route kept OpenAI's `macro "word_poly"`, which
+    # carve.py gen refuses (the verifier rejects any macro), while oai_port.py inlines macros. A
+    # macro is inlined in its own module and in every module importing it, and its doc comment goes
+    # with it (left behind, it dangled before the next command)
+    src = O.module_sources(LEAN, ['OAI.Fam'])
+    src['OAI.Fam.M'] = ('M', MACRO_DEF)
+    src['OAI.Fam.N'] = ('N', MACRO_USE)
+    src['OAI.Fam.P'] = ('P', 'import Mathlib\n\nnamespace OAI.Fam.P\ntheorem word_poly : True := trivial\nend OAI.Fam.P\n')
+    files = O.module_files(src, 'Solutions.F', (), COMPAT)
+    body = "(repeat' first | rfl | simp)"
+    assert 'macro' not in files['M.lean'] and 'Closes word goals' not in files['M.lean']
+    assert 'theorem m1 : 1 = 1 := by %s\n' % body in files['M.lean']
+    assert 'theorem m2 : 2 = 2 := by\n  %s\n' % body in files['N.lean']
+    assert "(word_poly' : Nat)" in files['N.lean']
+    # a module that does not import the macro's module keeps its own meaning of the name
+    assert 'theorem word_poly : True' in files['P.lean']
