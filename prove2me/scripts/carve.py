@@ -148,6 +148,20 @@ def costs(cfg, g):
     return cost
 
 
+def warn_leaks(g, P, limit=30):
+    """Instances a carved file shows a declaration its module never saw (C.instance_leaks): if a
+    file then fails where the port compiled (a rewrite no longer matching, a different
+    elaboration), look here first (RationalHitting 2026-10-24, witnessCharZero)."""
+    lines = C.leak_summary(C.instance_leaks(g, P))
+    if lines:
+        print('WARNING: %d instances are visible in carved files to declarations whose modules never '
+              'saw them (type class search may take another path there):' % len(lines))
+        for l in lines[:limit]:
+            print('  ' + l)
+        if len(lines) > limit:
+            print('  ... %d more (p2mlib.carve.instance_leaks)' % (len(lines) - limit))
+
+
 def main(argv):
     if len(argv) < 3:
         sys.exit(__doc__)
@@ -215,6 +229,7 @@ def main(argv):
         for c, n in worst:
             print('  %7.1f s  %s' % (c, n))
         probs = C.check_plan(g, P)
+        warn_leaks(g, P)
         for p in probs[:40]:
             print('PROBLEM', p)
         if probs:
@@ -232,6 +247,7 @@ def main(argv):
                        json.load(open(os.path.expanduser(cfg['patches']))) if cfg.get('patches') else ())
         for f in r['files']:
             print('%9d  %s' % (r['sizes'][f], f))
+        warn_leaks(g, P)
         for f in r['over_cap']:
             print('OVER 1 MiB', f)
         if r['patches_unused'] and names is None:

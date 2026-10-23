@@ -1286,3 +1286,27 @@ def test_an_export_goes_where_its_namespace_exists(g):
 @pytest.mark.lean
 def test_exports_compile(g, tmp_path):
     _compile_in_publish_order(g, _export_plan(), tmp_path)
+
+
+def test_an_instance_a_carved_declaration_never_saw_is_reported(g):
+    # RationalHitting (2026-10-24): the instance witnessCharZero (Generator.lean) reached the carved
+    # list_hits piece's Certificates.lean declarations through a bundle; `algebraMap ℚ` elaborated
+    # through it there, and a `rwa [RingHom.ext_rat …]` no longer matched. Detected, as a warning.
+    t = 'CD.LI.box_get'
+    p = {'bundles': [{'name': 'L0', 'nodes': ['CD.LI.Box', 'CD.LI.Box.get', 'CD.LI.boxInhabited',
+                                              'CD.LI.defaultBox'], 'imports': []}],
+         'nodes': [t], 'external_defs': {}, 'external': [],
+         'stubs': {t: {'bundles': ['L0']}}, 'pieces': {t: {'keep': [t], 'imports': [], 'bundles': ['L0']}}}
+    leaks = C.instance_leaks(g, p)
+    assert ('piece:' + t, t, 'CD.LI.boxInhabited') in leaks
+    assert ('statement:' + t, t, 'CD.LI.boxInhabited') in leaks
+    assert ('bundle:L0', 'CD.LI.Box.get', 'CD.LI.boxInhabited') in leaks
+    # defaultBox's module declares the instance before it; the structure itself uses nothing
+    assert not [x for x in leaks if x[1] in ('CD.LI.defaultBox', 'CD.LI.Box')]
+    # without the instance in reach there is nothing to report; a local instance never leaks
+    p['bundles'][0]['nodes'].remove('CD.LI.boxInhabited')
+    assert C.instance_leaks(g, p) == []
+    assert not C._global_instance(g, 'CD.LI.instPropCOfNatNat')
+    # grouped for the command line: one line per instance
+    assert C.leak_summary(leaks) == ['CD.LI.boxInhabited: 2 declarations in 3 files '
+                                     '(bundle:L0, piece:CD.LI.box_get, statement:CD.LI.box_get)']

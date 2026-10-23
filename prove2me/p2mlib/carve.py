@@ -1728,6 +1728,85 @@ def check_plan(g, plan):
     return probs
 
 
+def _global_instance(g, k):
+    """Is node k an instance every importer of its file sees (not `local`/`scoped`)?"""
+    nd = g.nodes[k]
+    if not nd.instance:
+        return False
+    info = g.infos[nd.module]
+    c = info.commands[nd.cmd]
+    head = info.text_bytes[c.start.byte:c.end.byte][:400].decode('utf-8', 'ignore')
+    return not re.match(r'\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?(?:noncomputable\s+)?(?:private\s+)?'
+                        r'(?:local|scoped)\b', head, re.S)
+
+
+def instance_leaks(g, plan):
+    """[(item, declaration, instance)]: a file of the plan (`bundle:B`, `statement:N`, `piece:N`)
+    makes a global instance visible to a declaration it carves that the declaration's own module
+    could not see there (declared in a module it does not import, or later in its own), and the
+    instance's type mentions something the declaration uses (or only library types). Type class
+    search may then take another path: RationalHitting (2026-10-24), the instance witnessCharZero
+    of Generator.lean reached the carved list_hits (Certificates.lean) through a bundle, and
+    `algebraMap ℚ` elaborated through it, so a `rwa [RingHom.ext_rat …]` no longer matched.
+    A warning: most such instances change nothing."""
+    pos, bimp, _ = _plan_index(plan)
+    ext = set(plan.get('external_defs') or {})
+
+    def bundles_have(names):
+        cl = _bundle_closure(bimp, [pos[x] for x in names if x in pos])
+        return {k for i in cl for k in plan['bundles'][i]['nodes']}
+    inst = {k for k in g.nodes if k not in ext and _global_instance(g, k)}
+
+    def saw(k, i):
+        a, b = g.nodes[k], g.nodes[i]
+        return b.cmd < a.cmd if a.module == b.module else g.sees(a.module, b.module)
+
+    def check(item, keep, visible):
+        out = []
+        cand = [i for i in visible & inst]
+        for k in sorted(keep):
+            if k not in g.nodes:
+                continue
+            uses = g.nodes[k].deps | g.nodes[k].sig
+            for i in sorted(cand):
+                if i == k or saw(k, i):
+                    continue
+                td = g.nodes[i].tdeps - {i}
+                if not td or td & uses:
+                    out.append((item, k, i))
+        return out
+    leaks = []
+    for b in plan['bundles']:
+        vis = bundles_have(b['imports']) | set(b['nodes'])
+        for st in b.get('statements', ()):
+            vis |= bundles_have(plan['stubs'][st]['bundles'])
+        leaks += check('bundle:' + b['name'], b['nodes'], vis)
+    for n, s in plan['stubs'].items():
+        if n not in plan.get('external', ()):
+            leaks += check('statement:' + n, [n], bundles_have(s['bundles']))
+    for n, p in plan['pieces'].items():
+        vis = bundles_have(p['bundles']) | set(p['keep'])
+        for i in p['imports']:
+            vis |= bundles_have(plan['stubs'][i]['bundles'])
+        leaks += check('piece:' + n, p['keep'], vis)
+    return leaks
+
+
+def leak_summary(leaks):
+    """instance_leaks as one line per instance: `instance: n declarations in k files (files…)`."""
+    by = collections.defaultdict(lambda: (set(), set()))
+    for item, k, i in leaks:
+        by[i][0].add(item)
+        by[i][1].add(k)
+    out = []
+    for i, (items, ks) in sorted(by.items(), key=lambda x: (-len(x[1][1]), x[0])):
+        its = sorted(items)
+        out.append('%s: %d declaration%s in %d file%s (%s%s)' % (
+            i, len(ks), '' if len(ks) == 1 else 's', len(its), '' if len(its) == 1 else 's',
+            ', '.join(its[:3]), ', …' if len(its) > 3 else ''))
+    return out
+
+
 def publish_order(plan, external=()):
     """The import DAG as waves: every item of a wave can publish concurrently once the earlier
     waves are published. Items: `bundle:NAME` (after the bundles it imports and the pieces of the
