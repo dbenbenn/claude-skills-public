@@ -1310,7 +1310,26 @@ back WA. The lessons:
   short name: a namespaced reference to a sibling theorem, and a definition in the target's own
   statement. Both are fixed: a field is matched only against the declaration's compiled
   constants, and a token is renamed only when it denotes the target. The per-carve `patches`
-  for these cases are no longer needed.
+  for these cases are no longer needed. The plain carves of 2026-10-24 found three more:
+  `export Coding (code)` stayed in a bundle without the class Coding ("unknown namespace"; an
+  `export` now goes where its namespace exists, like an `open`); sibling modules' identical
+  anonymous `local instance : Fact …` share one generated name (an instance of a Prop class is a
+  theorem, so Lean accepts the duplicate), and the losers were never re-emitted (they are now);
+  and an instance from a later module, visible through a bundle, changed how an earlier
+  declaration elaborated. The last is only detected: `carve.py plan` and `gen` print the
+  instances a carved file shows declarations whose modules never saw them. Most of them are
+  harmless, so read that list first when a carved file fails where the port compiled.
+- **The soundness guard refuses the token `prelude`, even as an identifier** (WLTime 2026-10-23:
+  OpenAI's `def prelude` failed a published bundle). Both port routes rename it to `prelude_`.
+  `carve.py gen`, `split_run.py` and `submit_solution.py` refuse any file the guard would refuse
+  (`p2mlib.leantext.guard_problems` holds the guard's rules; add a newly found rule there).
+- **The cost model is a little pessimistic near the budget; trust the measurement.** On 195
+  measured bundles and pieces of 27 carves (time_scale 1.2, 2026-10-24), measured -j1 time came
+  out at about 0.65 × estimate + 7.6 s (residual sd 6 s). Items estimated at 40–60 s measured at
+  0.74× (median), but the ratio ranged up to 1.43× (a ThorpNine piece: estimated 42 s, measured
+  60.5 s). The carves' own medians ran from 0.56 to 1.34, so the spread is per carve, not a
+  single scale to correct. The model is unchanged. Measure every carve (`carve_measure.py`), then
+  re-plan or `carve.py split` from the times.
 - `carve.py plan` refuses a plan in which a bundle misses a definition that one of its members
   needs (Erdős 3 B006 `A.space`, B024 `coord`), or in which a bundle or piece rests on `sorry`
   (B022). Compile every bundle locally before publishing it. A published bundle is frozen
@@ -1548,7 +1567,14 @@ transformations are in `p2mlib.oaiport`, and `tests/test_oaiport.py` pins the bu
    `oai_build_modules.py --elab-log`, then `carve_prep.py config` with `--def` for each published
    bundle the goal imports and `--forced` for each theorem the paper names. Then run `carve.py
    graph`, `carve_prep.py ext-defs`, `carve.py plan/gen/order`, `carve_measure.py`, and `carve.py
-   split` (see **Splitting a large ported proof**). Each forced theorem becomes its own published
+   split` (see **Splitting a large ported proof**). The single-file patches go through
+   `carve_prep.py filter-patches` first, with the same compat options as `oai_port_modules.py`.
+   It counts each patch against the text the module port patches, not against OpenAI's source:
+   the port's own rewrites can add a match (the `| zero` case of TensorProduct induction) or
+   remove one (a compat alias). It also drops single-file-only patches, which are marked
+   `"route": "single"` or reorder a universe list for merge.py's `universe` line. The module port
+   inlines tactic macros across modules, as `oai_port.py` does. `oai_build_modules.py` rebuilds
+   a module when anything it imports changed, so after a fix no `--force` is needed. Each forced theorem becomes its own published
    statement, so others can reuse it. `oai_build_modules.py`, `carve.py` and `carve_measure.py`
    each allow one live run per carve (`p2mlib/runlock.py`). A second copy exits 3 and names the
    pid already running it: wait for that run or stop it, and never start another (2026-10-23, a
