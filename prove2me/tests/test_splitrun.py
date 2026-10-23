@@ -341,3 +341,16 @@ def test_a_bundle_name_taken_by_a_different_definition_stops(split):
     run(cfg, api2)
     st = json.loads((d / 'run_state.json').read_text())
     assert st['bundle:XB000']['state'] == 'live' and st['bundle:XB000']['id'] == 'd0'
+
+
+def test_a_file_the_soundness_guard_refuses_blocks_the_item_before_any_post(split):
+    # WLTime (2026-10-23): bundle OAIQWWLT000 kept OpenAI's `def prelude`, and the platform's
+    # soundness guard refused the token `prelude` even as an identifier ("`prelude` — disables the
+    # automatic Init prelude import"): compile_error after the post. Checked locally first now.
+    d, cfg = split
+    (d / 'out' / 'lib' / 'Def_XB001.lean').write_text(
+        'import Mathlib\n\ndef prelude (n : Nat) : Nat := n\ndef XB001.k : Nat := prelude 1\n')
+    api = FakeApi()
+    r, summary = run(cfg, api)
+    assert ('def', 'XB001') not in api.posted
+    assert 'bundle:XB001' in summary['blocked'] and 'prelude' in summary['blocked']['bundle:XB001']

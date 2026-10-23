@@ -199,13 +199,16 @@ def check_no_draft_imports(path):
 
 def check_no_metaprogramming(path):
     """The platform's soundness guard rejects custom syntax/elaborator registration ("line N: `macro`
-    ... metaprogramming is not supported in submissions"); CFP §6's Lemma 6.1 was refused for a
-    `local macro "grp"` merged in from a development module. Refuse first. `notation` is allowed."""
-    bad = [(i + 1, l.strip()) for i, l in enumerate(open(path, encoding='utf-8'))
-           if re.match(r'\s*((local|scoped)\s+)?(macro|macro_rules|syntax|elab|elab_rules|declare_syntax_cat|initialize)\b', l)]
+    ... metaprogramming is not supported in submissions"; CFP §6's Lemma 6.1 was refused for a
+    `local macro "grp"` merged in from a development module) and the token `prelude` even as an
+    identifier (WLTime 2026-10-23). Refuse first (p2mlib.leantext.guard_problems, the one copy of
+    the guard's rules). `notation` is allowed."""
+    from p2mlib.leantext import guard_problems
+    bad = guard_problems(open(path, encoding='utf-8').read())
     if bad:
-        sys.exit('REFUSED: metaprogramming the verifier rejects:\n  ' +
-                 '\n  '.join('line %d: %s' % b for b in bad[:5]) + '\ninline the tactic instead.')
+        sys.exit('REFUSED: the verifier\'s soundness guard rejects:\n  ' +
+                 '\n  '.join('line %d: %s (%s)' % b for b in bad[:5]) +
+                 '\ninline a tactic macro; rename a refused identifier.')
 
 
 def _namespaces(lines):

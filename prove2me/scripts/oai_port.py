@@ -17,7 +17,7 @@ usage: oai_port.py TARGET ROOT_MODULE SRC_LEAN_DIR OUT_DIR [--bundle Def_X ...] 
 
 Steps: merge the closure (build_solution's closure and merge.py, each module section-wrapped);
 inline tactic macros; strip universe lists merge.py already declares; drop the bundles'
-declarations; rename OpenAI's copy of the target `<name>_oai`; core rewrites, compat rewrites and
+declarations; rename OpenAI's copy of the target `<name>_oai`; core rewrites, compat rewrites, guard renames (`prelude` -> `prelude_`) and
 patches; prepend the compatibility block; append `theorem solution : type_of% @T_oai := @T_oai`;
 then (unless --no-check) compile the verifier's form (the statement imported, `theorem _check`),
 -j1, and write OUT_DIR/result.json {secs (CPU), wall, errors, axioms, unknown, bytes, dropped}.
@@ -69,7 +69,7 @@ def port_text(target, root, src, bundles, patches=(), compat_ns='OAI', ws=None):
     text, dropped = O.drop_declarations(text, names, anon)
     text = O.rename_target(text, target)
     block, rewrites = O.compat_block(open(COMPAT, encoding='utf-8').read(), compat_ns)
-    text = O.apply_rewrites(O.core_rewrites(text), rewrites)
+    text = O.guard_renames(O.apply_rewrites(O.core_rewrites(text), rewrites))
     text = O.apply_patches(text, patches, route='single')
     t = BS.published(target)
     pre = [l for l in (t.get('preamble') or '').split('\n') if l.startswith('import ')]

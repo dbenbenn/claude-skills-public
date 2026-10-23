@@ -224,3 +224,12 @@ def test_inline_copy_check_compares_full_names(tmp_path, monkeypatch):
                 'namespace OAI\nnoncomputable section\ntheorem DeligneDrinfeld.ExactCountOrdering.transfer\' : True := trivial\nend\nend OAI\n'):
         with pytest.raises(SystemExit):
             S.check_no_inline_copies(sol(tmp_path, bad + tail), 'N.target', [])
+
+
+def test_guard_token_prelude_refused(tmp_path):
+    # WLTime (2026-10-23): the soundness guard refuses the token `prelude` even as an identifier
+    with pytest.raises(SystemExit, match='prelude'):
+        S.check_no_metaprogramming(sol(tmp_path, 'def prelude : Nat := 1\ntheorem solution : prelude = 1 := rfl\n'))
+    # a longer identifier, a comment or a string is fine
+    S.check_no_metaprogramming(sol(tmp_path, '-- the prelude\ndef prelude_size : String := "prelude"\n'
+                                   'theorem solution : prelude_size = "prelude" := rfl\n'))

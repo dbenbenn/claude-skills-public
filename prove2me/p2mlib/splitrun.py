@@ -96,6 +96,11 @@ class Runner:
         for p in (f['file'], f['text']):
             if not os.path.exists(p):
                 return 'missing ' + p
+        # the platform's soundness guard (WLTime 2026-10-23: `prelude` in a bundle, compile_error)
+        from .leantext import guard_problems, guard_message
+        bad = guard_problems(open(f['file'], encoding='utf-8').read())
+        if bad:
+            return 'the soundness guard would refuse %s: %s' % (os.path.basename(f['file']), guard_message(bad))
         text = open(f['text'], encoding='utf-8').read()
         if f['kind'] == 'piece':
             bad = E.problems(text)

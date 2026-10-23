@@ -194,3 +194,82 @@ def inline_tactic_macros(text):
     inline them. The module route (oaiport.module_texts) inlines across modules the same way."""
     text, macros = tactic_macros(text)
     return inline_macro_uses(text, macros), list(macros)
+
+
+def code_only(text):
+    """`text` with every comment and literal (string, char, raw string, «name») blanked to spaces,
+    newlines kept, so offsets and line numbers still match the source."""
+    out, i, n = [], 0, len(text)
+
+    def blank(j):
+        out.append(re.sub(r'[^\n]', ' ', text[i:j]))
+    while i < n:
+        prev = text[i - 1] if i else ''
+        ident_before = bool(prev) and bool(_IDCHAR.match(prev))
+        if text.startswith('/-', i):
+            depth, j = 0, i
+            while j < n:
+                if text.startswith('/-', j):
+                    depth += 1; j += 2
+                elif text.startswith('-/', j):
+                    depth -= 1; j += 2
+                    if depth == 0:
+                        break
+                else:
+                    j += 1
+            blank(j); i = j
+        elif text.startswith('--', i):
+            j = text.find('\n', i)
+            j = n if j == -1 else j
+            blank(j); i = j
+        elif text[i] == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == '\\' else 1
+            j = min(j + 1, n)
+            blank(j); i = j
+        elif text[i] == '«':
+            j = text.find('»', i)
+            j = n if j == -1 else j + 1
+            blank(j); i = j
+        elif text[i] == 'r' and not ident_before and _RAW.match(text, i):
+            close = '"' + _RAW.match(text, i).group(1)
+            j = text.find(close, _RAW.match(text, i).end())
+            j = n if j == -1 else j + len(close)
+            blank(j); i = j
+        elif text[i] == "'" and not ident_before and _CHARLIT.match(text, i):
+            j = _CHARLIT.match(text, i).end()
+            blank(j); i = j
+        else:
+            out.append(text[i]); i += 1
+    return ''.join(out)
+
+
+# What prove2.me's soundness guard refuses in any submitted file (solution, statement, bundle):
+# custom syntax/elaborator registration ("line N: `macro` ... metaprogramming is not supported in
+# submissions"; CFP §6's `local macro "grp"`), and the token `prelude` anywhere, even as an
+# identifier (WLTime 2026-10-23: OpenAI's `def prelude` in a bundle, "`prelude` — disables the
+# automatic Init prelude import, enabling kernel-primitive shadowing"). `notation` is allowed.
+GUARD_COMMAND = re.compile(r'[ \t]*(?:@\[[^\]\n]*\][ \t]*)?(?:(?:local|scoped)\s+)?'
+                           r'(macro|macro_rules|syntax|elab|elab_rules|declare_syntax_cat|initialize)\b')
+GUARD_TOKENS = {'prelude': 'disables the automatic Init prelude import (refused even as an identifier)'}
+_TOKEN = r"(?<![\w'!?₀-ₜ])%s(?![\w'!?₀-ₜ])"
+
+
+def guard_problems(text):
+    """[(line, token, why)] of what the soundness guard refuses, read outside comments and
+    literals: a metaprogramming command at the start of a line, a refused token anywhere."""
+    out = []
+    for k, l in enumerate(code_only(text).split('\n'), 1):
+        m = GUARD_COMMAND.match(l)
+        if m:
+            out.append((k, m.group(1), 'metaprogramming is not supported in submissions'))
+        for tok, why in GUARD_TOKENS.items():
+            if re.search(_TOKEN % re.escape(tok), l):
+                out.append((k, tok, why))
+    return out
+
+
+def guard_message(problems, limit=5):
+    return '; '.join('line %d: `%s` (%s)' % p for p in problems[:limit]) + \
+        (' (and %d more)' % (len(problems) - limit) if len(problems) > limit else '')

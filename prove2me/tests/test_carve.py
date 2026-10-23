@@ -1217,3 +1217,11 @@ def test_renaming_leaves_a_same_short_name_definition_in_the_statement_alone(g):
     have = g.have_names({'CD.uses_outer_cp', 'CD.Outer.cp', 'CD.cp', 'CD.Outer', 'CD.Inner'})
     out = C.Carver(g).carve({'CD.uses_outer_cp'}, have, rename={'CD.Outer.cp': 'cp_oai'})
     assert ':= o.cp_oai' in out and 'cp (o.inner 0).val = ' in out, out
+
+
+def test_generate_refuses_a_file_the_soundness_guard_would_refuse(g, plan, tmp_path):
+    # WLTime (2026-10-23): a bundle kept OpenAI's `def prelude`; the platform's soundness guard
+    # refuses the token `prelude` even as an identifier, found only on publishing (compile_error)
+    pt = [{'literal_old': 'def double (n : Nat)', 'literal_new': 'def prelude (n : Nat) : Nat := n\ndef double (n : Nat)'}]
+    with pytest.raises(C.CarveError, match='prelude'):
+        C.generate(g, plan, str(tmp_path / 'out'), patches=pt)

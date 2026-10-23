@@ -29,7 +29,7 @@ import subprocess
 from dataclasses import dataclass, field
 
 from . import leanedit, leaninfo
-from .leantext import strip
+from .leantext import guard_message, guard_problems, strip
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DECLGRAPH = os.path.join(os.path.dirname(HERE), 'lean', 'DeclGraph.lean')
@@ -2507,6 +2507,12 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
                 used.add(pt['literal_old'])
         if os.path.basename(path).startswith(('Def_', 'Sol_')) and re.search(r'\bsorry\b', strip(txt)):
             raise CarveError('%s still contains sorry (a repaired declaration whose patch did not apply?)' % path)
+        # what prove2.me's soundness guard refuses, found before publishing (WLTime 2026-10-23: a
+        # bundle kept OpenAI's `def prelude`; the port renames it now, oaiport.guard_renames)
+        bad = guard_problems(txt)
+        if bad:
+            raise CarveError('%s: the soundness guard would refuse %s; rename it in the port '
+                             '(oaiport.guard_renames) or by a carve patch' % (path, guard_message(bad)))
         with open(path, 'w', encoding='utf-8') as f:
             f.write(txt)
         files.append(path)

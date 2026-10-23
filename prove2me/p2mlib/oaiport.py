@@ -278,6 +278,19 @@ def apply_rewrites(text, rewrites):
     return text
 
 
+# identifiers prove2.me's soundness guard refuses (leantext.GUARD_TOKENS), and what the ports call
+# them instead (WLTime 2026-10-23: OpenAI's `def prelude`, renamed by hand to preludeCode)
+GUARD_RENAMES = {'prelude': 'prelude_'}
+
+
+def guard_renames(text):
+    """Every identifier token the soundness guard refuses renamed (GUARD_RENAMES), qualified uses
+    (`X.prelude`) included, longer names (`prelude_size`) not; comments too, harmlessly."""
+    for old, new in GUARD_RENAMES.items():
+        text = re.sub(r"(?<![\w'!?\u2080-\u209c])%s(?![\w'!?\u2080-\u209c])" % re.escape(old), new, text)
+    return text
+
+
 def core_rewrites(text):
     """Lean core/Mathlib renames every port needs: OpenAI's `TensorProduct.inductionOn` is our
     `induction_on`, which also wants a `zero` case."""
@@ -369,7 +382,7 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header=''):
         ls = t.split('\n')
         k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
         t = '\n'.join(ls[:k] + [''] + (LINT + header).rstrip().split('\n') + ls[k:])
-        files[short + '.lean'] = apply_rewrites(core_rewrites(t), rewrites)
+        files[short + '.lean'] = guard_renames(apply_rewrites(core_rewrites(t), rewrites))
     if missing:
         raise PortError('imports of OpenAI modules that are not ported:\n  ' + '\n  '.join(sorted(missing)))
     return files

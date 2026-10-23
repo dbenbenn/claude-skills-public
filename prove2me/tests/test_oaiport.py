@@ -203,3 +203,28 @@ def test_the_submit_queue_reconciles_from_logs_and_limits_retries(tmp_path):
     # a file over ~90 s gets one attempt; a faster one gets an unchanged retry
     assert q.terminal(st['slow'], 'slow') and not q.terminal(st['fast'], 'fast')
     assert q.terminal(st['done'], 'done')
+
+
+# ---------------------------------------------------------------- the soundness guard
+
+def test_guard_problems_find_metaprogramming_and_the_prelude_token():
+    from p2mlib import leantext as L
+    text = ('import Mathlib\n/- prelude in a comment -/\ndef prelude_size : Nat := 1\n'
+            'def prelude (n : Nat) : Nat := n\n  local macro "x" : term => `(1)\n'
+            'example : X.prelude 1 = 1 := rfl\ndef s : String := "prelude"\n')
+    got = [(n, tok) for n, tok, _ in L.guard_problems(text)]
+    assert got == [(4, 'prelude'), (5, 'macro'), (6, 'prelude')]
+
+
+def test_ports_rename_identifiers_the_soundness_guard_refuses():
+    # WLTime (2026-10-23): OpenAI's TMConsumer.prelude passed every local check and the published
+    # bundle failed on the guard; renamed by hand to preludeCode. Both port routes rename it.
+    from p2mlib import leantext as L
+    src = {'OAI.G.A': ('A', 'import Mathlib\nnamespace OAI.G\ndef prelude (n : Nat) : Nat := n\n'
+                            'theorem prelude_size : prelude 1 = 1 := rfl\nend OAI.G\n'),
+           'OAI.G.B': ('B', 'import OAI.G.A\nnamespace OAI.G\ntheorem b : G.prelude 2 = 2 := rfl\nend OAI.G\n')}
+    files = O.module_files(src, 'Solutions.G', (), '')
+    assert 'def prelude_ (n' in files['A.lean'] and 'prelude_size : prelude_ 1' in files['A.lean']
+    assert 'G.prelude_ 2' in files['B.lean']
+    assert not any(L.guard_problems(t) for t in files.values())
+    assert O.guard_renames('x := prelude 1') == 'x := prelude_ 1'
