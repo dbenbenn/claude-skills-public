@@ -1225,3 +1225,37 @@ def test_generate_refuses_a_file_the_soundness_guard_would_refuse(g, plan, tmp_p
     pt = [{'literal_old': 'def double (n : Nat)', 'literal_new': 'def prelude (n : Nat) : Nat := n\ndef double (n : Nat)'}]
     with pytest.raises(C.CarveError, match='prelude'):
         C.generate(g, plan, str(tmp_path / 'out'), patches=pt)
+
+
+# ---------------------------------------------------------------- exports and instances across modules
+
+def _section(txt, module):
+    """The text of one module's section in a carved file."""
+    i = txt.index('-- module %s\n' % module)
+    j = txt.find('\nsection\n-- module ', i)
+    return txt[i:j if j >= 0 else len(txt)]
+
+
+def _propc_plan(g):
+    return C.make_plan(g, ['CD.LI.uses_propc_a', 'CD.LI.uses_propc_b'], budget=100, bundle_budget=100,
+                       cost=C.size_costs(g), bundle_prefix='Q', chunker='schedule')
+
+
+def test_an_anonymous_local_instance_whose_name_another_module_took_comes_back(g):
+    # Problem340 (2026-10-24): sibling modules each declared `local instance : Fact ((0 : ℝ) < 100)`;
+    # an instance of a Prop class is a theorem, Lean lets two modules declare the same one, and
+    # both got one generated name. The declaration graph keeps one constant per name, so the other
+    # module's command was nobody's node and never came back for its declarations: the pieces
+    # failed (a global instance was patched in by hand).
+    assert 'CD.LI.instPropCOfNatNat' in g.nodes          # InstA's; InstB's command has no node
+    p = _propc_plan(g)
+    for n, mod in (('CD.LI.uses_propc_a', 'CarveDev.InstA'), ('CD.LI.uses_propc_b', 'CarveDev.InstB')):
+        piece, stub = C.gen_piece(g, p, n), C.gen_stub(g, p, n)
+        for txt, sec in ((piece, _section(piece, mod)), (stub, stub)):
+            assert re.search(r'^local instance \S+ : PropC 3', sec, re.M), txt
+            assert sec.index('local instance') < sec.index('theorem uses_propc')
+
+
+@pytest.mark.lean
+def test_local_instances_sharing_a_name_compile(g, tmp_path):
+    _compile_in_publish_order(g, _propc_plan(g), tmp_path)

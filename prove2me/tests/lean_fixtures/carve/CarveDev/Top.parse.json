@@ -9,17 +9,17 @@
     }
    ],
    "end": {
-    "byte": 74,
+    "byte": 143,
     "col": 10,
-    "line": 5
+    "line": 8
    },
    "heads": [],
    "idents": [
     {
-     "end": 74,
+     "end": 143,
      "name": "u",
      "role": "univ",
-     "start": 73
+     "start": 142
     }
    ],
    "ids": [],
@@ -28,9 +28,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 64,
+    "byte": 133,
     "col": 0,
-    "line": 5
+    "line": 8
    }
   },
   {
@@ -44,17 +44,17 @@
     }
    ],
    "end": {
-    "byte": 88,
+    "byte": 157,
     "col": 12,
-    "line": 7
+    "line": 10
    },
    "heads": [],
    "idents": [
     {
-     "end": 88,
+     "end": 157,
      "name": "CD",
      "role": "scope",
-     "start": 86
+     "start": 155
     }
    ],
    "ids": [],
@@ -63,9 +63,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 76,
+    "byte": 145,
     "col": 0,
-    "line": 7
+    "line": 10
    }
   },
   {
@@ -84,96 +84,96 @@
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 177,
+    "byte": 246,
     "col": 85,
-    "line": 9
+    "line": 12
    },
    "heads": [],
    "idents": [
     {
-     "end": 106,
+     "end": 175,
      "name": "top_pick",
      "role": "decl",
-     "start": 98
+     "start": 167
     },
     {
-     "end": 110,
+     "end": 179,
      "name": "α",
      "role": "binder",
-     "start": 108
+     "start": 177
     },
     {
-     "end": 119,
+     "end": 188,
      "name": "u",
      "role": "ref",
-     "start": 118
+     "start": 187
     },
     {
-     "end": 123,
+     "end": 192,
      "name": "a",
      "role": "binder",
-     "start": 122
+     "start": 191
     },
     {
-     "end": 128,
+     "end": 197,
      "name": "α",
      "role": "ref",
-     "start": 126
+     "start": 195
     },
     {
-     "end": 136,
+     "end": 205,
      "name": "pick",
      "role": "ref",
-     "start": 132
+     "start": 201
     },
     {
-     "end": 138,
+     "end": 207,
      "name": "[anonymous]",
      "role": "ref",
-     "start": 138
+     "start": 207
     },
     {
-     "end": 142,
+     "end": 211,
      "name": "pick",
      "role": "ref",
-     "start": 138
+     "start": 207
     },
     {
-     "end": 144,
+     "end": 213,
      "name": "a",
      "role": "ref",
-     "start": 143
+     "start": 212
     },
     {
-     "end": 149,
+     "end": 218,
      "name": "a",
      "role": "ref",
-     "start": 148
+     "start": 217
     },
     {
-     "end": 167,
+     "end": 236,
      "name": "pick_eq",
      "role": "ref",
-     "start": 160
+     "start": 229
     },
     {
-     "end": 176,
+     "end": 245,
      "name": "pick_eq",
      "role": "ref",
-     "start": 169
+     "start": 238
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 106,
+      "byte": 175,
       "col": 16,
-      "line": 9
+      "line": 12
      },
      "start": {
-      "byte": 98,
+      "byte": 167,
       "col": 8,
-      "line": 9
+      "line": 12
      }
     }
    ],
@@ -184,14 +184,14 @@
    "namespace": "CD",
    "opens": [],
    "start": {
-    "byte": 90,
+    "byte": 159,
     "col": 0,
-    "line": 9
+    "line": 12
    },
    "value_start": {
-    "byte": 150,
+    "byte": 219,
     "col": 58,
-    "line": 9
+    "line": 12
    }
   },
   {
@@ -209,17 +209,17 @@
     }
    ],
    "end": {
-    "byte": 187,
+    "byte": 256,
     "col": 8,
-    "line": 11
+    "line": 14
    },
    "heads": [],
    "idents": [
     {
-     "end": 187,
+     "end": 256,
      "name": "Aux",
      "role": "open",
-     "start": 184
+     "start": 253
     }
    ],
    "ids": [],
@@ -228,9 +228,9 @@
    "namespace": "CD",
    "opens": [],
    "start": {
-    "byte": 179,
+    "byte": 248,
     "col": 0,
-    "line": 11
+    "line": 14
    }
   },
   {
@@ -251,36 +251,36 @@
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 226,
+    "byte": 295,
     "col": 37,
-    "line": 13
+    "line": 16
    },
    "heads": [],
    "idents": [
     {
-     "end": 211,
+     "end": 280,
      "name": "helper",
      "role": "decl",
-     "start": 205
+     "start": 274
     },
     {
-     "end": 226,
+     "end": 295,
      "name": "rfl",
      "role": "ref",
-     "start": 223
+     "start": 292
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 211,
+      "byte": 280,
       "col": 22,
-      "line": 13
+      "line": 16
      },
      "start": {
-      "byte": 205,
+      "byte": 274,
       "col": 16,
-      "line": 13
+      "line": 16
      }
     }
    ],
@@ -296,18 +296,18 @@
     }
    ],
    "private": {
-    "end": 196,
-    "start": 189
+    "end": 265,
+    "start": 258
    },
    "start": {
-    "byte": 189,
+    "byte": 258,
     "col": 0,
-    "line": 13
+    "line": 16
    },
    "value_start": {
-    "byte": 220,
+    "byte": 289,
     "col": 31,
-    "line": 13
+    "line": 16
    }
   },
   {
@@ -328,95 +328,53 @@
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 451,
+    "byte": 520,
     "col": 53,
-    "line": 19
+    "line": 22
    },
    "heads": [],
    "idents": [
     {
-     "end": 240,
+     "end": 309,
      "name": "main",
      "role": "decl",
-     "start": 236
+     "start": 305
     },
     {
-     "end": 243,
+     "end": 312,
      "name": "A",
      "role": "binder",
-     "start": 242
+     "start": 311
     },
     {
-     "end": 251,
+     "end": 320,
      "name": "Space",
      "role": "ref",
-     "start": 246
+     "start": 315
     },
     {
-     "end": 255,
+     "end": 324,
      "name": "n",
      "role": "binder",
-     "start": 254
+     "start": 323
     },
     {
-     "end": 261,
+     "end": 330,
      "name": "Nat",
      "role": "ref",
-     "start": 258
+     "start": 327
     },
     {
-     "end": 271,
+     "end": 340,
      "name": "A.size",
-     "role": "ref",
-     "start": 265
-    },
-    {
-     "end": 280,
-     "name": "double",
-     "role": "ref",
-     "start": 274
-    },
-    {
-     "end": 282,
-     "name": "[anonymous]",
-     "role": "ref",
-     "start": 282
-    },
-    {
-     "end": 283,
-     "name": "n",
-     "role": "ref",
-     "start": 282
-    },
-    {
-     "end": 297,
-     "name": "double",
-     "role": "ref",
-     "start": 291
-    },
-    {
-     "end": 299,
-     "name": "n",
-     "role": "ref",
-     "start": 298
-    },
-    {
-     "end": 317,
-     "name": "List.headOr",
-     "role": "ref",
-     "start": 306
-    },
-    {
-     "end": 334,
-     "name": "[anonymous]",
      "role": "ref",
      "start": 334
     },
     {
-     "end": 343,
-     "name": "helper",
+     "end": 349,
+     "name": "double",
      "role": "ref",
-     "start": 337
+     "start": 343
     },
     {
      "end": 351,
@@ -425,65 +383,107 @@
      "start": 351
     },
     {
-     "end": 357,
-     "name": "quad",
+     "end": 352,
+     "name": "n",
      "role": "ref",
-     "start": 353
+     "start": 351
     },
     {
-     "end": 370,
-     "name": "rfl",
+     "end": 366,
+     "name": "double",
+     "role": "ref",
+     "start": 360
+    },
+    {
+     "end": 368,
+     "name": "n",
      "role": "ref",
      "start": 367
     },
     {
-     "end": 378,
+     "end": 386,
+     "name": "List.headOr",
+     "role": "ref",
+     "start": 375
+    },
+    {
+     "end": 403,
      "name": "[anonymous]",
      "role": "ref",
-     "start": 378
+     "start": 403
     },
     {
-     "end": 395,
-     "name": "size_via_coord",
+     "end": 412,
+     "name": "helper",
      "role": "ref",
-     "start": 381
+     "start": 406
     },
     {
-     "end": 397,
-     "name": "A",
+     "end": 420,
+     "name": "[anonymous]",
      "role": "ref",
-     "start": 396
-    },
-    {
-     "end": 413,
-     "name": "size_zero",
-     "role": "ref",
-     "start": 404
+     "start": 420
     },
     {
      "end": 426,
-     "name": "double_succ",
+     "name": "quad",
      "role": "ref",
-     "start": 415
+     "start": 422
     },
     {
-     "end": 443,
+     "end": 439,
+     "name": "rfl",
+     "role": "ref",
+     "start": 436
+    },
+    {
+     "end": 447,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 447
+    },
+    {
+     "end": 464,
+     "name": "size_via_coord",
+     "role": "ref",
+     "start": 450
+    },
+    {
+     "end": 466,
+     "name": "A",
+     "role": "ref",
+     "start": 465
+    },
+    {
+     "end": 482,
+     "name": "size_zero",
+     "role": "ref",
+     "start": 473
+    },
+    {
+     "end": 495,
+     "name": "double_succ",
+     "role": "ref",
+     "start": 484
+    },
+    {
+     "end": 512,
      "name": "List.headOr_nil",
      "role": "ref",
-     "start": 428
+     "start": 497
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 240,
+      "byte": 309,
       "col": 12,
-      "line": 15
+      "line": 18
      },
      "start": {
-      "byte": 236,
+      "byte": 305,
       "col": 8,
-      "line": 15
+      "line": 18
      }
     }
    ],
@@ -499,14 +499,14 @@
     }
    ],
    "start": {
-    "byte": 228,
+    "byte": 297,
     "col": 0,
-    "line": 15
+    "line": 18
    },
    "value_start": {
-    "byte": 321,
+    "byte": 390,
     "col": 93,
-    "line": 15
+    "line": 18
    }
   },
   {
@@ -527,54 +527,54 @@
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 514,
+    "byte": 583,
     "col": 39,
-    "line": 22
+    "line": 25
    },
    "heads": [
     {
-     "end": 475,
+     "end": 544,
      "kind": "Lean.Parser.Command.open",
-     "start": 453
+     "start": 522
     }
    ],
    "idents": [
     {
-     "end": 471,
+     "end": 540,
      "name": "_root_.CD.Aux",
      "role": "open",
-     "start": 458
+     "start": 527
     },
     {
-     "end": 490,
+     "end": 559,
      "name": "top_aux",
      "role": "decl",
-     "start": 483
+     "start": 552
     },
     {
-     "end": 500,
+     "end": 569,
      "name": "auxOnly",
      "role": "ref",
-     "start": 493
+     "start": 562
     },
     {
-     "end": 514,
+     "end": 583,
      "name": "aux_eq",
      "role": "ref",
-     "start": 508
+     "start": 577
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 490,
+      "byte": 559,
       "col": 15,
-      "line": 22
+      "line": 25
      },
      "start": {
-      "byte": 483,
+      "byte": 552,
       "col": 8,
-      "line": 22
+      "line": 25
      }
     }
    ],
@@ -591,14 +591,14 @@
     }
    ],
    "start": {
-    "byte": 453,
+    "byte": 522,
     "col": 0,
-    "line": 21
+    "line": 24
    },
    "value_start": {
-    "byte": 505,
+    "byte": 574,
     "col": 30,
-    "line": 22
+    "line": 25
    }
   },
   {
@@ -619,42 +619,42 @@
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 559,
+    "byte": 628,
     "col": 43,
-    "line": 24
+    "line": 27
    },
    "heads": [],
    "idents": [
     {
-     "end": 534,
+     "end": 603,
      "name": "uses_sorry",
      "role": "decl",
-     "start": 524
+     "start": 593
     },
     {
-     "end": 548,
+     "end": 617,
      "name": "usesSorried",
      "role": "ref",
-     "start": 537
+     "start": 606
     },
     {
-     "end": 559,
+     "end": 628,
      "name": "rfl",
      "role": "ref",
-     "start": 556
+     "start": 625
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 534,
+      "byte": 603,
       "col": 18,
-      "line": 24
+      "line": 27
      },
      "start": {
-      "byte": 524,
+      "byte": 593,
       "col": 8,
-      "line": 24
+      "line": 27
      }
     }
    ],
@@ -670,14 +670,14 @@
     }
    ],
    "start": {
-    "byte": 516,
+    "byte": 585,
     "col": 0,
-    "line": 24
+    "line": 27
    },
    "value_start": {
-    "byte": 553,
+    "byte": 622,
     "col": 37,
-    "line": 24
+    "line": 27
    }
   },
   {
@@ -698,72 +698,72 @@
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 622,
+    "byte": 691,
     "col": 61,
-    "line": 26
+    "line": 29
    },
    "heads": [],
    "idents": [
     {
-     "end": 579,
+     "end": 648,
      "name": "uses_sized",
      "role": "decl",
-     "start": 569
+     "start": 638
     },
     {
-     "end": 582,
+     "end": 651,
      "name": "B",
      "role": "binder",
-     "start": 581
+     "start": 650
     },
     {
-     "end": 590,
+     "end": 659,
      "name": "Space",
      "role": "ref",
-     "start": 585
+     "start": 654
     },
     {
-     "end": 595,
+     "end": 664,
      "name": "[anonymous]",
      "role": "ref",
-     "start": 595
+     "start": 664
     },
     {
-     "end": 604,
+     "end": 673,
      "name": "sizedZero",
      "role": "ref",
-     "start": 595
+     "start": 664
     },
     {
-     "end": 606,
+     "end": 675,
      "name": "B",
      "role": "ref",
-     "start": 605
+     "start": 674
     },
     {
-     "end": 611,
+     "end": 680,
      "name": "val",
      "role": "ref",
-     "start": 608
+     "start": 677
     },
     {
-     "end": 622,
+     "end": 691,
      "name": "rfl",
      "role": "ref",
-     "start": 619
+     "start": 688
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 579,
+      "byte": 648,
       "col": 18,
-      "line": 26
+      "line": 29
      },
      "start": {
-      "byte": 569,
+      "byte": 638,
       "col": 8,
-      "line": 26
+      "line": 29
      }
     }
    ],
@@ -779,14 +779,14 @@
     }
    ],
    "start": {
-    "byte": 561,
+    "byte": 630,
     "col": 0,
-    "line": 26
+    "line": 29
    },
    "value_start": {
-    "byte": 616,
+    "byte": 685,
     "col": 55,
-    "line": 26
+    "line": 29
    }
   },
   {
@@ -807,42 +807,42 @@
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
    "end": {
-    "byte": 668,
+    "byte": 737,
     "col": 44,
-    "line": 28
+    "line": 31
    },
    "heads": [],
    "idents": [
     {
-     "end": 643,
+     "end": 712,
      "name": "uses_scoped",
      "role": "decl",
-     "start": 632
+     "start": 701
     },
     {
-     "end": 655,
+     "end": 724,
      "name": "viaScoped",
      "role": "ref",
-     "start": 646
+     "start": 715
     },
     {
-     "end": 668,
+     "end": 737,
      "name": "rfl",
      "role": "ref",
-     "start": 665
+     "start": 734
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 643,
+      "byte": 712,
       "col": 19,
-      "line": 28
+      "line": 31
      },
      "start": {
-      "byte": 632,
+      "byte": 701,
       "col": 8,
-      "line": 28
+      "line": 31
      }
     }
    ],
@@ -858,14 +858,14 @@
     }
    ],
    "start": {
-    "byte": 624,
+    "byte": 693,
     "col": 0,
-    "line": 28
+    "line": 31
    },
    "value_start": {
-    "byte": 662,
+    "byte": 731,
     "col": 38,
-    "line": 28
+    "line": 31
    }
   },
   {
@@ -885,17 +885,17 @@
     }
    ],
    "end": {
-    "byte": 676,
+    "byte": 745,
     "col": 6,
-    "line": 30
+    "line": 33
    },
    "heads": [],
    "idents": [
     {
-     "end": 676,
+     "end": 745,
      "name": "CD",
      "role": "scope",
-     "start": 674
+     "start": 743
     }
    ],
    "ids": [],
@@ -909,9 +909,9 @@
     }
    ],
    "start": {
-    "byte": 670,
+    "byte": 739,
     "col": 0,
-    "line": 30
+    "line": 33
    }
   },
   {
@@ -925,9 +925,9 @@
     }
    ],
    "end": {
-    "byte": 677,
+    "byte": 746,
     "col": 0,
-    "line": 31
+    "line": 34
    },
    "heads": [],
    "idents": [],
@@ -937,9 +937,9 @@
    "namespace": "",
    "opens": [],
    "start": {
-    "byte": 677,
+    "byte": 746,
     "col": 0,
-    "line": 31
+    "line": 34
    }
   }
  ],

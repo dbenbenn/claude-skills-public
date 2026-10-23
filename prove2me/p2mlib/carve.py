@@ -2086,7 +2086,8 @@ class Carver:
         - imported (a bundle carries it as a plain constant): `attribute [local instance] N`
           (FiniteRayExpansion's `Fintype (MulChar R ℂ)` in B002); inst_names maps a port name to
           the name Lean gave it in a published bundle that kept it anonymous;
-        - not imported: its command again, under a name unique to this file."""
+        - not imported, or nobody's node (its generated name taken by another module's): its
+          command again, under a name unique to this file."""
         g = self.g
         chain = tuple(o for o, _ in c.context)
         out = []
@@ -2095,11 +2096,16 @@ class Carver:
                 continue
             vc = info.commands[vi]
             is_inst, anon_at = _local_instance(info, vc)
+            # ik None: a local instance that is nobody's node. An instance of a Prop class is a
+            # theorem, and Lean lets sibling modules declare the same one under one generated name
+            # (Problem340 2026-10-24: `local instance : Fact ((0 : ℝ) < 100)` in 28 modules, 13
+            # constants); the declaration graph keeps one per name, so this command is carved like
+            # one that is not imported: emitted again
             ik = g.cmd_node.get((m, vi))
-            if not is_inst or not ik or pubname(ik) in self.keep_names:
+            if not is_inst or (ik and pubname(ik) in self.keep_names):
                 continue
             done.add((vi, chain))
-            if pubname(ik) in have:
+            if ik and pubname(ik) in have:
                 out.append('attribute [local instance] %s\n' % inst_names.get(ik, pubname(ik)))
                 continue
             # not imported: its command again under a name unique to this file, anonymous or
@@ -2112,7 +2118,8 @@ class Carver:
             refs = [i for i in vc.idents or [] if i['role'] == 'ref']
             if any(self._gone(i['name'], vc, m, have, opens) for i in refs):
                 continue
-            short = pubname(ik).rsplit('.', 1)[-1]
+            short = pubname(ik).rsplit('.', 1)[-1] if ik else \
+                (decl['name'].rsplit('.', 1)[-1] if decl else 'localInst')
             self.re_count[short] += 1
             name = '%s_r%s_%d' % (short, self.tag, self.re_count[short])
             edit = (anon_at, anon_at, ' ' + name) if anon_at is not None else (decl['start'], decl['end'], name)
