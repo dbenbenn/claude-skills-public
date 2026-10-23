@@ -70,7 +70,7 @@ def port_text(target, root, src, bundles, patches=(), compat_ns='OAI', ws=None):
     text = O.rename_target(text, target)
     block, rewrites = O.compat_block(open(COMPAT, encoding='utf-8').read(), compat_ns)
     text = O.apply_rewrites(O.core_rewrites(text), rewrites)
-    text = O.apply_patches(text, patches)
+    text = O.apply_patches(text, patches, route='single')
     t = BS.published(target)
     pre = [l for l in (t.get('preamble') or '').split('\n') if l.startswith('import ')]
     # a preamble may import only a few Mathlib modules; OpenAI's code was written against all of it

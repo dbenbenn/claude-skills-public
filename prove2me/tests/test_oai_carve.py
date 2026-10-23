@@ -196,3 +196,63 @@ def test_ext_defs_ask_lean_for_a_bundle_with_anonymous_instances(tmp_path, monke
     names = CP.bundle_constants(str(ws), ['Definitions.Def_A', 'Definitions.Def_B'])
     assert asked == ['Definitions.Def_B']
     assert names == {'X.f': 'Definitions.Def_A', 'X.instNonemptyNat': 'Definitions.Def_B'}
+
+
+# ---------------------------------------------------------------- patches, counted as the port sees them
+
+TENSOR = ('import Mathlib\n\nnamespace OAI.Fam\n\ntheorem t (x : M ⊗[R] N) : f x = 0 := by\n'
+          '  induction x using TensorProduct.inductionOn with\n  | tmul a b => simp\n'
+          '  | add a b ha hb => simp [ha, hb]\n\nend OAI.Fam\n')
+UNIV = ('import Mathlib\n\nuniverse uA uB\n\nnamespace OAI.Fam\n\n'
+        'def useSys : Sys.{uA, uB} := sorry\n\nend OAI.Fam\n')
+
+
+def _sources():
+    src = O.module_sources(LEAN, ['OAI.Fam'])
+    src['OAI.Fam.T'] = ('T', TENSOR)
+    src['OAI.Fam.U'] = ('U', UNIV)
+    return src
+
+
+def test_filter_patches_counts_against_the_text_the_module_port_patches():
+    # ComparatorModel (2026-10-24): filter-patches counted against OpenAI's raw source, where the
+    # `| zero => simp only [map_zero]` the port's core rewrite inserts does not occur yet: dropped
+    # (0 occurrences), the build failed. CubeShuffle: `Finset.prod_le_one₀` is rewritten by the
+    # compat aliases before the patches run, so its patch no longer applies: kept, the port failed.
+    pz = {'old': '| zero => simp only [map_zero]', 'new': '| zero => simp'}
+    pa = {'old': 'Finset.prod_le_prod₀ = Finset.prod_le_prod₀', 'new': 'x'}
+    keep, drop = CP.port_filter_patches([pz, pa], _sources(), COMPAT, 'OAI')
+    assert keep == [pz]
+    assert drop == [(0, pa)]
+    # what is kept applies cleanly on the module route
+    O.module_files(_sources(), 'Solutions.F', keep, COMPAT)
+
+
+def test_filter_patches_drops_single_file_only_patches():
+    # WLTime (2026-10-23): merge.py's single `universe` line orders a declaration's universe
+    # parameters, so the single-file port needed `Sys.{uA, uB}` -> `Sys.{uB, uA}`; in a module the
+    # module's own `universe` line rules, the patch still matched once, and the build failed.
+    pu = {'old': 'Sys.{uA, uB}', 'new': 'Sys.{uB, uA}'}
+    ps = {'old': 'theorem b_thm', 'new': 'theorem b_thm', 'route': 'single'}
+    pm = {'old': 'theorem b_thm', 'new': 'theorem b_thm\'', 'route': 'modules'}
+    keep, drop = CP.port_filter_patches([pu, ps, pm], _sources(), COMPAT, 'OAI')
+    assert keep == [pm]
+    assert drop == [('single-file only', pu), ('single-file only', ps)]
+    # the module port itself never applies them, and the single-file route skips module-only ones
+    out = O.module_files(_sources(), 'Solutions.F', [pu, ps, pm], COMPAT)
+    assert 'Sys.{uA, uB}' in out['U.lean'] and "b_thm'" in out['Sub_B.lean']
+    assert O.apply_patches('theorem b_thm', [pm], route='single') == 'theorem b_thm'
+
+
+def test_filter_patches_command_line(tmp_path):
+    p = tmp_path / 'p.json'
+    p.write_text(json.dumps([{'old': 'Finset.prod_le_prod₀ = Finset.prod_le_prod₀', 'new': 'x'},
+                             {'old': 'theorem b_thm', 'new': 'theorem b_thm'}]))
+    c = tmp_path / 'compat.lean'
+    c.write_text(COMPAT)
+    out = tmp_path / 'out.json'
+    CP.main(['filter-patches', str(p), LEAN, str(out), 'OAI.Fam', '--compat', str(c)])
+    assert json.load(open(str(out))) == [{'old': 'theorem b_thm', 'new': 'theorem b_thm'}]
+    # with the root-level compat block the alias is not rewritten, so the first patch applies
+    CP.main(['filter-patches', str(p), LEAN, str(out), 'OAI.Fam', '--compat', str(c), '--root-compat'])
+    assert len(json.load(open(str(out)))) == 2

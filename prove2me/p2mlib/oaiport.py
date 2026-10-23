@@ -203,14 +203,41 @@ def rename_target(text, target, suffix='_oai'):
     return '\n'.join(lines)
 
 
-def apply_patches(files, patches):
+def _univ_norm(s):
+    return re.sub(r'\.\{([^}]*)\}', lambda m: '.{%s}' % ','.join(sorted(x.strip() for x in m.group(1).split(','))), s)
+
+
+def single_file_only(p):
+    """Is patch p for the single-file route only? Marked `"route": "single"`, or a reordering of a
+    universe list (`X.{uA, uB}` -> `X.{uB, uA}`): merge.py's one top-level `universe` line orders a
+    declaration's universe parameters there, while a module's own `universe` line rules a module
+    (WLTime 2026-10-23: two such patches matched in the modules and broke the build)."""
+    if p.get('route') == 'single':
+        return True
+    return p['old'] != p['new'] and _univ_norm(p['old']) == _univ_norm(p['new'])
+
+
+def applies_to(p, route):
+    """Does patch p apply on `route` ('single', 'modules' or None for any)? A patch's optional
+    `route` key says where it belongs; a universe reordering is single-file only."""
+    if route is None:
+        return True
+    if route == 'modules':
+        return not single_file_only(p)
+    return p.get('route', route) == route
+
+
+def apply_patches(files, patches, route=None):
     """`files` ({path: text}, or one text) with each patch {old, new, count=1} applied in order;
     each must occur exactly `count` times over all files as the earlier patches left them (a later
-    patch may amend an earlier one's output), and every one that does not is reported."""
+    patch may amend an earlier one's output), and every one that does not is reported. With
+    `route` ('single' or 'modules'), patches for the other route are skipped (applies_to)."""
     single = isinstance(files, str)
     files = {'': files} if single else dict(files)
     bad = []
     for p in patches:
+        if not applies_to(p, route):
+            continue
         n = sum(t.count(p['old']) for t in files.values())
         if n != p.get('count', 1):
             bad.append('patch applies %d times, want %d: %r' % (n, p.get('count', 1), p['old'][:100]))
@@ -286,13 +313,15 @@ def module_sources(lean_root, prefixes):
     return out
 
 
-def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', header=''):
-    """The workspace modules of a module-route port: {file name: text} under Lean prefix `mod`
-    (e.g. Solutions.OAIQW_X). `sources` as module_sources returns. Each module's OAI imports are
-    rewritten to the ported copies (an import of an OpenAI module that is not ported is an error:
-    add its prefix); a module importing none of them imports `<mod>.Compat`; the linter-off lines
-    and `header` go after the imports; core and compat rewrites, then the patches (each exactly
-    its count over all files). Compat.lean holds compat_block(compat_text, compat_ns)."""
+def module_texts(sources, mod, compat_text='', compat_ns='OAI', header=''):
+    """The workspace modules of a module-route port before the patches: {file name: text} under
+    Lean prefix `mod` (e.g. Solutions.OAIQW_X), Compat.lean not included. `sources` as
+    module_sources returns. Each module's OAI imports are rewritten to the ported copies (an import
+    of an OpenAI module that is not ported is an error: add its prefix); a module importing none of
+    them imports `<mod>.Compat`; the linter-off lines and `header` go after the imports; then the
+    core and compat rewrites. This is the text the patches are counted against
+    (carve_prep.py filter-patches; ComparatorModel 2026-10-24: counted against the raw source, the
+    `| zero` case core_rewrites adds was not there yet)."""
     names = {k: v[0] for k, v in sources.items()}
     block, rewrites = compat_block(compat_text, compat_ns)
     files, missing = {}, set()
@@ -318,8 +347,15 @@ def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', head
         files[short + '.lean'] = apply_rewrites(core_rewrites(t), rewrites)
     if missing:
         raise PortError('imports of OpenAI modules that are not ported:\n  ' + '\n  '.join(sorted(missing)))
-    files = apply_patches(files, patches)
-    files['Compat.lean'] = 'import Mathlib\n\n' + block
+    return files
+
+
+def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', header=''):
+    """module_texts, then the patches for the module route (each exactly its count over all files;
+    single-file-only ones skipped, see single_file_only), and Compat.lean holding
+    compat_block(compat_text, compat_ns)."""
+    files = apply_patches(module_texts(sources, mod, compat_text, compat_ns, header), patches, route='modules')
+    files['Compat.lean'] = 'import Mathlib\n\n' + compat_block(compat_text, compat_ns)[0]
     return files
 
 

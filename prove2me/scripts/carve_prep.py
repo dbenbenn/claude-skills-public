@@ -21,8 +21,13 @@ usage:
       (`NAME` or `NAME MODULE` per line); default: parsed from the bundle sources, with Lean asked
       for a bundle that has an anonymous instance (its name is Lean's to generate).
   carve_prep.py filter-patches PATCHES.json LEAN_ROOT OUT.json PREFIX [PREFIX ...]
+                       [--compat-ns NS | --root-compat] [--compat FILE] [--header H.lean]
       keep the single-file patches (oai_port.py) whose `old` occurs exactly `count` times over the
-      modules under the prefixes, for oai_port_modules.py; lists the others.
+      modules under the prefixes AS oai_port_modules.py PATCHES THEM (after its import, header,
+      core and compat rewrites, macro inlining and guard renames: pass it the same options), for
+      oai_port_modules.py; lists the others. Single-file-only patches go too: `"route": "single"`
+      or a universe-list reordering (merge.py's `universe` line; a module has its own). Mark a
+      patch `"route": "modules"` to keep oai_port.py from applying it.
   carve_prep.py publish-prep DIR SOURCE TAG[,TAG...]
       DIR/publish/: out/ and work/{plan,order,times}.json copied, run.json and
       run_{1_bundles,2_statements,3_pieces}.json for split_run.py, MANIFEST.sha1; prose/ and
@@ -51,6 +56,8 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 from p2mlib import oaiport as O  # noqa: E402
+
+COMPAT = os.path.join(os.path.dirname(HERE), 'lean', 'compat_4_34.lean')
 
 KEEP_KEYS = ('patches', 'external_theorems', 'frozen', 'pinned', 'extra_olean_modules', 'repaired',
              'instance_names', 'measured', 'bundles_import_statements', 'literal_patches')
@@ -232,28 +239,49 @@ def cmd_ext_defs(argv):
 
 def filter_patches(patches, texts):
     """(kept, [(count, patch)] dropped): a patch is kept when its `old` occurs exactly `count`
-    times over all the texts together, after the kept patches before it are applied (a later
-    patch may amend an earlier one's output)."""
-    allt = '\x00'.join(texts)
+    times over the texts (a list, or {name: text}), after the kept patches before it are applied
+    (a later patch may amend an earlier one's output). A single-file-only patch
+    (oaiport.single_file_only: `"route": "single"`, or a universe-list reordering for merge.py's
+    `universe` line) is dropped as ('single-file only', patch)."""
+    texts = list(texts.values()) if isinstance(texts, dict) else list(texts)
     keep, drop = [], []
     for p in patches:
-        n = allt.count(p['old'])
+        if O.single_file_only(p):
+            drop.append(('single-file only', p))
+            continue
+        n = sum(t.count(p['old']) for t in texts)
         if n == p.get('count', 1):
             keep.append(p)
-            allt = allt.replace(p['old'], p['new'])
+            texts = [t.replace(p['old'], p['new']) for t in texts]
         else:
             drop.append((n, p))
     return keep, drop
 
 
+def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header=''):
+    """filter_patches against the text oai_port_modules.py patches: the modules after its import,
+    header, core and compat rewrites (oaiport.module_texts), never OpenAI's raw source
+    (ComparatorModel 2026-10-24: the `| zero` case core_rewrites adds counted 0 there and was
+    dropped; CubeShuffle: a patch the compat aliases made redundant was kept)."""
+    return filter_patches(patches, O.module_texts(sources, 'Solutions.FilterPatches', compat_text,
+                                                  compat_ns, header))
+
+
 def cmd_filter_patches(argv):
-    if len(argv) < 4:
+    pos = positional(argv, ('--compat-ns', '--compat', '--header'))
+    if len(pos) < 4:
         sys.exit(__doc__)
-    src, lean_root, out, prefixes = argv[0], argv[1], argv[2], argv[3:]
+    src, lean_root, out, prefixes = pos[0], pos[1], pos[2], pos[3:]
     srcs = O.module_sources(lean_root, prefixes)
-    keep, drop = filter_patches(json.load(open(src)), [t for _, t in srcs.values()])
+    compat = open(opt(argv, '--compat', COMPAT), encoding='utf-8').read()
+    ns = None if '--root-compat' in argv else opt(argv, '--compat-ns', 'OAI')
+    header = open(opt(argv, '--header'), encoding='utf-8').read() if '--header' in argv else ''
+    try:
+        keep, drop = port_filter_patches(json.load(open(src)), srcs, compat, ns, header)
+    except O.PortError as e:
+        sys.exit(str(e))
     for n, p in drop:
-        print('dropped (%d occurrences): %r' % (n, p['old'][:70]))
+        print('dropped (%s): %r' % (n if isinstance(n, str) else '%d occurrences' % n, p['old'][:70]))
     json.dump(keep, open(out, 'w'), ensure_ascii=False, indent=1)
     print('kept', len(keep), 'of', len(keep) + len(drop))
 
