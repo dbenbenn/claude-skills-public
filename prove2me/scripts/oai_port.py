@@ -101,8 +101,16 @@ def check(sol, pre, target, out, ws=None):
     outp = r.stdout + r.stderr
     open(os.path.join(out, 'check.log'), 'w').write(outp)
     errs = [l for l in outp.split('\n') if ': error' in l]
+    # A run that died (OOM-killed in lean.slice, signal, timeout) prints no error and no axioms;
+    # its CPU time is lost too (systemd stops the whole scope, so lake dies before reaping lean and
+    # RUSAGE_CHILDREN sees only lake: 0.9 s for an 800 s ThreeMachine run, 2026-10-23). Report it
+    # as a failure, never as 0 errors.
+    killed = r.returncode not in (0, 1)
+    if killed:
+        errs.insert(0, 'check run died: exit %d (OOM-kill in lean.slice? see journalctl --user); '
+                    'secs is not its CPU time' % r.returncode)
     ax = [l for l in outp.split('\n') if 'depends on axioms' in l]
-    return {'secs': round(secs, 1), 'wall': round(wall, 1), 'errors': len(errs),
+    return {'secs': None if killed else round(secs, 1), 'rc': r.returncode, 'wall': round(wall, 1), 'errors': len(errs),
             'axioms': ax[-1] if ax else None, 'error_lines': errs[:8],
             'unknown': sorted(set(re.findall(r'Unknown (?:identifier|constant) `([^`]+)`', outp)))}
 
