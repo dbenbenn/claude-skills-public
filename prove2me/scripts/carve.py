@@ -151,6 +151,8 @@ def costs(cfg, g):
 def main(argv):
     if len(argv) < 3:
         sys.exit(__doc__)
+    from p2mlib import runlock
+    runlock.hold(runlock.dir_key('carve', argv[2]), 'carve.py ' + ' '.join(argv[1:]))
     cmd, cfg = argv[1], load_config(argv[2])
     rest = argv[3:]
     if cmd == 'graph':

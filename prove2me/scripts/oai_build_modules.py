@@ -113,7 +113,10 @@ def main(argv):
     if len(pos) != 2:
         sys.exit(__doc__)
     from p2mlib.workspace import workspace
-    ok, lines = build(opt(argv, '--ws') or workspace(), pos[0], pos[1], '--force' in argv,
+    from p2mlib import runlock
+    ws = opt(argv, '--ws') or workspace()
+    runlock.hold(runlock.build_key(ws, pos[0]), 'oai_build_modules.py ' + ' '.join(argv))
+    ok, lines = build(ws, pos[0], pos[1], '--force' in argv,
                       opt(argv, '--log'))
     if ok and '--elab-log' in argv:
         open(opt(argv, '--elab-log'), 'w', encoding='utf-8').write(elab_lines('\n'.join(lines), oh))

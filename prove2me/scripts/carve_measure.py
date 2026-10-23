@@ -201,6 +201,8 @@ def main(argv):
     pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] != '--dir')]
     if len(pos) != 1:
         sys.exit(__doc__)
+    from p2mlib import runlock
+    runlock.hold(runlock.dir_key('measure', pos[0]), 'carve_measure.py ' + ' '.join(argv))
     m = Measure(pos[0], opt(argv, '--dir'))
     ok = m.run_all('--force' in argv, '--keep-going' in argv, '--no-repair' not in argv)
     print('done' if ok else 'FAILED')
