@@ -5,14 +5,18 @@ line; read its docstring for the workflow and the lessons behind each rule).
 Inputs, both from Lean:
 * lean/DeclGraph.lean on the compiled development: every constant, its declaration range, and the
   project constants its type and value use (`load_decl_graph`);
-* lean/LeanInfo.lean --parse-only --idents on each module: its commands, scopes, and every
-  identifier with its role (`module_info`).
+* lean/LeanInfo.lean --idents, elaborating each module (`module_info`): its commands, scopes,
+  every identifier with its role, and what Lean resolved: each identifier token's constant (or a
+  local), and the instances each command's elaboration used (`Graph.reading`, `Node.ideps`).
 
 `Graph` joins them. A node is a declaration COMMAND (its constants: a structure with its fields,
 constructor and recursor, a def with its equation lemmas). Its dependencies are the owners of the
-constants its constants use (`term`), plus every identifier its source names that resolves to a
-project declaration in its namespace and opens (`simp only [h]` with an `rfl` lemma `h` leaves no
-trace in the term), plus what the `local notation`s in force before it name. `make_plan` chooses
+constants its constants use (`term`), plus every project constant Lean resolved an identifier of
+its source to (`simp only [h]` with an `rfl` lemma `h` leaves no trace in the term), plus the
+instances instance search used (a `Fact` instance is a theorem used silently), plus what the
+`local notation`s in force before it name. Every question "what does this identifier mean" is
+answered from Lean's record; the text reading (namespaces and opens) is only the fallback for a
+token Lean recorded nothing for, and those are logged (`Graph.fallbacks`). `make_plan` chooses
 bundles (every reachable non-theorem and its closure, cut along the module DAG under time and size
 budgets) and nodes (targets, plus theorems promoted bottom-up until each piece fits). `Carver`
 cuts module text by Lean's own command ranges (p2mlib.leanedit) and rewrites the context commands
@@ -1891,13 +1895,13 @@ def instance_leaks(g, plan):
     search may then take another path: RationalHitting (2026-10-24), the instance witnessCharZero
     of Generator.lean reached the carved list_hits (Certificates.lean) through a bundle, and
     `algebraMap ℚ` elaborated through it, so a `rwa [RingHom.ext_rat …]` no longer matched.
-    Only an instance that could answer a problem instance search solved in the declaration's
-    elaboration is reported (LeanInfo `inst_keys`: the class and argument heads of every instance
-    application in its terms; witnessCharZero is a `CharZero` of the type list_hits' `algebraMap ℚ`
-    needed one for, through algebraRat): same class, and the instance's own argument heads among
-    the problem's. A problem a binder answered is not one (a local instance comes first). Without
-    that record, an instance whose type mentions something the declaration uses (or only library
-    types). A warning: whether type class search takes the new path there is not known."""
+    Reported: an instance whose type mentions something the declaration uses (or only library
+    types), and, where the port recorded the problems instance search solved there (LeanInfo
+    `inst_keys`), only one of a class it solved some problem of. Not exact, and cannot be: the new
+    instance can open a path whose subgoal failed in the original, which leaves no trace (in
+    list_hits' `algebraMap ℚ WitnessField` the path through DivisionRing.toRatAlgebra needs a
+    `CharZero WitnessField`, which only the carved file has; the original solved only `CharZero ℂ`
+    problems). A warning: whether type class search takes the new path there is not known."""
     pos, bimp, _ = _plan_index(plan)
     ext = set(plan.get('external_defs') or {})
 
@@ -1921,10 +1925,8 @@ def instance_leaks(g, plan):
             for i in sorted(cand):
                 if i == k or saw(k, i):
                     continue
-                if asked is not None:
-                    ci = g.instance_class(i)
-                    if ci and any(cls == ci[0] and set(ci[1]) <= hs for cls, hs in asked):
-                        out.append((item, k, i))
+                ci = g.instance_class(i)
+                if asked is not None and ci and ci[0] not in {cls for cls, _ in asked}:
                     continue
                 td = g.nodes[i].tdeps - {i}
                 if not td or td & uses:

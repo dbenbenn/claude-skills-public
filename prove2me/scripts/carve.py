@@ -59,9 +59,12 @@ CONFIG.json (paths may use ~):
                                               # unnamed (Lean's name there differs from the
                                               # port's); consumers re-activate them by it
 
-Steps. `graph` runs DeclGraph on the compiled roots (one Lean process) and LeanInfo, parse-only,
-on each module (one at a time, cached under ~/.cache/p2m/leaninfo; slow the first time on a
-4000-module port). `plan` writes the plan and refuses one `check_plan` faults: a definition
+Steps. `graph` runs DeclGraph on the compiled roots (one Lean process) and LeanInfo --idents,
+elaborating each module (`jobs` at a time, default 3, cached under ~/.cache/p2m/leaninfo by the
+module's content and its imports' builds): it records what Lean resolved each identifier to and
+the instances each command used, which the carver reads instead of guessing from text. It costs
+about the module's own compile CPU time, so the first run is as slow as building the port again;
+the identifiers it still had to read from text are listed at the end. `plan` writes the plan and refuses one `check_plan` faults: a definition
 missing from the bundles a member needs (Erdős 3 B006 `A.space`, B024 `coord`), a bundle or
 piece resting on `sorry` (B022). `gen` writes out/lib/Def_<bundle>.lean, out/lib/Thm_<slug>.lean
 (statement stubs, `:= by sorry`) and out/solutions/Sol_<slug>.lean, each piece with OpenAI's copy
@@ -186,8 +189,9 @@ def main(argv):
     if cmd == 'graph':
         C.run_decl_graph(graph_path(cfg), cfg['prefix'], cfg['roots'], also=also_modules(cfg))
         mods = sorted(C.load_decl_graph(graph_path(cfg))[1])
-        # LeanInfo runs interpreted (~6 s a module): in parallel, `jobs` at a time (default 3, the
-        # local Lean cap); results are cached, so a rerun only reads the cache
+        # LeanInfo elaborates each module (about its compile time): in parallel, `jobs` at a time
+        # (default 3; the lean-cap wrapper bounds it anyway); results are cached, so a rerun only
+        # reads the cache
         from concurrent.futures import ThreadPoolExecutor, as_completed
         with ThreadPoolExecutor(int(cfg.get('jobs', 3))) as ex:
             futs = {ex.submit(C.module_info, cfg['src'], m): m for m in mods}

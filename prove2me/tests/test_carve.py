@@ -1423,3 +1423,31 @@ def test_names_declared_or_naming_a_case_are_never_written_in_full(g):
     c = g.infos['CarveDev.Fields'].commands[g.nodes['CD.Tree.size_pos'].cmd]
     leaf = next(i for i in c.idents if i['name'] == 'leaf')
     assert C._alternative_name(g.infos['CarveDev.Fields'], leaf)
+
+
+@pytest.fixture(scope='module')
+def g_text():
+    """The fixture graph with Lean's records removed: every identifier read from text, as for a
+    module the elaborated port has no record of (the fallback)."""
+    g2 = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    for info in g2.infos.values():
+        for c in info.commands:
+            c.resolved = c.insts = c.sig_insts = c.inst_keys = c.declares = None
+    return C.Graph(g2.consts, g2.imports, g2.ext_ns, g2.infos)
+
+
+def test_the_text_reading_remains_the_logged_fallback(g, g_text):
+    # with records nothing is read from text in the fixture
+    assert g.fallbacks == []
+    # without them, the text rules of 2026-10-16..23 still decide, and each guess is logged
+    assert 'CD.Space.coord_eq' in g_text.nodes['CD.size_via_coord'].deps          # B024
+    assert 'CD.Wide.succ' not in g_text.nodes['CD.uses_hk1'].deps                   # UniversalFInfinity
+    deps = g_text.nodes['CD.Outer.fqm'].deps                                        # PosteriorReplicas
+    assert 'CD.Inner.fqm' in deps and 'CD.fqm' not in deps
+    assert g_text.fallbacks and all(len(x) == 3 for x in g_text.fallbacks)
+    have = g_text.have_names({'CD.AZ.wcl', 'CD.ZG.wcl'})                           # Problem355
+    out = C.Carver(g_text).carve({'CD.AZ.wcl'}, have, rename={'CD.AZ.wcl': 'wcl_oai'})
+    assert 'theorem wcl_oai' in out and 'apply ZG.wcl\n' in out, out
+    # every local instance in scope comes back, used or not (the rule before the records)
+    out = C.Carver(g_text).carve({'CD.no_inst_use'}, g_text.have_names({'CD.no_inst_use', 'CD.Wide'}))
+    assert re.search(r'^local instance cdLocalInst_r', out, re.M), out
