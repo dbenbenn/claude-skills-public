@@ -7,6 +7,11 @@ usage (from the prove2me workspace):
   lake env lean --run LeanInfo.lean FILE.lean               -- elaborate, then report
   lake env lean --run LeanInfo.lean FILE.lean --parse-only  -- parse only (a file that does not
                                                              -- elaborate, or quick structure)
+  lake env lean --run LeanInfo.lean FILE.lean --idents --module M --no-decls
+                                                             -- the carver's reading: identifiers by
+                                                             -- role, what Lean resolved them to, the
+                                                             -- instances and notations each command
+                                                             -- used (see "--idents when elaborating")
   lake env lean --run LeanInfo.lean FILE.lean --candidates M1,M2,...
                                                              -- also import these modules and
                                                              -- report copies of their theorems

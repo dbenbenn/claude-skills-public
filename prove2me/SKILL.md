@@ -1316,9 +1316,37 @@ back WA. The lessons:
   anonymous `local instance : Fact …` share one generated name (an instance of a Prop class is a
   theorem, so Lean accepts the duplicate), and the losers were never re-emitted (they are now);
   and an instance from a later module, visible through a bundle, changed how an earlier
-  declaration elaborated. The last is only detected: `carve.py plan` and `gen` print the
-  instances a carved file shows declarations whose modules never saw them. Most of them are
-  harmless, so read that list first when a carved file fails where the port compiled.
+  declaration elaborated. All of these were the text reading disagreeing with Lean, and the
+  carver no longer reads meanings from text (next item).
+- **The carver reads what Lean elaborated, not the source text** (2026-10-24). `carve.py graph`
+  runs `lean/LeanInfo.lean --idents` *elaborating* each module (`--module M --no-decls`; cached
+  by content under `~/.cache/p2m/leaninfo`). It costs about the module's own compile CPU time
+  (FormalBoxes: 87 s against 93 s), so a first `graph` is about one more build of the port. For
+  every command it records from the info trees:
+  - `resolved`: what each identifier token resolved to, the name part and each field part
+    (`A.coord_eq` with `A : Space`, `(e).f`, an `open`-resolved name, a `simp only [h]` lemma, a
+    notation's `=> foo`, an `attribute`/`export` target), a local as `""`, a declared or bound
+    name and a structure-instance field marked;
+  - `insts`/`sig_insts`: the non-library instances its elaborated terms use (a `Fact`/`NeZero`
+    instance is a theorem only instance search uses; this is the only place its use shows);
+  - `inst_keys`: what instance search solved (class and argument heads);
+  - `declares_kinds`/`kinds_used`: the notations a command adds and the ones it is written with.
+
+  The carver takes from these: dependency edges (instance uses included; a local notation only
+  for the commands that use it), whether a context line names a gone declaration (fields
+  included), the `_oai`/suffix renames (exactly the token parts that resolved to the renamed
+  constant), and `_root_.` pins (only when the carved file would show the text other candidates
+  than the port's module saw; never a declared name or a case name like `| zero =>`). It puts back
+  in force exactly the local instances a kept declaration used (a stub: its statement), and at
+  the top of each module section it hides again, with `attribute [-instance]` (section-local),
+  the global instances that module never saw and whose type could match its problems: this fixed
+  RationalHitting's witnessCharZero leak, which had needed a post-carve patch. What it cannot
+  hide (an instance declared later in the same module, reached through a bundle) `plan`/`gen`
+  still warn about. The text reading survives only as the fallback for a token with no record (a
+  few per carve, inside some `simp`/`simpa` argument lists); `graph` and `gen` list them. The
+  case-by-case fixes of 2026-10-16..24 were all places where the text reading disagreed with
+  Lean; their tests run against the records now, and one test runs the old rules with the records
+  removed.
 - **`carve_measure.py` checks every import edge, and fails the carve on a false one.** The
   carver infers dependencies partly from source text, so it can emit an `import Theorems.*` a
   piece never uses; the file compiles, and the false edge goes into the published graph
