@@ -362,3 +362,15 @@ def test_stdsimplex_single_file_inlines_or_imports_the_bundle():
     assert 'OAI.SStd ℝ' in t
     assert 'def weights (s : SStd R X)' not in block and 'def map (g : X → Y)' in block
     assert O.stdsimplex_single('def x := 1\n', 'auto') == ('def x := 1\n', [], '')
+
+
+def test_core_rewrites_unsuffixed_prod_le_prod_is_primed():
+    # d13f23b's one-hypothesis `Finset.prod_le_prod` is our `Finset.prod_le_prod'`; the `₀` form
+    # is left for the compat alias rewrite, and primed or longer names are untouched
+    src = ("exact Finset.prod_le_prod fun i _ => h i\nexact prod_le_prod fun e _ => h e\n"
+           "exact Finset.prod_le_prod₀ h0 h1\nexact Finset.prod_le_prod' h\n"
+           "exact Finset.prod_le_prod_of_subset h\nexact List.prod_le_prod h\n")
+    out = O.core_rewrites(src)
+    assert out == ("exact Finset.prod_le_prod' fun i _ => h i\nexact prod_le_prod' fun e _ => h e\n"
+                   "exact Finset.prod_le_prod₀ h0 h1\nexact Finset.prod_le_prod' h\n"
+                   "exact Finset.prod_le_prod_of_subset h\nexact List.prod_le_prod h\n")

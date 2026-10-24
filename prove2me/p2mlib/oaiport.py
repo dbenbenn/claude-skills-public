@@ -306,8 +306,14 @@ def core_rewrites(text, compat_ns='OAI'):
                   pre + 'tensorInductionOn', text)
     # `FreeGroup.induction_on`'s first case is `one` in d13f23b and `C1` here (Eilenberg–Ganea
     # 2026-10-24): the compat block's `freeGroupInductionOn` has d13f23b's names
-    return re.sub(r"(?<![\w.'])(?:_root_\.)?FreeGroup\.induction_on(?![\w'])",
+    text = re.sub(r"(?<![\w.'])(?:_root_\.)?FreeGroup\.induction_on(?![\w'])",
                   pre + 'freeGroupInductionOn', text)
+    # d13f23b renamed the ordered-monoid `Finset.prod_le_prod'` (one hypothesis) to
+    # `Finset.prod_le_prod`, and our nonnegative `prod_le_prod` to `prod_le_prod₀` (the compat
+    # aliases map that one back, after this). So an unsuffixed use is our primed lemma
+    # (wave 2, 2026-10-25: BinaryMatching, QuantitativeVanDerWaerden, PeriodicTiling).
+    return re.sub(r"(?<![\w.'])((?:Finset\.)?(?:prod_le_prod|prod_le_one|one_le_prod))(?![\w'₀])",
+                  r"\1'", text)
 
 
 # ---------------------------------------------------------------- the StdSimplex compatibility shim
