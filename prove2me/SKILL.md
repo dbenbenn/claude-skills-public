@@ -1607,7 +1607,8 @@ d13f23b-only `Mathlib.Geometry.Convex.ConvexSpace.*` imports, and the module rou
 `--stdsimplex subtype`, which renames `Convexity.StdSimplex` to `OAI.SStd`. That mode needs finite
 index types and has no `ConvexSpace`, so Thomason-style code that mixes both kinds of use still needs
 hand work. The shim is published as `Definitions.Def_OAIStdSimplexCompat`
-(p2m-standalone/oai-stdsimplex-compat). Once that bundle is in the workspace (`fetch_theorems.py`),
+(c7014b9a, p2m-standalone/oai-stdsimplex-compat). Once that bundle is in the workspace
+(`Definitions/Def_OAIStdSimplexCompat.lean`, byte-identical to `lean/StdSimplexCompat.lean`, built),
 `oai_port.py` imports it instead of inlining the shim, and `carve_prep.py config` adds it as a
 `--def`, so a carve imports it rather than publishing the shim again. Pass the same `--stdsimplex`
 to `oai_port_modules.py` and `carve_prep.py filter-patches`.

@@ -21,7 +21,8 @@ usage: oai_port.py TARGET ROOT_MODULE SRC_LEAN_DIR OUT_DIR [--bundle Def_X ...] 
                 `OAI.SStd` (the subtype `stdSimplex`, for code that identifies the simplex with
                 SimplexCategory.toTop.obj); `off` never. The published bundle
                 Definitions.Def_OAIStdSimplexCompat is imported when it is in the workspace
-                (fetch it with fetch_theorems.py), else the shim is inlined; --stdsimplex-inline
+                (Definitions/Def_OAIStdSimplexCompat.lean, published c7014b9a, the same text as
+                lean/StdSimplexCompat.lean), else the shim is inlined; --stdsimplex-inline
                 always inlines
 
 Steps: merge the closure (build_solution's closure and merge.py, each module section-wrapped);
