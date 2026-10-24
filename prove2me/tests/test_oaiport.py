@@ -374,3 +374,13 @@ def test_core_rewrites_unsuffixed_prod_le_prod_is_primed():
     assert out == ("exact Finset.prod_le_prod' fun i _ => h i\nexact prod_le_prod' fun e _ => h e\n"
                    "exact Finset.prod_le_prod₀ h0 h1\nexact Finset.prod_le_prod' h\n"
                    "exact Finset.prod_le_prod_of_subset h\nexact List.prod_le_prod h\n")
+
+
+def test_compat_dite_lemmas_are_rewritable():
+    # `(if hp : p then a hp else b hp)` elaborates to eta-expanded lambdas, a higher-order pattern
+    # `rw [dite_eq_left h]` cannot match (DepthThree 2026-10-25); state them on `dite p a b`
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'dite p a b = a h := dif_pos h' in src and 'dite p a b = b h := dif_neg h' in src
+    assert 'then a hp else b hp' not in src
