@@ -50,6 +50,149 @@
      "opener": 0
     }
    ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.LI.late_default",
+     "",
+     []
+    ]
+   ],
+   "doc": {
+    "end": 229,
+    "start": 43
+   },
+   "end": {
+    "byte": 281,
+    "col": 51,
+    "line": 7
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 250,
+     "name": "late_default",
+     "role": "decl",
+     "start": 238
+    },
+    {
+     "end": 254,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 254
+    },
+    {
+     "end": 261,
+     "name": "default",
+     "role": "ref",
+     "start": 254
+    },
+    {
+     "end": 267,
+     "name": "Box",
+     "role": "ref",
+     "start": 264
+    },
+    {
+     "end": 270,
+     "name": "b",
+     "role": "ref",
+     "start": 269
+    },
+    {
+     "end": 281,
+     "name": "rfl",
+     "role": "ref",
+     "start": 278
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 250,
+      "col": 20,
+      "line": 7
+     },
+     "start": {
+      "byte": 238,
+      "col": 8,
+      "line": 7
+     }
+    }
+   ],
+   "inst_keys": [
+    "Inhabited CD.LI.Box",
+    "OfNat Nat"
+   ],
+   "insts": [
+    "CD.LI.boxInhabitedA"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.LI.late_default"
+   ],
+   "namespace": "CD.LI",
+   "opens": [],
+   "resolved": [
+    [
+     238,
+     250,
+     "CD.LI.late_default",
+     "b"
+    ],
+    [
+     238,
+     250,
+     "",
+     "b"
+    ],
+    [
+     254,
+     261,
+     "Inhabited.default"
+    ],
+    [
+     264,
+     267,
+     "CD.LI.Box"
+    ],
+    [
+     269,
+     270,
+     "CD.LI.Box.b"
+    ],
+    [
+     278,
+     281,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [
+    "CD.LI.boxInhabitedA"
+   ],
+   "start": {
+    "byte": 43,
+    "col": 0,
+    "line": 5
+   },
+   "value_start": {
+    "byte": 275,
+    "col": 45,
+    "line": 7
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
    "decl_kind": "Lean.Parser.Command.instance",
    "declares": [
     [
@@ -61,46 +204,46 @@
     ]
    ],
    "doc": {
-    "end": 122,
-    "start": 43
+    "end": 362,
+    "start": 283
    },
    "end": {
-    "byte": 177,
+    "byte": 417,
     "col": 46,
-    "line": 6
+    "line": 10
    },
    "heads": [],
    "idents": [
     {
-     "end": 144,
+     "end": 384,
      "name": "boxInhabited",
      "role": "decl",
-     "start": 132
+     "start": 372
     },
     {
-     "end": 156,
+     "end": 396,
      "name": "Inhabited",
      "role": "ref",
-     "start": 147
+     "start": 387
     },
     {
-     "end": 160,
+     "end": 400,
      "name": "Box",
      "role": "ref",
-     "start": 157
+     "start": 397
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 144,
+      "byte": 384,
       "col": 21,
-      "line": 6
+      "line": 10
      },
      "start": {
-      "byte": 132,
+      "byte": 372,
       "col": 9,
-      "line": 6
+      "line": 10
      }
     }
    ],
@@ -118,25 +261,25 @@
    "opens": [],
    "resolved": [
     [
-     132,
-     144,
+     372,
+     384,
      "CD.LI.boxInhabited",
      "b"
     ],
     [
-     132,
-     144,
+     372,
+     384,
      "",
      "b"
     ],
     [
-     147,
-     156,
+     387,
+     396,
      "Inhabited"
     ],
     [
-     157,
-     160,
+     397,
+     400,
      "CD.LI.Box"
     ]
    ],
@@ -144,14 +287,14 @@
     "CD.LI.boxInhabited"
    ],
    "start": {
-    "byte": 43,
+    "byte": 283,
     "col": 0,
-    "line": 5
+    "line": 9
    },
    "value_start": {
-    "byte": 161,
+    "byte": 401,
     "col": 38,
-    "line": 6
+    "line": 10
    }
   },
   {
@@ -175,42 +318,42 @@
     ]
    ],
    "end": {
-    "byte": 210,
+    "byte": 450,
     "col": 31,
-    "line": 8
+    "line": 12
    },
    "heads": [],
    "idents": [
     {
-     "end": 193,
+     "end": 433,
      "name": "defaultBox",
      "role": "decl",
-     "start": 183
+     "start": 423
     },
     {
-     "end": 199,
+     "end": 439,
      "name": "Box",
      "role": "ref",
-     "start": 196
+     "start": 436
     },
     {
-     "end": 210,
+     "end": 450,
      "name": "default",
      "role": "ref",
-     "start": 203
+     "start": 443
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 193,
+      "byte": 433,
       "col": 14,
-      "line": 8
+      "line": 12
      },
      "start": {
-      "byte": 183,
+      "byte": 423,
       "col": 4,
-      "line": 8
+      "line": 12
      }
     }
    ],
@@ -228,38 +371,38 @@
    "opens": [],
    "resolved": [
     [
-     183,
-     193,
+     423,
+     433,
      "CD.LI.defaultBox",
      "b"
     ],
     [
-     183,
-     193,
+     423,
+     433,
      "",
      "b"
     ],
     [
-     196,
-     199,
+     436,
+     439,
      "CD.LI.Box"
     ],
     [
-     203,
-     210,
+     443,
+     450,
      "Inhabited.default"
     ]
    ],
    "sig_insts": [],
    "start": {
-    "byte": 179,
+    "byte": 419,
     "col": 0,
-    "line": 8
+    "line": 12
    },
    "value_start": {
-    "byte": 200,
+    "byte": 440,
     "col": 21,
-    "line": 8
+    "line": 12
    }
   },
   {
@@ -276,17 +419,17 @@
    ],
    "declares": [],
    "end": {
-    "byte": 221,
+    "byte": 461,
     "col": 9,
-    "line": 10
+    "line": 14
    },
    "heads": [],
    "idents": [
     {
-     "end": 221,
+     "end": 461,
      "name": "CD.LI",
      "role": "scope",
-     "start": 216
+     "start": 456
     }
    ],
    "ids": [],
@@ -299,9 +442,9 @@
    "resolved": [],
    "sig_insts": [],
    "start": {
-    "byte": 212,
+    "byte": 452,
     "col": 0,
-    "line": 10
+    "line": 14
    }
   },
   {
@@ -314,9 +457,9 @@
    ],
    "declares": [],
    "end": {
-    "byte": 222,
+    "byte": 462,
     "col": 0,
-    "line": 11
+    "line": 15
    },
    "heads": [],
    "idents": [],
@@ -330,9 +473,9 @@
    "resolved": [],
    "sig_insts": [],
    "start": {
-    "byte": 222,
+    "byte": 462,
     "col": 0,
-    "line": 11
+    "line": 15
    }
   }
  ],

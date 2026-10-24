@@ -1890,7 +1890,8 @@ def _global_instance(g, k):
 def instance_leaks(g, plan):
     """[(item, declaration, instance)]: a file of the plan (`bundle:B`, `statement:N`, `piece:N`)
     makes a global instance visible to a declaration it carves that the declaration's own module
-    could not see there (declared in a module it does not import, or later in its own), and the
+    could not see there: declared later in its own module and imported through a bundle (one from a
+    module it does not import is hidden again by `attribute [-instance]`, Carver._unseen_instances), and the
     instance's type mentions something the declaration uses (or only library types). Type class
     search may then take another path: RationalHitting (2026-10-24), the instance witnessCharZero
     of Generator.lean reached the carved list_hits (Certificates.lean) through a bundle, and
@@ -1911,8 +1912,10 @@ def instance_leaks(g, plan):
     inst = {k for k in g.nodes if k not in ext and _global_instance(g, k)}
 
     def saw(k, i):
+        # an instance of a module k's module does not import is hidden again in every carved file
+        # (Carver._unseen_instances); only a later one of k's own module can leak
         a, b = g.nodes[k], g.nodes[i]
-        return b.cmd < a.cmd if a.module == b.module else g.sees(a.module, b.module)
+        return b.cmd < a.cmd if a.module == b.module else True
 
     def check(item, keep, visible):
         out = []
@@ -2088,6 +2091,7 @@ class Carver:
             for n in g.have_names([k]):
                 by_mod[g.nodes[k].module].update(ns_prefixes(n))
         out = []
+        earlier = set()
         for m in mods:
             info = g.infos[m]
             alive |= by_mod[m]
@@ -2095,10 +2099,47 @@ class Carver:
                 if c.short_kind == 'namespace' and c.index not in drops[m]:
                     full = join(c.namespace, leanedit.text(info, c.index).split()[1])
                     alive.update(ns_prefixes(full + '.x'))
-            out.append(self._module(m, kept_cmds[m], drops[m], have, set(alive), deprivatize,
-                                    {g.nodes[k].cmd for k in sorry if g.nodes[k].module == m},
-                                    rename))
+            sec = self._module(m, kept_cmds[m], drops[m], have, set(alive), deprivatize,
+                               {g.nodes[k].cmd for k in sorry if g.nodes[k].module == m}, rename)
+            hide = self._unseen_instances(m, have, earlier, rename)
+            if hide:
+                head = 'section\n-- module %s\n' % m
+                sec = head + 'attribute [-instance] %s\n' % ' '.join(hide) + sec[len(head):]
+            out.append(sec)
+            earlier |= {k for k in keep if g.nodes[k].module == m}
         return ''.join(out)
+
+    def _unseen_instances(self, m, have, earlier, rename):
+        """The global instances this file shows module m's section that m never saw (declared in a
+        module m does not import), by the names this file knows them by: `attribute [-instance]`
+        at the top of the section hides them again until its `end`, so type class search there
+        takes the paths it took in the port (RationalHitting 2026-10-24: witnessCharZero of
+        Generator.lean, visible in the carved list_hits through a bundle, changed how
+        `algebraMap ℚ WitnessField` elaborated in Certificates.lean, and a `rwa` no longer matched).
+        An instance from a later module of the file is not declared yet; one kept from an earlier
+        module, or imported, is."""
+        g = self.g
+        if not hasattr(g, '_global_insts'):
+            g._global_insts = sorted(k for k in g.nodes if _global_instance(g, k))
+        names = getattr(g, 'instance_names', None) or {}
+        out = []
+        for i in g._global_insts:
+            nd = g.nodes[i]
+            if nd.module == m or g.sees(m, nd.module):
+                continue
+            if i in self.keep:
+                if i not in earlier:
+                    continue
+            elif pubname(i) not in have:
+                continue
+            if i in names:
+                full = names[i]
+            else:
+                full = pubname(i)
+                if i in rename:
+                    full = full.rsplit('.', 1)[0] + '.' + rename[i] if '.' in full else rename[i]
+            out.append('_root_.' + full)
+        return out
 
     # ---------------------------------------------------------- what goes
     def _gone(self, tok, c, m, have, opens, bound=(), idn=None):
@@ -2711,8 +2752,15 @@ class Carver:
                     continue                       # a dot-identifier: resolved by its expected type
                 htxt = info.text_bytes[a:b].decode('utf-8')
                 now, k2 = g.lean_hits(htxt, c.namespace, opens, lambda n: pubname(n) in have)
-                if k2 == 0 and now and {pubname(n) for n in now} != {pubname(orig)}:
-                    out.append((a, b, '_root_.' + pubname(orig)))
+                if k2 or not now or {pubname(n) for n in now} == {pubname(orig)}:
+                    continue
+                # the same candidates the original module saw: Lean chose among them there and
+                # will choose the same way here (PermanentBorder: `Plane` read both
+                # FrobeniusPlane.Plane and another, in the port too)
+                src, k = g.lean_hits(htxt, c.namespace, opens, lambda n: g.visible(n, m))
+                if k == 0 and {pubname(n) for n in src} == {pubname(n) for n in now}:
+                    continue
+                out.append((a, b, '_root_.' + pubname(orig)))
                 continue
             if tok.split('.')[0] in binders:
                 continue

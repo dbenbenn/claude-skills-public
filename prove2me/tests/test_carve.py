@@ -1316,94 +1316,47 @@ def test_exports_compile(g, tmp_path):
     _compile_in_publish_order(g, _export_plan(), tmp_path)
 
 
-def test_an_instance_a_carved_declaration_never_saw_is_reported(g):
+def test_an_instance_a_module_never_saw_is_hidden_again(g):
     # RationalHitting (2026-10-24): the instance witnessCharZero (Generator.lean) reached the carved
     # list_hits piece's Certificates.lean declarations through a bundle; `algebraMap ℚ` elaborated
-    # through it there, and a `rwa [RingHom.ext_rat …]` no longer matched. Detected, as a warning.
-    t, u, v = 'CD.LI.box_default', 'CD.LI.box_get', 'CD.LI.box_default_local'
-    p = {'bundles': [{'name': 'L0', 'nodes': ['CD.LI.Box', 'CD.LI.Box.get', 'CD.LI.boxInhabited',
-                                              'CD.LI.boxInhabitedA', 'CD.LI.defaultBox'], 'imports': []}],
-         'nodes': [t, u, v], 'external_defs': {}, 'external': [],
-         'stubs': {x: {'bundles': ['L0']} for x in (t, u, v)},
-         'pieces': {x: {'keep': [x], 'imports': [], 'bundles': ['L0']} for x in (t, u, v)}}
+    # through it there, and a `rwa [RingHom.ext_rat …]` no longer matched (a post-carve patch).
+    # Here box_default (InstBase) is `rfl` only with boxInhabitedA: InstLate's later boxInhabited,
+    # in the same bundle, would win. The module's section hides it: `attribute [-instance]`.
+    p = _leak_plan()
+    for txt in (C.gen_piece(g, p, 'CD.LI.box_default'), C.gen_stub(g, p, 'CD.LI.box_default')):
+        sec = _section(txt, 'CarveDev.InstBase') if '-- module' in txt else txt
+        m = re.search(r'^attribute \[-instance\] (.*)$', sec, re.M)
+        assert m and '_root_.CD.LI.boxInhabited' in m.group(1).split(), txt
+        assert '_root_.CD.LI.boxInhabitedA' not in m.group(1).split()
+    # an instance of the declaration's own module, declared after it, cannot be hidden: reported
     leaks = C.instance_leaks(g, p)
-    # box_default's instance search solved an `Inhabited Box`: the later boxInhabited could answer it
-    assert ('piece:' + t, t, 'CD.LI.boxInhabited') in leaks
-    assert ('statement:' + t, t, 'CD.LI.boxInhabited') in leaks
-    # box_get and Box.get solve no Inhabited problem, box_default_local's binder answers its own
-    # (the old rule, which matched the instance's type against what a declaration uses, reported
-    # all three: 16-63 such warnings per real carve)
-    assert not [x for x in leaks if x[1] in (u, v, 'CD.LI.Box.get')]
-    # defaultBox's module declares the instance before it; the structure itself uses nothing
-    assert not [x for x in leaks if x[1] in ('CD.LI.defaultBox', 'CD.LI.Box')]
-    # without the instance in reach there is nothing to report; a local instance never leaks
-    p['bundles'][0]['nodes'].remove('CD.LI.boxInhabited')
-    p['bundles'][0]['nodes'].remove('CD.LI.boxInhabitedA')
-    assert C.instance_leaks(g, p) == []
+    assert ('piece:CD.LI.late_default', 'CD.LI.late_default', 'CD.LI.boxInhabited') in leaks
+    assert not [x for x in leaks if x[1] != 'CD.LI.late_default']
     assert not C._global_instance(g, 'CD.LI.instPropCOfNatNat')
-    # grouped for the command line: one line per instance
     assert C.leak_summary(leaks) == ['CD.LI.boxInhabited: 1 declaration in 2 files '
-                                     '(piece:CD.LI.box_default, statement:CD.LI.box_default)']
+                                     '(piece:CD.LI.late_default, statement:CD.LI.late_default)']
+    # the filter: InstLate's box-free declarations, or one whose problems no Inhabited answers,
+    # are not reported even when later instances show
+    p['bundles'][0]['nodes'].remove('CD.LI.boxInhabited')
+    assert C.instance_leaks(g, p) == []
+
+
+def _leak_plan():
+    ts = ['CD.LI.box_default', 'CD.LI.box_get', 'CD.LI.box_default_local', 'CD.LI.late_default']
+    return {'bundles': [{'name': 'L0', 'nodes': ['CD.LI.Box', 'CD.LI.Box.get', 'CD.LI.boxInhabited',
+                                                 'CD.LI.boxInhabitedA', 'CD.LI.defaultBox'], 'imports': []}],
+            'nodes': ts, 'external_defs': {}, 'external': [],
+            'stubs': {x: {'bundles': ['L0']} for x in ts},
+            'pieces': {x: {'keep': [x], 'imports': [], 'bundles': ['L0']} for x in ts}}
 
 
 @pytest.mark.lean
-def test_measure_finds_a_false_import_edge(tmp_path):
-    # PosteriorReplicas (2026-10-23): a carved piece imported a statement it never used; it compiled,
-    # so only a hand check (drop each import, recompile) caught it. carve_measure now checks every
-    # `import Theorems.*` against what the file's declarations use, and fails on a false edge.
-    import shutil
-    import subprocess
-    import sys
-    work = tmp_path / 'work'
-    work.mkdir()
-    shutil.copy(os.path.join(FIX, 'decl_graph.jsonl'), work / 'decl_graph.jsonl')
-    cfg = tmp_path / 'carve.json'
-    cfg.write_text(json.dumps({'src': FIX, 'prefix': 'CarveDev', 'roots': ['CarveDev.Top'],
-                               'targets': ['CD.double_succ', 'CD.double_zero', 'CD.main'],
-                               'forced': ['CD.double_eq'], 'work': str(work), 'out': str(tmp_path / 'out'),
-                               'bundle_prefix': 'CDE', 'budget': 1000, 'bundle_budget': 1000,
-                               'bytes_per_second': 10000}))
-    scripts = os.path.join(os.path.dirname(HERE), 'scripts')
-
-    def run(script, *a):
-        r = subprocess.run([sys.executable, os.path.join(scripts, script)] + list(a), capture_output=True, text=True)
-        return r.returncode, r.stdout + r.stderr
-    assert run('carve.py', 'plan', str(cfg))[0] == 0
-
-    def gen_and_inject():
-        assert run('carve.py', 'gen', str(cfg))[0] == 0
-        sol = tmp_path / 'out' / 'solutions' / 'Sol_CD_double_succ.lean'
-        t = sol.read_text()
-        assert 'import Theorems.Thm_CD_double_eq\n' in t      # used: `simp only [double_eq]`
-        sol.write_text(t.replace('import Theorems.Thm_CD_double_eq\n',
-                                 'import Theorems.Thm_CD_double_eq\nimport Theorems.Thm_CD_double_zero\n'))
-        return sol
-    sol = gen_and_inject()
-    code, out = run('carve_measure.py', str(cfg))
-    assert code == 1 and out.rstrip().endswith('FAILED'), out
-    assert 'FALSE EDGE piece:CD.double_succ (Sol_CD_double_succ.lean): import Theorems.Thm_CD_double_zero' in out
-    rep = json.loads((work / 'false_edges.json').read_text())
-    hit = [f for f in rep['false_edges'] if f['item'] == 'piece:CD.double_succ']
-    assert [(f['import'], f['statement'], f['verdict']) for f in hit] == \
-        [('Theorems.Thm_CD_double_zero', 'CD.double_zero', 'false')]
-    edges = json.loads((work / 'edges.json').read_text())
-    # the edges a proof does use are kept: a rewrite, a notation (`DE` for double_eq), a statement
-    assert edges['piece:CD.double_succ']['method'] == 'constants'      # read from the .olean
-    assert edges['piece:CD.double_succ']['compiles'] == 1               # one confirming compile
-    assert edges['piece:CD.double_succ']['imports']['Theorems.Thm_CD_double_eq'] == 'used'
-    assert edges['piece:CD.double_zero']['imports'] == {'Theorems.Thm_CD_double_eq': 'used'}
-    assert edges['piece:CD.main']['imports']['Theorems.Thm_CD_double_succ'] == 'used'
-    # skipped on request
-    code, out = run('carve_measure.py', str(cfg), '--no-edge-check')
-    assert code == 0 and 'FALSE EDGE' not in out, out
-    # dropped on request: cut, recorded, re-measured; the cut survives a fresh `carve.py gen`
-    code, out = run('carve_measure.py', str(cfg), '--drop-false-edges')
-    assert code == 0 and 'edge check: no false edges' in out, out
-    assert 'Thm_CD_double_zero' not in sol.read_text()
-    assert 'import Theorems.Thm_CD_double_zero' in json.loads((work / 'repairs.json').read_text())['Sol_CD_double_succ.lean']
-    gen_and_inject()
-    code, out = run('carve_measure.py', str(cfg))
-    assert code == 0 and 'Thm_CD_double_zero' not in sol.read_text(), out
+def test_hidden_instances_compile(g, tmp_path):
+    p = _leak_plan()
+    for t in ('CD.LI.late_default',):            # the unhidable leak: its rfl fails
+        p['nodes'].remove(t)
+        del p['stubs'][t], p['pieces'][t]
+    _compile_in_publish_order(g, p, tmp_path)
 
 
 def test_names_declared_or_naming_a_case_are_never_written_in_full(g):

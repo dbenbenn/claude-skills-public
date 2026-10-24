@@ -108,7 +108,7 @@
 {"i":false,"k":"def","m":"CarveDev.InstBase","n":"CD.LI.PropC.casesOn","p":false,"r":[33,0,34,13],"s":false,"t":["CD.LI.PropC","CD.LI.PropC.mk"],"u":["u"],"v":["CD.LI.PropC","CD.LI.PropC.mk","CD.LI.PropC.rec"]}
 {"i":false,"k":"def","m":"CarveDev.InstBase","n":"CD.LI.PropC.recOn","p":false,"r":[33,0,34,13],"s":false,"t":["CD.LI.PropC","CD.LI.PropC.mk"],"u":["u"],"v":["CD.LI.PropC","CD.LI.PropC.mk","CD.LI.PropC.rec"]}
 {"i":false,"k":"def","m":"CarveDev.InstBase","n":"CD.LI.needsPropC","p":false,"r":[43,0,44,45],"s":false,"t":["CD.LI.PropC"],"u":[],"v":["CD.LI.PropC"]}
-{"i":false,"k":"def","m":"CarveDev.InstLate","n":"CD.LI.defaultBox","p":false,"r":[8,0,8,31],"s":false,"t":["CD.LI.Box"],"u":[],"v":["CD.LI.Box","CD.LI.boxInhabited"]}
+{"i":false,"k":"def","m":"CarveDev.InstLate","n":"CD.LI.defaultBox","p":false,"r":[12,0,12,31],"s":false,"t":["CD.LI.Box"],"u":[],"v":["CD.LI.Box","CD.LI.boxInhabited"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.Nat.cdTwice","p":false,"r":[77,0,78,36],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.NoteNs.keptHere","p":false,"r":[153,0,154,23],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.NoteNs.xInst","p":false,"r":[162,0,162,99],"s":false,"t":["CD.Wide","CD.double","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.double","CD.double_zero","CD.Wide.w"]}
@@ -207,6 +207,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.box_default","p":true,"r":[48,0,50,50],"s":false,"t":["CD.LI.Box","CD.LI.boxInhabitedA","CD.LI.Box.b"],"u":[],"v":["CD.LI.Box","CD.LI.boxInhabitedA","CD.LI.Box.b"]}
 {"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.box_default_local","p":true,"r":[52,0,54,90],"s":false,"t":["CD.LI.Box","CD.LI.Box.b","CD.LI.Box.get"],"u":[],"v":["CD.LI.Box","CD.LI.Box.get"]}
 {"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.box_get","p":true,"r":[41,0,41,46],"s":false,"t":["CD.LI.Box","CD.LI.Box.b","CD.LI.Box.get"],"u":[],"v":["CD.LI.Box","CD.LI.Box.get"]}
+{"i":false,"k":"theorem","m":"CarveDev.InstLate","n":"CD.LI.late_default","p":true,"r":[5,0,7,51],"s":false,"t":["CD.LI.Box","CD.LI.boxInhabitedA","CD.LI.Box.b"],"u":[],"v":["CD.LI.Box","CD.LI.boxInhabitedA","CD.LI.Box.b"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.NoteNs.uses_x","p":true,"r":[164,0,164,33],"s":false,"t":["CD.Wide","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.Wide.w"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.Space.cd_unused_simp","p":true,"r":[120,0,124,21],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.Space.coord_eq","p":true,"r":[12,0,12,55],"s":false,"t":["CD.Space","CD.Space.coord"],"u":[],"v":["CD.Space","CD.Space.coord"]}
@@ -238,7 +239,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"_private.CarveDev.Top.0.CD.helper","p":true,"r":[16,0,16,37],"s":false,"t":[],"u":[],"v":[]}
 {"i":true,"k":"def","m":"CarveDev.InstBase","n":"CD.Ex.instCodingNat","p":false,"r":[23,0,23,29],"s":false,"t":["CD.Ex.Coding"],"u":[],"v":["CD.Ex.Coding.mk"]}
 {"i":true,"k":"def","m":"CarveDev.InstBase","n":"CD.LI.boxInhabitedA","p":false,"r":[46,0,46,47],"s":false,"t":["CD.LI.Box"],"u":[],"v":["CD.LI.Box","CD.LI.Box.mk"]}
-{"i":true,"k":"def","m":"CarveDev.InstLate","n":"CD.LI.boxInhabited","p":false,"r":[5,0,6,46],"s":false,"t":["CD.LI.Box"],"u":[],"v":["CD.LI.Box","CD.LI.Box.mk"]}
+{"i":true,"k":"def","m":"CarveDev.InstLate","n":"CD.LI.boxInhabited","p":false,"r":[9,0,10,46],"s":false,"t":["CD.LI.Box"],"u":[],"v":["CD.LI.Box","CD.LI.Box.mk"]}
 {"imports":["Init","Init","CarveDev.Base"],"module":"CarveDev.Alt"}
 {"imports":["Init","Init","CarveDev.Base"],"module":"CarveDev.Fields"}
 {"imports":["Init","Init","CarveDev.Base"],"module":"CarveDev.InstBase"}
