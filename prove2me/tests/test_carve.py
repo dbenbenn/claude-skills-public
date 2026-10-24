@@ -1444,6 +1444,34 @@ def test_an_instance_a_module_never_saw_is_hidden_again(g):
     assert C.instance_leaks(g, p) == []
 
 
+def test_only_external_instances_the_file_imports_are_hidden(g):
+    # Eilenberg–Ganea (2026-10-24): every bundle, statement and piece hid the StdSimplex shim's
+    # instances (`attribute [-instance] _root_.Convexity.StdSimplex.instInhabited …`), external
+    # definitions of Def_OAIStdSimplexCompat, which most files do not import: "Unknown constant".
+    # A file's names are its imports' names, external definitions included only through the
+    # external bundles it (or a bundle or statement it imports) actually imports.
+    p = _leak_plan()
+    for k in ('CD.LI.boxInhabited', 'CD.LI.defaultBox'):     # defaultBox uses boxInhabited
+        p['bundles'][0]['nodes'].remove(k)
+    p['external_defs'] = {'CD.LI.boxInhabited': 'Definitions.Def_Other'}
+    for txt in (C.gen_piece(g, p, 'CD.LI.box_default'), C.gen_stub(g, p, 'CD.LI.box_default'),
+                C.gen_bundle(g, p, 'L0')):
+        assert 'Def_Other' not in txt, txt
+        assert not re.search(r'^attribute \[-instance\].*boxInhabited(?!A)', txt, re.M), txt
+    # imported (here: every bundle declaration is external, in the one external bundle), it is
+    # visible and hidden again as before
+    q = _leak_plan()
+    q['external_defs'] = {k: 'Definitions.Def_Ext' for k in q['bundles'][0]['nodes']}
+    q['bundles'] = []
+    for k in q['stubs']:
+        q['stubs'][k]['bundles'] = []
+        q['pieces'][k]['bundles'] = []
+    txt = C.gen_piece(g, q, 'CD.LI.box_default')
+    assert 'import Definitions.Def_Ext' in txt
+    m = re.search(r'^attribute \[-instance\] (.*)$', txt, re.M)
+    assert m and '_root_.CD.LI.boxInhabited' in m.group(1).split(), txt
+
+
 def _leak_plan():
     ts = ['CD.LI.box_default', 'CD.LI.box_get', 'CD.LI.box_default_local', 'CD.LI.late_default']
     return {'bundles': [{'name': 'L0', 'nodes': ['CD.LI.Box', 'CD.LI.Box.get', 'CD.LI.boxInhabited',

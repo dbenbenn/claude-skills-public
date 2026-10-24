@@ -2873,6 +2873,38 @@ def _bundle_have(g, plan, names):
     return {k for i in cl for k in plan['bundles'][i]['nodes']}
 
 
+def _ext_have(g, plan, own, bundles=(), statements=()):
+    """The external definitions a file can name: those of the external bundles it imports itself
+    (`own`, its `_ext_imports`) or through a bundle or statement it imports. Not every
+    external definition: a file that does not import Def_OAIStdSimplexCompat cannot name its
+    instances, and hiding them there was "Unknown constant" (Eilenberg–Ganea 2026-10-24)."""
+    ext = plan.get('external_defs') or {}
+    if not ext:
+        return set()
+    pos, bimp, _ = _plan_index(plan)
+    mods = set(own)
+    seen_b, seen_s = set(), set()
+    todo_b, todo_s = list(bundles), list(statements)
+    while todo_b or todo_s:
+        if todo_s:
+            st = todo_s.pop()
+            if st in seen_s:
+                continue
+            seen_s.add(st)
+            mods.update(_ext_imports(g, plan, [st], statement_only=True))
+            todo_b.extend(plan['stubs'].get(st, {}).get('bundles', ()))
+            continue
+        name = todo_b.pop()
+        if name in seen_b or name not in pos:
+            continue
+        seen_b.add(name)
+        b = plan['bundles'][pos[name]]
+        mods.update(_ext_imports(g, plan, b['nodes']))
+        todo_b.extend(b['imports'])
+        todo_s.extend(b.get('statements', ()))
+    return {d for d, mod in ext.items() if mod in mods}
+
+
 def gen_bundle(g, plan, name, collapse_mathlib=True):
     b = next(x for x in plan['bundles'] if x['name'] == name)
     keep = set(b['nodes'])
@@ -2880,7 +2912,8 @@ def gen_bundle(g, plan, name, collapse_mathlib=True):
     if bad:
         raise CarveError('bundle %s would contain sorry: %s (repair the port first)' % (name, bad))
     sts = list(b.get('statements', ()))
-    avail = _bundle_have(g, plan, b['imports']) | set(plan.get('external_defs') or {}) | set(sts)
+    avail = _bundle_have(g, plan, b['imports']) | set(sts)
+    avail |= _ext_have(g, plan, _ext_imports(g, plan, keep), b['imports'], sts)
     for st in sts:
         avail |= _bundle_have(g, plan, plan['stubs'][st]['bundles'])
     ren = collision_renames(g)
@@ -2894,7 +2927,8 @@ def gen_bundle(g, plan, name, collapse_mathlib=True):
 
 def gen_stub(g, plan, node, collapse_mathlib=True):
     bs = plan['stubs'][node]['bundles']
-    avail = _bundle_have(g, plan, bs) | set(plan.get('external_defs') or {})
+    avail = _bundle_have(g, plan, bs)
+    avail |= _ext_have(g, plan, _ext_imports(g, plan, [node], statement_only=True), bs)
     ren = collision_renames(g)
     ren.update(_stmt_renames(g, plan, [node]))
     body = Carver(g).carve({node}, g.have_names({node} | avail), sorry={node}, rename=ren)
@@ -2923,7 +2957,8 @@ def gen_piece(g, plan, node, collapse_mathlib=True):
     bad = sorted(k for k in keep if g.nodes[k].sorry)
     if bad:
         raise CarveError('piece %s would contain sorry: %s (repair the port first)' % (node, bad))
-    avail = _bundle_have(g, plan, p['bundles']) | set(p['imports']) | set(plan.get('external_defs') or {})
+    avail = _bundle_have(g, plan, p['bundles']) | set(p['imports'])
+    avail |= _ext_have(g, plan, _ext_imports(g, plan, keep), p['bundles'], p['imports'])
     for i in p['imports']:
         avail |= _bundle_have(g, plan, plan['stubs'][i]['bundles'])
     ren = collision_renames(g)
