@@ -298,9 +298,16 @@ def core_rewrites(text, compat_ns='OAI'):
     OpenAI's signature, so `induction … with` alternatives, bullets and term-mode uses stay as
     written. (An inserted `| zero => simp only [map_zero]` failed on most real goals and took the
     `induction` line's indentation, not its alternatives': ComparatorModel, Boone–Higman
-    2026-10-24.) `compat_ns` is the compat block's namespace (None: root level)."""
-    target = (compat_ns + '.' if compat_ns else '') + 'tensorInductionOn'
-    return re.sub(r"(?<![\w.'])(?:_root_\.)?TensorProduct\.inductionOn(?![\w'])", target, text)
+    2026-10-24.) Likewise `FreeGroup.induction_on`, whose first case d13f23b calls `one` and ours
+    `C1`: every use becomes `freeGroupInductionOn`. `compat_ns` is the compat block's namespace
+    (None: root level)."""
+    pre = compat_ns + '.' if compat_ns else ''
+    text = re.sub(r"(?<![\w.'])(?:_root_\.)?TensorProduct\.inductionOn(?![\w'])",
+                  pre + 'tensorInductionOn', text)
+    # `FreeGroup.induction_on`'s first case is `one` in d13f23b and `C1` here (Eilenberg–Ganea
+    # 2026-10-24): the compat block's `freeGroupInductionOn` has d13f23b's names
+    return re.sub(r"(?<![\w.'])(?:_root_\.)?FreeGroup\.induction_on(?![\w'])",
+                  pre + 'freeGroupInductionOn', text)
 
 
 # ---------------------------------------------------------------- the StdSimplex compatibility shim

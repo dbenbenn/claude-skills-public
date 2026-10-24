@@ -24,6 +24,12 @@ theorem tensorInductionOn {R M N : Type*} [CommSemiring R] [AddCommMonoid M] [Ad
     (tmul : ∀ x y, motive (TensorProduct.tmul R x y))
     (add : ∀ x y, motive x → motive y → motive (x + y)) : motive z :=
   TensorProduct.induction_on z (by simpa using tmul 0 0) tmul add
+/-- Mathlib's newer case names for `FreeGroup.induction_on` (`one`, where ours says `C1`). -/
+@[elab_as_elim]
+theorem freeGroupInductionOn {α : Type*} {C : FreeGroup α → Prop} (z : FreeGroup α) (one : C 1)
+    (of : ∀ x, C (FreeGroup.of x)) (inv_of : ∀ x, C (FreeGroup.of x) → C (FreeGroup.of x)⁻¹)
+    (mul : ∀ x y, C x → C y → C (x * y)) : C z :=
+  FreeGroup.induction_on z one of inv_of mul
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod

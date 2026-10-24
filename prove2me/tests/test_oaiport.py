@@ -183,6 +183,31 @@ def test_tensor_induction_uses_the_compat_eliminator_and_inserts_no_zero_case():
     assert O.core_rewrites('using TensorProduct.inductionOn with', None) == 'using tensorInductionOn with'
 
 
+# OpenAI's Mathlib (d13f23b) names `FreeGroup.induction_on`'s first case `one`; ours (0df444a) names
+# it `C1`, so `induction w using FreeGroup.induction_on with | one => …` fails ("Invalid alternative
+# name `one`: Expected `C1`"; Eilenberg–Ganea UnitaryWords, 2026-10-24, and 24 files of openai/math).
+# Every use becomes the compat block's `freeGroupInductionOn`, OpenAI's signature and case names.
+
+def test_freegroup_induction_uses_the_compat_eliminator():
+    src = ('  induction w using FreeGroup.induction_on with\n  | one => simp\n  | of i => simp\n'
+           '  | inv_of i hi => simp [hi]\n  | mul a b ha hb => simp [ha, hb]\n'
+           'theorem t : P w := FreeGroup.induction_on w h1 hof hinv hmul\n')
+    out = O.core_rewrites(src)
+    assert 'FreeGroup.induction_on' not in out
+    assert '  induction w using OAI.freeGroupInductionOn with\n  | one => simp\n' in out
+    assert out.replace('OAI.freeGroupInductionOn', 'FreeGroup.induction_on') == src
+    # other names are left alone, and a root-level compat block means a root-level name
+    assert O.core_rewrites('FreeGroup.induction_on_x FreeAddGroup.induction_on') == \
+        'FreeGroup.induction_on_x FreeAddGroup.induction_on'
+    assert O.core_rewrites('using FreeGroup.induction_on with', None) == 'using freeGroupInductionOn with'
+
+
+def test_the_compat_block_declares_the_freegroup_eliminator_with_case_one():
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    m = re.search(r'^@\[elab_as_elim\]\ntheorem freeGroupInductionOn\b(.*?):=', block, re.M | re.S)
+    assert m and '(one :' in m.group(1)
+
+
 def test_the_compat_block_declares_the_eliminator_outside_a_tensorproduct_namespace():
     block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
     assert re.search(r'^@\[elab_as_elim\]\ntheorem tensorInductionOn\b', block, re.M)
