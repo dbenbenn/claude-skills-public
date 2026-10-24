@@ -228,3 +228,79 @@ def test_ports_rename_identifiers_the_soundness_guard_refuses():
     assert 'G.prelude_ 2' in files['B.lean']
     assert not any(L.guard_problems(t) for t in files.values())
     assert O.guard_renames('x := prelude 1') == 'x := prelude_ 1'
+
+
+# ---------------------------------------------------------------- the StdSimplex compatibility shim
+
+# OpenAI's Mathlib (d13f23b) has API on the structure `Convexity.StdSimplex` that ours (0df444a)
+# lacks, and takes SimplexCategory.toTop to the structure where ours takes the subtype `stdSimplex`.
+# Problem340 (2026-10-24) needed a hand-written shim and 22 hand rewrites; WeakMTW, MatchingEntropy
+# and SubpolynomialLp each patched the same two lemmas away by hand.
+
+SIMPLEX_SRC = ('import Mathlib\nimport Mathlib.Geometry.Convex.ConvexSpace.Barycenter\n\n'
+               'namespace OAI.S\nopen Convexity\n'
+               'theorem r (n : ℕ) : Set.range (fun s : Convexity.StdSimplex ℝ (Fin n) ↦ ⇑s.weights) = '
+               'Set.range (fun s : StdSimplex ℝ (Fin n) ↦ ⇑s.weights) := '
+               'Convexity.StdSimplex.range_toFun_comp_weights.trans rfl\n'
+               'def keep : Set (Fin 2 → ℝ) := stdSimplex ℝ (Fin 2)\n'
+               'def MyStdSimplex := 1\ndef StdSimplexLike := MyStdSimplex\nend OAI.S\n')
+
+
+def test_stdsimplex_detection_and_mode():
+    assert O.mentions_stdsimplex(SIMPLEX_SRC)
+    assert not O.mentions_stdsimplex('def keep : Set (Fin 2 → ℝ) := stdSimplex ℝ (Fin 2)\ndef MyStdSimplex := 1\n')
+    # a missing ConvexSpace module alone also needs the shim (it is what the import provided)
+    assert O.mentions_stdsimplex('import Mathlib.Geometry.Convex.ConvexSpace.Barycenter\n')
+    assert O.stdsimplex_mode([SIMPLEX_SRC]) == 'structure'          # auto
+    assert O.stdsimplex_mode([SIMPLEX_SRC], 'subtype') == 'subtype'
+    assert O.stdsimplex_mode([SIMPLEX_SRC], 'off') == 'off'
+    assert O.stdsimplex_mode(['def x := 1\n'], 'subtype') == 'off'  # nothing to do
+    with pytest.raises(O.PortError, match='stdsimplex'):
+        O.stdsimplex_mode([SIMPLEX_SRC], 'bogus')
+
+
+def test_stdsimplex_rewrites_by_mode():
+    # structure mode: the names stay (the shim declares them on Convexity.StdSimplex); the imports
+    # of d13f23b-only Mathlib files go
+    s = O.stdsimplex_rewrite(SIMPLEX_SRC, 'structure')
+    assert 'ConvexSpace.Barycenter' not in s and 'import Mathlib\n' in s
+    assert 'Convexity.StdSimplex.range_toFun_comp_weights' in s and 'StdSimplex ℝ (Fin n)' in s
+    # subtype mode: every qualified or bare StdSimplex becomes OAI.SStd; nothing longer, nothing
+    # lowercase
+    t = O.stdsimplex_rewrite(SIMPLEX_SRC, 'subtype')
+    assert 'Convexity.StdSimplex' not in t and 'ConvexSpace.Barycenter' not in t
+    assert 'fun s : OAI.SStd ℝ (Fin n)' in t and 'OAI.SStd.range_toFun_comp_weights' in t
+    assert t.count('OAI.SStd ℝ (Fin n)') == 2
+    assert 'stdSimplex ℝ (Fin 2)' in t and 'MyStdSimplex' in t and 'def StdSimplexLike' in t
+    assert O.stdsimplex_rewrite(SIMPLEX_SRC, 'off') == SIMPLEX_SRC
+
+
+def test_stdsimplex_shim_text_is_a_closed_section():
+    shim = O.stdsimplex_shim()
+    assert shim.startswith('import Mathlib\n')
+    body = O.stdsimplex_shim(body=True)
+    assert not re.search(r'^import ', body, re.M)
+    # merge.py declares `universe u v` at the top of a single file: the shim's own universes must
+    # live inside its section, never at the top level
+    lines = body.split('\n')
+    k = next(i for i, l in enumerate(lines) if l.startswith('noncomputable section StdSimplexCompat'))
+    assert all(not l.startswith('universe') for l in lines[:k])
+    assert body.rstrip().endswith('end StdSimplexCompat')
+    # and the names OpenAI's code uses are all declared (by our Mathlib or by the shim)
+    for n in ('range_toFun_comp_weights', 'isEmbedding_toFun_comp_weights', 'homeomorphI',
+              'subBarycenter', 'continuous_convexCombPair', 'compactSpace', 'total_of_fintype'):
+        assert re.search(r'^\s*(?:noncomputable\s+)?(?:lemma|def|instance|abbrev)\s+%s\b' % n, body, re.M), n
+
+
+def test_stdsimplex_single_file_inlines_or_imports_the_bundle():
+    text = O.stdsimplex_rewrite(SIMPLEX_SRC, 'structure')
+    t, imports, block = O.stdsimplex_single(SIMPLEX_SRC, 'auto')
+    assert imports == [] and 'noncomputable section StdSimplexCompat' in block
+    assert 'ConvexSpace.Barycenter' not in t
+    t, imports, block = O.stdsimplex_single(SIMPLEX_SRC, 'auto', use_bundle=True)
+    assert imports == ['import ' + O.STDSIMPLEX_BUNDLE] and block == ''
+    # a declaration a statement bundle already provides is not declared twice
+    t, imports, block = O.stdsimplex_single(SIMPLEX_SRC, 'subtype', drop=({'OAI.SStd.weights'}, set()))
+    assert 'OAI.SStd ℝ' in t
+    assert 'def weights (s : SStd R X)' not in block and 'def map (g : X → Y)' in block
+    assert O.stdsimplex_single('def x := 1\n', 'auto') == ('def x := 1\n', [], '')

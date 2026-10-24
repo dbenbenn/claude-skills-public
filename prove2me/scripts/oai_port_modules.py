@@ -4,6 +4,7 @@ single-file route is oai_port.py).
 
 usage: oai_port_modules.py LEAN_ROOT FOLDER PREFIX [PREFIX ...] [--patches P.json] [--header H.lean]
                            [--compat-ns NS | --root-compat] [--compat FILE] [--ws WORKSPACE]
+                           [--stdsimplex auto|structure|subtype|off]
 
   LEAN_ROOT   the fetched lean/ tree (oai_fetch.py DEST ROOT_MODULE, then DEST/lean)
   FOLDER      the workspace folder: modules land in Solutions/FOLDER/ as Solutions.FOLDER.*
@@ -18,6 +19,14 @@ usage: oai_port_modules.py LEAN_ROOT FOLDER PREFIX [PREFIX ...] [--patches P.jso
               is inside); `alias` lines become rewrites of the sources (p2mlib.oaiport.compat_block)
   --root-compat  the old root-level block (two bundles both declaring root `ite_eq_left` clash)
   --compat    the compatibility block (default lean/compat_4_34.lean in this skill)
+  --stdsimplex the StdSimplex shim (p2mlib.oaiport.stdsimplex_mode): auto (default) adds the module
+              StdSimplexCompat (lean/StdSimplexCompat.lean: the d13f23b `Convexity.StdSimplex` API
+              our Mathlib lacks) and imports it in each module using `Convexity.StdSimplex`;
+              `subtype` also renames `Convexity.StdSimplex` to `OAI.SStd` (the subtype
+              `stdSimplex`, for SimplexCategory.toTop code); `off` never. Once the shim bundle
+              Definitions.Def_OAIStdSimplexCompat is in the workspace, carve_prep.py config makes
+              its declarations external, so the carve imports it. carve_prep.py filter-patches
+              takes the same option
 
 Files are rewritten only when their text changes, so oai_build_modules.py rebuilds only those.
 """
@@ -50,7 +59,7 @@ def write_changed(out, files):
 
 
 def main(argv):
-    valued = ('--patches', '--header', '--compat-ns', '--compat', '--ws')
+    valued = ('--patches', '--header', '--compat-ns', '--compat', '--ws', '--stdsimplex')
     skip = {argv.index(o) + 1 for o in valued if o in argv}
     pos = [a for i, a in enumerate(argv) if not a.startswith('--') and i not in skip]
     if len(pos) < 3:
@@ -62,7 +71,8 @@ def main(argv):
     ns = None if '--root-compat' in argv else opt(argv, '--compat-ns', 'OAI')
     try:
         files = O.module_files(O.module_sources(lean_root, prefixes), 'Solutions.' + folder, patches,
-                               open(opt(argv, '--compat', COMPAT), encoding='utf-8').read(), ns, header)
+                               open(opt(argv, '--compat', COMPAT), encoding='utf-8').read(), ns, header,
+                               opt(argv, '--stdsimplex', 'auto'))
     except O.PortError as e:
         sys.exit(str(e))
     out = os.path.join(ws, 'Solutions', folder)

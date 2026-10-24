@@ -14,6 +14,8 @@ usage:
       more (floor 0.1 s). external_defs: every declaration of each --def bundle, by full
       name (p2mlib.oaiport.bundle_decl_names); narrow it with `ext-defs` after `carve.py graph`.
       The old config's hand-set keys (patches, external_theorems, frozen, pinned, ...) are kept.
+      A port carrying the StdSimplex shim (Solutions/FOLDER/StdSimplexCompat.lean) gets the published
+      shim bundle (oaiport.STDSIMPLEX_BUNDLE, once in the workspace) as a --def automatically.
   carve_prep.py ext-defs CONFIG.json [--def Definitions.Def_X ...] [--names FILE] [--lean]
       after `carve.py graph`: external_defs = the bundles' declarations that are graph nodes
       (a field or constructor maps to its owner). --lean lists each bundle's constants with Lean
@@ -22,6 +24,7 @@ usage:
       for a bundle that has an anonymous instance (its name is Lean's to generate).
   carve_prep.py filter-patches PATCHES.json LEAN_ROOT OUT.json PREFIX [PREFIX ...]
                        [--compat-ns NS | --root-compat] [--compat FILE] [--header H.lean]
+                       [--stdsimplex auto|structure|subtype|off]
       keep the single-file patches (oai_port.py) whose `old` occurs exactly `count` times over the
       modules under the prefixes AS oai_port_modules.py PATCHES THEM (after its import, header,
       core and compat rewrites, macro inlining and guard renames: pass it the same options), for
@@ -138,6 +141,14 @@ def bundle_constants(ws, defmods):
 def make_config(d, folder, root, target, defmods=(), bundle_prefix=None, forced=(), budget=37,
                 overhead=0.0, ws=None, old=None):
     d = os.path.abspath(d)
+    defmods = list(defmods)
+    # the port carries the StdSimplex shim (oai_port_modules.py) and the shim is published: its
+    # declarations are external, so the carve imports the bundle instead of re-publishing them
+    shim_bundle = os.path.join(ws, *O.STDSIMPLEX_BUNDLE.split('.')) + '.lean'
+    if (os.path.exists(os.path.join(ws, 'Solutions', folder, O.STDSIMPLEX_MODULE + '.lean'))
+            and os.path.exists(shim_bundle) and O.STDSIMPLEX_BUNDLE not in defmods):
+        print('the port uses the StdSimplex shim: external definitions from', O.STDSIMPLEX_BUNDLE)
+        defmods.append(O.STDSIMPLEX_BUNDLE)
     open(os.path.join(d, 'build_adj.log'), 'w', encoding='utf-8').write(merged_build_log(d, overhead))
     cfg = {'src': ws, 'roots': ['Solutions.%s.%s' % (folder, root)], 'prefix': 'Solutions.' + folder,
            'targets': [target], 'forced': list(forced), 'external': [target],
@@ -258,17 +269,17 @@ def filter_patches(patches, texts):
     return keep, drop
 
 
-def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header=''):
+def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='', stdsimplex='auto'):
     """filter_patches against the text oai_port_modules.py patches: the modules after its import,
     header, core and compat rewrites (oaiport.module_texts), never OpenAI's raw source
     (ComparatorModel 2026-10-24: the `| zero` case core_rewrites adds counted 0 there and was
     dropped; CubeShuffle: a patch the compat aliases made redundant was kept)."""
     return filter_patches(patches, O.module_texts(sources, 'Solutions.FilterPatches', compat_text,
-                                                  compat_ns, header))
+                                                  compat_ns, header, stdsimplex))
 
 
 def cmd_filter_patches(argv):
-    pos = positional(argv, ('--compat-ns', '--compat', '--header'))
+    pos = positional(argv, ('--compat-ns', '--compat', '--header', '--stdsimplex'))
     if len(pos) < 4:
         sys.exit(__doc__)
     src, lean_root, out, prefixes = pos[0], pos[1], pos[2], pos[3:]
@@ -277,7 +288,8 @@ def cmd_filter_patches(argv):
     ns = None if '--root-compat' in argv else opt(argv, '--compat-ns', 'OAI')
     header = open(opt(argv, '--header'), encoding='utf-8').read() if '--header' in argv else ''
     try:
-        keep, drop = port_filter_patches(json.load(open(src)), srcs, compat, ns, header)
+        keep, drop = port_filter_patches(json.load(open(src)), srcs, compat, ns, header,
+                                         opt(argv, '--stdsimplex', 'auto'))
     except O.PortError as e:
         sys.exit(str(e))
     for n, p in drop:

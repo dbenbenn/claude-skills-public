@@ -300,6 +300,88 @@ def core_rewrites(text):
                   text, flags=re.M)
 
 
+# ---------------------------------------------------------------- the StdSimplex compatibility shim
+
+STDSIMPLEX_SHIM = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                               'StdSimplexCompat.lean')
+# the shim published as a definitions bundle (the single-file route imports it once it is in the
+# workspace; carve_prep config treats its declarations as external)
+STDSIMPLEX_BUNDLE = 'Definitions.Def_OAIStdSimplexCompat'
+STDSIMPLEX_MODULE = 'StdSimplexCompat'
+STDSIMPLEX_MODES = ('auto', 'structure', 'subtype', 'off')
+# Mathlib d13f23b files our Mathlib (0df444a) does not have; the shim provides their content
+STDSIMPLEX_MISSING_IMPORTS = tuple('Mathlib.Geometry.Convex.ConvexSpace.' + m for m in (
+    'Topology', 'CompactSpaceStdSimplex', 'Barycenter', 'PathConnectedSpaceStdSimplex',
+    'ModuleTopology'))
+# every `Convexity.StdSimplex.*` name the openai/math sources use (full checkout 1581d4c,
+# 2026-10-24); the P2M_LEAN test checks the shim (with our Mathlib) declares each one
+OAI_STDSIMPLEX_NAMES = tuple('StdSimplex.' + n for n in (
+    'barycenter continuous_convexCombPair continuous_map continuous_weights_apply '
+    'diam_range_toFun_comp_weights_subset_closedBall ext homeomorphI homeomorphI_apply_coe '
+    'homeomorphI_single_one homeomorphI_single_zero homeomorphI_symm_one homeomorphI_symm_zero '
+    'iConvexComb_single isAffineMap_map isBounded_range_toFun_comp_weights '
+    'isClosedEmbedding_toFun_comp_weights isEmbedding_toFun_comp_weights map map_comp map_const '
+    'map_id map_map map_sConvexComb map_single range_toFun_comp_weights single single_injective '
+    'subBarycenter subBarycenter_weights_apply_eq_zero total_of_fintype weights '
+    'weights_barycenter_apply weights_convexCombPair weights_map weights_nonneg weights_sConvexComb '
+    'weights_single weights_subBarycenter').split())
+_SIMPLEX = re.compile(r"(?<![\w.'])(?:Convexity\.)?StdSimplex(?![\w'])")
+_MISSING_IMPORT = re.compile(r'^import (%s)[ \t]*\n' % '|'.join(re.escape(m) for m in STDSIMPLEX_MISSING_IMPORTS), re.M)
+
+
+def mentions_stdsimplex(text):
+    """Does the text use `Convexity.StdSimplex` (qualified or bare) or import a d13f23b-only
+    ConvexSpace file?"""
+    return bool(_SIMPLEX.search(text) or _MISSING_IMPORT.search(text))
+
+
+def stdsimplex_mode(texts, mode='auto'):
+    """The shim mode for a port: 'off' when no text needs it (or on request); 'auto' means
+    'structure' (the shim's API on our `Convexity.StdSimplex`, no renaming). 'subtype' (on request)
+    renames `Convexity.StdSimplex` to `OAI.SStd`, the subtype `stdSimplex R X`: for code that
+    identifies the simplex with `SimplexCategory.toTop.obj` (Problem340's singular homology), whose
+    objects are that subtype in our Mathlib; it needs finite index types and has no ConvexSpace."""
+    if mode not in STDSIMPLEX_MODES:
+        raise PortError('unknown --stdsimplex mode %r (one of %s)' % (mode, ', '.join(STDSIMPLEX_MODES)))
+    if mode == 'off' or not any(mentions_stdsimplex(t) for t in texts):
+        return 'off'
+    return 'structure' if mode == 'auto' else mode
+
+
+def stdsimplex_rewrite(text, mode):
+    """The text for shim mode `mode`: the d13f23b-only Mathlib imports dropped; in 'subtype' mode
+    every `Convexity.StdSimplex` / bare `StdSimplex` renamed `OAI.SStd`."""
+    if mode == 'off':
+        return text
+    text = _MISSING_IMPORT.sub('', text)
+    if mode == 'subtype':
+        text = _SIMPLEX.sub('OAI.SStd', text)
+    return text
+
+
+def stdsimplex_shim(body=False):
+    """The shim's text (lean/StdSimplexCompat.lean); with body=True without its import lines, for
+    inlining into a single file."""
+    t = open(STDSIMPLEX_SHIM, encoding='utf-8').read()
+    if body:
+        t = re.sub(r'^import [^\n]*\n', '', t, flags=re.M).lstrip('\n')
+    return t
+
+
+def stdsimplex_single(text, mode='auto', use_bundle=False, drop=((), ())):
+    """The single-file route: (text, extra import lines, shim block to put after the imports).
+    With use_bundle the published bundle is imported; otherwise the shim is inlined, without the
+    declarations `drop` = (full names, anonymous instances) a statement bundle already declares."""
+    mode = stdsimplex_mode([text], mode)
+    if mode == 'off':
+        return text, [], ''
+    text = stdsimplex_rewrite(text, mode)
+    if use_bundle:
+        return text, ['import ' + STDSIMPLEX_BUNDLE], ''
+    block, _ = drop_declarations(stdsimplex_shim(body=True), set(drop[0]), set(drop[1]))
+    return text, [], block
+
+
 LINT = ('set_option linter.all false\nset_option linter.unusedVariables false\n'
         'set_option linter.unusedTactic false\nset_option linter.unreachableTactic false\n')
 
@@ -350,18 +432,21 @@ def inline_module_macros(sources):
             for oai, (short, _) in sources.items()}
 
 
-def module_texts(sources, mod, compat_text='', compat_ns='OAI', header=''):
+def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsimplex='auto'):
     """The workspace modules of a module-route port before the patches: {file name: text} under
     Lean prefix `mod` (e.g. Solutions.OAIQW_X), Compat.lean not included. `sources` as
     module_sources returns. Each module's OAI imports are rewritten to the ported copies (an import
     of an OpenAI module that is not ported is an error: add its prefix); tactic macros are inlined
     (inline_module_macros); a module importing none of them imports `<mod>.Compat`; the linter-off
-    lines and `header` go after the imports; then the core and compat rewrites. This is the text the patches are counted against
+    lines and `header` go after the imports; then the core and compat rewrites, and the StdSimplex
+    shim (stdsimplex_mode over all modules: each module that needs it imports `<mod>.StdSimplexCompat`,
+    stdsimplex_rewrite). This is the text the patches are counted against
     (carve_prep.py filter-patches; ComparatorModel 2026-10-24: counted against the raw source, the
     `| zero` case core_rewrites adds was not there yet)."""
     names = {k: v[0] for k, v in sources.items()}
     block, rewrites = compat_block(compat_text, compat_ns)
     sources = inline_module_macros(sources)
+    smode = stdsimplex_mode([x for _, x in sources.values()], stdsimplex)
     files, missing = {}, set()
     for oai, (short, t) in sources.items():
         def rep(m):
@@ -379,6 +464,11 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header=''):
                            count=1, flags=re.M)
             if not k:
                 t = 'import %s.Compat\n' % mod + t
+        if smode != 'off' and mentions_stdsimplex(t):
+            t = stdsimplex_rewrite(t, smode)
+            ls = t.split('\n')
+            k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
+            t = '\n'.join(ls[:k] + ['import %s.%s' % (mod, STDSIMPLEX_MODULE)] + ls[k:])
         ls = t.split('\n')
         k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
         t = '\n'.join(ls[:k] + [''] + (LINT + header).rstrip().split('\n') + ls[k:])
@@ -388,12 +478,16 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header=''):
     return files
 
 
-def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', header=''):
+def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', header='', stdsimplex='auto'):
     """module_texts, then the patches for the module route (each exactly its count over all files;
-    single-file-only ones skipped, see single_file_only), and Compat.lean holding
-    compat_block(compat_text, compat_ns)."""
-    files = apply_patches(module_texts(sources, mod, compat_text, compat_ns, header), patches, route='modules')
+    single-file-only ones skipped, see single_file_only), Compat.lean holding
+    compat_block(compat_text, compat_ns), and StdSimplexCompat.lean (the shim) when a module
+    needs it."""
+    files = apply_patches(module_texts(sources, mod, compat_text, compat_ns, header, stdsimplex),
+                          patches, route='modules')
     files['Compat.lean'] = 'import Mathlib\n\n' + compat_block(compat_text, compat_ns)[0]
+    if any(('import %s.%s\n' % (mod, STDSIMPLEX_MODULE)) in x for x in files.values()):
+        files[STDSIMPLEX_MODULE + '.lean'] = stdsimplex_shim()
     return files
 
 

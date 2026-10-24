@@ -327,3 +327,70 @@ def test_build_rebuilds_the_dependents_of_a_changed_module(tmp_path, monkeypatch
     os.utime(str(out / 'C.olean'), (t0, t0))
     del built[:]
     assert BM.build(str(ws), 'F', 'Main')[0] and built == ['Main']
+
+
+# ---------------------------------------------------------------- the StdSimplex shim, module route
+
+def simplex_sources():
+    src = O.module_sources(LEAN, ['OAI.Fam'])
+    short, t = src['OAI.Fam.A']
+    src['OAI.Fam.A'] = (short, t.replace('import Mathlib\n', 'import Mathlib\nimport Mathlib.Geometry.Convex.ConvexSpace.Barycenter\n')
+                        + 'theorem s (n : ℕ) : Nonempty (Convexity.StdSimplex ℝ (Fin (n+1))) := inferInstance\n')
+    return src
+
+
+def test_module_route_adds_the_stdsimplex_shim_module_where_it_is_used():
+    files = O.module_files(simplex_sources(), 'Solutions.F', (), COMPAT)
+    assert files['StdSimplexCompat.lean'] == O.stdsimplex_shim()
+    a = files['A.lean']
+    # Compat still imported (the shim import is not a ported OpenAI module), the shim too, the
+    # d13f23b-only Mathlib import gone, the names kept (structure mode)
+    assert 'import Solutions.F.Compat\n' in a and 'import Solutions.F.StdSimplexCompat\n' in a
+    assert 'ConvexSpace.Barycenter' not in a and 'Convexity.StdSimplex ℝ' in a
+    assert 'StdSimplexCompat' not in files['Sub_B.lean'] and 'StdSimplexCompat' not in files['Main.lean']
+    sub = O.module_files(simplex_sources(), 'Solutions.F', (), COMPAT, stdsimplex='subtype')
+    assert 'Nonempty (OAI.SStd ℝ (Fin (n+1)))' in sub['A.lean']
+    off = O.module_files(simplex_sources(), 'Solutions.F', (), COMPAT, stdsimplex='off')
+    assert 'StdSimplexCompat.lean' not in off and 'ConvexSpace.Barycenter' in off['A.lean']
+    # nothing mentions it: no shim
+    assert 'StdSimplexCompat.lean' not in port()
+
+
+def test_filter_patches_sees_the_stdsimplex_rewrite():
+    src = simplex_sources()
+    p = [{'old': 'Nonempty (OAI.SStd ℝ', 'new': 'Nonempty (OAI.SStd ℝ'}]
+    keep, _ = CP.port_filter_patches(p, src, COMPAT, stdsimplex='subtype')
+    assert keep == p
+    keep, _ = CP.port_filter_patches(p, src, COMPAT)
+    assert keep == []
+
+
+def test_config_imports_the_published_shim_bundle(tmp_path):
+    d = tmp_path
+    ws = tmp_path / 'ws'
+    (ws / 'Definitions').mkdir(parents=True)
+    (ws / 'Solutions' / 'F').mkdir(parents=True)
+    (ws / 'Solutions' / 'F' / 'StdSimplexCompat.lean').write_text(O.stdsimplex_shim())
+    cfg = CP.make_config(str(d), 'F', 'Main', 'OAI.Fam.main', [], 'FAM', [], 40, 0.0, str(ws), None)
+    assert O.STDSIMPLEX_BUNDLE not in set(cfg['external_defs'].values())   # not published locally
+    (ws / 'Definitions' / (O.STDSIMPLEX_BUNDLE.split('.')[-1] + '.lean')).write_text(O.stdsimplex_shim())
+    cfg = CP.make_config(str(d), 'F', 'Main', 'OAI.Fam.main', [], 'FAM', [], 40, 0.0, str(ws), None)
+    assert cfg['external_defs']['Convexity.StdSimplex.homeomorphI'] == O.STDSIMPLEX_BUNDLE
+    assert cfg['external_defs']['OAI.SStd.map'] == O.STDSIMPLEX_BUNDLE
+
+
+@pytest.mark.lean
+def test_stdsimplex_shim_compiles_and_covers_openai_names(tmp_path):
+    import subprocess
+    from p2mlib.workspace import workspace
+    f = tmp_path / 'Shim.lean'
+    checks = ''.join('#check @Convexity.%s\n' % n for n in O.OAI_STDSIMPLEX_NAMES)
+    checks += 'example : CompactSpace (Convexity.StdSimplex ℝ (Fin 3)) := inferInstance\n'
+    checks += 'example : PathConnectedSpace (Convexity.StdSimplex ℝ ℕ) := inferInstance\n'
+    checks += '#check @OAI.SStd.isEmbedding_toFun_comp_weights\n'
+    f.write_text(O.stdsimplex_shim() + '\n' + checks)
+    r = subprocess.run(['lake', 'env', 'lean', '-DautoImplicit=false', str(f)], cwd=workspace(),
+                       capture_output=True, text=True)
+    out = r.stdout + r.stderr
+    assert r.returncode == 0 and 'error' not in out, out[-3000:]
+    assert 'sorry' not in out

@@ -1595,6 +1595,23 @@ already published still export root names: UniversalFInfinity's `OAIQWUFI004` (`
 `ite_eq_right`, `dite_eq_left`, `dite_eq_right`) and ESB's `OAIQWESB000` (`alias
 Finset.prod_le_prod₀`). A port that imports either of them must not declare those names again.
 
+**`Convexity.StdSimplex` is handled by a shim, never by hand** (2026-10-24). OpenAI's Mathlib
+(d13f23b) has `Convexity.StdSimplex` API ours (0df444a) lacks: its topology, compactness,
+barycenters, `homeomorphI`, `range_toFun_comp_weights` and more. `lean/StdSimplexCompat.lean`
+supplies all of it under the d13f23b names (Part 1, copied from Mathlib d13f23b), plus `OAI.SStd`,
+the subtype `stdSimplex` with the same names (Part 2). Both port routes apply it automatically when a
+source mentions `StdSimplex` (`--stdsimplex auto`, `p2mlib.oaiport.stdsimplex_*`). They drop the
+d13f23b-only `Mathlib.Geometry.Convex.ConvexSpace.*` imports, and the module route adds the module
+`StdSimplexCompat`. Our `SimplexCategory.toTop` is the subtype, so code that uses
+`SimplexCategory.toTop.obj` as a `StdSimplex` (Problem340's singular homology) needs
+`--stdsimplex subtype`, which renames `Convexity.StdSimplex` to `OAI.SStd`. That mode needs finite
+index types and has no `ConvexSpace`, so Thomason-style code that mixes both kinds of use still needs
+hand work. The shim is published as `Definitions.Def_OAIStdSimplexCompat`
+(p2m-standalone/oai-stdsimplex-compat). Once that bundle is in the workspace (`fetch_theorems.py`),
+`oai_port.py` imports it instead of inlining the shim, and `carve_prep.py config` adds it as a
+`--def`, so a carve imports it rather than publishing the shim again. Pass the same `--stdsimplex`
+to `oai_port_modules.py` and `carve_prep.py filter-patches`.
+
 ## Contributing outside a mission
 
 Almost every existing mission milestone is proved; the productive seams are milestones whose

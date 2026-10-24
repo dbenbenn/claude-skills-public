@@ -3,7 +3,8 @@
 way the verifier does (locally; never submits).
 
 usage: oai_port.py TARGET ROOT_MODULE SRC_LEAN_DIR OUT_DIR [--bundle Def_X ...] [--patches P.json]
-                   [--root-compat] [--no-check]
+                   [--root-compat] [--stdsimplex auto|structure|subtype|off] [--stdsimplex-inline]
+                   [--no-check]
 
   TARGET        the published theorem, e.g. OAI.Saxl.saxl_conjecture (its statement and bundles
                 must be in the workspace: fetch_theorems.py --names TARGET)
@@ -14,11 +15,19 @@ usage: oai_port.py TARGET ROOT_MODULE SRC_LEAN_DIR OUT_DIR [--bundle Def_X ...] 
   --patches     [{old, new, count, why}]: each must apply exactly `count` times (default 1)
   --root-compat the compatibility lemmas at the root, as before 2026-10-18; by default they live in
                 namespace OAI (two bundles each declaring root `ite_eq_left` clash)
+  --stdsimplex  the StdSimplex shim (lean/StdSimplexCompat.lean; p2mlib.oaiport.stdsimplex_mode):
+                auto (default) applies it when the source uses `Convexity.StdSimplex`, giving our
+                `Convexity.StdSimplex` the d13f23b API OpenAI uses; `subtype` also renames it to
+                `OAI.SStd` (the subtype `stdSimplex`, for code that identifies the simplex with
+                SimplexCategory.toTop.obj); `off` never. The published bundle
+                Definitions.Def_OAIStdSimplexCompat is imported when it is in the workspace
+                (fetch it with fetch_theorems.py), else the shim is inlined; --stdsimplex-inline
+                always inlines
 
 Steps: merge the closure (build_solution's closure and merge.py, each module section-wrapped);
 inline tactic macros; strip universe lists merge.py already declares; drop the bundles'
-declarations; rename OpenAI's copy of the target `<name>_oai`; core rewrites, compat rewrites, guard renames (`prelude` -> `prelude_`) and
-patches; prepend the compatibility block; append `theorem solution : type_of% @T_oai := @T_oai`;
+declarations; rename OpenAI's copy of the target `<name>_oai`; core rewrites, compat rewrites, guard renames (`prelude` -> `prelude_`),
+the StdSimplex shim and patches; prepend the compatibility block; append `theorem solution : type_of% @T_oai := @T_oai`;
 then (unless --no-check) compile the verifier's form (the statement imported, `theorem _check`),
 -j1, and write OUT_DIR/result.json {secs (CPU), wall, errors, axioms, unknown, bytes, dropped}.
 Rough rule: up to ~70–80 s local CPU passes the 300 s verifier; 90 s and slower timed out.
@@ -40,7 +49,8 @@ from p2mlib.workspace import workspace  # noqa: E402
 COMPAT = os.path.join(os.path.dirname(HERE), 'lean', 'compat_4_34.lean')
 
 
-def port_text(target, root, src, bundles, patches=(), compat_ns='OAI', ws=None):
+def port_text(target, root, src, bundles, patches=(), compat_ns='OAI', ws=None, stdsimplex='auto',
+              stdsimplex_inline=False):
     """(solution text, number of modules, dropped declarations)."""
     import build_solution as BS
     from p2mlib.leantext import inline_tactic_macros
@@ -70,13 +80,17 @@ def port_text(target, root, src, bundles, patches=(), compat_ns='OAI', ws=None):
     text = O.rename_target(text, target)
     block, rewrites = O.compat_block(open(COMPAT, encoding='utf-8').read(), compat_ns)
     text = O.guard_renames(O.apply_rewrites(O.core_rewrites(text), rewrites))
+    shim_bundle = os.path.exists(os.path.join(ws, *O.STDSIMPLEX_BUNDLE.split('.')) + '.lean')
+    text, shim_imports, shim = O.stdsimplex_single(text, stdsimplex, shim_bundle and not stdsimplex_inline,
+                                                   (names, anon))
     text = O.apply_patches(text, patches, route='single')
     t = BS.published(target)
     pre = [l for l in (t.get('preamble') or '').split('\n') if l.startswith('import ')]
     # a preamble may import only a few Mathlib modules; OpenAI's code was written against all of it
     if 'import Mathlib' not in pre:
         pre = ['import Mathlib'] + pre
-    sol = ('\n'.join(pre) + '\n\n' + block + '\n' + text.rstrip() + '\n\n'
+    pre += [l for l in shim_imports if l not in pre]
+    sol = ('\n'.join(pre) + '\n\n' + (shim + '\n' if shim else '') + block + '\n' + text.rstrip() + '\n\n'
            # no `open X in`: type_of% needs none, and a relative X fails at root level
            + 'theorem solution : type_of%% @%s_oai := @%s_oai\n' % (target, target))
     return sol, pre, len(mods), dropped
@@ -121,10 +135,13 @@ def main(argv):
     target, root, src, out = argv[:4]
     bundles = [argv[i + 1] for i, a in enumerate(argv) if a == '--bundle']
     patches = json.load(open(argv[argv.index('--patches') + 1])) if '--patches' in argv else []
+    smode = argv[argv.index('--stdsimplex') + 1] if '--stdsimplex' in argv else 'auto'
     os.makedirs(out, exist_ok=True)
     try:
         sol, pre, nmods, dropped = port_text(target, root, src, bundles, patches,
-                                             None if '--root-compat' in argv else 'OAI')
+                                             None if '--root-compat' in argv else 'OAI',
+                                             stdsimplex=smode,
+                                             stdsimplex_inline='--stdsimplex-inline' in argv)
     except O.PortError as e:
         sys.exit(str(e))
     solp = os.path.join(out, 'Sol_%s.lean' % target.replace('.', '_'))
