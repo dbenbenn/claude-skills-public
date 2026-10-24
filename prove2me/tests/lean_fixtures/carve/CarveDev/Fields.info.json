@@ -9,6 +9,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 700,
     "col": 65,
@@ -20,6 +21,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
    "names": [],
    "namespace": "",
    "opens": [],
@@ -40,6 +42,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 714,
     "col": 12,
@@ -58,6 +61,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
    "names": [],
    "namespace": "",
    "opens": [],
@@ -89,6 +93,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 745,
     "col": 29,
@@ -132,6 +137,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.fqm"
    ],
@@ -198,6 +204,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 780,
     "col": 11,
@@ -241,6 +248,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.Inner"
    ],
@@ -298,6 +306,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 838,
     "col": 56,
@@ -364,6 +373,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.Inner.fqm"
    ],
@@ -466,6 +476,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 885,
     "col": 21,
@@ -515,6 +526,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.Outer"
    ],
@@ -577,6 +589,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 975,
     "col": 88,
@@ -679,6 +692,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.Outer.fqm"
    ],
@@ -786,6 +800,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 1055,
     "col": 78,
@@ -876,6 +891,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.outer_dot"
    ],
@@ -976,6 +992,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 1069,
     "col": 12,
@@ -994,6 +1011,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD",
    "opens": [],
@@ -1029,6 +1047,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 1101,
     "col": 30,
@@ -1071,6 +1090,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.ZG.wcl"
    ],
@@ -1124,6 +1144,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 1109,
     "col": 6,
@@ -1142,6 +1163,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD.ZG",
    "opens": [],
@@ -1166,6 +1188,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 1123,
     "col": 12,
@@ -1184,6 +1207,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD",
    "opens": [],
@@ -1219,6 +1243,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 1169,
     "col": 14,
@@ -1261,6 +1286,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.AZ.wcl"
    ],
@@ -1314,6 +1340,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 1177,
     "col": 6,
@@ -1332,6 +1359,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD.AZ",
    "opens": [],
@@ -1363,6 +1391,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 1206,
     "col": 27,
@@ -1418,6 +1447,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.cp"
    ],
@@ -1490,6 +1520,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 1282,
     "col": 74,
@@ -1583,6 +1614,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.Outer.cp"
    ],
@@ -1685,6 +1717,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 1364,
     "col": 80,
@@ -1778,6 +1811,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.uses_outer_cp"
    ],
@@ -1890,6 +1924,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 1765,
     "col": 33,
@@ -1945,6 +1980,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.transfer"
    ],
@@ -2022,6 +2058,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 1855,
     "col": 44,
@@ -2113,6 +2150,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.Step"
    ],
@@ -2216,6 +2254,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 1908,
     "col": 21,
@@ -2277,6 +2316,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.Tree"
    ],
@@ -2352,6 +2392,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 1986,
     "col": 32,
@@ -2436,6 +2477,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.Tree.size"
    ],
@@ -2532,6 +2574,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 2003,
     "col": 15,
@@ -2550,6 +2593,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD",
    "opens": [],
@@ -2585,6 +2629,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 2023,
     "col": 19,
@@ -2624,6 +2669,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.Other.leaf"
    ],
@@ -2677,6 +2723,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 2033,
     "col": 9,
@@ -2695,6 +2742,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD.Other",
    "opens": [],
@@ -2726,6 +2774,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 2199,
     "col": 49,
@@ -2839,6 +2888,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.in",
+   "kinds_used": [],
    "names": [
     "CD.Tree.size_pos"
    ],
@@ -2959,6 +3009,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 2384,
     "col": 70,
@@ -3084,6 +3135,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.in",
+   "kinds_used": [],
    "names": [
     "CD.Tree.size_pos'"
    ],
@@ -3201,6 +3253,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 2392,
     "col": 6,
@@ -3219,6 +3272,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD",
    "opens": [],
@@ -3239,6 +3293,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 2393,
     "col": 0,
@@ -3250,6 +3305,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
    "names": [],
    "namespace": "",
    "opens": [],

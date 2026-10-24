@@ -9,6 +9,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 41,
     "col": 15,
@@ -27,6 +28,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
    "names": [],
    "namespace": "",
    "opens": [],
@@ -60,6 +62,7 @@
      ]
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 80,
     "col": 33,
@@ -88,6 +91,7 @@
     "CD.LI.instPropCOfNatNat"
    ],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD.LI",
    "opens": [],
@@ -137,6 +141,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 129,
     "col": 47,
@@ -185,6 +190,7 @@
     "CD.LI.instPropCOfNatNat"
    ],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.LI.uses_propc_b"
    ],
@@ -246,6 +252,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "doc": {
     "end": 223,
     "start": 131
@@ -298,6 +305,7 @@
     "CD.LI.instPropCOfNatNat"
    ],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.LI.uses_propc_sig_b"
    ],
@@ -354,6 +362,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 285,
     "col": 9,
@@ -372,6 +381,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD.LI",
    "opens": [],
@@ -392,6 +402,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 286,
     "col": 0,
@@ -403,6 +414,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
    "names": [],
    "namespace": "",
    "opens": [],

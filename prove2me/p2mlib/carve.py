@@ -776,22 +776,38 @@ class Graph:
             # theorem whose use need not show anywhere else)
             nd.ideps = self.inst_owners(c.insts or (), k, nd.module, c.index)
             nd.sig |= self.inst_owners(c.sig_insts or (), k, nd.module, c.index)
-        # `attribute [simp] foo` marks foo; notations in force are dependencies of what follows
+        # `attribute [simp] foo` marks foo; a notation in force is a dependency of what follows
+        # that uses it: by Lean's record, the commands whose syntax contains the notation's kind
+        # (and, through a notation written with another, that one's too); without a record, of
+        # everything that follows in its scope (a false `import Theorems.*` edge when the piece
+        # never used it: `local notation "DE" => double_eq` made size_zero, after it, need
+        # double_eq, 2026-10-24)
         for m, info in self.infos.items():
-            notations = []
+            notations = []              # (opener, refs, kinds or None)
+            by_kind = {}                # kind -> refs, transitively through notations it uses
             for c in info.commands:
                 if c.short_kind == 'attribute':
                     for o in self._source_refs(info, c, m, None):
                         self.nodes[o].attributed = True
                 elif c.short_kind in NOTATION and (m, c.index) not in self._scoped_cmds:
                     inner = c.context[-1][0] if c.context else None
-                    notations.append((inner, self._source_refs(info, c, m, None)))
+                    refs = self._source_refs(info, c, m, None)
+                    for kd in c.kinds_used or ():
+                        refs |= by_kind.get(kd, set())
+                    kinds = set(c.declares_kinds) if c.declares_kinds is not None else None
+                    for kd in kinds or ():
+                        by_kind[kd] = refs
+                    notations.append((inner, refs, kinds))
                 key = self.cmd_node.get((m, c.index))
                 if key:
                     openers = {o for o, _ in c.context}
-                    for inner, refs in notations:
-                        if inner is None or inner in openers:
-                            self.nodes[key].ndeps |= refs - {key}
+                    used = set(c.kinds_used) if c.kinds_used is not None else None
+                    for inner, refs, kinds in notations:
+                        if inner is not None and inner not in openers:
+                            continue
+                        if kinds is not None and used is not None and not kinds & used:
+                            continue
+                        self.nodes[key].ndeps |= refs - {key}
         for k, nd in self.nodes.items():
             nd.deps = nd.term | nd.sdeps | nd.ndeps | nd.ideps
         self._build_scoped_deps()

@@ -269,6 +269,9 @@ With `--idents` in elaborate mode every command also reports, from its info tree
   conclusion at those arguments and the head constants of its arguments (`algebraRat` at a field
   `K`: `CharZero K…`'s heads). The carver's leak check asks whether an instance a carved file
   newly shows could have answered one of these problems.
+* `declares_kinds`: the syntax kinds a notation (or syntax) command adds; `kinds_used`: those of
+  this file's earlier commands that the command's syntax contains (the notations it is written
+  with: a local notation is a dependency only of the commands that use it).
 * `declares`: `[name, class, [heads]]` for the constants its declaration names bind (class `""`
   unless an instance; heads: of the instance's conclusion, generic arguments left out).
 -/
@@ -285,6 +288,15 @@ def problemKey (env : Environment) (c : Name) (args : Array Expr) : Option (Name
   let body := ty.getForallBody
   let cls ← body.getAppFn.constName?
   return (cls, body.getAppArgs.filterMap (·.getAppFn.constName?))
+
+/-- The syntax kinds among `fileKinds` (those this file's notation commands added) that occur in
+`stx`: the notations a command is written with. -/
+partial def kindsUsed (fileKinds : NameSet) (stx : Syntax) (acc : NameSet) : NameSet :=
+  match stx with
+  | .node _ k args =>
+    let acc := if fileKinds.contains k then acc.insert k else acc
+    args.foldl (fun a x => kindsUsed fileKinds x a) acc
+  | _ => acc
 
 /-- The ranges of a command's identifier tokens, sorted by start. -/
 def tokenRanges (stx : Syntax) : Array (Nat × Nat) :=
@@ -523,6 +535,7 @@ unsafe def main (args : List String) : IO UInt32 := do
     opts messages inputCtx (headerStx? := header) (mainModule := mainModule)
   let headerEnv := env
   let factsRef ← IO.mkRef (#[] : Array (List (String × Json)))
+  let kindsRef ← IO.mkRef ({} : NameSet)
   -- one loop for both modes, like Frontend.processCommand but keeping every message (elaboration
   -- resets the command state's log per command -- Elab/Command.lean, elabCommandTopLevel -- and
   -- each parse starts from a fresh log so its syntax errors survive too). In parse-only mode only
@@ -557,7 +570,19 @@ unsafe def main (args : List String) : IO UInt32 := do
         let info ← IO.wait (← getCommandState).infoState.substituteLazy
         let trees := info.trees.toArray.map (·.substitute info.assignment)
         cmdRefs := referencedConsts trees
-        if idents then facts ← factsJ (← getCommandState).env headerEnv cmd trees
+        if idents then
+          facts ← factsJ (← getCommandState).env headerEnv cmd trees
+          -- the syntax kinds a notation (or syntax) command adds, and the ones of this file a
+          -- command's syntax uses: which notation a declaration actually uses
+          let mut newK : Array Name := #[]
+          if shapesParsing cmd.getKind then
+            let before := (Parser.parserExtension.getState cmdState.env).kinds
+            let after := (Parser.parserExtension.getState (← getCommandState).env).kinds
+            newK := after.foldl (fun acc k _ => if before.contains k then acc else acc.push k) #[]
+          kindsRef.modify fun ks => newK.foldl (·.insert ·) ks
+          let used := kindsUsed (← kindsRef.get) cmd {}
+          facts := facts ++ [("declares_kinds", toJson (newK.map toString)),
+                             ("kinds_used", toJson ((used.toList.map toString).toArray.qsort (· < ·)))]
     factsRef.modify (·.push facts)
     let got := got ++ pmsgs.toArray ++ emsgs
     let refs := refs.push cmdRefs

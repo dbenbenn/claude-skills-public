@@ -9,6 +9,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 39,
     "col": 17,
@@ -27,6 +28,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
    "names": [],
    "namespace": "",
    "opens": [],
@@ -58,6 +60,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "doc": {
     "end": 88,
     "start": 41
@@ -125,6 +128,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.List.headOr"
    ],
@@ -207,6 +211,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 183,
     "col": 41,
@@ -252,6 +257,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.List.headOr_nil"
    ],
@@ -306,6 +312,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 196,
     "col": 11,
@@ -324,6 +331,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD.List",
    "opens": [],
@@ -344,6 +352,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 214,
     "col": 16,
@@ -362,6 +371,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
    "names": [],
    "namespace": "",
    "opens": [],
@@ -386,6 +396,9 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [
+    "CD.Mac.termTwice!_"
+   ],
    "end": {
     "byte": 259,
     "col": 43,
@@ -438,6 +451,7 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.macro",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD.Mac",
    "opens": [],
@@ -496,6 +510,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 289,
     "col": 28,
@@ -538,6 +553,9 @@
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [
+    "CD.Mac.termTwice!_"
+   ],
    "names": [
     "CD.Mac.useMac"
    ],
@@ -587,6 +605,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 301,
     "col": 10,
@@ -605,6 +624,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD.Mac",
    "opens": [],
@@ -625,6 +645,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 302,
     "col": 0,
@@ -636,6 +657,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
    "names": [],
    "namespace": "",
    "opens": [],

@@ -79,10 +79,17 @@ def test_dot_notation_reads_no_unrelated_project_declaration_by_short_name(g):
     assert 'CD.Space.coord_eq' in g.nodes['CD.size_via_coord'].deps
 
 
-def test_local_notation_names_are_dependencies_of_what_follows(g):
-    # `local notation "DE" => double_eq` precedes `size_zero` in Mid's scope: a file keeping
-    # size_zero keeps the notation, whose identifiers Lean prechecks
-    assert 'CD.double_eq' in g.nodes['CD.size_zero'].deps
+def test_local_notation_names_are_dependencies_of_what_uses_the_notation(g):
+    # `local notation "DE" => double_eq` in Mid: double_zero (`DE 0`) depends on double_eq; size_zero,
+    # after it in its scope, never uses DE and does not (it did, by scope: a false import of the
+    # double_eq statement into the CD.main piece; the import-edge check found it, 2026-10-24)
+    assert 'CD.double_eq' in g.nodes['CD.double_zero'].deps
+    assert 'CD.double_eq' not in g.nodes['CD.size_zero'].deps
+    p = C.make_plan(g, ['CD.double_succ', 'CD.double_zero', 'CD.main'], forced=['CD.double_eq'],
+                    cost=C.size_costs(g), bundle_prefix='DE')
+    assert 'CD.double_eq' not in p['pieces']['CD.main']['imports']
+    assert 'import Theorems.Thm_CD_double_eq' not in C.gen_piece(g, p, 'CD.main')
+    # without Lean's record, a notation still counts for everything after it in its scope
 
 
 def test_private_names_are_per_module(g):
@@ -151,14 +158,14 @@ def test_check_plan_flags_a_definition_missing_from_the_bundles(g, plan):
 def test_forced_theorem_a_definition_needs_is_a_clear_error_without_statement_imports(g):
     # StrictInverseFirstPower (2026-10-18): forcing Bieberbach's |a₂| ≤ 2, which the instance
     # `CompactSpace DiskFamily` needs, crashed make_plan with KeyError. `CD.double_eq` is a theorem
-    # the definition `CD.sizedZero` uses, so it is bundle material once `CD.uses_sized` is a target.
+    # the definition `CD.doubleWitness` uses, so it is bundle material once `CD.uses_witness` is a target.
     # With bundles_import_statements off (the default is on) that stays a clear error.
-    with pytest.raises(C.CarveError, match=r'CD\.double_eq.*bundle.*CD\.sizedZero'):
-        C.make_plan(g, ['CD.uses_sized'], forced=['CD.double_eq'], cost=C.size_costs(g),
+    with pytest.raises(C.CarveError, match=r'CD\.double_eq.*bundle.*CD\.doubleWitness'):
+        C.make_plan(g, ['CD.uses_witness'], forced=['CD.double_eq'], cost=C.size_costs(g),
                     bundles_import_statements=False)
     # a target pulled into a bundle the same way gets the same error
     with pytest.raises(C.CarveError, match=r'CD\.double_eq.*bundle'):
-        C.make_plan(g, ['CD.uses_sized', 'CD.double_eq'], cost=C.size_costs(g),
+        C.make_plan(g, ['CD.uses_witness', 'CD.double_eq'], cost=C.size_costs(g),
                     bundles_import_statements=False)
 
 
@@ -1386,6 +1393,7 @@ def g_text():
     for info in g2.infos.values():
         for c in info.commands:
             c.resolved = c.insts = c.sig_insts = c.inst_keys = c.declares = None
+            c.declares_kinds = c.kinds_used = None
     return C.Graph(g2.consts, g2.imports, g2.ext_ns, g2.infos)
 
 
@@ -1395,6 +1403,7 @@ def test_the_text_reading_remains_the_logged_fallback(g, g_text):
     # without them, the text rules of 2026-10-16..23 still decide, and each guess is logged
     assert 'CD.Space.coord_eq' in g_text.nodes['CD.size_via_coord'].deps          # B024
     assert 'CD.Wide.succ' not in g_text.nodes['CD.uses_hk1'].deps                   # UniversalFInfinity
+    assert 'CD.double_eq' in g_text.nodes['CD.size_zero'].deps                     # notation by scope
     deps = g_text.nodes['CD.Outer.fqm'].deps                                        # PosteriorReplicas
     assert 'CD.Inner.fqm' in deps and 'CD.fqm' not in deps
     assert g_text.fallbacks and all(len(x) == 3 for x in g_text.fallbacks)

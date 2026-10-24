@@ -80,6 +80,8 @@ class Command:
     sig_insts: list = None
     inst_keys: list = None
     declares: list = None
+    declares_kinds: list = None   # syntax kinds a notation command adds
+    kinds_used: list = None       # this file's notation kinds the command's syntax contains
 
     @property
     def short_kind(self):
@@ -167,7 +169,7 @@ def parse(data, text_bytes=b''):
                     [(_pos(x['start']), _pos(x['end'])) for x in c.get('ids') or []],
                     c.get('idents'), c.get('heads'), c.get('binders'), c.get('doc'), c.get('private'),
                     c.get('resolved'), c.get('insts'), c.get('sig_insts'), c.get('inst_keys'),
-                    c.get('declares'))
+                    c.get('declares'), c.get('declares_kinds'), c.get('kinds_used'))
             for i, c in enumerate(data['commands'])]
     decls = []
     for d in data.get('decls') or []:

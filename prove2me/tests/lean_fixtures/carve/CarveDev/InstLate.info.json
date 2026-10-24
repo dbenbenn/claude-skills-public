@@ -9,6 +9,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 41,
     "col": 15,
@@ -27,6 +28,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
    "names": [],
    "namespace": "",
    "opens": [],
@@ -58,6 +60,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "doc": {
     "end": 229,
     "start": 43
@@ -128,6 +131,7 @@
     "CD.LI.boxInhabitedA"
    ],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.LI.late_default"
    ],
@@ -203,6 +207,7 @@
      ]
     ]
    ],
+   "declares_kinds": [],
    "doc": {
     "end": 362,
     "start": 283
@@ -254,6 +259,7 @@
     "CD.LI.boxInhabited"
    ],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.LI.boxInhabited"
    ],
@@ -317,6 +323,7 @@
      []
     ]
    ],
+   "declares_kinds": [],
    "end": {
     "byte": 450,
     "col": 31,
@@ -364,6 +371,7 @@
     "CD.LI.boxInhabited"
    ],
    "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
    "names": [
     "CD.LI.defaultBox"
    ],
@@ -418,6 +426,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 461,
     "col": 9,
@@ -436,6 +445,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
    "names": [],
    "namespace": "CD.LI",
    "opens": [],
@@ -456,6 +466,7 @@
     }
    ],
    "declares": [],
+   "declares_kinds": [],
    "end": {
     "byte": 462,
     "col": 0,
@@ -467,6 +478,7 @@
    "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
    "names": [],
    "namespace": "",
    "opens": [],
