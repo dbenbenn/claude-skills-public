@@ -253,7 +253,8 @@ With `--idents` in elaborate mode every command also reports, from its info tree
   one of the command's identifier tokens (a dot-identifier's range may start at its dot): `name` is
   the head constant of the elaborated term (`""` for a local: a bound variable, a section variable,
   a hypothesis); a structure-instance field (`{ w := 0 }`, `where w := 0`) is `[start, end,
-  projection, "f"]`. `A.coord_eq` with `A : Space` gives `[A]` local, `[coord_eq]` (its field part)
+  projection, "f"]`, and a name being declared or bound there (a declId, a constructor or
+  structure field of the declaration, a binder) `[start, end, name, "b"]`. `A.coord_eq` with `A : Space` gives `[A]` local, `[coord_eq]` (its field part)
   `CD.Space.coord_eq` and the whole token the same; `simp only [h]` and `rw [h]` record `h`; an
   `open`-resolved name records the constant it resolved to; a notation's `=> foo` and an
   `attribute [simp] foo` record `foo`. Only ranges the user wrote (canonical source info) count:
@@ -287,6 +288,7 @@ def inToken (toks : Array (Nat × Nat)) (a b : Nat) : Bool := Id.run do
 structure Facts where
   resolved : Array (Nat × Nat × String) := #[]
   fieldRanges : Std.HashSet (Nat × Nat) := {}
+  binderRanges : Std.HashSet (Nat × Nat) := {}
   seen : Std.HashSet (Nat × Nat × String) := {}
   consts : NameSet := {}
   sigConsts : NameSet := {}     -- of the terms elaborated before the value (the statement)
@@ -336,6 +338,7 @@ unsafe def factsOf (toks : Array (Nat × Nat)) (lo hi vs : Nat) (trees : Array I
                     st.modify fun f => { f with resolved := f.resolved.push (a, b, v), seen := f.seen.insert (a, b, v) }
               if ti.isBinder then
                 if let .const n _ := e.getAppFn then st.modify fun f => { f with declares := f.declares.insert n }
+                if inToken toks a b then st.modify fun f => { f with binderRanges := f.binderRanges.insert (a, b) }
               let (p, ns) := constsOf e ((← vis.get), (← st.get).consts)
               vis.set p
               st.modify fun f => { f with consts := ns }
@@ -395,7 +398,9 @@ unsafe def factsJ (env headerEnv : Environment) (stx : Syntax) (trees : Array In
   let decl := f.declares.toList.map fun c =>
     Json.arr #[toJson (toString c), toJson (if Meta.isInstanceCore env c then ((instClass env c).map toString).getD "" else "")]
   return [("resolved", Json.arr <| res.map fun (a, b, v) =>
-            Json.arr (#[toJson a, toJson b, toJson v] ++ (if f.fieldRanges.contains (a, b) then #[toJson "f"] else #[]))),
+            Json.arr (#[toJson a, toJson b, toJson v] ++
+              (if f.fieldRanges.contains (a, b) then #[toJson "f"]
+               else if f.binderRanges.contains (a, b) then #[toJson "b"] else #[]))),
           ("insts", names (insts.foldl (·.insert ·) {})),
           ("sig_insts", names (sigInsts.foldl (·.insert ·) {})),
           ("inst_classes", names classes),

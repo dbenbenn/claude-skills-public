@@ -191,12 +191,14 @@
     [
      90,
      102,
-     "CD.LI.uses_propc_a"
+     "CD.LI.uses_propc_a",
+     "b"
     ],
     [
      90,
      102,
-     ""
+     "",
+     "b"
     ],
     [
      105,
@@ -233,19 +235,133 @@
      "opener": 0
     }
    ],
-   "declares": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.LI.uses_propc_sig",
+     ""
+    ]
+   ],
+   "doc": {
+    "end": 363,
+    "start": 131
+   },
    "end": {
-    "byte": 140,
-    "col": 9,
-    "line": 9
+    "byte": 412,
+    "col": 48,
+    "line": 12
    },
    "heads": [],
    "idents": [
     {
-     "end": 140,
+     "end": 386,
+     "name": "uses_propc_sig",
+     "role": "decl",
+     "start": 372
+    },
+    {
+     "end": 399,
+     "name": "needsPropC",
+     "role": "ref",
+     "start": 389
+    },
+    {
+     "end": 412,
+     "name": "rfl",
+     "role": "ref",
+     "start": 409
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 386,
+      "col": 22,
+      "line": 12
+     },
+     "start": {
+      "byte": 372,
+      "col": 8,
+      "line": 12
+     }
+    }
+   ],
+   "inst_classes": [
+    "CD.LI.PropC",
+    "OfNat"
+   ],
+   "insts": [
+    "CD.LI.instPropCOfNatNat"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.LI.uses_propc_sig"
+   ],
+   "namespace": "CD.LI",
+   "opens": [],
+   "resolved": [
+    [
+     372,
+     386,
+     "CD.LI.uses_propc_sig",
+     "b"
+    ],
+    [
+     372,
+     386,
+     "",
+     "b"
+    ],
+    [
+     389,
+     399,
+     "CD.LI.needsPropC"
+    ],
+    [
+     409,
+     412,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [
+    "CD.LI.instPropCOfNatNat"
+   ],
+   "start": {
+    "byte": 131,
+    "col": 0,
+    "line": 9
+   },
+   "value_start": {
+    "byte": 406,
+    "col": 42,
+    "line": 12
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "declares": [],
+   "end": {
+    "byte": 423,
+    "col": 9,
+    "line": 14
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 423,
      "name": "CD.LI",
      "role": "scope",
-     "start": 135
+     "start": 418
     }
    ],
    "ids": [],
@@ -258,9 +374,9 @@
    "resolved": [],
    "sig_insts": [],
    "start": {
-    "byte": 131,
+    "byte": 414,
     "col": 0,
-    "line": 9
+    "line": 14
    }
   },
   {
@@ -273,9 +389,9 @@
    ],
    "declares": [],
    "end": {
-    "byte": 141,
+    "byte": 424,
     "col": 0,
-    "line": 10
+    "line": 15
    },
    "heads": [],
    "idents": [],
@@ -289,9 +405,9 @@
    "resolved": [],
    "sig_insts": [],
    "start": {
-    "byte": 141,
+    "byte": 424,
     "col": 0,
-    "line": 10
+    "line": 15
    }
   }
  ],

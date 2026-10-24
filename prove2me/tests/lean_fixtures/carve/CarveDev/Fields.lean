@@ -45,4 +45,32 @@ theorem Outer.cp (o : Outer) : cp (o.inner 0).val = (o.inner 0).val := rfl
 
 theorem uses_outer_cp (o : Outer) : cp (o.inner 0).val = (o.inner 0).val := o.cp
 
+/- Names that declare or name a case are not references: the carver must never write them in full
+(RationalHitting 2026-10-24: the constructor `| transfer (a b : K) …` of `Eval`, also the name of a
+definition, became `| _root_.….Eval.transfer`; PermanentBorder: `| zero =>` of `induction … with`
+became `| _root_.Nat.zero =>`, "Invalid alternative name"). -/
+
+def transfer (n : Nat) : Nat := n
+
+inductive Step : Nat → Nat → Prop where
+  | transfer (n : Nat) : Step n (transfer n)
+
+inductive Tree where
+  | leaf
+  | node (l r : Tree)
+
+def Tree.size : Tree → Nat
+  | .leaf => 1
+  | .node l r => l.size + r.size
+
+namespace Other
+def leaf : Nat := 0
+end Other
+
+open Other in
+theorem Tree.size_pos (t : Tree) : 0 < t.size := by
+  induction t with
+  | leaf => exact Nat.one_pos
+  | node l r hl _ => simp only [Tree.size]; omega
+
 end CD

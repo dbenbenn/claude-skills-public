@@ -613,14 +613,15 @@ def _compile_in_publish_order(g, plan, tmp_path):
             else:
                 mod = 'Solutions.Sol_' + C.slug(name)
                 C.compile_file(os.path.join(out, 'solutions', 'Sol_%s.lean' % C.slug(name)), mod, olean)
-                # the verifier's check: `solution` states exactly the published statement
+                # the verifier's check (p2mlib.localcheck): the solution, then the published
+                # statement in the same file, then `theorem _check : type_of% @T := @solution`
+                from p2mlib import localcheck
+                stub = open(os.path.join(out, 'lib', 'Thm_%s.lean' % C.slug(name)), encoding='utf-8').read()
+                sol = open(os.path.join(out, 'solutions', 'Sol_%s.lean' % C.slug(name)), encoding='utf-8').read()
+                pre = ''.join(l + '\n' for l in stub.split('\n') if l.startswith('import '))
+                stmt = '\n'.join(l for l in stub.split('\n') if not l.startswith('import '))
                 chk = tmp_path / ('Chk_%s.lean' % C.slug(name))
-                chk.write_text('import Lean\nimport Theorems.Thm_%s\nimport %s\nopen Lean in\n'
-                               'run_meta do\n'
-                               '  let a := (← getConstInfo `%s).type\n'
-                               '  let b := (← getConstInfo `solution).type\n'
-                               '  unless a == b do throwError "solution states {b}, not {a}"\n'
-                               % (C.slug(name), mod, name))
+                chk.write_text(localcheck.server_check_text(sol, pre, stmt, name))
                 C.compile_file(str(chk), None, olean)
 
 
@@ -1110,6 +1111,18 @@ def test_a_dotted_declaration_reads_its_body_in_its_own_namespace(g):
     assert 'CD.Space.size_eq' in g.nodes['CD.Space.cd_unused_simp'].deps
 
 
+def test_a_local_instance_in_scope_that_nothing_kept_uses_stays_out(g):
+    # every local instance in scope used to come back; Lean's record says no_inst_use never used
+    # cdLocalInst, while uses_local_inst's statement did (`default : Wide`, instance search)
+    out = C.Carver(g).carve({'CD.no_inst_use'}, g.have_names({'CD.no_inst_use', 'CD.Wide'}))
+    assert 'theorem no_inst_use' in out and not re.search(r'^local instance', out, re.M), out
+    out = C.Carver(g).carve({'CD.no_inst_use', 'CD.uses_local_inst'},
+                            g.have_names({'CD.no_inst_use', 'CD.uses_local_inst', 'CD.Wide'}))
+    assert out.count('local instance cdLocalInst_r') == 1
+    assert out.index('local instance cdLocalInst_r') < out.index('theorem uses_local_inst')
+    assert 'CD.cdLocalInst' in g.nodes['CD.uses_local_inst'].sig
+
+
 def test_a_named_local_instance_not_imported_is_emitted_again_under_a_unique_name(g):
     out = C.Carver(g).carve({'CD.uses_local_inst'}, g.have_names({'CD.uses_local_inst', 'CD.Wide'}),
                             sorry={'CD.uses_local_inst'})
@@ -1242,7 +1255,8 @@ def _section(txt, module):
 
 
 def _propc_plan(g):
-    return C.make_plan(g, ['CD.LI.uses_propc_a', 'CD.LI.uses_propc_b'], budget=100, bundle_budget=100,
+    return C.make_plan(g, ['CD.LI.uses_propc_a', 'CD.LI.uses_propc_b', 'CD.LI.uses_propc_sig',
+                           'CD.LI.uses_propc_sig_b'], budget=100, bundle_budget=100,
                        cost=C.size_costs(g), bundle_prefix='Q', chunker='schedule')
 
 
@@ -1254,11 +1268,20 @@ def test_an_anonymous_local_instance_whose_name_another_module_took_comes_back(g
     # failed (a global instance was patched in by hand).
     assert 'CD.LI.instPropCOfNatNat' in g.nodes          # InstA's; InstB's command has no node
     p = _propc_plan(g)
-    for n, mod in (('CD.LI.uses_propc_a', 'CarveDev.InstA'), ('CD.LI.uses_propc_b', 'CarveDev.InstB')):
+    for n, mod in (('CD.LI.uses_propc_a', 'CarveDev.InstA'), ('CD.LI.uses_propc_b', 'CarveDev.InstB'),
+                   ('CD.LI.uses_propc_sig', 'CarveDev.InstA'), ('CD.LI.uses_propc_sig_b', 'CarveDev.InstB')):
         piece, stub = C.gen_piece(g, p, n), C.gen_stub(g, p, n)
-        for txt, sec in ((piece, _section(piece, mod)), (stub, stub)):
-            assert re.search(r'^local instance \S+ : PropC 3', sec, re.M), txt
-            assert sec.index('local instance') < sec.index('theorem uses_propc')
+        # a statement stub carries the instance only when its statement needs it (`needsPropC 3`:
+        # instance search, no name in the text); `PropC 3 := inferInstance` needs it in its proof only
+        texts = [(piece, _section(piece, mod))] + ([(stub, stub)] if '_sig' in n else [])
+        # in force again: its command re-emitted, or (InstA's, which a bundle carries for the
+        # statements needing it) re-activated from the bundle
+        for txt, sec in texts:
+            m = re.search(r'^(local instance \S+ : PropC 3|attribute \[local instance\] \S*instPropC)', sec, re.M)
+            assert m, txt
+            assert m.start() < sec.index('theorem uses_propc')
+        if '_sig' not in n:
+            assert 'local instance' not in stub, stub
 
 
 @pytest.mark.lean
@@ -1297,15 +1320,20 @@ def test_an_instance_a_carved_declaration_never_saw_is_reported(g):
     # RationalHitting (2026-10-24): the instance witnessCharZero (Generator.lean) reached the carved
     # list_hits piece's Certificates.lean declarations through a bundle; `algebraMap ℚ` elaborated
     # through it there, and a `rwa [RingHom.ext_rat …]` no longer matched. Detected, as a warning.
-    t = 'CD.LI.box_get'
+    t, u = 'CD.LI.box_default', 'CD.LI.box_get'
     p = {'bundles': [{'name': 'L0', 'nodes': ['CD.LI.Box', 'CD.LI.Box.get', 'CD.LI.boxInhabited',
                                               'CD.LI.defaultBox'], 'imports': []}],
-         'nodes': [t], 'external_defs': {}, 'external': [],
-         'stubs': {t: {'bundles': ['L0']}}, 'pieces': {t: {'keep': [t], 'imports': [], 'bundles': ['L0']}}}
+         'nodes': [t, u], 'external_defs': {}, 'external': [],
+         'stubs': {t: {'bundles': ['L0']}, u: {'bundles': ['L0']}},
+         'pieces': {t: {'keep': [t], 'imports': [], 'bundles': ['L0']},
+                    u: {'keep': [u], 'imports': [], 'bundles': ['L0']}}}
     leaks = C.instance_leaks(g, p)
+    # box_default asks instance search for an `Inhabited Box`: the later boxInhabited could take part
     assert ('piece:' + t, t, 'CD.LI.boxInhabited') in leaks
     assert ('statement:' + t, t, 'CD.LI.boxInhabited') in leaks
-    assert ('bundle:L0', 'CD.LI.Box.get', 'CD.LI.boxInhabited') in leaks
+    # box_get and Box.get ask for no Inhabited instance (the old rule, which matched the
+    # instance's type against what they use, reported both: 16-63 such warnings per real carve)
+    assert not [x for x in leaks if x[1] in (u, 'CD.LI.Box.get')]
     # defaultBox's module declares the instance before it; the structure itself uses nothing
     assert not [x for x in leaks if x[1] in ('CD.LI.defaultBox', 'CD.LI.Box')]
     # without the instance in reach there is nothing to report; a local instance never leaks
@@ -1313,8 +1341,8 @@ def test_an_instance_a_carved_declaration_never_saw_is_reported(g):
     assert C.instance_leaks(g, p) == []
     assert not C._global_instance(g, 'CD.LI.instPropCOfNatNat')
     # grouped for the command line: one line per instance
-    assert C.leak_summary(leaks) == ['CD.LI.boxInhabited: 2 declarations in 3 files '
-                                     '(bundle:L0, piece:CD.LI.box_get, statement:CD.LI.box_get)']
+    assert C.leak_summary(leaks) == ['CD.LI.boxInhabited: 1 declaration in 2 files '
+                                     '(piece:CD.LI.box_default, statement:CD.LI.box_default)']
 
 
 @pytest.mark.lean
@@ -1359,6 +1387,8 @@ def test_measure_finds_a_false_import_edge(tmp_path):
         [('Theorems.Thm_CD_double_zero', 'CD.double_zero', 'false')]
     edges = json.loads((work / 'edges.json').read_text())
     # the edges a proof does use are kept: a rewrite, a notation (`DE` for double_eq), a statement
+    assert edges['piece:CD.double_succ']['method'] == 'constants'      # read from the .olean
+    assert edges['piece:CD.double_succ']['compiles'] == 1               # one confirming compile
     assert edges['piece:CD.double_succ']['imports']['Theorems.Thm_CD_double_eq'] == 'used'
     assert edges['piece:CD.double_zero']['imports'] == {'Theorems.Thm_CD_double_eq': 'used'}
     assert edges['piece:CD.main']['imports']['Theorems.Thm_CD_double_succ'] == 'used'
@@ -1373,3 +1403,19 @@ def test_measure_finds_a_false_import_edge(tmp_path):
     gen_and_inject()
     code, out = run('carve_measure.py', str(cfg))
     assert code == 0 and 'Thm_CD_double_zero' not in sol.read_text(), out
+
+
+def test_names_declared_or_naming_a_case_are_never_written_in_full(g):
+    # RationalHitting (2026-10-24): the constructor `| transfer (a b : K) …` of `Eval`, whose name
+    # is also a definition in the file, was pinned to `| _root_.….Eval.transfer` (a constructor name
+    # is a binder: Lean records it, but it is no reference). PermanentBorder: `| zero =>` of
+    # `induction … with` was pinned to `| _root_.Nat.zero` ("Invalid alternative name")
+    out = C.Carver(g).carve({'CD.Step'}, g.have_names({'CD.Step', 'CD.transfer'}))
+    assert '  | transfer (n : Nat) : Step n (transfer n)' in out, out
+    have = g.have_names({'CD.Tree.size_pos', 'CD.Tree', 'CD.Tree.size', 'CD.Other.leaf'})
+    out = C.Carver(g).carve({'CD.Tree.size_pos'}, have)
+    assert '  | leaf => exact Nat.one_pos' in out, out
+    # the case name is Lean's CD.Tree.leaf, the opened CD.Other.leaf would be the text's reading
+    c = g.infos['CarveDev.Fields'].commands[g.nodes['CD.Tree.size_pos'].cmd]
+    leaf = next(i for i in c.idents if i['name'] == 'leaf')
+    assert C._alternative_name(g.infos['CarveDev.Fields'], leaf)

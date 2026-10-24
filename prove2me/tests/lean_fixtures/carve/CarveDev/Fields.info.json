@@ -140,12 +140,14 @@
     [
      724,
      727,
-     "CD.fqm"
+     "CD.fqm",
+     "b"
     ],
     [
      724,
      727,
-     ""
+     "",
+     "b"
     ],
     [
      730,
@@ -245,17 +247,20 @@
     [
      757,
      762,
-     "CD.Inner"
+     "CD.Inner",
+     "b"
     ],
     [
      757,
      762,
-     ""
+     "",
+     "b"
     ],
     [
      771,
      774,
-     "CD.Inner.val"
+     "CD.Inner.val",
+     "b"
     ],
     [
      777,
@@ -363,17 +368,20 @@
     [
      790,
      799,
-     "CD.Inner.fqm"
+     "CD.Inner.fqm",
+     "b"
     ],
     [
      790,
      799,
-     ""
+     "",
+     "b"
     ],
     [
      801,
      802,
-     ""
+     "",
+     "b"
     ],
     [
      805,
@@ -509,17 +517,20 @@
     [
      850,
      855,
-     "CD.Outer"
+     "CD.Outer",
+     "b"
     ],
     [
      850,
      855,
-     ""
+     "",
+     "b"
     ],
     [
      864,
      869,
-     "CD.Outer.inner"
+     "CD.Outer.inner",
+     "b"
     ],
     [
      872,
@@ -668,17 +679,20 @@
     [
      895,
      904,
-     "CD.Outer.fqm"
+     "CD.Outer.fqm",
+     "b"
     ],
     [
      895,
      904,
-     ""
+     "",
+     "b"
     ],
     [
      906,
      907,
-     ""
+     "",
+     "b"
     ],
     [
      910,
@@ -860,17 +874,20 @@
     [
      985,
      994,
-     "CD.outer_dot"
+     "CD.outer_dot",
+     "b"
     ],
     [
      985,
      994,
-     ""
+     "",
+     "b"
     ],
     [
      996,
      997,
-     ""
+     "",
+     "b"
     ],
     [
      1000,
@@ -1050,12 +1067,14 @@
     [
      1079,
      1082,
-     ""
+     "",
+     "b"
     ],
     [
      1079,
      1082,
-     "CD.ZG.wcl"
+     "CD.ZG.wcl",
+     "b"
     ],
     [
      1098,
@@ -1236,12 +1255,14 @@
     [
      1133,
      1136,
-     ""
+     "",
+     "b"
     ],
     [
      1133,
      1136,
-     "CD.AZ.wcl"
+     "CD.AZ.wcl",
+     "b"
     ],
     [
      1163,
@@ -1390,17 +1411,20 @@
     [
      1183,
      1185,
-     "CD.cp"
+     "CD.cp",
+     "b"
     ],
     [
      1183,
      1185,
-     ""
+     "",
+     "b"
     ],
     [
      1187,
      1188,
-     ""
+     "",
+     "b"
     ],
     [
      1191,
@@ -1551,17 +1575,20 @@
     [
      1216,
      1224,
-     "CD.Outer.cp"
+     "CD.Outer.cp",
+     "b"
     ],
     [
      1216,
      1224,
-     ""
+     "",
+     "b"
     ],
     [
      1226,
      1227,
-     ""
+     "",
+     "b"
     ],
     [
      1230,
@@ -1742,17 +1769,20 @@
     [
      1292,
      1305,
-     "CD.uses_outer_cp"
+     "CD.uses_outer_cp",
+     "b"
     ],
     [
      1292,
      1305,
-     ""
+     "",
+     "b"
     ],
     [
      1307,
      1308,
-     ""
+     "",
+     "b"
     ],
     [
      1311,
@@ -1834,19 +1864,1078 @@
      "opener": 1
     }
    ],
-   "declares": [],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.transfer",
+     ""
+    ]
+   ],
    "end": {
-    "byte": 1372,
-    "col": 6,
-    "line": 48
+    "byte": 1765,
+    "col": 33,
+    "line": 53
    },
    "heads": [],
    "idents": [
     {
-     "end": 1372,
+     "end": 1744,
+     "name": "transfer",
+     "role": "decl",
+     "start": 1736
+    },
+    {
+     "end": 1747,
+     "name": "n",
+     "role": "binder",
+     "start": 1746
+    },
+    {
+     "end": 1753,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1750
+    },
+    {
+     "end": 1760,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1757
+    },
+    {
+     "end": 1765,
+     "name": "n",
+     "role": "ref",
+     "start": 1764
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1744,
+      "col": 12,
+      "line": 53
+     },
+     "start": {
+      "byte": 1736,
+      "col": 4,
+      "line": 53
+     }
+    }
+   ],
+   "inst_classes": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.transfer"
+   ],
+   "namespace": "CD",
+   "opens": [],
+   "resolved": [
+    [
+     1736,
+     1744,
+     "CD.transfer",
+     "b"
+    ],
+    [
+     1736,
+     1744,
+     "",
+     "b"
+    ],
+    [
+     1746,
+     1747,
+     "",
+     "b"
+    ],
+    [
+     1750,
+     1753,
+     "Nat"
+    ],
+    [
+     1757,
+     1760,
+     "Nat"
+    ],
+    [
+     1764,
+     1765,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "start": {
+    "byte": 1732,
+    "col": 0,
+    "line": 53
+   },
+   "value_start": {
+    "byte": 1761,
+    "col": 29,
+    "line": 53
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.inductive",
+   "declares": [
+    [
+     "CD.Step.transfer",
+     ""
+    ],
+    [
+     "CD.Step",
+     ""
+    ]
+   ],
+   "end": {
+    "byte": 1855,
+    "col": 44,
+    "line": 56
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1781,
+     "name": "Step",
+     "role": "decl",
+     "start": 1777
+    },
+    {
+     "end": 1787,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1784
+    },
+    {
+     "end": 1795,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1792
+    },
+    {
+     "end": 1823,
+     "name": "transfer",
+     "role": "ref",
+     "start": 1815
+    },
+    {
+     "end": 1826,
+     "name": "n",
+     "role": "binder",
+     "start": 1825
+    },
+    {
+     "end": 1832,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1829
+    },
+    {
+     "end": 1840,
+     "name": "Step",
+     "role": "ref",
+     "start": 1836
+    },
+    {
+     "end": 1842,
+     "name": "n",
+     "role": "ref",
+     "start": 1841
+    },
+    {
+     "end": 1844,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1844
+    },
+    {
+     "end": 1852,
+     "name": "transfer",
+     "role": "ref",
+     "start": 1844
+    },
+    {
+     "end": 1854,
+     "name": "n",
+     "role": "ref",
+     "start": 1853
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1781,
+      "col": 14,
+      "line": 55
+     },
+     "start": {
+      "byte": 1777,
+      "col": 10,
+      "line": 55
+     }
+    }
+   ],
+   "inst_classes": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.Step"
+   ],
+   "namespace": "CD",
+   "opens": [],
+   "resolved": [
+    [
+     1777,
+     1781,
+     "CD.Step",
+     "b"
+    ],
+    [
+     1777,
+     1781,
+     "",
+     "b"
+    ],
+    [
+     1784,
+     1787,
+     "Nat"
+    ],
+    [
+     1792,
+     1795,
+     "Nat"
+    ],
+    [
+     1815,
+     1823,
+     "CD.Step.transfer",
+     "b"
+    ],
+    [
+     1825,
+     1826,
+     "",
+     "b"
+    ],
+    [
+     1829,
+     1832,
+     "Nat"
+    ],
+    [
+     1836,
+     1840,
+     ""
+    ],
+    [
+     1841,
+     1842,
+     ""
+    ],
+    [
+     1844,
+     1852,
+     "CD.transfer"
+    ],
+    [
+     1853,
+     1854,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "start": {
+    "byte": 1767,
+    "col": 0,
+    "line": 55
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.inductive",
+   "declares": [
+    [
+     "CD.Tree.node",
+     ""
+    ],
+    [
+     "CD.Tree",
+     ""
+    ],
+    [
+     "CD.Tree.leaf",
+     ""
+    ]
+   ],
+   "end": {
+    "byte": 1908,
+    "col": 21,
+    "line": 60
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1871,
+     "name": "Tree",
+     "role": "decl",
+     "start": 1867
+    },
+    {
+     "end": 1886,
+     "name": "leaf",
+     "role": "ref",
+     "start": 1882
+    },
+    {
+     "end": 1895,
+     "name": "node",
+     "role": "ref",
+     "start": 1891
+    },
+    {
+     "end": 1898,
+     "name": "l",
+     "role": "binder",
+     "start": 1897
+    },
+    {
+     "end": 1900,
+     "name": "r",
+     "role": "binder",
+     "start": 1899
+    },
+    {
+     "end": 1907,
+     "name": "Tree",
+     "role": "ref",
+     "start": 1903
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1871,
+      "col": 14,
+      "line": 58
+     },
+     "start": {
+      "byte": 1867,
+      "col": 10,
+      "line": 58
+     }
+    }
+   ],
+   "inst_classes": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.Tree"
+   ],
+   "namespace": "CD",
+   "opens": [],
+   "resolved": [
+    [
+     1867,
+     1871,
+     "CD.Tree",
+     "b"
+    ],
+    [
+     1867,
+     1871,
+     "",
+     "b"
+    ],
+    [
+     1882,
+     1886,
+     "CD.Tree.leaf",
+     "b"
+    ],
+    [
+     1891,
+     1895,
+     "CD.Tree.node",
+     "b"
+    ],
+    [
+     1897,
+     1898,
+     "",
+     "b"
+    ],
+    [
+     1899,
+     1900,
+     "",
+     "b"
+    ],
+    [
+     1903,
+     1907,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "start": {
+    "byte": 1857,
+    "col": 0,
+    "line": 58
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.Tree.size",
+     ""
+    ]
+   ],
+   "end": {
+    "byte": 1986,
+    "col": 32,
+    "line": 64
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1923,
+     "name": "Tree.size",
+     "role": "decl",
+     "start": 1914
+    },
+    {
+     "end": 1930,
+     "name": "Tree",
+     "role": "ref",
+     "start": 1926
+    },
+    {
+     "end": 1938,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1935
+    },
+    {
+     "end": 1948,
+     "name": "leaf",
+     "role": "dot",
+     "start": 1944
+    },
+    {
+     "end": 1963,
+     "name": "node",
+     "role": "dot",
+     "start": 1959
+    },
+    {
+     "end": 1965,
+     "name": "l",
+     "role": "ref",
+     "start": 1964
+    },
+    {
+     "end": 1967,
+     "name": "r",
+     "role": "ref",
+     "start": 1966
+    },
+    {
+     "end": 1977,
+     "name": "l.size",
+     "role": "ref",
+     "start": 1971
+    },
+    {
+     "end": 1986,
+     "name": "r.size",
+     "role": "ref",
+     "start": 1980
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1923,
+      "col": 13,
+      "line": 62
+     },
+     "start": {
+      "byte": 1914,
+      "col": 4,
+      "line": 62
+     }
+    }
+   ],
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.Tree.size"
+   ],
+   "namespace": "CD",
+   "opens": [],
+   "resolved": [
+    [
+     1914,
+     1923,
+     "CD.Tree.size",
+     "b"
+    ],
+    [
+     1914,
+     1923,
+     "",
+     "b"
+    ],
+    [
+     1926,
+     1930,
+     "CD.Tree"
+    ],
+    [
+     1935,
+     1938,
+     "Nat"
+    ],
+    [
+     1943,
+     1948,
+     "CD.Tree.leaf"
+    ],
+    [
+     1958,
+     1963,
+     "CD.Tree.node"
+    ],
+    [
+     1964,
+     1965,
+     "",
+     "b"
+    ],
+    [
+     1966,
+     1967,
+     "",
+     "b"
+    ],
+    [
+     1971,
+     1972,
+     ""
+    ],
+    [
+     1973,
+     1977,
+     ""
+    ],
+    [
+     1980,
+     1981,
+     ""
+    ],
+    [
+     1982,
+     1986,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "start": {
+    "byte": 1910,
+    "col": 0,
+    "line": 62
+   },
+   "value_start": {
+    "byte": 1941,
+    "col": 2,
+    "line": 63
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "end": {
+    "byte": 2003,
+    "col": 15,
+    "line": 66
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 2003,
+     "name": "Other",
+     "role": "scope",
+     "start": 1998
+    }
+   ],
+   "ids": [],
+   "inst_classes": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "names": [],
+   "namespace": "CD",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "start": {
+    "byte": 1988,
+    "col": 0,
+    "line": 66
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 21
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.Other.leaf",
+     ""
+    ]
+   ],
+   "end": {
+    "byte": 2023,
+    "col": 19,
+    "line": 67
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 2012,
+     "name": "leaf",
+     "role": "decl",
+     "start": 2008
+    },
+    {
+     "end": 2018,
+     "name": "Nat",
+     "role": "ref",
+     "start": 2015
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 2012,
+      "col": 8,
+      "line": 67
+     },
+     "start": {
+      "byte": 2008,
+      "col": 4,
+      "line": 67
+     }
+    }
+   ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.Other.leaf"
+   ],
+   "namespace": "CD.Other",
+   "opens": [],
+   "resolved": [
+    [
+     2008,
+     2012,
+     "",
+     "b"
+    ],
+    [
+     2008,
+     2012,
+     "CD.Other.leaf",
+     "b"
+    ],
+    [
+     2015,
+     2018,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "start": {
+    "byte": 2004,
+    "col": 0,
+    "line": 67
+   },
+   "value_start": {
+    "byte": 2019,
+    "col": 15,
+    "line": 67
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 21
+    }
+   ],
+   "declares": [],
+   "end": {
+    "byte": 2033,
+    "col": 9,
+    "line": 68
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 2033,
+     "name": "Other",
+     "role": "scope",
+     "start": 2028
+    }
+   ],
+   "ids": [],
+   "inst_classes": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "CD.Other",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "start": {
+    "byte": 2024,
+    "col": 0,
+    "line": 68
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Tree.size_pos",
+     ""
+    ]
+   ],
+   "end": {
+    "byte": 2199,
+    "col": 49,
+    "line": 74
+   },
+   "heads": [
+    {
+     "end": 2049,
+     "kind": "Lean.Parser.Command.open",
+     "start": 2035
+    }
+   ],
+   "idents": [
+    {
+     "end": 2045,
+     "name": "Other",
+     "role": "open",
+     "start": 2040
+    },
+    {
+     "end": 2070,
+     "name": "Tree.size_pos",
+     "role": "decl",
+     "start": 2057
+    },
+    {
+     "end": 2073,
+     "name": "t",
+     "role": "binder",
+     "start": 2072
+    },
+    {
+     "end": 2080,
+     "name": "Tree",
+     "role": "ref",
+     "start": 2076
+    },
+    {
+     "end": 2094,
+     "name": "t.size",
+     "role": "ref",
+     "start": 2088
+    },
+    {
+     "end": 2114,
+     "name": "t",
+     "role": "ref",
+     "start": 2113
+    },
+    {
+     "end": 2128,
+     "name": "leaf",
+     "role": "ref",
+     "start": 2124
+    },
+    {
+     "end": 2149,
+     "name": "Nat.one_pos",
+     "role": "ref",
+     "start": 2138
+    },
+    {
+     "end": 2158,
+     "name": "node",
+     "role": "ref",
+     "start": 2154
+    },
+    {
+     "end": 2160,
+     "name": "l",
+     "role": "ref",
+     "start": 2159
+    },
+    {
+     "end": 2162,
+     "name": "r",
+     "role": "ref",
+     "start": 2161
+    },
+    {
+     "end": 2165,
+     "name": "hl",
+     "role": "ref",
+     "start": 2163
+    },
+    {
+     "end": 2191,
+     "name": "Tree.size",
+     "role": "ref",
+     "start": 2182
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 2070,
+      "col": 21,
+      "line": 71
+     },
+     "start": {
+      "byte": 2057,
+      "col": 8,
+      "line": 71
+     }
+    }
+   ],
+   "inner_kind": "Lean.Parser.Command.declaration",
+   "inst_classes": [
+    "LT",
+    "OfNat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.in",
+   "names": [
+    "CD.Tree.size_pos"
+   ],
+   "namespace": "CD",
+   "opens": [],
+   "resolved": [
+    [
+     2057,
+     2070,
+     "CD.Tree.size_pos",
+     "b"
+    ],
+    [
+     2057,
+     2070,
+     "",
+     "b"
+    ],
+    [
+     2072,
+     2073,
+     "",
+     "b"
+    ],
+    [
+     2076,
+     2080,
+     "CD.Tree"
+    ],
+    [
+     2088,
+     2089,
+     ""
+    ],
+    [
+     2088,
+     2094,
+     "CD.Tree.size"
+    ],
+    [
+     2090,
+     2094,
+     "CD.Tree.size"
+    ],
+    [
+     2113,
+     2114,
+     ""
+    ],
+    [
+     2124,
+     2128,
+     "CD.Tree.leaf"
+    ],
+    [
+     2138,
+     2149,
+     "Nat.one_pos"
+    ],
+    [
+     2154,
+     2158,
+     "CD.Tree.node"
+    ],
+    [
+     2159,
+     2160,
+     "",
+     "b"
+    ],
+    [
+     2161,
+     2162,
+     "",
+     "b"
+    ],
+    [
+     2163,
+     2165,
+     "",
+     "b"
+    ],
+    [
+     2182,
+     2191,
+     "CD.Tree.size"
+    ]
+   ],
+   "sig_insts": [],
+   "start": {
+    "byte": 2035,
+    "col": 0,
+    "line": 70
+   },
+   "value_start": {
+    "byte": 2095,
+    "col": 46,
+    "line": 71
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "end": {
+    "byte": 2207,
+    "col": 6,
+    "line": 76
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 2207,
      "name": "CD",
      "role": "scope",
-     "start": 1370
+     "start": 2205
     }
    ],
    "ids": [],
@@ -1859,9 +2948,9 @@
    "resolved": [],
    "sig_insts": [],
    "start": {
-    "byte": 1366,
+    "byte": 2201,
     "col": 0,
-    "line": 48
+    "line": 76
    }
   },
   {
@@ -1874,9 +2963,9 @@
    ],
    "declares": [],
    "end": {
-    "byte": 1373,
+    "byte": 2208,
     "col": 0,
-    "line": 49
+    "line": 77
    },
    "heads": [],
    "idents": [],
@@ -1890,9 +2979,9 @@
    "resolved": [],
    "sig_insts": [],
    "start": {
-    "byte": 1373,
+    "byte": 2208,
     "col": 0,
-    "line": 49
+    "line": 77
    }
   }
  ],

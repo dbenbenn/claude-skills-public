@@ -118,12 +118,14 @@
     [
      132,
      144,
-     "CD.LI.boxInhabited"
+     "CD.LI.boxInhabited",
+     "b"
     ],
     [
      132,
      144,
-     ""
+     "",
+     "b"
     ],
     [
      147,
@@ -225,12 +227,14 @@
     [
      183,
      193,
-     "CD.LI.defaultBox"
+     "CD.LI.defaultBox",
+     "b"
     ],
     [
      183,
      193,
-     ""
+     "",
+     "b"
     ],
     [
      196,

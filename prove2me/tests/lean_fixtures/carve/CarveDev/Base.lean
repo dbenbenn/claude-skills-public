@@ -70,6 +70,9 @@ section
 which a carved statement needs to make `ZMod (∏ …)` finite, and which no bundle carries). -/
 local instance cdLocalInst : Inhabited Wide := ⟨⟨0⟩⟩
 theorem uses_local_inst : (default : Wide).w = 0 := rfl
+/-- In the local instance's scope but never uses it: a carved file keeping only this does not need
+the instance (the carver used to re-emit every local instance in scope). -/
+theorem no_inst_use : (1 : Nat) = 1 := rfl
 /- A binder that needs the local instance to elaborate: the instance must come back before the
 `variable`, not only before the theorem (Erdős 3 v2: `variable (hread : … W.cover …)` after
 `local instance … : NeZero W.cover`). -/

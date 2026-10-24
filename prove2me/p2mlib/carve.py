@@ -202,8 +202,9 @@ class Node:
     tdeps: set = field(default_factory=set)   # owners of what its declared constants' types use
     sdeps: set = field(default_factory=set)   # what its source names (resolved)
     ndeps: set = field(default_factory=set)   # what the notations in force before it name
+    ideps: set = field(default_factory=set)   # the project instances its elaboration used
     sig: set = field(default_factory=set)     # what its statement needs: tdeps + names before `:=`
-    deps: set = field(default_factory=set)    # term | sdeps | ndeps
+    deps: set = field(default_factory=set)    # term | sdeps | ndeps | ideps
 
 
 def load_decl_graph(path):
@@ -334,10 +335,18 @@ class Reading:
     consts: set
     entries: list
     field: bool = False       # the head is a structure-instance field name (`{ w := 0 }`)
+    binder: bool = False      # the token declares or binds its name (a declId, a constructor)
 
     @property
     def local(self):
         return not self.head
+
+
+def _alternative_name(info, idn):
+    """Is identifier idn the name of a case alternative (`| zero =>` of `induction … with`,
+    `case succ =>`), where Lean accepts no qualified name ("Invalid alternative name")?"""
+    before = info.text_bytes[max(0, idn['start'] - 40):idn['start']].rstrip()
+    return before.endswith(b'|') or re.search(rb'(?:^|\s)(?:case|next)$', before) is not None
 
 
 def last_component(text_bytes, a, b):
@@ -359,6 +368,9 @@ class Graph:
         self.modules = sorted(infos)
         self._closure_cache = {}
         self._readings = {}
+        # local instances a kept declaration used that a carved file could not put back in force
+        # (they name a declaration the file lacks): (module, instance line, declaration line)
+        self.lost_instances = []
         # identifier tokens read from text because Lean recorded nothing for them, that the
         # text-based reading took for project constants: (module, line, token)
         self.fallbacks = []
@@ -595,24 +607,30 @@ class Graph:
         key = (info.path, c.index)
         idx = self._readings.get(key)
         if idx is None:
-            # [a, b, name] for a term, [a, b, name, 'f'] for a structure-instance field
-            ents = sorted((x[0], x[1], x[2], len(x) > 3) for x in c.resolved)
+            # [a, b, name] for a term, + 'f' for a structure-instance field, 'b' for a binder
+            ents = sorted((x[0], x[1], x[2], x[3] if len(x) > 3 else '') for x in c.resolved)
             idx = self._readings[key] = ([(a, b, n) for a, b, n, _ in ents], [a for a, _, _, _ in ents],
-                                         {(a, b) for a, b, _, f in ents if f})
-        ents, starts, fields = idx
+                                         {(a, b): k for a, b, _, k in ents if k})
+        ents, starts, kinds = idx
         s0, e0 = idn['start'], idn['end']
         lo = bisect.bisect_left(starts, s0 - 1)
         hi = bisect.bisect_left(starts, e0)
         mine = [x for x in ents[lo:hi] if x[1] <= e0 and x[1] > s0]
         if not mine:
             return None
+        # a name the token declares or binds is not a use of it: read the uses when there are any
+        uses = [x for x in mine if kinds.get((x[0], x[1])) != 'b']
+        binder = not uses
+        if uses:
+            mine = uses
         at = [x for x in mine if x[0] <= s0]
         if not at:
             return None
         hb = min(b for _, b, _ in at)
         hs = min(a for a, b, _ in at if b == hb)
         head = tuple(sorted({n for a, b, n in at if b == hb and n}))
-        return Reading(head, (hs, hb), {n for _, _, n in mine if n}, mine, (hs, hb) in fields)
+        return Reading(head, (hs, hb), {n for _, _, n in mine if n} if not binder else set(), mine,
+                       kinds.get((hs, hb)) == 'f', binder)
 
     def is_project(self, n):
         return n in self.owner
@@ -747,6 +765,10 @@ class Graph:
             nd.sdeps = self._source_refs(info, c, nd.module, k)
             vs = c.value_start.byte if c.value_start else None
             nd.sig = set(nd.tdeps) | self._source_refs(info, c, nd.module, k, before=vs)
+            # the instances instance search used (a Prop instance such as `Fact`/`NeZero` is a
+            # theorem whose use need not show anywhere else)
+            nd.ideps = self.inst_owners(c.insts or (), k, nd.module, c.index)
+            nd.sig |= self.inst_owners(c.sig_insts or (), k, nd.module, c.index)
         # `attribute [simp] foo` marks foo; notations in force are dependencies of what follows
         for m, info in self.infos.items():
             notations = []
@@ -764,8 +786,47 @@ class Graph:
                         if inner is None or inner in openers:
                             self.nodes[key].ndeps |= refs - {key}
         for k, nd in self.nodes.items():
-            nd.deps = nd.term | nd.sdeps | nd.ndeps
+            nd.deps = nd.term | nd.sdeps | nd.ndeps | nd.ideps
         self._build_scoped_deps()
+
+    def is_local_instance(self, k):
+        """Is node k a `local instance` (visible only in the rest of its own section)?"""
+        nd = self.nodes[k]
+        return nd.instance and _local_instance(self.infos[nd.module], self.infos[nd.module].commands[nd.cmd])[0]
+
+    def inst_classes(self, k):
+        """The classes node k's elaboration asked instance search for (None: no record)."""
+        nd = self.nodes[k]
+        return self.infos[nd.module].commands[nd.cmd].inst_classes
+
+    def instance_class(self, k):
+        """The class instance node k provides (from its command's LeanInfo `declares`), or None."""
+        nd = self.nodes[k]
+        names = set(nd.names)
+        for n, cls in self.infos[nd.module].commands[nd.cmd].declares or ():
+            if n in names and cls:
+                return cls
+        return None
+
+    def inst_owners(self, names, me, m, idx):
+        """The nodes of the instances `names` (LeanInfo `insts`) that command idx of module m
+        could have used: earlier in m, or a global or scoped one of a module m imports. Sibling
+        modules' identical anonymous local instances share one generated name and one node
+        (Problem340); another module's local instance is never the one used: the command that
+        declared it in m is emitted again by the carver instead (Carver._reactivate)."""
+        out = set()
+        own = set(self.nodes[me].names) if me in self.nodes else set()
+        for n in names:
+            o = self.owner.get(n)
+            if not o or o == me or n in own:
+                continue
+            on = self.nodes[o]
+            if on.module == m:
+                if on.cmd < idx:
+                    out.add(o)
+            elif self.sees(m, on.module) and not self.is_local_instance(o):
+                out.add(o)
+        return out
 
     def _scope_targets(self, tok, ns):
         """The namespaces `open tok`, written in namespace ns, may name (no existence check: a
@@ -1823,7 +1884,11 @@ def instance_leaks(g, plan):
     search may then take another path: RationalHitting (2026-10-24), the instance witnessCharZero
     of Generator.lean reached the carved list_hits (Certificates.lean) through a bundle, and
     `algebraMap ℚ` elaborated through it, so a `rwa [RingHom.ext_rat …]` no longer matched.
-    A warning: most such instances change nothing."""
+    Only an instance of a class the declaration's elaboration asked instance search for can take
+    part (LeanInfo `inst_classes`: the classes of the instance arguments of every constant its terms
+    use; witnessCharZero is a CharZero, which `algebraMap ℚ` asks for through algebraRat). Without
+    that record, an instance whose type mentions something the declaration uses (or only library
+    types). A warning: whether type class search takes the new path there is not known."""
     pos, bimp, _ = _plan_index(plan)
     ext = set(plan.get('external_defs') or {})
 
@@ -1843,8 +1908,13 @@ def instance_leaks(g, plan):
             if k not in g.nodes:
                 continue
             uses = g.nodes[k].deps | g.nodes[k].sig
+            asked = g.inst_classes(k)
             for i in sorted(cand):
                 if i == k or saw(k, i):
+                    continue
+                if asked is not None:
+                    if g.instance_class(i) in asked:
+                        out.append((item, k, i))
                     continue
                 td = g.nodes[i].tdeps - {i}
                 if not td or td & uses:
@@ -2249,12 +2319,31 @@ class Carver:
         return ('section\n-- module %s\n' % m + (body + '\n' if body else '') +
                 ''.join(x + '\n' for x in closers) + 'end\n\n')
 
+    def _used_instances(self, info, c, m, sorried):
+        """The instances kept command c's elaboration used (LeanInfo `insts`, which sees instance
+        search in every term the elaborator recorded, plus the instances its compiled constants
+        name); for a statement stub (`sorried`) only its statement's. None when the port has no
+        record of c (then every local instance in scope counts, as before the record existed)."""
+        if c.insts is None:
+            return None
+        used = set(c.sig_insts if sorried else c.insts)
+        k = self.g.cmd_node.get((m, c.index))
+        if k:
+            for n in self.g.nodes[k].names:
+                x = self.g.consts.get(n) or {}
+                used.update(x.get('t', ()))
+                if not sorried:
+                    used.update(x.get('v', ()))
+        return used
+
     def _reactivate(self, info, c, m, drop, done, inst_names, have, sorried=False):
         """The local instances in force at kept command c in its module that this file does not
-        declare, put back in force. Their use can be invisible in the declaration graph (Hecke 7/8
-        AmplificationAllocationCost: `local instance : DecidableEq (ι ⊕ Fin 2) := Classical.decEq _`
-        won instance synthesis, but the elaborated term kept the defeq instance it was checked
-        against, so the theorem's constants never name it), so every one in scope counts:
+        declare and c's elaboration used, put back in force. Their use can be invisible in the
+        declaration graph (Hecke 7/8 AmplificationAllocationCost: `local instance : DecidableEq
+        (ι ⊕ Fin 2) := Classical.decEq _` won instance synthesis, but the elaborated term kept the
+        defeq instance it was checked against, so the theorem's constants never name it): the
+        elaborated port's record says which (`_used_instances`); without one, every one in scope
+        counts:
         - imported (a bundle carries it as a plain constant): `attribute [local instance] N`
           (FiniteRayExpansion's `Fintype (MulChar R ℂ)` in B002); inst_names maps a port name to
           the name Lean gave it in a published bundle that kept it anonymous;
@@ -2263,11 +2352,17 @@ class Carver:
         g = self.g
         chain = tuple(o for o, _ in c.context)
         out = []
+        used = self._used_instances(info, c, m, sorried)
         for vi in sorted(drop):
             if vi >= c.index or (vi, chain) in done or not _in_scope(info, vi, c):
                 continue
             vc = info.commands[vi]
             is_inst, anon_at = _local_instance(info, vc)
+            if is_inst and used is not None:
+                ik0 = g.cmd_node.get((m, vi))
+                names = {x[0] for x in vc.declares or ()} or set(g.nodes[ik0].names if ik0 else ())
+                if not names & used:
+                    continue
             # ik None: a local instance that is nobody's node. An instance of a Prop class is a
             # theorem, and Lean lets sibling modules declare the same one under one generated name
             # (Problem340 2026-10-24: `local instance : Fact ((0 : ℝ) < 100)` in 28 modules, 13
@@ -2289,6 +2384,9 @@ class Carver:
             opens = g.scope_opens(info, vc, m)
             refs = [i for i in vc.idents or [] if i['role'] == 'ref']
             if any(self._gone(i['name'], vc, m, have, opens, idn=i) for i in refs):
+                if used is not None:
+                    # used, but it names what this file lacks: the plan should have kept it
+                    g.lost_instances.append((m, vc.start.line, c.start.line))
                 continue
             short = pubname(ik).rsplit('.', 1)[-1] if ik else \
                 (decl['name'].rsplit('.', 1)[-1] if decl else 'localInst')
@@ -2453,13 +2551,21 @@ class Carver:
             if r is None:
                 rest.append(i)
                 continue
-            for a, b, n in r.entries:
+            for a, b, n in r.entries + self._binder_entries(info, c, i, r):
                 if n in rename:
                     span = last_component(info.text_bytes, a, b)
                     if span not in done:
                         done.add(span)
                         edits.append((span[0], span[1], rename[n]))
         return edits + self._rename_text(info, c, m, opens, rename, rest)
+
+    def _binder_entries(self, info, c, i, r):
+        """The declaring entries of token i that its Reading left out for a use (`theorem foo`
+        with `foo` also used inside the token: both renamed)."""
+        if r.binder:
+            return []
+        ents = [tuple(x[:3]) for x in c.resolved if len(x) > 3 and x[3] == 'b']
+        return [x for x in ents if i['start'] - 1 <= x[0] and x[1] <= i['end'] and x[1] > i['start']]
 
     def _rename_text(self, info, c, m, opens, rename, idents):
         """The text-based rename of identifiers the elaborated port has no record of (the fallback;
@@ -2583,9 +2689,10 @@ class Carver:
                 # carved file, where modules the original never imported sit side by side, would
                 # read that text as some other project declaration (a library constant included:
                 # a project `CD.Finset.foo` in the file would capture `Finset.foo`)
-                if len(r.head) != 1 or r.field or is_field(info, i) or \
-                        r.head[0].startswith('_private.') or r.head[0] in self.rename:
-                    continue                       # a field (`(e).f`, `{ f := … }`): typed, not named
+                if len(r.head) != 1 or r.field or r.binder or is_field(info, i) or \
+                        not g.is_project(r.head[0]) or r.head[0].startswith('_private.') or \
+                        r.head[0] in self.rename or _alternative_name(info, i):
+                    continue      # a field, a declared name, a case name (`| zero =>`): not a reference
                 orig = r.head[0]
                 a, b = r.span
                 if a < i['start'] or info.text_bytes[a:b].startswith(b'.'):

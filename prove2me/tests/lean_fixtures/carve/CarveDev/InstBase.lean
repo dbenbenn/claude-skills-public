@@ -40,4 +40,11 @@ def Box.get (x : Box) : Nat := x.b
 
 theorem box_get (x : Box) : x.get = x.b := rfl
 
+/-- Asks instance search for a `PropC n`: a statement using it at `3` needs the local instance. -/
+def needsPropC (n : Nat) [PropC n] : Nat := n
+
+/-- Instance search solves an `Inhabited Box` here (from the binder): a global instance of that
+class that this module never saw, visible in a carved file, could take part. -/
+theorem box_default [Inhabited Box] : (default : Box).get = (default : Box).b := rfl
+
 end CD.LI
