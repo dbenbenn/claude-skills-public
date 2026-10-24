@@ -55,7 +55,11 @@ class FakeApi:
         self.published = dict(published or {'A.top': 'TOP'})    # name -> id
         self.posted, self.jobs, self.subs, self.n = [], {}, {}, 0
         self.proved = set()
-        self.foreign, self.texts = {}, {}
+        self.foreign, self.texts, self.proofs = {}, {}, {}
+
+    def live_proofs(self, name):
+        """The live proofs of the theorem `name`: [{id, author, status, content}]."""
+        return [dict(x) for x in self.proofs.get(name, [])]
 
     def _next(self, name, ok):
         s = self.script.get(name)
@@ -214,7 +218,7 @@ def test_dry_run_reads_nothing_writes_nothing(split):
     class NoApi:
         def __getattr__(self, k):
             raise AssertionError('API used in a dry run: ' + k)
-    plan = R.Runner(cfg, NoApi(), sleep=lambda s: None).dry_run()
+    plan = R.Runner(cfg, NoApi(), sleep=lambda s: None).dry_run(read=False)
     assert plan['ready'] == ['bundle:XB000']
     assert plan['blocked'] == {}
     assert not (d / 'run_state.json').exists()
@@ -253,7 +257,7 @@ def test_command_line_is_a_dry_run_without_go(split, capsys):
     import split_run
     d, cfg = split
     (d / 'run.json').write_text(json.dumps(cfg))
-    split_run.main([str(d / 'run.json')])
+    split_run.main([str(d / 'run.json'), '--offline'])
     out = capsys.readouterr().out
     assert 'DRY RUN' in out and 'bundle:XB000' in out
     assert not (d / 'run_state.json').exists()
@@ -296,23 +300,23 @@ def test_a_bundle_importing_a_statement_waits_for_its_accepted_proof(split):
     assert api.posted.index(('verify', 'A.low_s2')) < api.posted.index(('def', 'XB001'))
 
 
-def test_a_statement_name_taken_by_a_different_statement_stops_with_its_dependents(split):
+def test_a_statement_name_taken_by_a_different_statement_is_a_hard_stop(split):
     # KervaireMixing 2026-10-18: `phase_upper_of_fixed` was Shuze Chen's, with their own bundles;
-    # split_run adopted it by name and our pieces imported it, colliding with our bundle
+    # split_run adopted it by name and our pieces imported it, colliding with our bundle. A live
+    # name with other text now stops the whole run before anything is posted (Boone-Higman
+    # 2026-10-24: a regenerated frozen bundle that differs from its published text is the same case)
     d, cfg = split
     api = FakeApi()
     api.foreign['A.low_s2'] = {'id': 'theirs', 'author': 'Shuze Chen',
                                'preamble': 'import Mathlib\nimport Definitions.Def_Theirs',
                                'formal_statement': 'theorem A_low_s2 : True := by\n  sorry\n'}
-    r, summary = run(cfg, api)
-    st = json.loads((d / 'run_state.json').read_text())
-    assert st['statement:A.low']['state'] == 'stop'
-    assert 'name taken by a different statement' in st['statement:A.low']['last']
-    assert 'Shuze Chen' in st['statement:A.low']['last'] and 'theirs' in st['statement:A.low']['last']
-    assert 'statement_suffix' in st['statement:A.low']['last']
-    assert ('verify', 'A.low_s2') not in api.posted and ('thm', 'A.low_s2') not in api.posted
-    # its dependents are reported blocked, not silently waiting
-    assert any('statement:A.low' in why for x, why in summary['blocked'].items() if x == 'piece:A.low')
+    with pytest.raises(R.LiveMismatch) as e:
+        run(cfg, api)
+    msg = str(e.value)
+    assert 'statement A.low_s2' in msg and 'Shuze Chen' in msg and 'theirs' in msg
+    assert 'statement_suffix' in msg and 'carve.py gen' in msg
+    assert api.posted == []
+    assert 'LIVE TEXT DIFFERS' in (d / 'PROGRESS.log').read_text()
 
 
 def test_an_exact_match_is_adopted_whitespace_aside(split):
@@ -326,21 +330,89 @@ def test_an_exact_match_is_adopted_whitespace_aside(split):
     assert st['statement:A.low']['state'] == 'live' and st['statement:A.low']['id'] == 'ours-before'
 
 
-def test_a_bundle_name_taken_by_a_different_definition_stops(split):
+def test_a_bundle_name_taken_by_a_different_definition_is_a_hard_stop(split):
     d, cfg = split
     api = FakeApi()
-    api.foreign['XB000'] = {'id': 'd1', 'author': 'Someone', 'definition': 'import Mathlib\n\ndef other : Nat := 2\n'}
-    r, summary = run(cfg, api)
-    st = json.loads((d / 'run_state.json').read_text())
-    assert st['bundle:XB000']['state'] == 'stop'
-    assert 'name taken by a different definitions bundle' in st['bundle:XB000']['last']
-    assert ('def', 'XB000') not in api.posted and ('def', 'XB001') not in api.posted
+    api.foreign['XB001'] = {'id': 'd1', 'author': 'Someone', 'definition': 'import Mathlib\n\ndef other : Nat := 2\n'}
+    with pytest.raises(R.LiveMismatch) as e:
+        run(cfg, api)
+    assert 'definitions bundle XB001' in str(e.value) and 'd1' in str(e.value)
+    assert api.posted == []                                   # not even the independent XB000
     api2 = FakeApi()
     api2.foreign['XB000'] = {'id': 'd0', 'author': 'dbenbenn', 'definition': 'import Mathlib\n\ndef  XB000.k : Nat := 1'}
-    (d / 'run_state.json').unlink()
     run(cfg, api2)
     st = json.loads((d / 'run_state.json').read_text())
     assert st['bundle:XB000']['state'] == 'live' and st['bundle:XB000']['id'] == 'd0'
+
+
+def test_live_items_of_an_extended_carve_are_adopted_without_their_prose(split):
+    # Extending a published carve (Boone-Higman option (c), 2026-10-24): the new carve's fresh run
+    # state would have re-posted the five live bundles; the agent seeded the state by hand. Every
+    # bundle and statement already live under its name with our text is adopted before anything
+    # is posted, and needs no prose (that belongs to the run that published it).
+    d, cfg = split
+    for n in ('XB000', 'XB001', 'A_low_s2'):
+        os.remove(d / 'prose' / ('%s.md' % n))
+    api = FakeApi(published={'A.top': 'TOP', 'XB000': 'b0', 'XB001': 'b1', 'A.low_s2': 's0'})
+    api.texts['XB001'] = {'definition': (d / 'out' / 'lib' / 'Def_XB001.lean').read_text()}
+    r, summary = run(cfg, api)
+    assert [p for p in api.posted if p[0] != 'verify'] == [('thm', 'A.mid_s2')]
+    st = json.loads((d / 'run_state.json').read_text())
+    assert [st[x]['id'] for x in ('bundle:XB000', 'bundle:XB001', 'statement:A.low')] == ['b0', 'b1', 's0']
+    assert summary['live'] == 7 and not summary['blocked']
+    assert '  XB001  adopt  b1' in (d / 'PROGRESS.log').read_text()
+
+
+def test_dry_run_reads_the_platform_and_reports_adoptions_without_writing(split):
+    d, cfg = split
+
+    class ReadOnly(FakeApi):
+        def submit_definition(self, body):
+            raise AssertionError('dry run posted')
+        submit_problems = verify = submit_definition
+    api = ReadOnly(published={'A.top': 'TOP', 'XB000': 'b0'})
+    plan = R.Runner(cfg, api, sleep=lambda s: None).dry_run()
+    assert plan['adopt'] == {'bundle:XB000': 'b0'} and plan['mismatch'] == []
+    assert plan['ready'] == ['bundle:XB001', 'statement:A.low']
+    assert not (d / 'run_state.json').exists() and not (d / 'PROGRESS.log').exists()
+    api.foreign['XB001'] = {'id': 'd1', 'author': 'Someone', 'definition': 'def other : Nat := 2\n'}
+    plan = R.Runner(cfg, api, sleep=lambda s: None).dry_run()
+    assert [m['name'] for m in plan['mismatch']] == ['XB001']
+
+
+def test_a_piece_whose_proof_is_live_with_our_text_is_adopted(split):
+    # Boone-Higman option (c): the first carve's pieces were accepted; a fresh run state would
+    # have sent them again (post_verify then refuses, as a stop). Our exact source live: adopted.
+    d, cfg = split
+    sol = (d / 'out' / 'solutions' / 'Sol_A_low_s2.lean').read_text()
+    api = FakeApi(published={'A.top': 'TOP', 'XB000': 'b0', 'A.low_s2': 's0'})
+    api.proofs['A.low_s2'] = [{'id': 'sub0', 'author': 'dbenbenn', 'status': 'ACCEPTED', 'content': sol + '\n'}]
+    api.proofs['A.top'] = [{'id': 'other', 'author': 'wurtle', 'status': 'SKETCH_ACCEPTED',
+                            'content': 'theorem solution : True := by\n  exact trivial\n'}]
+    plan = R.Runner(cfg, api, sleep=lambda s: None).dry_run()
+    assert plan['adopt']['piece:A.low'] == 'sub0'
+    assert plan['proved_elsewhere'] == {'piece:A.top': ['other (SKETCH_ACCEPTED, wurtle)']}
+    r, summary = run(cfg, api)
+    assert ('verify', 'A.low_s2') not in api.posted
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.low'] == {'state': 'live', 'id': 'sub0', 'history': {}}
+
+
+def test_command_line_dry_run_reads_but_never_writes(split, capsys, monkeypatch):
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
+    import split_run
+    d, cfg = split
+    (d / 'run.json').write_text(json.dumps(cfg))
+    fake = FakeApi(published={'A.top': 'TOP', 'XB000': 'b0'})
+    monkeypatch.setattr(R, 'LiveApi', lambda: fake)
+    split_run.main([str(d / 'run.json')])
+    out = capsys.readouterr().out
+    assert 'would adopt (1): bundle:XB000 b0' in out and 'would send now (2)' in out
+    assert not (d / 'run_state.json').exists()
+    # the read-only wrapper refuses every write, whatever the API object offers
+    with pytest.raises(RuntimeError):
+        R.ReadOnly(fake).submit_definition({})
 
 
 def test_a_file_the_soundness_guard_refuses_blocks_the_item_before_any_post(split):

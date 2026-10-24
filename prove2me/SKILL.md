@@ -1388,6 +1388,22 @@ back WA. The lessons:
   needs (Erdős 3 B006 `A.space`, B024 `coord`), or in which a bundle or piece rests on `sorry`
   (B022). Compile every bundle locally before publishing it. A published bundle is frozen
   (`frozen` in the config), so a later re-plan keeps it as it is.
+- **Extending a published carve** (a new statement after the first bundles are live) is the
+  normal path. Make a second carve with the live bundles under `frozen` (`plan`: the first carve's
+  plan; `bundles`: their names) and the live statements under `external_theorems`, then plan, gen,
+  measure and `split_run.py` as usual, with a fresh run state.
+  - **gen** writes each frozen bundle byte for byte from its published copy: `frozen.lib`, else
+    the workspace's `Definitions/` (`fetch_theorems.py --names`). It refuses when there is no copy.
+    It also re-applies `work/repairs.json` to every file, so a regenerated file is the one
+    measured. With `frozen.repairs` (the first carve's repairs.json) it checks the regenerated
+    text and prints `FROZEN … differs` on drift.
+  - **split_run** starts every run (and the dry run, read-only) by looking up every bundle,
+    statement and piece of the plan on the platform. It adopts each one live under its name with
+    our text (a piece: our exact source as a live proof), without needing its prose. A live name
+    with other text stops the whole run before anything is posted.
+  - Boone–Higman, 2026-10-24: gen dropped a measure-time repair from a frozen bundle, and the
+    agent seeded the run state by hand to keep five live bundles from being re-posted. Both are
+    now in the tools.
 - **Extending a split whose bundle another carver made** (the zero-divisor K(G,1) clause,
   2026-10-10): `carve.py` with a `frozen` bundle from the old per-mission carver produced pieces
   that imported none of the new bundles (its dependency edges missed names a `simp only` or `rw`

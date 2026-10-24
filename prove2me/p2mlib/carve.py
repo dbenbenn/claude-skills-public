@@ -33,6 +33,7 @@ import subprocess
 from dataclasses import dataclass, field
 
 from . import leanedit, leaninfo
+from . import repair as RP
 from .leantext import guard_message, guard_problems, strip
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -2936,7 +2937,7 @@ def gen_piece(g, plan, node, collapse_mathlib=True):
 
 
 def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, external=(),
-             collapse_mathlib=True, patches=()):
+             collapse_mathlib=True, patches=(), repairs=None, frozen_text=None):
     """Write out/lib/Def_<bundle>.lean, out/lib/Thm_<slug>.lean (not for `external` nodes,
     published by someone else) and out/solutions/Sol_<slug>.lean. Returns {'files', 'sizes',
     'over_cap'} (files over prove2.me's 1 MiB cap), 'patches_unused'}.
@@ -2944,18 +2945,37 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
     `patches`: [{'literal_old', 'literal_new'}] text replacements applied to every generated file.
     Proof fixes (a port's leftover `sorry`, a slow proof) go here, never into the port's source: the
     carver cuts modules by the command ranges recorded when the port was compiled, so a source edit
-    corrupts every later carve of that module (Erdős 3, 2026-10-16)."""
+    corrupts every later carve of that module (Erdős 3, 2026-10-16).
+
+    `repairs`: {file name: [cut]}, the cuts carve_measure recorded in work/repairs.json, applied
+    after the patches, so a regenerated file is the one that was measured (and published);
+    a cut that no longer matches is returned in 'stale_repairs' as (file name, cut).
+
+    `frozen_text`: {bundle name: text} of published bundles. A published bundle is frozen, so its
+    file is written exactly as published; when the generator (with patches and repairs) would
+    write something else, the bundle is listed in 'frozen_drift' (Boone-Higman, 2026-10-24: a
+    carve extending a published one regenerated its frozen bundles without their repair)."""
+    repairs, frozen_text = repairs or {}, frozen_text or {}
+    stale, drift = [], []
     os.makedirs(os.path.join(out, 'lib'), exist_ok=True)
     os.makedirs(os.path.join(out, 'solutions'), exist_ok=True)
     files = []
 
     used = set()
 
-    def put(path, txt):
+    def put(path, txt, published=None):
         for pt in patches:
             if pt['literal_old'] in txt:
                 txt = txt.replace(pt['literal_old'], pt['literal_new'])
                 used.add(pt['literal_old'])
+        base = os.path.basename(path)
+        if repairs.get(base):
+            txt, _, bad = RP.apply_cuts(txt, repairs[base])
+            stale.extend((base, c) for c in bad)
+        if published is not None:
+            if txt != published:
+                drift.append(base)
+            txt = published
         if os.path.basename(path).startswith(('Def_', 'Sol_')) and re.search(r'\bsorry\b', strip(txt)):
             raise CarveError('%s still contains sorry (a repaired declaration whose patch did not apply?)' % path)
         # what prove2.me's soundness guard refuses, found before publishing (WLTime 2026-10-23: a
@@ -2971,7 +2991,7 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
         for b in plan['bundles']:
             if names is None or b['name'] in names:
                 put(os.path.join(out, 'lib', 'Def_%s.lean' % b['name']),
-                    gen_bundle(g, plan, b['name'], collapse_mathlib))
+                    gen_bundle(g, plan, b['name'], collapse_mathlib), frozen_text.get(b['name']))
     for n in plan['nodes']:
         if names is not None and n not in names:
             continue
@@ -2984,4 +3004,5 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
                 gen_piece(g, plan, n, collapse_mathlib))
     sizes = {f: os.path.getsize(f) for f in files}
     return {'files': files, 'sizes': sizes, 'over_cap': [f for f, s in sizes.items() if s > SIZE_CAP],
-            'patches_unused': [pt['literal_old'] for pt in patches if pt['literal_old'] not in used]}
+            'patches_unused': [pt['literal_old'] for pt in patches if pt['literal_old'] not in used],
+            'stale_repairs': stale, 'frozen_drift': drift}

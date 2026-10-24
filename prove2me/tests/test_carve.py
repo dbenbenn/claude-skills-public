@@ -878,6 +878,102 @@ def test_patches_apply_to_every_generated_file(g, plan, tmp_path):
     assert res2['patches_unused'] == ['NO SUCH TEXT']
 
 
+# ---------------------------------------------------------------- extending a published carve
+
+def _carve_cli(tmp_path, name, **extra):
+    """A carve config of the fixture under tmp_path/name, and a runner of carve.py on it."""
+    import shutil
+    import subprocess
+    import sys
+    work = tmp_path / name / 'work'
+    work.mkdir(parents=True)
+    shutil.copy(os.path.join(FIX, 'decl_graph.jsonl'), work / 'decl_graph.jsonl')
+    cfg = tmp_path / name / 'carve.json'
+    cfg.write_text(json.dumps(dict({
+        'src': FIX, 'prefix': 'CarveDev', 'roots': ['CarveDev.Top'], 'targets': TARGETS,
+        'external': ['CD.main'], 'work': str(work), 'out': str(tmp_path / name / 'out'),
+        'bundle_prefix': 'CDB', 'budget': 0.05, 'bundle_budget': 0.005, 'bytes_per_second': 10000},
+        **extra)))
+    script = os.path.join(os.path.dirname(HERE), 'scripts', 'carve.py')
+
+    def run(*a, ok=True):
+        r = subprocess.run([sys.executable, script] + list(a), capture_output=True, text=True,
+                           env=dict(os.environ, P2M_WORKSPACE=str(tmp_path / 'ws')))
+        assert (r.returncode == 0) == ok, r.stdout + r.stderr
+        return r.stdout + r.stderr
+    (tmp_path / 'ws').mkdir(exist_ok=True)
+    return cfg, work, tmp_path / name / 'out', run
+
+
+def test_gen_applies_recorded_repairs(tmp_path):
+    # carve_measure cuts a failing context command and records the cut in work/repairs.json;
+    # Boone-Higman (2026-10-24): a later `carve.py gen` rewrote the bundle without the cut, so the
+    # regenerated file differed from the one measured and published
+    cfg, work, out, run = _carve_cli(tmp_path, 'a')
+    run('plan', str(cfg))
+    run('gen', str(cfg))
+    assert 'open _root_.List\n' in (out / 'lib' / 'Def_CDB002.lean').read_text()
+    (work / 'repairs.json').write_text(json.dumps({'Def_CDB002.lean': ['open _root_.List']}))
+    run('gen', str(cfg))
+    assert 'open _root_.List' not in (out / 'lib' / 'Def_CDB002.lean').read_text()
+    # a recorded cut that no longer matches is reported, not silently dropped
+    (work / 'repairs.json').write_text(json.dumps({'Def_CDB002.lean': ['open NoSuch']}))
+    assert 'STALE REPAIR Def_CDB002.lean' in run('gen', str(cfg))
+
+
+def test_gen_takes_frozen_bundles_verbatim_from_the_published_copy(tmp_path):
+    # Extending a published carve (Boone-Higman option (c), 2026-10-24): a second carve with the
+    # first carve's bundles `frozen` regenerated them from the graph, without the first carve's
+    # measure-time repair, and the agent copied the published files over by hand. A published
+    # bundle is frozen: gen writes exactly its published text.
+    cfg, work, out, run = _carve_cli(tmp_path, 'first')
+    run('plan', str(cfg))
+    run('gen', str(cfg))
+    pub = tmp_path / 'published'
+    pub.mkdir()
+    for b in ('CDB000', 'CDB002'):
+        txt = (out / 'lib' / ('Def_%s.lean' % b)).read_text()
+        if b == 'CDB002':                                   # the first carve's repair
+            from p2mlib import repair as RP
+            txt = RP.apply_cuts(txt, ['open _root_.List'])[0]
+            assert 'open _root_.List' not in txt
+        (pub / ('Def_%s.lean' % b)).write_text(txt)
+    frozen = {'plan': str(work / 'plan.json'), 'bundles': ['CDB000', 'CDB002']}
+    cfg2, work2, out2, run2 = _carve_cli(tmp_path, 'second', frozen=dict(frozen, lib=str(pub)))
+    run2('plan', str(cfg2))
+    run2('gen', str(cfg2))
+    for b in ('CDB000', 'CDB002'):
+        assert (out2 / 'lib' / ('Def_%s.lean' % b)).read_bytes() == (pub / ('Def_%s.lean' % b)).read_bytes()
+    # the published copy may also come from the workspace (fetch_theorems.py writes it there);
+    # the first carve's repairs, named by `frozen.repairs`, make the regenerated text agree
+    (work / 'repairs.json').write_text(json.dumps({'Def_CDB002.lean': ['open _root_.List']}))
+    cfg3, work3, out3, run3 = _carve_cli(tmp_path, 'third', frozen=dict(
+        frozen, repairs=str(work / 'repairs.json')))
+    (tmp_path / 'ws' / 'Definitions').mkdir()
+    for b in ('CDB000', 'CDB002'):
+        (tmp_path / 'ws' / 'Definitions' / ('Def_%s.lean' % b)).write_bytes((pub / ('Def_%s.lean' % b)).read_bytes())
+    run3('plan', str(cfg3))
+    assert 'differs' not in run3('gen', str(cfg3))
+    assert (out3 / 'lib' / 'Def_CDB002.lean').read_bytes() == (pub / 'Def_CDB002.lean').read_bytes()
+    # a frozen bundle the generator would now write differently is reported (the copy still wins)
+    (tmp_path / 'ws' / 'Definitions' / 'Def_CDB002.lean').write_text(
+        (pub / 'Def_CDB002.lean').read_text() + '-- published later\n')
+    msg = run3('gen', str(cfg3))
+    assert 'Def_CDB002' in msg and 'differs' in msg
+    assert (out3 / 'lib' / 'Def_CDB002.lean').read_text().endswith('-- published later\n')
+
+
+def test_gen_refuses_a_frozen_bundle_without_a_published_copy(tmp_path):
+    cfg, work, out, run = _carve_cli(tmp_path, 'first')
+    run('plan', str(cfg))
+    cfg2, _, out2, run2 = _carve_cli(tmp_path, 'second', frozen={
+        'plan': str(work / 'plan.json'), 'bundles': ['CDB000']})
+    run2('plan', str(cfg2))
+    msg = run2('gen', str(cfg2), ok=False)
+    assert 'CDB000' in msg and 'fetch_theorems.py' in msg
+    assert not (out2 / 'lib' / 'Def_CDB000.lean').exists()
+
+
 # ---------------------------------------------------------------- the schedule chunker
 
 def _bundle_depth(plan):

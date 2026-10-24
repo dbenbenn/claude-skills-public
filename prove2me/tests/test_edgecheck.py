@@ -123,6 +123,19 @@ def test_drop_records_the_cut_so_it_survives_gen(tmp_path):
     assert M.drop_cuts({'false': ['Theorems.Thm_U'], 'restore': {'Theorems.Thm_U': ['Definitions.Def_S']}}) is None
 
 
+def test_recorded_cuts_already_applied_by_gen_are_not_stale():
+    # carve.py gen re-applies work/repairs.json now (Boone-Higman, 2026-10-24), so measure finds
+    # most recorded cuts already made: silent; a cut whose text is still there but no longer
+    # matches as a command is stale
+    import carve_measure as M
+    text = 'import Mathlib\n\nvariable (a : Nat)\n  (b : Nat)\n\ntheorem t : True := trivial\n'
+    cut = ['open Foo', '(b : Nat)']
+    new, stale = M.reapply(text, cut)
+    assert '(b : Nat)' not in new and stale == []
+    assert M.reapply(new, cut) == (new, [])
+    assert M.reapply('import Mathlib\nopen Foo Bar\n', ['open Foo'])[1] == ['open Foo']
+
+
 # ------------------------------------------------------------- with Lean
 
 @pytest.mark.lean

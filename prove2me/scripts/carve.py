@@ -28,7 +28,12 @@ CONFIG.json (paths may use ~):
    "bundle_budget": 90, "bundle_size": 650000, "band_width": 4,
    "build_logs": ["build.log"],               # `lake build` output: per-module times for costs
    "time_scale": 1.5,                         # verifier time / local build time
-   "frozen": {"plan": "old_plan.json", "bundles": ["OAIErdos3B000"]},  # published: keep as is
+   "frozen": {"plan": "old_plan.json", "bundles": ["OAIErdos3B000"]},  # published: keep as is;
+                                              # gen writes each byte for byte from its published
+                                              # copy ("lib": DIR, else the workspace's
+                                              # Definitions/, fetch_theorems.py) and refuses
+                                              # without one; "repairs": the old carve's
+                                              # work/repairs.json, to check the regenerated text
    "collapse_mathlib": true,                  # `import Mathlib` instead of the module list
    "external_defs": {"OAI.Erdos3.HasAP": "Definitions.Def_ErdosReciprocal"},  # declarations
                                               # someone else's published bundle provides
@@ -67,7 +72,8 @@ about the module's own compile CPU time, so the first run is as slow as building
 the identifiers it still had to read from text are listed at the end. `plan` writes the plan and refuses one `check_plan` faults: a definition
 missing from the bundles a member needs (Erdős 3 B006 `A.space`, B024 `coord`), a bundle or
 piece resting on `sorry` (B022). `gen` writes out/lib/Def_<bundle>.lean, out/lib/Thm_<slug>.lean
-(statement stubs, `:= by sorry`) and out/solutions/Sol_<slug>.lean, each piece with OpenAI's copy
+(statement stubs, `:= by sorry`) and out/solutions/Sol_<slug>.lean, with the cuts carve_measure
+recorded in work/repairs.json re-applied and frozen bundles exactly as published, each piece with OpenAI's copy
 of its target renamed `<name>_oai` and `theorem solution : type_of% @<name>_oai := @<name>_oai`
 (without the rename, submissions came back WA). Compile each bundle locally, `-j1`, before
 publishing it. `order` prints waves: everything in a wave publishes concurrently once the earlier
@@ -119,6 +125,43 @@ def graph_path(cfg):
 
 def plan_path(cfg):
     return cfg.get('plan') or os.path.join(cfg['work'], 'plan.json')
+
+
+def recorded_repairs(cfg):
+    """carve_measure's recorded cuts (work/repairs.json), and those of the carve whose bundles are
+    frozen here (`frozen.repairs`), {file name: [cut]}: gen re-applies them."""
+    out = {}
+    for p in (((cfg.get('frozen') or {}).get('repairs')), os.path.join(cfg['work'], 'repairs.json')):
+        if p and os.path.exists(os.path.expanduser(p)):
+            for f, cuts in json.load(open(os.path.expanduser(p), encoding='utf-8')).items():
+                out.setdefault(f, [])
+                out[f] += [c for c in cuts if c not in out[f]]
+    return out
+
+
+def published_frozen(cfg, plan, names=None):
+    """{bundle: published text} of the frozen bundles gen is asked for, from `frozen.lib` or the
+    workspace's Definitions/ (where fetch_theorems.py writes published bundles). A published
+    bundle is frozen, so gen writes it byte for byte; without a copy it refuses."""
+    fz = cfg.get('frozen') or {}
+    dirs = [os.path.expanduser(fz['lib'])] if fz.get('lib') else []
+    dirs.append(os.path.join(leaninfo.workspace(), 'Definitions'))
+    out, missing = {}, []
+    planned = {b['name'] for b in plan['bundles']}
+    for b in fz.get('bundles', ()):
+        if b not in planned or (names is not None and b not in names):
+            continue
+        p = next((os.path.join(d, 'Def_%s.lean' % b) for d in dirs
+                  if os.path.exists(os.path.join(d, 'Def_%s.lean' % b))), None)
+        if p:
+            out[b] = open(p, encoding='utf-8').read()
+        else:
+            missing.append(b)
+    if missing:
+        sys.exit('frozen bundle(s) %s: no published copy in %s. A published bundle is written exactly '
+                 'as published: fetch it (fetch_theorems.py --names %s) or set frozen.lib to the '
+                 'directory holding Def_<name>.lean' % (' '.join(missing), ' or '.join(dirs), ' '.join(missing)))
+    return out
 
 
 def load_graph(cfg):
@@ -261,11 +304,19 @@ def main(argv):
         g, P = load_graph(cfg), json.load(open(plan_path(cfg)))
         what = rest[0] if rest and rest[0] in ('bundles', 'stubs', 'pieces', 'all') else 'all'
         names = set(rest[1:] if rest and rest[0] == what else rest) or None
-        r = C.generate(g, P, cfg['out'], ('bundles', 'stubs', 'pieces') if what == 'all' else (what,),
+        kinds = ('bundles', 'stubs', 'pieces') if what == 'all' else (what,)
+        frozen_text = published_frozen(cfg, P, names) if 'bundles' in kinds else {}
+        r = C.generate(g, P, cfg['out'], kinds,
                        names, cfg.get('external', ()), cfg.get('collapse_mathlib', True),
-                       json.load(open(os.path.expanduser(cfg['patches']))) if cfg.get('patches') else ())
+                       json.load(open(os.path.expanduser(cfg['patches']))) if cfg.get('patches') else (),
+                       repairs=recorded_repairs(cfg), frozen_text=frozen_text)
         for f in r['files']:
             print('%9d  %s' % (r['sizes'][f], f))
+        for f, c in r['stale_repairs']:
+            print('STALE REPAIR %s | %s' % (f, c.replace('\n', ' ')[:120]))
+        for f in r['frozen_drift']:
+            print('FROZEN %s: written as published; the generated text differs from it (the plan '
+                  'or a patch changed what this bundle would be; check what imports it)' % f)
         warn_leaks(g, P)
         report_fallbacks(g)
         for f in r['over_cap']:

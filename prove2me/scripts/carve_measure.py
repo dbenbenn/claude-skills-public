@@ -86,6 +86,14 @@ def copy_published(ws, olean, mods):
             shutil.copy(src, dst)
 
 
+
+def reapply(text, cuts):
+    """(text with the recorded cuts made, the cuts that are stale). `carve.py gen` already makes
+    them, so a cut whose text is gone counts as made; stale is one still there that no longer
+    matches as a command or binder group."""
+    new, _, stale = RP.apply_cuts(text, cuts)
+    return new, [c for c in stale if c in text]
+
 class Measure:
     def __init__(self, cfg_path, d=None):
         self.cfg = CLI.load_config(cfg_path)
@@ -139,7 +147,7 @@ class Measure:
     def apply_recorded(self, src):
         name = os.path.basename(src)
         text = open(src, encoding='utf-8').read()
-        new, _, stale = RP.apply_cuts(text, self.repairs.get(name, []))
+        new, stale = reapply(text, self.repairs.get(name, []))
         if new != text:
             open(src, 'w', encoding='utf-8').write(new)
         for c in stale:

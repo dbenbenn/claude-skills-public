@@ -11,8 +11,11 @@ matter `title:`, optional `source:`), `explanations/<slug>.md` for a piece (chec
 `explanation.problems`). An item whose files are missing or fail a check is blocked, never posted.
 
 State (`state` file, written after every post and result) makes a run resumable: live items are
-never re-posted, in-flight jobs and submissions are polled again, and a bundle or statement that is
-already on the platform under its name is adopted when its text is the one we generated. Terminal states (`split`, `stop`, `give_up`,
+never re-posted, in-flight jobs and submissions are polled again. Every run starts with
+`reconcile`: each bundle and statement already on the platform under its name is adopted when its
+text is the one we generated (prose not needed), and one with other text stops the whole run
+before anything is posted (LiveMismatch), which is what makes extending a published carve safe;
+a piece whose exact source is a live proof of its statement is adopted too. Terminal states (`split`, `stop`, `give_up`,
 `raise_heartbeats`) wait for a person; `reset(item)` clears one.
 
 The platform is an object with `theorem_id(name)`, `existing(kind, name)` (the live statement or
@@ -57,6 +60,18 @@ def same_as_ours(kind, rec, text):
     ours = split_statement(text)
     theirs = (split_statement(rec.get('preamble'))[0], _ws(rec.get('formal_statement')))
     return ours == theirs
+
+
+class LiveMismatch(RuntimeError):
+    """A bundle or statement of the plan is live under its name with other text: nothing is posted."""
+
+
+def _first_difference(ours, theirs):
+    a, b = (ours or '').split('\n'), (theirs or '').split('\n')
+    for i, (x, y) in enumerate(zip(a, b)):
+        if _ws(x) != _ws(y):
+            return 'line %d: ours %r, live %r' % (i + 1, x.strip()[:80], y.strip()[:80])
+    return 'ours has %d lines, live %d' % (len(a), len(b))
 
 
 class Runner:
@@ -156,6 +171,61 @@ class Runner:
         # statements or pieces
         rank = {'bundle': 0, 'statement': 1, 'piece': 2}
         return sorted(out, key=lambda x: rank[x.split(':', 1)[0]])
+
+    # ------------------------------------------------------------------ what is already live
+    def reconcile(self, write=True):
+        """Look up every bundle and statement not yet live in the state: one live under its name
+        with our text is adopted (no prose needed: it was published by an earlier run or carve);
+        one with other text is collected. Returns ({item: id} adopted, [mismatch]). With `write`,
+        adoptions go into the state and the log, and a mismatch raises LiveMismatch before
+        anything is posted. Boone-Higman (2026-10-24): a carve extended after its first bundles
+        were live started from a fresh state, and its run would have re-posted them."""
+        adopted, bad, self.proved_elsewhere = {}, [], {}
+        proofs = getattr(self.api, 'live_proofs', None)
+        for x in self.items:
+            kind = x.split(':', 1)[0]
+            if self.state.get(x, {}).get('state') in ('live', 'inflight'):
+                continue
+            f = self.info(x)
+            if not os.path.exists(f['file']):
+                continue
+            if kind == 'piece':
+                # our exact source already live is adopted; someone else's live proof is reported
+                # (a run's post_verify refuses the item then, for a person to compare)
+                if proofs is None:
+                    continue
+                text = _ws(open(f['file'], encoding='utf-8').read())
+                rows = proofs(f['name'])
+                mine = [r for r in rows if _ws(r.get('content')) == text]
+                if mine:
+                    adopted[x] = mine[0]['id']
+                elif rows:
+                    self.proved_elsewhere[x] = ['%s (%s, %s)' % (r.get('id'), r.get('status'), r.get('author') or '?')
+                                                for r in rows]
+                continue
+            rec = self.api.existing(kind, f['name'])
+            if not rec:
+                continue
+            text = open(f['file'], encoding='utf-8').read()
+            if same_as_ours(kind, rec, text):
+                adopted[x] = rec['id']
+                continue
+            theirs = rec.get('definition') if kind == 'bundle' else \
+                (rec.get('preamble') or '') + '\n\n' + (rec.get('formal_statement') or '')
+            bad.append({'item': x, 'kind': kind, 'name': f['name'], 'id': rec.get('id'),
+                        'author': rec.get('author') or '?', 'file': f['file'],
+                        'diff': _first_difference(text, theirs) if theirs else 'live text not served'})
+        if write:
+            for x, i in adopted.items():
+                self.st(x).update(state='live', id=i)
+                self.log(x, 'adopt', i)
+            if adopted:
+                self.save()
+            if bad:
+                for m in bad:
+                    self.log(m['item'], 'LIVE TEXT DIFFERS', 'id %s by %s; %s' % (m['id'], m['author'], m['diff']))
+                raise LiveMismatch(mismatch_message(bad))
+        return adopted, bad
 
     def reset(self, item):
         self.state.pop(item, None)
@@ -297,6 +367,7 @@ class Runner:
 
     def run(self, max_hours=None):
         t0 = time.time()
+        self.reconcile()
         while self.step():
             if max_hours and time.time() - t0 > max_hours * 3600:
                 break
@@ -312,10 +383,50 @@ class Runner:
                 'stopped': [x for x, s in zip(self.items, states) if s in TERMINAL],
                 'blocked': dict(self.blocked), 'total': len(self.items)}
 
-    def dry_run(self):
-        """What a run would send first, and what is blocked, without touching the platform."""
-        return {'ready': self.ready(), 'blocked': dict(self.blocked),
-                'items': len(self.items), 'live': sum(self.live(x) for x in self.items)}
+    def dry_run(self, read=True):
+        """What a run would adopt and send first, and what is blocked, writing nothing (neither
+        the platform nor the state file). With `read`, it looks the plan's names up on the
+        platform (reads only) as a run would; `read=False` touches no API at all."""
+        adopted, bad = self.reconcile(write=False) if read else ({}, [])
+        saved = self.state
+        self.state = json.loads(json.dumps(saved))
+        for x, i in adopted.items():
+            self.st(x).update(state='live', id=i)
+        try:
+            return {'ready': self.ready(), 'blocked': dict(self.blocked), 'adopt': adopted,
+                    'mismatch': bad, 'proved_elsewhere': dict(getattr(self, 'proved_elsewhere', {})),
+                    'items': len(self.items),
+                    'live': sum(self.live(x) for x in self.items)}
+        finally:
+            self.state = saved
+
+
+def mismatch_message(bad):
+    lines = ['%d name(s) of this plan are live on prove2.me with different text; nothing was posted.'
+             % len(bad)]
+    for m in bad:
+        what = 'definitions bundle' if m['kind'] == 'bundle' else 'statement'
+        lines.append('  %s %s: live id %s by %s; %s (ours: %s)' % (
+            what, m['name'], m['id'], m['author'], m['diff'], m['file']))
+    lines.append('A published item is frozen. If it is ours, regenerate the file to match it '
+                 '(carve.py gen writes frozen bundles from their published copy and re-applies '
+                 'work/repairs.json; a statement published by an earlier carve goes in '
+                 'external_theorems). If the name is someone else\'s, carve under a fresh name '
+                 '(statement_suffix, or another bundle_prefix).')
+    return '\n'.join(lines)
+
+
+class ReadOnly:
+    """An API wrapper for dry runs: lookups pass through, every write raises."""
+    READS = ('theorem_id', 'existing', 'live_proofs')
+
+    def __init__(self, api):
+        self._api = api
+
+    def __getattr__(self, k):
+        if k in self.READS:
+            return getattr(self._api, k)
+        raise RuntimeError('dry run: %s would write to the platform' % k)
 
 
 class LiveApi:
@@ -350,13 +461,32 @@ class LiveApi:
             h = hit[0]
             return {'id': h.get('theorem_id') or h.get('id'), 'author': h.get('created_by_username'),
                     'preamble': h.get('preamble'), 'formal_statement': h.get('formal_statement')}
-        r = self._call('GET', '/definitions?q=%s&limit=20' % name)
-        hit = [x for x in (r.get('definitions') or []) if x.get('definition_name') == name]
+        hit = []
+        # discover.md: `definition_name` is the exact filter; `q=` (the old lookup) is a search
+        for q in ('definition_name=%s&limit=5' % name, 'q=%s&limit=20' % name):
+            r = self._call('GET', '/definitions?' + q)
+            hit = [x for x in (r.get('definitions') or []) if x.get('definition_name') == name]
+            if hit:
+                break
         if not hit:
             return None
         h = hit[0]
         return {'id': h.get('definition_id'), 'author': h.get('created_by_username'),
                 'definition': h.get('definition')}
+
+    def live_proofs(self, name):
+        """The live proofs (accepted, sketch-accepted, pending) of the theorem named `name`, each
+        {id, author, status, content} with its exact solution.lean."""
+        tid = self.theorem_id(name)
+        if not tid:
+            return []
+        out = []
+        for r in self._api.live_proofs(tid, call=self._call):
+            sid = r.get('submission_id') or r.get('id')
+            out.append({'id': sid, 'status': r.get('status'),
+                        'author': r.get('username') or r.get('created_by_username') or r.get('user'),
+                        'content': self._api.submission_source(sid, call=self._call)})
+        return out
 
     def submit_definition(self, body):
         return self._ok(self._call('POST', '/submit-definition', body), 'submit-definition')['job_id']
