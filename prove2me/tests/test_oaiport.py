@@ -162,10 +162,43 @@ def test_the_three_finset_aliases_are_rewritten_in_every_form():
     assert O.apply_rewrites('theorem t : x := prod_le_prod₀ h\n', rw) == 'theorem t : x := prod_le_prod₀ h\n'
 
 
-def test_core_rewrites_add_the_zero_case_of_tensor_induction():
-    src = '  induction x using TensorProduct.inductionOn with\n  | tmul a b => simp\n'
+# OpenAI's Mathlib (d13f23b) has `TensorProduct.inductionOn z tmul add`, its zero case taken from
+# `tmul 0 0`; ours (0df444a) has only `induction_on z zero tmul add`. The port used to rename and
+# insert `| zero => simp only [map_zero]` at the `induction` line's indentation: too weak for most
+# goals (ComparatorModel, Boone–Higman: `0 ∈ C`, `Commute _ 0`, a `Module.compHom` smul) and
+# misplaced when that line is indented differently from its alternatives (Boone–Higman Corners).
+
+def test_tensor_induction_uses_the_compat_eliminator_and_inserts_no_zero_case():
+    src = fix('tensor_induction.lean')
     out = O.core_rewrites(src)
-    assert 'TensorProduct.induction_on with\n  | zero => simp only [map_zero]\n  | tmul' in out
+    assert 'TensorProduct.inductionOn' not in out and '| zero' not in out
+    assert out.count('induction z using OAI.tensorInductionOn with\n') == 3
+    assert '  induction w using OAI.tensorInductionOn with\n' in out
+    assert '  induction z using OAI.tensorInductionOn\n  · exact' in out
+    assert 'OAI.tensorInductionOn z h fun' in out
+    # every alternative and bullet is left exactly as OpenAI wrote it
+    assert out.replace('OAI.tensorInductionOn', 'TensorProduct.inductionOn') == src
+    # ours is left alone, and a root-level compat block means a root-level name
+    assert O.core_rewrites('TensorProduct.induction_on z') == 'TensorProduct.induction_on z'
+    assert O.core_rewrites('using TensorProduct.inductionOn with', None) == 'using tensorInductionOn with'
+
+
+def test_the_compat_block_declares_the_eliminator_outside_a_tensorproduct_namespace():
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^@\[elab_as_elim\]\ntheorem tensorInductionOn\b', block, re.M)
+    # an OAI.TensorProduct namespace would capture `open TensorProduct` inside `namespace OAI.…`
+    assert not re.search(r'^(theorem|lemma|def|namespace) TensorProduct\b', block, re.M)
+
+
+@pytest.mark.lean
+def test_tensor_induction_shapes_compile_against_the_workspace_mathlib(tmp_path):
+    from p2mlib import carve as C
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    f = tmp_path / 'TensorFix.lean'
+    f.write_text('import Mathlib\n\n' + block + '\n' + O.core_rewrites(fix('tensor_induction.lean')),
+                 encoding='utf-8')
+    out = C.compile_file(str(f), None, str(tmp_path / 'olean'))
+    assert 'Ambiguous namespace' not in out, out
 
 
 # ---------------------------------------------------------------- the submit queue's logs

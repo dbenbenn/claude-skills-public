@@ -291,13 +291,16 @@ def guard_renames(text):
     return text
 
 
-def core_rewrites(text):
-    """Lean core/Mathlib renames every port needs: OpenAI's `TensorProduct.inductionOn` is our
-    `induction_on`, which also wants a `zero` case."""
-    text = text.replace('TensorProduct.inductionOn', 'TensorProduct.induction_on')
-    return re.sub(r'^([ \t]*)(induction \S+ using TensorProduct\.induction_on with\n)(?![ \t]*\| zero)',
-                  lambda m: m.group(1) + m.group(2) + m.group(1) + '| zero => simp only [map_zero]\n',
-                  text, flags=re.M)
+def core_rewrites(text, compat_ns='OAI'):
+    """Lean core/Mathlib renames every port needs. OpenAI's `TensorProduct.inductionOn z tmul add`
+    (Mathlib d13f23b) takes its zero case from `tmul 0 0`; ours has only `induction_on`, which
+    wants a `zero` case too. Every use becomes the compat block's `tensorInductionOn`, which has
+    OpenAI's signature, so `induction … with` alternatives, bullets and term-mode uses stay as
+    written. (An inserted `| zero => simp only [map_zero]` failed on most real goals and took the
+    `induction` line's indentation, not its alternatives': ComparatorModel, Boone–Higman
+    2026-10-24.) `compat_ns` is the compat block's namespace (None: root level)."""
+    target = (compat_ns + '.' if compat_ns else '') + 'tensorInductionOn'
+    return re.sub(r"(?<![\w.'])(?:_root_\.)?TensorProduct\.inductionOn(?![\w'])", target, text)
 
 
 # ---------------------------------------------------------------- the StdSimplex compatibility shim
@@ -441,8 +444,8 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
     lines and `header` go after the imports; then the core and compat rewrites, and the StdSimplex
     shim (stdsimplex_mode over all modules: each module that needs it imports `<mod>.StdSimplexCompat`,
     stdsimplex_rewrite). This is the text the patches are counted against
-    (carve_prep.py filter-patches; ComparatorModel 2026-10-24: counted against the raw source, the
-    `| zero` case core_rewrites adds was not there yet)."""
+    (carve_prep.py filter-patches; ComparatorModel 2026-10-24: counted against the raw source, a
+    patch of what core_rewrites had inserted counted 0)."""
     names = {k: v[0] for k, v in sources.items()}
     block, rewrites = compat_block(compat_text, compat_ns)
     sources = inline_module_macros(sources)
@@ -472,7 +475,7 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
         ls = t.split('\n')
         k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
         t = '\n'.join(ls[:k] + [''] + (LINT + header).rstrip().split('\n') + ls[k:])
-        files[short + '.lean'] = guard_renames(apply_rewrites(core_rewrites(t), rewrites))
+        files[short + '.lean'] = guard_renames(apply_rewrites(core_rewrites(t, compat_ns), rewrites))
     if missing:
         raise PortError('imports of OpenAI modules that are not ported:\n  ' + '\n  '.join(sorted(missing)))
     return files

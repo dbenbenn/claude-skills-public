@@ -80,7 +80,7 @@ def port_text(target, root, src, bundles, patches=(), compat_ns='OAI', ws=None, 
     text, dropped = O.drop_declarations(text, names, anon)
     text = O.rename_target(text, target)
     block, rewrites = O.compat_block(open(COMPAT, encoding='utf-8').read(), compat_ns)
-    text = O.guard_renames(O.apply_rewrites(O.core_rewrites(text), rewrites))
+    text = O.guard_renames(O.apply_rewrites(O.core_rewrites(text, compat_ns), rewrites))
     shim_bundle = os.path.exists(os.path.join(ws, *O.STDSIMPLEX_BUNDLE.split('.')) + '.lean')
     text, shim_imports, shim = O.stdsimplex_single(text, stdsimplex, shim_bundle and not stdsimplex_inline,
                                                    (names, anon))

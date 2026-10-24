@@ -1624,7 +1624,7 @@ transformations are in `p2mlib.oaiport`, and `tests/test_oaiport.py` pins the bu
    split` (see **Splitting a large ported proof**). The single-file patches go through
    `carve_prep.py filter-patches` first, with the same compat options as `oai_port_modules.py`.
    It counts each patch against the text the module port patches, not against OpenAI's source:
-   the port's own rewrites can add a match (the `| zero` case of TensorProduct induction) or
+   the port's own rewrites can add a match (`OAI.tensorInductionOn`, below) or
    remove one (a compat alias). It also drops single-file-only patches, which are marked
    `"route": "single"` or reorder a universe list for merge.py's `universe` line. The module port
    inlines tactic macros across modules, as `oai_port.py` does. `oai_build_modules.py` rebuilds
@@ -1667,6 +1667,20 @@ under `open Finset`, so each alias is rewritten into the sources instead. Two bu
 already published still export root names: UniversalFInfinity's `OAIQWUFI004` (`ite_eq_left`,
 `ite_eq_right`, `dite_eq_left`, `dite_eq_right`) and ESB's `OAIQWESB000` (`alias
 Finset.prod_le_prod₀`). A port that imports either of them must not declare those names again.
+
+**`TensorProduct.inductionOn` becomes the compat eliminator `OAI.tensorInductionOn`** (2026-10-24).
+OpenAI's Mathlib (d13f23b) has `TensorProduct.inductionOn z tmul add`, with the zero case taken
+from `tmul 0 0`; ours (0df444a) has only `induction_on`, which asks for a `zero` case. The ports
+used to rename it and insert `| zero => simp only [map_zero]` at the `induction` line's
+indentation. That failed on most real goals (`0 ∈ C`, `Commute _ 0`, a `Module.compHom` smul, a
+coerced `0` in a completion) and landed misindented when OpenAI indented the `induction` line
+differently from its alternatives; ComparatorModel and Boone–Higman each carried hand patches for
+it. `lean/compat_4_34.lean` now declares `tensorInductionOn` with OpenAI's signature, and
+`oaiport.core_rewrites` points every use at it, so alternatives, bullets and term-mode uses stay
+as written and no zero case is ever guessed. It is not called `OAI.TensorProduct.inductionOn`:
+an `OAI.TensorProduct` namespace makes `open TensorProduct` inside `namespace OAI` open only that
+namespace (Lean warns "Ambiguous namespace"), which loses Mathlib's `⊗ₜ` lemmas. A carve's old
+`| zero => …` patches now count 0 and must be dropped.
 
 **`Convexity.StdSimplex` is handled by a shim, never by hand** (2026-10-24). OpenAI's Mathlib
 (d13f23b) has `Convexity.StdSimplex` API ours (0df444a) lacks: its topology, compactness,

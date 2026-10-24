@@ -280,7 +280,7 @@ def filter_patches(patches, texts):
 def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='', stdsimplex='auto'):
     """filter_patches against the text oai_port_modules.py patches: the modules after its import,
     header, core and compat rewrites (oaiport.module_texts), never OpenAI's raw source
-    (ComparatorModel 2026-10-24: the `| zero` case core_rewrites adds counted 0 there and was
+    (ComparatorModel 2026-10-24: the `| zero` case core_rewrites then added counted 0 there and was
     dropped; CubeShuffle: a patch the compat aliases made redundant was kept)."""
     return filter_patches(patches, O.module_texts(sources, 'Solutions.FilterPatches', compat_text,
                                                   compat_ns, header, stdsimplex))

@@ -216,10 +216,11 @@ def _sources():
 
 def test_filter_patches_counts_against_the_text_the_module_port_patches():
     # ComparatorModel (2026-10-24): filter-patches counted against OpenAI's raw source, where the
-    # `| zero => simp only [map_zero]` the port's core rewrite inserts does not occur yet: dropped
-    # (0 occurrences), the build failed. CubeShuffle: `Finset.prod_le_one₀` is rewritten by the
-    # compat aliases before the patches run, so its patch no longer applies: kept, the port failed.
-    pz = {'old': '| zero => simp only [map_zero]', 'new': '| zero => simp'}
+    # `| zero => simp only [map_zero]` the port's core rewrite then inserted did not occur yet:
+    # dropped (0 occurrences), the build failed (the rewrite now names `OAI.tensorInductionOn`).
+    # CubeShuffle: `Finset.prod_le_one₀` is rewritten by the compat aliases before the patches
+    # run, so its patch no longer applies: kept, the port failed.
+    pz = {'old': 'using OAI.tensorInductionOn with', 'new': 'using OAI.tensorInductionOn with'}
     pa = {'old': 'Finset.prod_le_prod₀ = Finset.prod_le_prod₀', 'new': 'x'}
     keep, drop = CP.port_filter_patches([pz, pa], _sources(), COMPAT, 'OAI')
     assert keep == [pz]
