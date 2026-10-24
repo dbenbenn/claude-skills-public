@@ -8,6 +8,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 39,
     "col": 17,
@@ -23,10 +24,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 22,
     "col": 0,
@@ -46,6 +51,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.List.headOr",
+     ""
+    ]
+   ],
    "doc": {
     "end": 88,
     "start": 41
@@ -108,12 +119,59 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.List.headOr"
    ],
    "namespace": "CD.List",
    "opens": [],
+   "resolved": [
+    [
+     93,
+     99,
+     "CD.List.headOr"
+    ],
+    [
+     93,
+     99,
+     ""
+    ],
+    [
+     101,
+     102,
+     ""
+    ],
+    [
+     105,
+     116,
+     "List"
+    ],
+    [
+     117,
+     120,
+     "Nat"
+    ],
+    [
+     124,
+     127,
+     "Nat"
+    ],
+    [
+     131,
+     132,
+     ""
+    ],
+    [
+     133,
+     138,
+     "List.headD"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 41,
     "col": 0,
@@ -138,6 +196,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.List.headOr_nil",
+     ""
+    ]
+   ],
    "end": {
     "byte": 183,
     "col": 41,
@@ -178,12 +242,39 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.List.headOr_nil"
    ],
    "namespace": "CD.List",
    "opens": [],
+   "resolved": [
+    [
+     150,
+     160,
+     "CD.List.headOr_nil"
+    ],
+    [
+     150,
+     160,
+     ""
+    ],
+    [
+     163,
+     169,
+     "CD.List.headOr"
+    ],
+    [
+     180,
+     183,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 142,
     "col": 0,
@@ -207,6 +298,7 @@
      "opener": 0
     }
    ],
+   "declares": [],
    "end": {
     "byte": 196,
     "col": 11,
@@ -222,10 +314,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD.List",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 185,
     "col": 0,
@@ -240,6 +336,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 214,
     "col": 16,
@@ -255,10 +352,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 198,
     "col": 0,
@@ -277,6 +378,7 @@
      "opener": 4
     }
    ],
+   "declares": [],
    "end": {
     "byte": 259,
     "col": 43,
@@ -316,10 +418,47 @@
     }
    ],
    "ids": [],
+   "inst_classes": [
+    "Applicative",
+    "Bind",
+    "Lean.MonadQuotation",
+    "Lean.MonadRef",
+    "Monad",
+    "Pure"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.macro",
    "names": [],
    "namespace": "CD.Mac",
    "opens": [],
+   "resolved": [
+    [
+     232,
+     233,
+     ""
+    ],
+    [
+     234,
+     238,
+     "Lean.Parser.Category.term"
+    ],
+    [
+     241,
+     245,
+     "Lean.Parser.Category.term"
+    ],
+    [
+     252,
+     253,
+     ""
+    ],
+    [
+     257,
+     258,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 216,
     "col": 0,
@@ -339,6 +478,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.Mac.useMac",
+     ""
+    ]
+   ],
    "end": {
     "byte": 289,
     "col": 28,
@@ -373,12 +518,36 @@
      }
     }
    ],
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Mac.useMac"
    ],
    "namespace": "CD.Mac",
    "opens": [],
+   "resolved": [
+    [
+     265,
+     271,
+     ""
+    ],
+    [
+     265,
+     271,
+     "CD.Mac.useMac"
+    ],
+    [
+     274,
+     277,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 261,
     "col": 0,
@@ -402,6 +571,7 @@
      "opener": 4
     }
    ],
+   "declares": [],
    "end": {
     "byte": 301,
     "col": 10,
@@ -417,10 +587,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD.Mac",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 291,
     "col": 0,
@@ -435,6 +609,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 302,
     "col": 0,
@@ -443,10 +618,14 @@
    "heads": [],
    "idents": [],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 302,
     "col": 0,
@@ -457,5 +636,5 @@
  "decls": [],
  "file": "CarveDev/Alt.lean",
  "messages": [],
- "mode": "parse"
+ "mode": "elaborate"
 }

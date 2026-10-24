@@ -1063,11 +1063,16 @@ def test_a_variable_with_nothing_kept_after_it_goes(g):
 
 
 def test_binders_are_not_dropped_by_guessing(g):
-    # the carver no longer guesses from text whether a binder group is needed (a field read by its
+    # the carver never guesses from text whether a binder group is needed (a field read by its
     # short name, B065; project names in it that no kept declaration uses, B066): both guesses
-    # dropped binders a declaration needed (B107, B167, B248). A group that does not elaborate is
-    # cut by p2mlib.repair from Lean's error instead
+    # dropped binders a declaration needed (B107, B167, B248). It reads what Lean resolved: in
+    # `(hF : ∀ k, (F k).big)` the field is CD.Space.big, which this file lacks, so the group goes
+    # (the text alone could not tell, and the group was left for p2mlib.repair to cut)
     out = C.Carver(g).carve({'CD.Space.paren_free'}, g.have_names({'CD.Space.paren_free', 'CD.Space'}),
+                            sorry={'CD.Space.paren_free'})
+    assert '(F k).big' not in out and 'theorem paren_free' in out
+    out = C.Carver(g).carve({'CD.Space.paren_free'},
+                            g.have_names({'CD.Space.paren_free', 'CD.Space', 'CD.Space.big'}),
                             sorry={'CD.Space.paren_free'})
     assert '(F k).big' in out
     out = C.Carver(g).carve({'CD.unused_var_free'}, g.have_names({'CD.unused_var_free', 'CD.double'}))
@@ -1310,3 +1315,61 @@ def test_an_instance_a_carved_declaration_never_saw_is_reported(g):
     # grouped for the command line: one line per instance
     assert C.leak_summary(leaks) == ['CD.LI.boxInhabited: 2 declarations in 3 files '
                                      '(bundle:L0, piece:CD.LI.box_get, statement:CD.LI.box_get)']
+
+
+@pytest.mark.lean
+def test_measure_finds_a_false_import_edge(tmp_path):
+    # PosteriorReplicas (2026-10-23): a carved piece imported a statement it never used; it compiled,
+    # so only a hand check (drop each import, recompile) caught it. carve_measure now checks every
+    # `import Theorems.*` against what the file's declarations use, and fails on a false edge.
+    import shutil
+    import subprocess
+    import sys
+    work = tmp_path / 'work'
+    work.mkdir()
+    shutil.copy(os.path.join(FIX, 'decl_graph.jsonl'), work / 'decl_graph.jsonl')
+    cfg = tmp_path / 'carve.json'
+    cfg.write_text(json.dumps({'src': FIX, 'prefix': 'CarveDev', 'roots': ['CarveDev.Top'],
+                               'targets': ['CD.double_succ', 'CD.double_zero', 'CD.main'],
+                               'forced': ['CD.double_eq'], 'work': str(work), 'out': str(tmp_path / 'out'),
+                               'bundle_prefix': 'CDE', 'budget': 1000, 'bundle_budget': 1000,
+                               'bytes_per_second': 10000}))
+    scripts = os.path.join(os.path.dirname(HERE), 'scripts')
+
+    def run(script, *a):
+        r = subprocess.run([sys.executable, os.path.join(scripts, script)] + list(a), capture_output=True, text=True)
+        return r.returncode, r.stdout + r.stderr
+    assert run('carve.py', 'plan', str(cfg))[0] == 0
+
+    def gen_and_inject():
+        assert run('carve.py', 'gen', str(cfg))[0] == 0
+        sol = tmp_path / 'out' / 'solutions' / 'Sol_CD_double_succ.lean'
+        t = sol.read_text()
+        assert 'import Theorems.Thm_CD_double_eq\n' in t      # used: `simp only [double_eq]`
+        sol.write_text(t.replace('import Theorems.Thm_CD_double_eq\n',
+                                 'import Theorems.Thm_CD_double_eq\nimport Theorems.Thm_CD_double_zero\n'))
+        return sol
+    sol = gen_and_inject()
+    code, out = run('carve_measure.py', str(cfg))
+    assert code == 1 and out.rstrip().endswith('FAILED'), out
+    assert 'FALSE EDGE piece:CD.double_succ (Sol_CD_double_succ.lean): import Theorems.Thm_CD_double_zero' in out
+    rep = json.loads((work / 'false_edges.json').read_text())
+    hit = [f for f in rep['false_edges'] if f['item'] == 'piece:CD.double_succ']
+    assert [(f['import'], f['statement'], f['verdict']) for f in hit] == \
+        [('Theorems.Thm_CD_double_zero', 'CD.double_zero', 'false')]
+    edges = json.loads((work / 'edges.json').read_text())
+    # the edges a proof does use are kept: a rewrite, a notation (`DE` for double_eq), a statement
+    assert edges['piece:CD.double_succ']['imports']['Theorems.Thm_CD_double_eq'] == 'used'
+    assert edges['piece:CD.double_zero']['imports'] == {'Theorems.Thm_CD_double_eq': 'used'}
+    assert edges['piece:CD.main']['imports']['Theorems.Thm_CD_double_succ'] == 'used'
+    # skipped on request
+    code, out = run('carve_measure.py', str(cfg), '--no-edge-check')
+    assert code == 0 and 'FALSE EDGE' not in out, out
+    # dropped on request: cut, recorded, re-measured; the cut survives a fresh `carve.py gen`
+    code, out = run('carve_measure.py', str(cfg), '--drop-false-edges')
+    assert code == 0 and 'edge check: no false edges' in out, out
+    assert 'Thm_CD_double_zero' not in sol.read_text()
+    assert 'import Theorems.Thm_CD_double_zero' in json.loads((work / 'repairs.json').read_text())['Sol_CD_double_succ.lean']
+    gen_and_inject()
+    code, out = run('carve_measure.py', str(cfg))
+    assert code == 0 and 'Thm_CD_double_zero' not in sol.read_text(), out

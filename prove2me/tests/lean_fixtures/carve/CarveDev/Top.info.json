@@ -8,6 +8,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 143,
     "col": 10,
@@ -23,10 +24,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.universe",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 133,
     "col": 0,
@@ -43,6 +48,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 157,
     "col": 12,
@@ -58,10 +64,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 145,
     "col": 0,
@@ -83,6 +93,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.top_pick",
+     ""
+    ]
+   ],
    "end": {
     "byte": 246,
     "col": 85,
@@ -177,12 +193,72 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.top_pick"
    ],
    "namespace": "CD",
    "opens": [],
+   "resolved": [
+    [
+     167,
+     175,
+     "CD.top_pick"
+    ],
+    [
+     167,
+     175,
+     ""
+    ],
+    [
+     177,
+     179,
+     ""
+    ],
+    [
+     191,
+     192,
+     ""
+    ],
+    [
+     195,
+     197,
+     ""
+    ],
+    [
+     201,
+     205,
+     "CD.pick"
+    ],
+    [
+     207,
+     211,
+     "CD.pick"
+    ],
+    [
+     212,
+     213,
+     ""
+    ],
+    [
+     217,
+     218,
+     ""
+    ],
+    [
+     229,
+     236,
+     "CD.pick_eq"
+    ],
+    [
+     238,
+     245,
+     "CD.pick_eq"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 159,
     "col": 0,
@@ -208,6 +284,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 256,
     "col": 8,
@@ -223,10 +300,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.open",
    "names": [],
    "namespace": "CD",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 248,
     "col": 0,
@@ -250,6 +331,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "_private.CarveDev.Top.0.CD.helper",
+     ""
+    ]
+   ],
    "end": {
     "byte": 295,
     "col": 37,
@@ -284,6 +371,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.helper"
@@ -299,6 +390,24 @@
     "end": 265,
     "start": 258
    },
+   "resolved": [
+    [
+     274,
+     280,
+     ""
+    ],
+    [
+     274,
+     280,
+     "_private.CarveDev.Top.0.CD.helper"
+    ],
+    [
+     292,
+     295,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 258,
     "col": 0,
@@ -327,6 +436,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.main",
+     ""
+    ]
+   ],
    "end": {
     "byte": 520,
     "col": 53,
@@ -487,6 +602,12 @@
      }
     }
    ],
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.main"
@@ -498,6 +619,119 @@
      "namespace": "CD.Aux"
     }
    ],
+   "resolved": [
+    [
+     305,
+     309,
+     "CD.main"
+    ],
+    [
+     305,
+     309,
+     ""
+    ],
+    [
+     311,
+     312,
+     ""
+    ],
+    [
+     315,
+     320,
+     "CD.Space"
+    ],
+    [
+     323,
+     324,
+     ""
+    ],
+    [
+     327,
+     330,
+     "Nat"
+    ],
+    [
+     334,
+     335,
+     ""
+    ],
+    [
+     334,
+     340,
+     "CD.Space.size"
+    ],
+    [
+     336,
+     340,
+     "CD.Space.size"
+    ],
+    [
+     343,
+     349,
+     "CD.double"
+    ],
+    [
+     351,
+     352,
+     ""
+    ],
+    [
+     360,
+     366,
+     "CD.double"
+    ],
+    [
+     367,
+     368,
+     ""
+    ],
+    [
+     375,
+     386,
+     "CD.List.headOr"
+    ],
+    [
+     406,
+     412,
+     "_private.CarveDev.Top.0.CD.helper"
+    ],
+    [
+     422,
+     426,
+     "CD.quad"
+    ],
+    [
+     436,
+     439,
+     "rfl"
+    ],
+    [
+     450,
+     464,
+     "CD.size_via_coord"
+    ],
+    [
+     465,
+     466,
+     ""
+    ],
+    [
+     473,
+     482,
+     "CD.size_zero"
+    ],
+    [
+     484,
+     495,
+     "CD.double_succ"
+    ],
+    [
+     497,
+     512,
+     "CD.List.headOr_nil"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 297,
     "col": 0,
@@ -526,6 +760,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.top_aux",
+     ""
+    ]
+   ],
    "end": {
     "byte": 583,
     "col": 39,
@@ -579,6 +819,10 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.in",
    "names": [
     "CD.top_aux"
@@ -590,6 +834,29 @@
      "namespace": "CD.Aux"
     }
    ],
+   "resolved": [
+    [
+     552,
+     559,
+     "CD.top_aux"
+    ],
+    [
+     552,
+     559,
+     ""
+    ],
+    [
+     562,
+     569,
+     "CD.Aux.auxOnly"
+    ],
+    [
+     577,
+     583,
+     "CD.Aux.aux_eq"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 522,
     "col": 0,
@@ -618,6 +885,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_sorry",
+     ""
+    ]
+   ],
    "end": {
     "byte": 628,
     "col": 43,
@@ -658,6 +931,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.uses_sorry"
@@ -669,6 +946,29 @@
      "namespace": "CD.Aux"
     }
    ],
+   "resolved": [
+    [
+     593,
+     603,
+     "CD.uses_sorry"
+    ],
+    [
+     593,
+     603,
+     ""
+    ],
+    [
+     606,
+     617,
+     "CD.usesSorried"
+    ],
+    [
+     625,
+     628,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 585,
     "col": 0,
@@ -697,6 +997,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_sized",
+     ""
+    ]
+   ],
    "end": {
     "byte": 691,
     "col": 61,
@@ -767,6 +1073,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.uses_sized"
@@ -778,6 +1088,49 @@
      "namespace": "CD.Aux"
     }
    ],
+   "resolved": [
+    [
+     638,
+     648,
+     "CD.uses_sized"
+    ],
+    [
+     638,
+     648,
+     ""
+    ],
+    [
+     650,
+     651,
+     ""
+    ],
+    [
+     654,
+     659,
+     "CD.Space"
+    ],
+    [
+     664,
+     673,
+     "CD.sizedZero"
+    ],
+    [
+     674,
+     675,
+     ""
+    ],
+    [
+     677,
+     680,
+     "Subtype.val"
+    ],
+    [
+     688,
+     691,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 630,
     "col": 0,
@@ -806,6 +1159,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_scoped",
+     ""
+    ]
+   ],
    "end": {
     "byte": 737,
     "col": 44,
@@ -846,6 +1205,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.uses_scoped"
@@ -857,6 +1220,29 @@
      "namespace": "CD.Aux"
     }
    ],
+   "resolved": [
+    [
+     701,
+     712,
+     "CD.uses_scoped"
+    ],
+    [
+     701,
+     712,
+     ""
+    ],
+    [
+     715,
+     724,
+     "CD.viaScoped"
+    ],
+    [
+     734,
+     737,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 693,
     "col": 0,
@@ -884,6 +1270,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 745,
     "col": 6,
@@ -899,6 +1286,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD",
@@ -908,6 +1297,8 @@
      "namespace": "CD.Aux"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 739,
     "col": 0,
@@ -924,6 +1315,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 746,
     "col": 0,
@@ -932,10 +1324,14 @@
    "heads": [],
    "idents": [],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 746,
     "col": 0,
@@ -946,5 +1342,5 @@
  "decls": [],
  "file": "CarveDev/Top.lean",
  "messages": [],
- "mode": "parse"
+ "mode": "elaborate"
 }

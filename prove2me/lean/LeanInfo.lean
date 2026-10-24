@@ -242,6 +242,165 @@ def commandJ (fm : FileMap) (stx : Syntax) (scope : Name × List OpenDecl) (ctx 
     | none => []) ++
     (if idents then identsJ stx else []))
 
+def ourModule (m : Name) : Bool :=
+  !(m.getRoot ∈ [`Mathlib, `Init, `Lean, `Std, `Batteries, `Aesop, `Qq, `ProofWidgets, `Plausible,
+                 `ImportGraph, `LeanSearchClient, `Lake, `Cli])
+
+/-! ### `--idents` when elaborating: what Lean resolved, for the carver
+
+With `--idents` in elaborate mode every command also reports, from its info trees:
+* `resolved`: `[start, end, name]` for every term the elaborator recorded at a source range inside
+  one of the command's identifier tokens (a dot-identifier's range may start at its dot): `name` is
+  the head constant of the elaborated term (`""` for a local: a bound variable, a section variable,
+  a hypothesis); a structure-instance field (`{ w := 0 }`, `where w := 0`) is `[start, end,
+  projection, "f"]`. `A.coord_eq` with `A : Space` gives `[A]` local, `[coord_eq]` (its field part)
+  `CD.Space.coord_eq` and the whole token the same; `simp only [h]` and `rw [h]` record `h`; an
+  `open`-resolved name records the constant it resolved to; a notation's `=> foo` and an
+  `attribute [simp] foo` record `foo`. Only ranges the user wrote (canonical source info) count:
+  what a macro or notation expansion introduces is not the user's identifier.
+* `insts`: the instances its elaborated terms use (every term of the info trees, metavariables
+  instantiated) that are not global instances of the libraries: this file's and our project's
+  instances, and anything a `local`/`scoped` attribute or `open scoped` made an instance. An
+  instance of a `Prop` class is a theorem used silently by instance search; this is where its use
+  shows.
+* `inst_classes`: the classes of every instance those terms use, library ones included (what
+  type class search solved there; the carver's leak check compares an instance's class with it).
+-/
+
+/-- The ranges of a command's identifier tokens, sorted by start. -/
+def tokenRanges (stx : Syntax) : Array (Nat × Nat) :=
+  (((identRoles stx "ref" #[]).map fun (_, _, a, b) => (a, b)).filter (fun (a, b) => a < b)).qsort
+    (fun x y => x.1 < y.1)
+
+/-- Is [a, b) inside an identifier token (a dot-identifier's info may start at its dot)? -/
+def inToken (toks : Array (Nat × Nat)) (a b : Nat) : Bool := Id.run do
+  -- the last token starting at or before a + 1
+  let mut lo := 0
+  let mut hi := toks.size
+  while lo < hi do
+    let mid := (lo + hi) / 2
+    if toks[mid]!.1 ≤ a + 1 then lo := mid + 1 else hi := mid
+  if lo == 0 then return false
+  let (s, e) := toks[lo - 1]!
+  return s ≤ a + 1 && b ≤ e && a + 1 ≥ s && b > s
+
+structure Facts where
+  resolved : Array (Nat × Nat × String) := #[]
+  fieldRanges : Std.HashSet (Nat × Nat) := {}
+  seen : Std.HashSet (Nat × Nat × String) := {}
+  consts : NameSet := {}
+  sigConsts : NameSet := {}     -- of the terms elaborated before the value (the statement)
+  declares : NameSet := {}      -- what its declaration names bind (an anonymous instance's name too)
+
+/-- Every constant of `e`, each shared subterm visited once. -/
+unsafe def constsOf (e : Expr) (acc : PtrSet Expr × NameSet) : PtrSet Expr × NameSet :=
+  if acc.1.contains e then acc else
+  let acc := (acc.1.insert e, acc.2)
+  match e with
+  | .const n _ => (acc.1, acc.2.insert n)
+  | .app f a => constsOf a (constsOf f acc)
+  | .lam _ t b _ | .forallE _ t b _ => constsOf b (constsOf t acc)
+  | .letE _ t v b _ => constsOf b (constsOf v (constsOf t acc))
+  | .mdata _ b | .proj _ _ b => constsOf b acc
+  | _ => acc
+
+/-- Walk a command's info trees: identifier readings inside its tokens, and the constants of every
+term elaborated inside its range. -/
+unsafe def factsOf (toks : Array (Nat × Nat)) (lo hi vs : Nat) (trees : Array InfoTree) : IO Facts := do
+  let st ← IO.mkRef ({} : Facts)
+  let vis ← IO.mkRef (mkPtrSet (α := Expr) 1024)
+  let svis ← IO.mkRef (mkPtrSet (α := Expr) 64)
+  let rec go (ctx? : Option ContextInfo) (t : InfoTree) : IO Unit := do
+    match t with
+    | .context pci t => go (pci.mergeIntoOuter? ctx?) t
+    | .hole _ => pure ()
+    | .node i cs =>
+      if let some ci := ctx? then
+        match i.stx.getRange? (canonicalOnly := true) with
+        | some r =>
+          let a := r.start.byteIdx
+          let b := r.stop.byteIdx
+          if lo ≤ a && b ≤ hi then
+            match i with
+            | .ofTermInfo ti =>
+              let e ← if ti.expr.hasMVar then
+                  (try ci.runMetaM ti.lctx (instantiateMVars ti.expr) catch _ => pure ti.expr)
+                else pure ti.expr
+              if inToken toks a b then
+                let v? := match e.getAppFn with
+                  | .const n _ => some (toString n)
+                  | .fvar _ => some ""
+                  | _ => none
+                if let some v := v? then
+                  unless (← st.get).seen.contains (a, b, v) do
+                    st.modify fun f => { f with resolved := f.resolved.push (a, b, v), seen := f.seen.insert (a, b, v) }
+              if ti.isBinder then
+                if let .const n _ := e.getAppFn then st.modify fun f => { f with declares := f.declares.insert n }
+              let (p, ns) := constsOf e ((← vis.get), (← st.get).consts)
+              vis.set p
+              st.modify fun f => { f with consts := ns }
+              if a < vs then
+                let (p, ns) := constsOf e ((← svis.get), (← st.get).sigConsts)
+                svis.set p
+                st.modify fun f => { f with sigConsts := ns }
+            | .ofFieldInfo fi =>
+              if inToken toks a b then
+                let v := toString fi.projName
+                st.modify fun f => { f with fieldRanges := f.fieldRanges.insert (a, b) }
+                unless (← st.get).seen.contains (a, b, v) do
+                  st.modify fun f => { f with resolved := f.resolved.push (a, b, v), seen := f.seen.insert (a, b, v) }
+            | _ => pure ()
+        | none => pure ()
+      for c in cs do go ctx? c
+  for t in trees do go none t
+  st.get
+
+/-- The class an instance constant provides: the head of its type's conclusion. -/
+def instClass (env : Environment) (c : Name) : Option Name := do
+  let ci ← env.find? c
+  ci.type.getForallBody.getAppFn.constName?
+
+/-- The classes a constant's instance-implicit binders ask for (`algebraMap` asks for `Algebra`). -/
+def binderClasses (env : Environment) (c : Name) : Array Name := Id.run do
+  let some ci := env.find? c | return #[]
+  let mut ty := ci.type
+  let mut out := #[]
+  while true do
+    match ty with
+    | .forallE _ d b bi =>
+      if bi.isInstImplicit then
+        if let some k := d.getForallBody.getAppFn.constName? then out := out.push k
+      ty := b
+    | _ => break
+  return out
+
+/-- The `resolved`, `insts` and `inst_classes` fields of a command (see above). -/
+unsafe def factsJ (env headerEnv : Environment) (stx : Syntax) (trees : Array InfoTree) : IO (List (String × Json)) := do
+  let some r := stx.getRange? | return []
+  let vs := ((valueStart? stx).map (·.byteIdx)).getD r.stop.byteIdx
+  let f ← factsOf (tokenRanges stx) r.start.byteIdx r.stop.byteIdx vs trees
+  let local? (c : Name) : Bool := Meta.isInstanceCore env c &&
+    ((match env.getModuleIdxFor? c with
+      | none => true
+      | some idx => ourModule env.header.moduleNames[idx.toNat]!) || !Meta.isInstanceCore headerEnv c)
+  let mut classes : NameSet := {}
+  for c in f.consts.toList do
+    for k in binderClasses env c do classes := classes.insert k
+    if Meta.isInstanceCore env c then
+      if let some k := instClass env c then classes := classes.insert k
+  let names (s : NameSet) : Json := toJson ((s.toList.map toString).toArray.qsort (· < ·))
+  let insts := f.consts.toList.filter local?
+  let sigInsts := f.sigConsts.toList.filter local?
+  let res := f.resolved.qsort fun x y => x.1 < y.1 || (x.1 == y.1 && x.2.1 < y.2.1)
+  let decl := f.declares.toList.map fun c =>
+    Json.arr #[toJson (toString c), toJson (if Meta.isInstanceCore env c then ((instClass env c).map toString).getD "" else "")]
+  return [("resolved", Json.arr <| res.map fun (a, b, v) =>
+            Json.arr (#[toJson a, toJson b, toJson v] ++ (if f.fieldRanges.contains (a, b) then #[toJson "f"] else #[]))),
+          ("insts", names (insts.foldl (·.insert ·) {})),
+          ("sig_insts", names (sigInsts.foldl (·.insert ·) {})),
+          ("inst_classes", names classes),
+          ("declares", Json.arr decl.toArray)]
+
 /-- Commands that set context for the rest of their scope and end with it -- what a command moved
 elsewhere must carry. `open scoped X` adds no `OpenDecl`, so the commands themselves are recorded,
 not `Scope.openDecls`. -/
@@ -282,10 +441,6 @@ def kindOf (env : Environment) (n : Name) : ConstantInfo → String
   | .ctorInfo _ => "constructor"
   | .recInfo _ => "recursor"
 
-def ourModule (m : Name) : Bool :=
-  !(m.getRoot ∈ [`Mathlib, `Init, `Lean, `Std, `Batteries, `Aesop, `Qq, `ProofWidgets, `Plausible,
-                 `ImportGraph, `LeanSearchClient, `Lake, `Cli])
-
 /-- What a declaration rests on, stopping at statements: the `Theorems.*` constants (published
 statements or draft stubs) reached through this file and our own other modules, and whether
 `sorryAx` is reachable WITHOUT passing through one. A milestone's proof is complete when it is
@@ -312,6 +467,10 @@ unsafe def main (args : List String) : IO UInt32 := do
   let some path := args.head? | IO.eprintln "usage: LeanInfo FILE.lean [--parse-only]"; return 2
   let parseOnly := args.contains "--parse-only"
   let idents := args.contains "--idents"
+  let noDecls := args.contains "--no-decls"
+  let mainModule : Name := match args.dropWhile (· != "--module") with
+    | _ :: m :: _ => m.toName
+    | _ => .anonymous
   let candidates : Array Name := match args.dropWhile (· != "--candidates") with
     | _ :: ms :: _ => (ms.splitOn ",").filter (· ≠ "") |>.map String.toName |>.toArray
     | _ => #[]
@@ -326,7 +485,9 @@ unsafe def main (args : List String) : IO UInt32 := do
   let (env, messages) ← processHeaderCore (HeaderSyntax.startPos header)
     (HeaderSyntax.imports header ++ candidates.map fun m => ({ module := m } : Import))
     (HeaderSyntax.isModule header)
-    opts messages inputCtx (headerStx? := header)
+    opts messages inputCtx (headerStx? := header) (mainModule := mainModule)
+  let headerEnv := env
+  let factsRef ← IO.mkRef (#[] : Array (List (String × Json)))
   -- one loop for both modes, like Frontend.processCommand but keeping every message (elaboration
   -- resets the command state's log per command -- Elab/Command.lean, elabCommandTopLevel -- and
   -- each parse starts from a fresh log so its syntax errors survive too). In parse-only mode only
@@ -351,6 +512,7 @@ unsafe def main (args : List String) : IO UInt32 := do
     setParserState ps
     let mut emsgs : Array Message := #[]
     let mut cmdRefs : NameSet := ∅
+    let mut facts : List (String × Json) := []
     if !parseOnly || shapesParsing cmd.getKind then
       elabCommandAtFrontend cmd
       emsgs := (← getCommandState).messages.reportedPlusUnreported.toArray
@@ -358,7 +520,10 @@ unsafe def main (args : List String) : IO UInt32 := do
         -- the info state, like the message log, is per command (elabCommandTopLevel resets both),
         -- so every tree in it is this command's; fill their holes before reading them
         let info ← IO.wait (← getCommandState).infoState.substituteLazy
-        cmdRefs := referencedConsts (info.trees.toArray.map (·.substitute info.assignment))
+        let trees := info.trees.toArray.map (·.substitute info.assignment)
+        cmdRefs := referencedConsts trees
+        if idents then facts ← factsJ (← getCommandState).env headerEnv cmd trees
+    factsRef.modify (·.push facts)
     let got := got ++ pmsgs.toArray ++ emsgs
     let refs := refs.push cmdRefs
     let d1 := (← getCommandState).scopes.length
@@ -391,11 +556,13 @@ unsafe def main (args : List String) : IO UInt32 := do
   let msgArr := messages.reportedPlusUnreported.toArray ++ got
   let finalEnv := s.commandState.env
   let env := finalEnv
-  let commandsJ := cmds.filterMap fun (stx, sc, cx) => commandJ fm stx sc cx idents
+  let factsArr ← factsRef.get
+  let commandsJ := (cmds.zip factsArr).filterMap fun ((stx, sc, cx), fx) =>
+    (commandJ fm stx sc cx idents).map (·.mergeObj (Json.mkObj fx))
   -- declarations: user-facing constants of this file (they have declaration ranges)
   let mine := env.constants.toList.filter fun (n, _) => (env.getModuleIdxFor? n).isNone
   let mut ranges : Std.HashMap Name DeclarationRanges := {}
-  for (n, _) in mine do
+  for (n, _) in (if noDecls then [] else mine) do
     if let .ok (some rg) ← ((findDeclarationRanges? n : CoreM _).run' { fileName := path, fileMap := fm, initHeartbeats := (← IO.getNumHeartbeats) } { env }).toBaseIO then
       ranges := ranges.insert n rg
   let userFacing (n : Name) : Bool :=
@@ -444,7 +611,7 @@ unsafe def main (args : List String) : IO UInt32 := do
   let mut declsJ : Array Json := #[]
   -- parse-only mode reports commands, not declarations (the few it elaborates -- notation --
   -- would make a partial, misleading list)
-  for (n, ci) in (if parseOnly then [] else mine) do
+  for (n, ci) in (if parseOnly || noDecls then [] else mine) do
     unless userFacing n do continue
     let some rg := ranges.get? n | continue
     let (used, _) := deps 64 n ∅

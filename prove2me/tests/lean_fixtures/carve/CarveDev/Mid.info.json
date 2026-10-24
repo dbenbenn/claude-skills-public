@@ -8,6 +8,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 32,
     "col": 10,
@@ -23,10 +24,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.universe",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 22,
     "col": 0,
@@ -43,6 +48,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 46,
     "col": 12,
@@ -58,10 +64,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 34,
     "col": 0,
@@ -83,6 +93,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.pick_eq",
+     ""
+    ]
+   ],
    "end": {
     "byte": 106,
     "col": 56,
@@ -159,12 +175,62 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.pick_eq"
    ],
    "namespace": "CD",
    "opens": [],
+   "resolved": [
+    [
+     56,
+     63,
+     "CD.pick_eq"
+    ],
+    [
+     56,
+     63,
+     ""
+    ],
+    [
+     65,
+     67,
+     ""
+    ],
+    [
+     79,
+     80,
+     ""
+    ],
+    [
+     83,
+     85,
+     ""
+    ],
+    [
+     89,
+     93,
+     "CD.pick"
+    ],
+    [
+     94,
+     95,
+     ""
+    ],
+    [
+     98,
+     99,
+     ""
+    ],
+    [
+     103,
+     106,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 48,
     "col": 0,
@@ -191,6 +257,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.Space.coord",
+     ""
+    ]
+   ],
    "doc": {
     "end": 139,
     "start": 108
@@ -241,12 +313,44 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Space.coord"
    ],
    "namespace": "CD",
    "opens": [],
+   "resolved": [
+    [
+     144,
+     155,
+     "CD.Space.coord"
+    ],
+    [
+     144,
+     155,
+     ""
+    ],
+    [
+     157,
+     159,
+     ""
+    ],
+    [
+     162,
+     167,
+     "CD.Space"
+    ],
+    [
+     171,
+     174,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 108,
     "col": 0,
@@ -273,6 +377,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Space.coord_eq",
+     ""
+    ]
+   ],
    "end": {
     "byte": 236,
     "col": 55,
@@ -325,12 +435,59 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Space.coord_eq"
    ],
    "namespace": "CD",
    "opens": [],
+   "resolved": [
+    [
+     189,
+     203,
+     "CD.Space.coord_eq"
+    ],
+    [
+     189,
+     203,
+     ""
+    ],
+    [
+     205,
+     206,
+     ""
+    ],
+    [
+     209,
+     214,
+     "CD.Space"
+    ],
+    [
+     218,
+     219,
+     ""
+    ],
+    [
+     218,
+     225,
+     "CD.Space.coord"
+    ],
+    [
+     220,
+     225,
+     "CD.Space.coord"
+    ],
+    [
+     233,
+     236,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 181,
     "col": 0,
@@ -357,6 +514,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.size_via_coord",
+     ""
+    ]
+   ],
    "doc": {
     "end": 417,
     "start": 238
@@ -419,12 +582,86 @@
      }
     }
    ],
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.size_via_coord"
    ],
    "namespace": "CD",
    "opens": [],
+   "resolved": [
+    [
+     426,
+     440,
+     "CD.size_via_coord"
+    ],
+    [
+     426,
+     440,
+     ""
+    ],
+    [
+     442,
+     443,
+     ""
+    ],
+    [
+     446,
+     451,
+     "CD.Space"
+    ],
+    [
+     455,
+     456,
+     ""
+    ],
+    [
+     455,
+     462,
+     "CD.Space.coord"
+    ],
+    [
+     457,
+     462,
+     "CD.Space.coord"
+    ],
+    [
+     465,
+     466,
+     ""
+    ],
+    [
+     465,
+     471,
+     "CD.Space.size"
+    ],
+    [
+     467,
+     471,
+     "CD.Space.size"
+    ],
+    [
+     496,
+     497,
+     ""
+    ],
+    [
+     496,
+     506,
+     "CD.Space.coord_eq"
+    ],
+    [
+     498,
+     506,
+     "CD.Space.coord_eq"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 238,
     "col": 0,
@@ -451,6 +688,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.quad",
+     ""
+    ]
+   ],
    "doc": {
     "end": 603,
     "start": 516
@@ -525,12 +768,57 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.quad"
    ],
    "namespace": "CD",
    "opens": [],
+   "resolved": [
+    [
+     608,
+     612,
+     "CD.quad"
+    ],
+    [
+     608,
+     612,
+     ""
+    ],
+    [
+     614,
+     615,
+     ""
+    ],
+    [
+     618,
+     621,
+     "Nat"
+    ],
+    [
+     625,
+     628,
+     "Nat"
+    ],
+    [
+     632,
+     638,
+     "CD.double"
+    ],
+    [
+     640,
+     646,
+     "CD.double"
+    ],
+    [
+     647,
+     648,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 516,
     "col": 0,
@@ -556,6 +844,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 660,
     "col": 9,
@@ -571,10 +860,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.open",
    "names": [],
    "namespace": "CD",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 651,
     "col": 0,
@@ -597,6 +890,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 694,
     "col": 32,
@@ -612,6 +906,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.notation",
    "names": [],
    "namespace": "CD",
@@ -621,6 +917,14 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     685,
+     694,
+     "CD.double_eq"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 662,
     "col": 0,
@@ -644,6 +948,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.double_zero",
+     ""
+    ]
+   ],
    "doc": {
     "end": 737,
     "start": 696
@@ -682,6 +992,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.double_zero"
@@ -693,6 +1007,24 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     746,
+     757,
+     ""
+    ],
+    [
+     746,
+     757,
+     "CD.double_zero"
+    ],
+    [
+     760,
+     766,
+     "CD.double"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 696,
     "col": 0,
@@ -721,6 +1053,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "_private.CarveDev.Mid.0.CD.helper",
+     ""
+    ]
+   ],
    "end": {
     "byte": 822,
     "col": 40,
@@ -761,6 +1099,8 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.helper"
@@ -776,6 +1116,29 @@
     "end": 789,
     "start": 782
    },
+   "resolved": [
+    [
+     798,
+     804,
+     "_private.CarveDev.Mid.0.CD.helper"
+    ],
+    [
+     798,
+     804,
+     ""
+    ],
+    [
+     807,
+     811,
+     "True"
+    ],
+    [
+     815,
+     822,
+     "trivial"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 782,
     "col": 0,
@@ -826,6 +1189,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 881,
     "col": 24,
@@ -871,6 +1235,10 @@
     }
    ],
    "ids": [],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD",
@@ -880,6 +1248,39 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     834,
+     835,
+     ""
+    ],
+    [
+     838,
+     843,
+     "CD.Space"
+    ],
+    [
+     848,
+     849,
+     ""
+    ],
+    [
+     852,
+     855,
+     "Nat"
+    ],
+    [
+     860,
+     862,
+     ""
+    ],
+    [
+     865,
+     876,
+     "CD.Aux.auxOnly"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 824,
     "col": 0,
@@ -903,6 +1304,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 893,
     "col": 10,
@@ -918,6 +1320,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.include",
    "names": [],
    "namespace": "CD",
@@ -927,6 +1331,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 883,
     "col": 0,
@@ -952,6 +1358,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_hx",
+     ""
+    ]
+   ],
    "end": {
     "byte": 934,
     "col": 39,
@@ -992,6 +1404,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.uses_hx"
@@ -1003,6 +1419,29 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     903,
+     910,
+     "CD.uses_hx"
+    ],
+    [
+     903,
+     910,
+     ""
+    ],
+    [
+     913,
+     924,
+     "CD.Aux.auxOnly"
+    ],
+    [
+     932,
+     934,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 895,
     "col": 0,
@@ -1033,6 +1472,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.size_zero",
+     ""
+    ]
+   ],
    "end": {
     "byte": 990,
     "col": 41,
@@ -1080,6 +1525,10 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.in",
    "names": [
     "CD.size_zero"
@@ -1091,6 +1540,34 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     957,
+     966,
+     "CD.size_zero"
+    ],
+    [
+     957,
+     966,
+     ""
+    ],
+    [
+     969,
+     970,
+     ""
+    ],
+    [
+     969,
+     975,
+     "CD.Space.size"
+    ],
+    [
+     971,
+     975,
+     "CD.Space.size"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 936,
     "col": 0,
@@ -1121,6 +1598,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.double_succ",
+     ""
+    ]
+   ],
    "end": {
     "byte": 1108,
     "col": 30,
@@ -1210,6 +1693,12 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.in",
    "names": [
     "CD.double_succ"
@@ -1221,6 +1710,49 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     1011,
+     1022,
+     "CD.double_succ"
+    ],
+    [
+     1011,
+     1022,
+     ""
+    ],
+    [
+     1025,
+     1031,
+     "CD.double"
+    ],
+    [
+     1033,
+     1034,
+     ""
+    ],
+    [
+     1042,
+     1048,
+     "CD.double"
+    ],
+    [
+     1049,
+     1050,
+     ""
+    ],
+    [
+     1071,
+     1077,
+     "_private.CarveDev.Mid.0.CD.helper"
+    ],
+    [
+     1091,
+     1100,
+     "CD.double_eq"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 992,
     "col": 0,
@@ -1250,6 +1782,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1128,
     "col": 18,
@@ -1265,6 +1798,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.check",
    "names": [],
    "namespace": "CD",
@@ -1274,6 +1809,14 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     1117,
+     1128,
+     "CD.double_succ"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1110,
     "col": 0,
@@ -1299,6 +1842,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.sizedZero",
+     ""
+    ]
+   ],
    "doc": {
     "end": 1325,
     "start": 1130
@@ -1367,6 +1916,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.sizedZero"
@@ -1378,6 +1931,59 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     1330,
+     1339,
+     "CD.sizedZero"
+    ],
+    [
+     1330,
+     1339,
+     ""
+    ],
+    [
+     1341,
+     1342,
+     ""
+    ],
+    [
+     1345,
+     1350,
+     "CD.Space"
+    ],
+    [
+     1355,
+     1356,
+     ""
+    ],
+    [
+     1359,
+     1362,
+     "Nat"
+    ],
+    [
+     1366,
+     1367,
+     ""
+    ],
+    [
+     1370,
+     1371,
+     ""
+    ],
+    [
+     1370,
+     1376,
+     "CD.Space.size"
+    ],
+    [
+     1372,
+     1376,
+     "CD.Space.size"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1130,
     "col": 0,
@@ -1407,6 +2013,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1406,
     "col": 7,
@@ -1415,6 +2022,8 @@
    "heads": [],
    "idents": [],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.section",
    "names": [],
    "namespace": "CD",
@@ -1424,6 +2033,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 1399,
     "col": 0,
@@ -1452,6 +2063,7 @@
      "opener": 18
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1426,
     "col": 19,
@@ -1467,6 +2079,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.open",
    "names": [],
    "namespace": "CD",
@@ -1476,6 +2090,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 1407,
     "col": 0,
@@ -1507,6 +2123,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.viaScoped",
+     ""
+    ]
+   ],
    "end": {
     "byte": 1467,
     "col": 36,
@@ -1559,6 +2181,8 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.viaScoped"
@@ -1570,6 +2194,39 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     1431,
+     1440,
+     "CD.viaScoped"
+    ],
+    [
+     1431,
+     1440,
+     ""
+    ],
+    [
+     1442,
+     1443,
+     ""
+    ],
+    [
+     1446,
+     1449,
+     "Nat"
+    ],
+    [
+     1453,
+     1456,
+     "Nat"
+    ],
+    [
+     1463,
+     1464,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1427,
     "col": 0,
@@ -1605,6 +2262,7 @@
      "opener": 18
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1471,
     "col": 3,
@@ -1613,6 +2271,8 @@
    "heads": [],
    "idents": [],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD",
@@ -1622,6 +2282,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 1468,
     "col": 0,
@@ -1646,6 +2308,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1488,
     "col": 15,
@@ -1661,6 +2324,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "CD",
@@ -1670,6 +2335,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 1473,
     "col": 0,
@@ -1707,6 +2374,7 @@
      "opener": 22
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1509,
     "col": 20,
@@ -1728,6 +2396,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD.Space",
@@ -1737,6 +2407,19 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     1499,
+     1500,
+     ""
+    ],
+    [
+     1503,
+     1508,
+     "CD.Space"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1489,
     "col": 0,
@@ -1776,6 +2459,7 @@
      "opener": 22
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1531,
     "col": 21,
@@ -1797,6 +2481,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD.Space",
@@ -1806,6 +2492,29 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     1520,
+     1522,
+     ""
+    ],
+    [
+     1525,
+     1526,
+     ""
+    ],
+    [
+     1525,
+     1530,
+     "CD.Space.big"
+    ],
+    [
+     1527,
+     1530,
+     "CD.Space.big"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1510,
     "col": 0,
@@ -1838,6 +2547,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Space.field_free",
+     ""
+    ]
+   ],
    "doc": {
     "end": 1772,
     "start": 1532
@@ -1900,6 +2615,8 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Space.field_free"
@@ -1911,6 +2628,44 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     1781,
+     1791,
+     "CD.Space.field_free"
+    ],
+    [
+     1781,
+     1791,
+     ""
+    ],
+    [
+     1793,
+     1794,
+     ""
+    ],
+    [
+     1797,
+     1800,
+     "Nat"
+    ],
+    [
+     1804,
+     1805,
+     ""
+    ],
+    [
+     1808,
+     1809,
+     ""
+    ],
+    [
+     1813,
+     1816,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1532,
     "col": 0,
@@ -1947,6 +2702,7 @@
      "opener": 22
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1826,
     "col": 9,
@@ -1962,6 +2718,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD.Space",
@@ -1971,6 +2729,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 1817,
     "col": 0,
@@ -1995,6 +2755,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1846,
     "col": 18,
@@ -2010,6 +2771,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.section",
    "names": [],
    "namespace": "CD",
@@ -2019,6 +2782,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 1828,
     "col": 0,
@@ -2056,6 +2821,7 @@
      "opener": 27
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1866,
     "col": 19,
@@ -2077,6 +2843,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD",
@@ -2086,6 +2854,19 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     1857,
+     1858,
+     ""
+    ],
+    [
+     1861,
+     1865,
+     "CD.Wide"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1847,
     "col": 0,
@@ -2116,6 +2897,7 @@
      "opener": 27
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1891,
     "col": 24,
@@ -2131,6 +2913,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.notation",
    "names": [],
    "namespace": "CD",
@@ -2140,6 +2924,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 1867,
     "col": 0,
@@ -2171,6 +2957,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.note_free",
+     ""
+    ]
+   ],
    "doc": {
     "end": 2085,
     "start": 1892
@@ -2233,6 +3025,12 @@
      }
     }
    ],
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.note_free"
@@ -2244,6 +3042,44 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2094,
+     2103,
+     "CD.note_free"
+    ],
+    [
+     2094,
+     2103,
+     ""
+    ],
+    [
+     2105,
+     2106,
+     ""
+    ],
+    [
+     2109,
+     2112,
+     "Nat"
+    ],
+    [
+     2116,
+     2117,
+     ""
+    ],
+    [
+     2124,
+     2125,
+     ""
+    ],
+    [
+     2129,
+     2132,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1892,
     "col": 0,
@@ -2279,6 +3115,7 @@
      "opener": 27
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2147,
     "col": 14,
@@ -2294,6 +3131,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD",
@@ -2303,6 +3142,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 2133,
     "col": 0,
@@ -2327,6 +3168,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2162,
     "col": 13,
@@ -2342,6 +3184,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "CD",
@@ -2351,6 +3195,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 2149,
     "col": 0,
@@ -2380,6 +3226,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.Nat.cdTwice",
+     ""
+    ]
+   ],
    "doc": {
     "end": 2220,
     "start": 2163
@@ -2442,6 +3294,11 @@
      }
     }
    ],
+   "inst_classes": [
+    "Add",
+    "HAdd"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Nat.cdTwice"
@@ -2453,6 +3310,44 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2225,
+     2232,
+     "CD.Nat.cdTwice"
+    ],
+    [
+     2225,
+     2232,
+     ""
+    ],
+    [
+     2234,
+     2235,
+     ""
+    ],
+    [
+     2238,
+     2241,
+     "Nat"
+    ],
+    [
+     2245,
+     2248,
+     "Nat"
+    ],
+    [
+     2252,
+     2253,
+     ""
+    ],
+    [
+     2256,
+     2257,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2163,
     "col": 0,
@@ -2486,6 +3381,7 @@
      "opener": 32
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2265,
     "col": 7,
@@ -2501,6 +3397,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD.Nat",
@@ -2510,6 +3408,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 2258,
     "col": 0,
@@ -2534,6 +3434,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2283,
     "col": 16,
@@ -2549,6 +3450,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.section",
    "names": [],
    "namespace": "CD",
@@ -2558,6 +3461,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 2267,
     "col": 0,
@@ -2595,6 +3500,7 @@
      "opener": 35
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2302,
     "col": 18,
@@ -2616,6 +3522,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD",
@@ -2625,6 +3533,19 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2294,
+     2295,
+     ""
+    ],
+    [
+     2298,
+     2301,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2284,
     "col": 0,
@@ -2656,6 +3577,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.trail_kept",
+     ""
+    ]
+   ],
    "end": {
     "byte": 2328,
     "col": 25,
@@ -2696,6 +3623,8 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.trail_kept"
@@ -2707,6 +3636,29 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2307,
+     2317,
+     "CD.trail_kept"
+    ],
+    [
+     2307,
+     2317,
+     ""
+    ],
+    [
+     2320,
+     2323,
+     "Nat"
+    ],
+    [
+     2327,
+     2328,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2303,
     "col": 0,
@@ -2749,6 +3701,7 @@
      "opener": 35
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2354,
     "col": 25,
@@ -2770,6 +3723,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD",
@@ -2779,6 +3734,19 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2339,
+     2348,
+     "Inhabited"
+    ],
+    [
+     2349,
+     2353,
+     "CD.Wide"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2329,
     "col": 0,
@@ -2811,6 +3779,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.trail_dropped",
+     ""
+    ]
+   ],
    "doc": {
     "end": 2526,
     "start": 2355
@@ -2861,6 +3835,11 @@
      }
     }
    ],
+   "inst_classes": [
+    "Inhabited",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.trail_dropped"
@@ -2872,6 +3851,29 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2535,
+     2548,
+     "CD.trail_dropped"
+    ],
+    [
+     2535,
+     2548,
+     ""
+    ],
+    [
+     2556,
+     2559,
+     "Nat"
+    ],
+    [
+     2568,
+     2571,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2355,
     "col": 0,
@@ -2908,6 +3910,7 @@
      "opener": 35
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2584,
     "col": 12,
@@ -2923,6 +3926,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD",
@@ -2932,6 +3937,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 2572,
     "col": 0,
@@ -2956,6 +3963,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2601,
     "col": 15,
@@ -2971,6 +3979,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "CD",
@@ -2980,6 +3990,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 2586,
     "col": 0,
@@ -3017,6 +4029,7 @@
      "opener": 41
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2630,
     "col": 26,
@@ -3044,6 +4057,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD.Space",
@@ -3053,6 +4068,24 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2612,
+     2613,
+     ""
+    ],
+    [
+     2616,
+     2619,
+     "Nat"
+    ],
+    [
+     2624,
+     2629,
+     "CD.Space"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2602,
     "col": 0,
@@ -3092,6 +4125,7 @@
      "opener": 41
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2663,
     "col": 30,
@@ -3137,6 +4171,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD.Space",
@@ -3146,6 +4182,34 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2641,
+     2643,
+     ""
+    ],
+    [
+     2650,
+     2651,
+     ""
+    ],
+    [
+     2654,
+     2655,
+     ""
+    ],
+    [
+     2656,
+     2657,
+     ""
+    ],
+    [
+     2659,
+     2662,
+     "CD.Space.big"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2631,
     "col": 0,
@@ -3178,6 +4242,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Space.paren_free",
+     ""
+    ]
+   ],
    "doc": {
     "end": 2799,
     "start": 2664
@@ -3240,6 +4310,8 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Space.paren_free"
@@ -3251,6 +4323,44 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2808,
+     2818,
+     "CD.Space.paren_free"
+    ],
+    [
+     2808,
+     2818,
+     ""
+    ],
+    [
+     2820,
+     2821,
+     ""
+    ],
+    [
+     2824,
+     2827,
+     "Nat"
+    ],
+    [
+     2831,
+     2832,
+     ""
+    ],
+    [
+     2835,
+     2836,
+     ""
+    ],
+    [
+     2840,
+     2843,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2664,
     "col": 0,
@@ -3287,6 +4397,7 @@
      "opener": 41
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2853,
     "col": 9,
@@ -3302,6 +4413,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD.Space",
@@ -3311,6 +4424,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 2844,
     "col": 0,
@@ -3335,6 +4450,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2871,
     "col": 16,
@@ -3350,6 +4466,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.section",
    "names": [],
    "namespace": "CD",
@@ -3359,6 +4477,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 2855,
     "col": 0,
@@ -3403,6 +4523,7 @@
      "opener": 46
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2911,
     "col": 39,
@@ -3436,6 +4557,10 @@
     }
    ],
    "ids": [],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD",
@@ -3445,6 +4570,29 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2882,
+     2884,
+     ""
+    ],
+    [
+     2887,
+     2890,
+     "Nat"
+    ],
+    [
+     2893,
+     2895,
+     ""
+    ],
+    [
+     2898,
+     2904,
+     "CD.double"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2872,
     "col": 0,
@@ -3484,6 +4632,7 @@
      "opener": 46
     }
    ],
+   "declares": [],
    "end": {
     "byte": 2942,
     "col": 30,
@@ -3517,6 +4666,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD",
@@ -3526,6 +4677,29 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     2922,
+     2924,
+     ""
+    ],
+    [
+     2927,
+     2933,
+     "CD.double"
+    ],
+    [
+     2934,
+     2936,
+     ""
+    ],
+    [
+     2939,
+     2941,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2912,
     "col": 0,
@@ -3558,6 +4732,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.unused_var_free",
+     ""
+    ]
+   ],
    "doc": {
     "end": 3236,
     "start": 2943
@@ -3596,6 +4776,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.unused_var_free"
@@ -3607,6 +4791,24 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     3241,
+     3256,
+     ""
+    ],
+    [
+     3241,
+     3256,
+     "CD.unused_var_free"
+    ],
+    [
+     3259,
+     3262,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 2943,
     "col": 0,
@@ -3644,6 +4846,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_hk",
+     ""
+    ]
+   ],
    "doc": {
     "end": 3316,
     "start": 3282
@@ -3713,6 +4921,8 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.in",
    "names": [
     "CD.uses_hk"
@@ -3724,6 +4934,39 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     3325,
+     3332,
+     "CD.uses_hk"
+    ],
+    [
+     3325,
+     3332,
+     ""
+    ],
+    [
+     3335,
+     3341,
+     "CD.double"
+    ],
+    [
+     3342,
+     3344,
+     ""
+    ],
+    [
+     3347,
+     3349,
+     ""
+    ],
+    [
+     3353,
+     3355,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 3268,
     "col": 0,
@@ -3776,6 +5019,7 @@
      "opener": 46
     }
    ],
+   "declares": [],
    "end": {
     "byte": 3400,
     "col": 44,
@@ -3815,6 +5059,12 @@
     }
    ],
    "ids": [],
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD",
@@ -3824,6 +5074,44 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     3366,
+     3368,
+     ""
+    ],
+    [
+     3371,
+     3374,
+     "Nat"
+    ],
+    [
+     3377,
+     3380,
+     ""
+    ],
+    [
+     3383,
+     3385,
+     ""
+    ],
+    [
+     3383,
+     3390,
+     "Nat.succ"
+    ],
+    [
+     3386,
+     3390,
+     "Nat.succ"
+    ],
+    [
+     3393,
+     3395,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 3356,
     "col": 0,
@@ -3857,6 +5145,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_hk1",
+     ""
+    ]
+   ],
    "doc": {
     "end": 3610,
     "start": 3416
@@ -3920,6 +5214,12 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.in",
    "names": [
     "CD.uses_hk1"
@@ -3931,6 +5231,44 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     3619,
+     3627,
+     "CD.uses_hk1"
+    ],
+    [
+     3619,
+     3627,
+     ""
+    ],
+    [
+     3630,
+     3632,
+     ""
+    ],
+    [
+     3630,
+     3637,
+     "Nat.succ"
+    ],
+    [
+     3633,
+     3637,
+     "Nat.succ"
+    ],
+    [
+     3640,
+     3642,
+     ""
+    ],
+    [
+     3650,
+     3653,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 3401,
     "col": 0,
@@ -3977,6 +5315,7 @@
      "opener": 46
     }
    ],
+   "declares": [],
    "end": {
     "byte": 3689,
     "col": 35,
@@ -4016,6 +5355,12 @@
     }
    ],
    "ids": [],
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD",
@@ -4025,6 +5370,29 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     3664,
+     3667,
+     ""
+    ],
+    [
+     3671,
+     3673,
+     ""
+    ],
+    [
+     3679,
+     3683,
+     "Nat.pred"
+    ],
+    [
+     3686,
+     3688,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 3654,
     "col": 0,
@@ -4059,6 +5427,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_hk2",
+     ""
+    ]
+   ],
    "doc": {
     "end": 3869,
     "start": 3705
@@ -4134,6 +5508,12 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.in",
    "names": [
     "CD.uses_hk2"
@@ -4145,6 +5525,39 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     3878,
+     3886,
+     "CD.uses_hk2"
+    ],
+    [
+     3878,
+     3886,
+     ""
+    ],
+    [
+     3890,
+     3892,
+     ""
+    ],
+    [
+     3898,
+     3902,
+     "Nat.pred"
+    ],
+    [
+     3905,
+     3907,
+     ""
+    ],
+    [
+     3911,
+     3914,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 3690,
     "col": 0,
@@ -4183,6 +5596,7 @@
      "opener": 46
     }
    ],
+   "declares": [],
    "end": {
     "byte": 3927,
     "col": 12,
@@ -4198,6 +5612,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD",
@@ -4207,6 +5623,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 3915,
     "col": 0,
@@ -4232,6 +5650,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Space.cd_unused_simp",
+     ""
+    ]
+   ],
    "doc": {
     "end": 4195,
     "start": 3929
@@ -4276,6 +5700,8 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Space.cd_unused_simp"
@@ -4287,6 +5713,29 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     4204,
+     4224,
+     "CD.Space.cd_unused_simp"
+    ],
+    [
+     4204,
+     4224,
+     ""
+    ],
+    [
+     4227,
+     4231,
+     "True"
+    ],
+    [
+     4251,
+     4258,
+     "CD.Space.size_eq"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 3929,
     "col": 0,
@@ -4317,6 +5766,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_dot_thm",
+     ""
+    ]
+   ],
    "doc": {
     "end": 4503,
     "start": 4261
@@ -4403,6 +5858,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.uses_dot_thm"
@@ -4414,6 +5873,89 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     4512,
+     4524,
+     "CD.uses_dot_thm"
+    ],
+    [
+     4512,
+     4524,
+     ""
+    ],
+    [
+     4526,
+     4527,
+     ""
+    ],
+    [
+     4530,
+     4535,
+     "CD.Space"
+    ],
+    [
+     4539,
+     4540,
+     ""
+    ],
+    [
+     4539,
+     4546,
+     "CD.Space.coord"
+    ],
+    [
+     4541,
+     4546,
+     "CD.Space.coord"
+    ],
+    [
+     4555,
+     4556,
+     ""
+    ],
+    [
+     4555,
+     4562,
+     "CD.Space.coord"
+    ],
+    [
+     4557,
+     4562,
+     "CD.Space.coord"
+    ],
+    [
+     4573,
+     4574,
+     ""
+    ],
+    [
+     4573,
+     4583,
+     "CD.Space.coord_eq"
+    ],
+    [
+     4575,
+     4583,
+     "CD.Space.coord_eq"
+    ],
+    [
+     4586,
+     4588,
+     "id"
+    ],
+    [
+     4589,
+     4590,
+     ""
+    ],
+    [
+     4592,
+     4600,
+     "CD.Space.coord_eq"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 4261,
     "col": 0,
@@ -4443,6 +5985,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 4621,
     "col": 16,
@@ -4458,6 +6001,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.section",
    "names": [],
    "namespace": "CD",
@@ -4467,6 +6012,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 4605,
     "col": 0,
@@ -4495,6 +6042,7 @@
      "opener": 58
     }
    ],
+   "declares": [],
    "end": {
     "byte": 4643,
     "col": 21,
@@ -4516,6 +6064,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.open",
    "names": [],
    "namespace": "CD",
@@ -4525,6 +6075,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 4622,
     "col": 0,
@@ -4556,6 +6108,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.perm_length_cd",
+     ""
+    ]
+   ],
    "doc": {
     "end": 4990,
     "start": 4644
@@ -4654,6 +6212,8 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.perm_length_cd"
@@ -4681,6 +6241,99 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     4999,
+     5013,
+     "CD.perm_length_cd"
+    ],
+    [
+     4999,
+     5013,
+     ""
+    ],
+    [
+     5015,
+     5016,
+     ""
+    ],
+    [
+     5017,
+     5019,
+     ""
+    ],
+    [
+     5022,
+     5026,
+     "List"
+    ],
+    [
+     5027,
+     5030,
+     "Nat"
+    ],
+    [
+     5033,
+     5034,
+     ""
+    ],
+    [
+     5037,
+     5038,
+     ""
+    ],
+    [
+     5039,
+     5043,
+     "List.Perm"
+    ],
+    [
+     5044,
+     5046,
+     ""
+    ],
+    [
+     5050,
+     5051,
+     ""
+    ],
+    [
+     5050,
+     5058,
+     "List.length"
+    ],
+    [
+     5052,
+     5058,
+     "List.length"
+    ],
+    [
+     5061,
+     5063,
+     ""
+    ],
+    [
+     5061,
+     5070,
+     "List.length"
+    ],
+    [
+     5064,
+     5070,
+     "List.length"
+    ],
+    [
+     5074,
+     5083,
+     "List.Perm.length_eq"
+    ],
+    [
+     5084,
+     5085,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 4644,
     "col": 0,
@@ -4716,6 +6369,7 @@
      "opener": 58
     }
    ],
+   "declares": [],
    "end": {
     "byte": 5098,
     "col": 12,
@@ -4731,6 +6385,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD",
@@ -4756,6 +6412,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 5086,
     "col": 0,
@@ -4781,6 +6439,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_core_succ",
+     ""
+    ]
+   ],
    "doc": {
     "end": 5380,
     "start": 5100
@@ -4873,6 +6537,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "LE"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.uses_core_succ"
@@ -4884,6 +6552,89 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     5389,
+     5403,
+     "CD.uses_core_succ"
+    ],
+    [
+     5389,
+     5403,
+     ""
+    ],
+    [
+     5405,
+     5406,
+     ""
+    ],
+    [
+     5407,
+     5408,
+     ""
+    ],
+    [
+     5411,
+     5414,
+     "Nat"
+    ],
+    [
+     5417,
+     5418,
+     ""
+    ],
+    [
+     5421,
+     5422,
+     ""
+    ],
+    [
+     5427,
+     5428,
+     ""
+    ],
+    [
+     5432,
+     5433,
+     ""
+    ],
+    [
+     5432,
+     5438,
+     "Nat.succ"
+    ],
+    [
+     5434,
+     5438,
+     "Nat.succ"
+    ],
+    [
+     5443,
+     5444,
+     ""
+    ],
+    [
+     5443,
+     5449,
+     "Nat.succ"
+    ],
+    [
+     5445,
+     5449,
+     "Nat.succ"
+    ],
+    [
+     5453,
+     5469,
+     "Nat.succ_le_succ"
+    ],
+    [
+     5470,
+     5471,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 5100,
     "col": 0,
@@ -4914,6 +6665,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.doubleWitness",
+     ""
+    ]
+   ],
    "doc": {
     "end": 5753,
     "start": 5473
@@ -5012,6 +6769,11 @@
      }
     }
    ],
+   "inst_classes": [
+    "Add",
+    "HAdd"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.doubleWitness"
@@ -5023,6 +6785,74 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     5758,
+     5771,
+     "CD.doubleWitness"
+    ],
+    [
+     5758,
+     5771,
+     ""
+    ],
+    [
+     5773,
+     5774,
+     ""
+    ],
+    [
+     5777,
+     5780,
+     "Nat"
+    ],
+    [
+     5785,
+     5786,
+     ""
+    ],
+    [
+     5789,
+     5792,
+     "Nat"
+    ],
+    [
+     5796,
+     5797,
+     ""
+    ],
+    [
+     5800,
+     5801,
+     ""
+    ],
+    [
+     5804,
+     5805,
+     ""
+    ],
+    [
+     5813,
+     5819,
+     "CD.double"
+    ],
+    [
+     5820,
+     5821,
+     ""
+    ],
+    [
+     5823,
+     5832,
+     "CD.double_eq"
+    ],
+    [
+     5833,
+     5834,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 5473,
     "col": 0,
@@ -5053,6 +6883,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_witness",
+     ""
+    ]
+   ],
    "end": {
     "byte": 5894,
     "col": 55,
@@ -5105,6 +6941,12 @@
      }
     }
    ],
+   "inst_classes": [
+    "Add",
+    "HAdd",
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.uses_witness"
@@ -5116,6 +6958,34 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     5847,
+     5859,
+     "CD.uses_witness"
+    ],
+    [
+     5847,
+     5859,
+     ""
+    ],
+    [
+     5863,
+     5876,
+     "CD.doubleWitness"
+    ],
+    [
+     5880,
+     5883,
+     "Subtype.val"
+    ],
+    [
+     5891,
+     5894,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 5839,
     "col": 0,
@@ -5145,6 +7015,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 5912,
     "col": 16,
@@ -5160,6 +7031,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "CD",
@@ -5169,6 +7042,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 5896,
     "col": 0,
@@ -5198,6 +7073,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.NoteNs.keptHere",
+     ""
+    ]
+   ],
    "doc": {
     "end": 5964,
     "start": 5913
@@ -5236,6 +7117,10 @@
      }
     }
    ],
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.NoteNs.keptHere"
@@ -5247,6 +7132,24 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     5969,
+     5977,
+     ""
+    ],
+    [
+     5969,
+     5977,
+     "CD.NoteNs.keptHere"
+    ],
+    [
+     5980,
+     5983,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 5913,
     "col": 0,
@@ -5289,6 +7192,7 @@
      "opener": 65
     }
    ],
+   "declares": [],
    "end": {
     "byte": 6008,
     "col": 19,
@@ -5310,6 +7214,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.variable",
    "names": [],
    "namespace": "CD.NoteNs",
@@ -5319,6 +7225,19 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     5999,
+     6000,
+     ""
+    ],
+    [
+     6003,
+     6007,
+     "CD.Wide"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 5989,
     "col": 0,
@@ -5349,6 +7268,7 @@
      "opener": 65
     }
    ],
+   "declares": [],
    "end": {
     "byte": 6033,
     "col": 24,
@@ -5364,6 +7284,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.notation",
    "names": [],
    "namespace": "CD.NoteNs",
@@ -5373,6 +7295,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 6009,
     "col": 0,
@@ -5404,6 +7328,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "CD.NoteNs.xInst",
+     "Inhabited"
+    ]
+   ],
    "end": {
     "byte": 6534,
     "col": 99,
@@ -5498,6 +7428,13 @@
      }
     }
    ],
+   "inst_classes": [
+    "Inhabited",
+    "OfNat"
+   ],
+   "insts": [
+    "CD.NoteNs.xInst"
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.NoteNs.xInst"
@@ -5508,6 +7445,56 @@
      "except": [],
      "namespace": "List"
     }
+   ],
+   "resolved": [
+    [
+     6436,
+     6441,
+     "CD.NoteNs.xInst"
+    ],
+    [
+     6436,
+     6441,
+     ""
+    ],
+    [
+     6444,
+     6453,
+     "Inhabited"
+    ],
+    [
+     6455,
+     6460,
+     "PLift"
+    ],
+    [
+     6467,
+     6468,
+     "CD.Wide.w"
+    ],
+    [
+     6476,
+     6477,
+     "CD.Wide.w"
+    ],
+    [
+     6482,
+     6488,
+     "CD.double"
+    ],
+    [
+     6509,
+     6512,
+     "rfl"
+    ],
+    [
+     6514,
+     6525,
+     "CD.double_zero"
+    ]
+   ],
+   "sig_insts": [
+    "CD.NoteNs.xInst"
    ],
    "start": {
     "byte": 6421,
@@ -5545,6 +7532,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.NoteNs.uses_x",
+     ""
+    ]
+   ],
    "end": {
     "byte": 6579,
     "col": 33,
@@ -5604,6 +7597,8 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.in",
    "names": [
     "CD.NoteNs.uses_x"
@@ -5615,6 +7610,54 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     6554,
+     6560,
+     "CD.NoteNs.uses_x"
+    ],
+    [
+     6554,
+     6560,
+     ""
+    ],
+    [
+     6563,
+     6564,
+     ""
+    ],
+    [
+     6563,
+     6566,
+     "CD.Wide.w"
+    ],
+    [
+     6565,
+     6566,
+     "CD.Wide.w"
+    ],
+    [
+     6569,
+     6570,
+     ""
+    ],
+    [
+     6569,
+     6572,
+     "CD.Wide.w"
+    ],
+    [
+     6571,
+     6572,
+     "CD.Wide.w"
+    ],
+    [
+     6576,
+     6579,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 6535,
     "col": 0,
@@ -5650,6 +7693,7 @@
      "opener": 65
     }
    ],
+   "declares": [],
    "end": {
     "byte": 6590,
     "col": 10,
@@ -5665,6 +7709,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD.NoteNs",
@@ -5674,6 +7720,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 6580,
     "col": 0,
@@ -5699,6 +7747,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_keptHere",
+     ""
+    ]
+   ],
    "end": {
     "byte": 6653,
     "col": 50,
@@ -5752,6 +7806,10 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
+   "inst_classes": [
+    "OfNat"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.in",
    "names": [
     "CD.uses_keptHere"
@@ -5763,6 +7821,29 @@
      "namespace": "List"
     }
    ],
+   "resolved": [
+    [
+     6611,
+     6624,
+     "CD.uses_keptHere"
+    ],
+    [
+     6611,
+     6624,
+     ""
+    ],
+    [
+     6627,
+     6642,
+     "CD.NoteNs.keptHere"
+    ],
+    [
+     6650,
+     6653,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 6592,
     "col": 0,
@@ -5792,6 +7873,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 6661,
     "col": 6,
@@ -5807,6 +7889,8 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD",
@@ -5816,6 +7900,8 @@
      "namespace": "List"
     }
    ],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 6655,
     "col": 0,
@@ -5832,6 +7918,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 6662,
     "col": 0,
@@ -5840,10 +7927,14 @@
    "heads": [],
    "idents": [],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 6662,
     "col": 0,
@@ -5856,32 +7947,200 @@
  "messages": [
   {
    "end": {
-    "byte": 1891,
-    "col": 24,
-    "line": 70
+    "byte": 1116,
+    "col": 6,
+    "line": 49
    },
-   "severity": "error",
+   "severity": "information",
    "start": {
-    "byte": 1890,
-    "col": 23,
-    "line": 70
+    "byte": 1110,
+    "col": 0,
+    "line": 49
    },
-   "text": "Unknown identifier `w` at quotation precheck\n\nNote: You can use `set_option quotPrecheck false` to disable this check."
+   "text": "CD.double_succ (n : Nat) : double (n + 1) = double n + 2"
   },
   {
    "end": {
-    "byte": 6033,
-    "col": 24,
-    "line": 156
+    "byte": 1816,
+    "col": 43,
+    "line": 65
    },
-   "severity": "error",
+   "severity": "warning",
    "start": {
-    "byte": 6032,
-    "col": 23,
-    "line": 156
+    "byte": 1773,
+    "col": 0,
+    "line": 65
    },
-   "text": "Unknown identifier `x` at quotation precheck\n\nNote: You can use `set_option quotPrecheck false` to disable this check."
+   "text": "automatically included section variable(s) unused in theorem `CD.Space.field_free`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 2132,
+    "col": 46,
+    "line": 73
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 2086,
+    "col": 0,
+    "line": 73
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.note_free`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 2571,
+    "col": 44,
+    "line": 87
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 2527,
+    "col": 0,
+    "line": 87
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.trail_dropped`:\n  hx\n  [Inhabited Wide]\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx [Inhabited Wide] in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 2843,
+    "col": 43,
+    "line": 95
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 2800,
+    "col": 0,
+    "line": 95
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.Space.paren_free`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 3355,
+    "col": 38,
+    "line": 107
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 3317,
+    "col": 0,
+    "line": 107
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.uses_hk`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 3653,
+    "col": 42,
+    "line": 112
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 3611,
+    "col": 0,
+    "line": 112
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.uses_hk1`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 3914,
+    "col": 44,
+    "line": 117
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 3870,
+    "col": 0,
+    "line": 117
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.uses_hk2`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 4259,
+    "col": 21,
+    "line": 124
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 4196,
+    "col": 0,
+    "line": 123
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.Space.cd_unused_simp`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 4258,
+    "col": 20,
+    "line": 124
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 4251,
+    "col": 13,
+    "line": 124
+   },
+   "text": "This simp argument is unused:\n  size_eq\n\nHint: Omit it from the simp argument list.\n  [apply] simp only\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`"
+  },
+  {
+   "end": {
+    "byte": 4603,
+    "col": 93,
+    "line": 129
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 4504,
+    "col": 0,
+    "line": 129
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.uses_dot_thm`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 5085,
+    "col": 94,
+    "line": 137
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 4991,
+    "col": 0,
+    "line": 137
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.perm_length_cd`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 5471,
+    "col": 86,
+    "line": 143
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 5381,
+    "col": 0,
+    "line": 143
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.uses_core_succ`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
+  },
+  {
+   "end": {
+    "byte": 5894,
+    "col": 55,
+    "line": 150
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 5839,
+    "col": 0,
+    "line": 150
+   },
+   "text": "automatically included section variable(s) unused in theorem `CD.uses_witness`:\n  hx\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit hx in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`"
   }
  ],
- "mode": "parse"
+ "mode": "elaborate"
 }

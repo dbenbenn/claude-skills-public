@@ -8,6 +8,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 708,
     "col": 83,
@@ -16,10 +17,14 @@
    "heads": [],
    "idents": [],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.moduleDoc",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 22,
     "col": 0,
@@ -34,6 +39,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 725,
     "col": 15,
@@ -49,10 +55,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 710,
     "col": 0,
@@ -72,6 +82,16 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.Ex.Word",
+     ""
+    ],
+    [
+     "CD.Ex.Word.val",
+     ""
+    ]
+   ],
    "end": {
     "byte": 759,
     "col": 11,
@@ -112,12 +132,37 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Ex.Word"
    ],
    "namespace": "CD.Ex",
    "opens": [],
+   "resolved": [
+    [
+     737,
+     741,
+     "CD.Ex.Word"
+    ],
+    [
+     737,
+     741,
+     ""
+    ],
+    [
+     750,
+     753,
+     "CD.Ex.Word.val"
+    ],
+    [
+     756,
+     759,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 727,
     "col": 0,
@@ -137,6 +182,16 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.Ex.Coding.code",
+     ""
+    ],
+    [
+     "CD.Ex.Coding",
+     ""
+    ]
+   ],
    "end": {
     "byte": 809,
     "col": 16,
@@ -189,12 +244,49 @@
      }
     }
    ],
+   "inst_classes": [
+    "CD.Ex.Coding"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Ex.Coding"
    ],
    "namespace": "CD.Ex",
    "opens": [],
+   "resolved": [
+    [
+     767,
+     773,
+     ""
+    ],
+    [
+     767,
+     773,
+     "CD.Ex.Coding"
+    ],
+    [
+     775,
+     776,
+     ""
+    ],
+    [
+     793,
+     797,
+     "CD.Ex.Coding.code"
+    ],
+    [
+     800,
+     801,
+     ""
+    ],
+    [
+     806,
+     809,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 761,
     "col": 0,
@@ -213,6 +305,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 831,
     "col": 20,
@@ -234,10 +327,22 @@
     }
    ],
    "ids": [],
+   "inst_classes": [
+    "CD.Ex.Coding"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.export",
    "names": [],
    "namespace": "CD.Ex",
    "opens": [],
+   "resolved": [
+    [
+     826,
+     830,
+     "CD.Ex.Coding.code"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 811,
     "col": 0,
@@ -257,6 +362,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "CD.Ex.instCodingNat",
+     "CD.Ex.Coding"
+    ]
+   ],
    "end": {
     "byte": 866,
     "col": 29,
@@ -284,10 +395,36 @@
     }
    ],
    "ids": [],
+   "inst_classes": [
+    "CD.Ex.Coding"
+   ],
+   "insts": [
+    "CD.Ex.instCodingNat"
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [],
    "namespace": "CD.Ex",
    "opens": [],
+   "resolved": [
+    [
+     844,
+     850,
+     "CD.Ex.Coding"
+    ],
+    [
+     851,
+     854,
+     "Nat"
+    ],
+    [
+     861,
+     863,
+     "id"
+    ]
+   ],
+   "sig_insts": [
+    "CD.Ex.instCodingNat"
+   ],
    "start": {
     "byte": 833,
     "col": 0,
@@ -312,6 +449,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.Ex.Word.len",
+     ""
+    ]
+   ],
    "end": {
     "byte": 906,
     "col": 38,
@@ -364,12 +507,57 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Ex.Word.len"
    ],
    "namespace": "CD.Ex",
    "opens": [],
+   "resolved": [
+    [
+     872,
+     880,
+     "CD.Ex.Word.len"
+    ],
+    [
+     872,
+     880,
+     ""
+    ],
+    [
+     882,
+     883,
+     ""
+    ],
+    [
+     886,
+     890,
+     "CD.Ex.Word"
+    ],
+    [
+     894,
+     897,
+     "Nat"
+    ],
+    [
+     901,
+     902,
+     ""
+    ],
+    [
+     901,
+     906,
+     "CD.Ex.Word.val"
+    ],
+    [
+     903,
+     906,
+     "CD.Ex.Word.val"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 868,
     "col": 0,
@@ -394,6 +582,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Ex.word_len",
+     ""
+    ]
+   ],
    "end": {
     "byte": 958,
     "col": 50,
@@ -452,12 +646,72 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.Ex.word_len"
    ],
    "namespace": "CD.Ex",
    "opens": [],
+   "resolved": [
+    [
+     916,
+     924,
+     "CD.Ex.word_len"
+    ],
+    [
+     916,
+     924,
+     ""
+    ],
+    [
+     926,
+     927,
+     ""
+    ],
+    [
+     930,
+     934,
+     "CD.Ex.Word"
+    ],
+    [
+     938,
+     939,
+     ""
+    ],
+    [
+     938,
+     943,
+     "CD.Ex.Word.len"
+    ],
+    [
+     940,
+     943,
+     "CD.Ex.Word.len"
+    ],
+    [
+     946,
+     947,
+     ""
+    ],
+    [
+     946,
+     951,
+     "CD.Ex.Word.val"
+    ],
+    [
+     948,
+     951,
+     "CD.Ex.Word.val"
+    ],
+    [
+     955,
+     958,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 908,
     "col": 0,
@@ -481,6 +735,7 @@
      "opener": 1
     }
    ],
+   "declares": [],
    "end": {
     "byte": 969,
     "col": 9,
@@ -496,10 +751,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD.Ex",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 960,
     "col": 0,
@@ -514,6 +773,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 986,
     "col": 15,
@@ -529,10 +789,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 971,
     "col": 0,
@@ -552,6 +816,16 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.LI.PropC",
+     ""
+    ],
+    [
+     "CD.LI.PropC.out",
+     ""
+    ]
+   ],
    "end": {
     "byte": 1036,
     "col": 13,
@@ -610,12 +884,54 @@
      }
     }
    ],
+   "inst_classes": [
+    "CD.LI.PropC"
+   ],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.LI.PropC"
    ],
    "namespace": "CD.LI",
    "opens": [],
+   "resolved": [
+    [
+     994,
+     999,
+     ""
+    ],
+    [
+     994,
+     999,
+     "CD.LI.PropC"
+    ],
+    [
+     1001,
+     1002,
+     ""
+    ],
+    [
+     1005,
+     1008,
+     "Nat"
+    ],
+    [
+     1025,
+     1028,
+     "CD.LI.PropC.out"
+    ],
+    [
+     1031,
+     1032,
+     ""
+    ],
+    [
+     1035,
+     1036,
+     ""
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 988,
     "col": 0,
@@ -635,6 +951,16 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.LI.Box",
+     ""
+    ],
+    [
+     "CD.LI.Box.b",
+     ""
+    ]
+   ],
    "end": {
     "byte": 1067,
     "col": 9,
@@ -675,12 +1001,37 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.LI.Box"
    ],
    "namespace": "CD.LI",
    "opens": [],
+   "resolved": [
+    [
+     1048,
+     1051,
+     "CD.LI.Box"
+    ],
+    [
+     1048,
+     1051,
+     ""
+    ],
+    [
+     1060,
+     1061,
+     "CD.LI.Box.b"
+    ],
+    [
+     1064,
+     1067,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1038,
     "col": 0,
@@ -700,6 +1051,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.LI.Box.get",
+     ""
+    ]
+   ],
    "end": {
     "byte": 1103,
     "col": 34,
@@ -752,12 +1109,57 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.LI.Box.get"
    ],
    "namespace": "CD.LI",
    "opens": [],
+   "resolved": [
+    [
+     1073,
+     1080,
+     "CD.LI.Box.get"
+    ],
+    [
+     1073,
+     1080,
+     ""
+    ],
+    [
+     1082,
+     1083,
+     ""
+    ],
+    [
+     1086,
+     1089,
+     "CD.LI.Box"
+    ],
+    [
+     1093,
+     1096,
+     "Nat"
+    ],
+    [
+     1100,
+     1101,
+     ""
+    ],
+    [
+     1100,
+     1103,
+     "CD.LI.Box.b"
+    ],
+    [
+     1102,
+     1103,
+     "CD.LI.Box.b"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1069,
     "col": 0,
@@ -782,6 +1184,12 @@
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.LI.box_get",
+     ""
+    ]
+   ],
    "end": {
     "byte": 1151,
     "col": 46,
@@ -840,12 +1248,72 @@
      }
     }
    ],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.LI.box_get"
    ],
    "namespace": "CD.LI",
    "opens": [],
+   "resolved": [
+    [
+     1113,
+     1120,
+     "CD.LI.box_get"
+    ],
+    [
+     1113,
+     1120,
+     ""
+    ],
+    [
+     1122,
+     1123,
+     ""
+    ],
+    [
+     1126,
+     1129,
+     "CD.LI.Box"
+    ],
+    [
+     1133,
+     1134,
+     ""
+    ],
+    [
+     1133,
+     1138,
+     "CD.LI.Box.get"
+    ],
+    [
+     1135,
+     1138,
+     "CD.LI.Box.get"
+    ],
+    [
+     1141,
+     1142,
+     ""
+    ],
+    [
+     1141,
+     1144,
+     "CD.LI.Box.b"
+    ],
+    [
+     1143,
+     1144,
+     "CD.LI.Box.b"
+    ],
+    [
+     1148,
+     1151,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
    "start": {
     "byte": 1105,
     "col": 0,
@@ -869,6 +1337,7 @@
      "opener": 9
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1162,
     "col": 9,
@@ -884,10 +1353,14 @@
     }
    ],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
    "namespace": "CD.LI",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 1153,
     "col": 0,
@@ -902,6 +1375,7 @@
      "opener": null
     }
    ],
+   "declares": [],
    "end": {
     "byte": 1163,
     "col": 0,
@@ -910,10 +1384,14 @@
    "heads": [],
    "idents": [],
    "ids": [],
+   "inst_classes": [],
+   "insts": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],
    "namespace": "",
    "opens": [],
+   "resolved": [],
+   "sig_insts": [],
    "start": {
     "byte": 1163,
     "col": 0,
@@ -924,5 +1402,5 @@
  "decls": [],
  "file": "CarveDev/InstBase.lean",
  "messages": [],
- "mode": "parse"
+ "mode": "elaborate"
 }

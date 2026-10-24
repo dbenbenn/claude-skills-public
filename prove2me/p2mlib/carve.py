@@ -94,8 +94,9 @@ def module_path(src_root, m):
 
 
 def module_info(src_root, m, ws=None, use_cache=True):
-    """LeanInfo (parse-only, with identifiers) of module m under src_root; cached."""
-    return leaninfo.run(module_path(src_root, m), parse_only=True, idents=True, ws=ws,
+    """LeanInfo of module m under src_root, elaborated (its imports must be built), with its
+    identifiers, what Lean resolved each to and the instances each command used; cached."""
+    return leaninfo.run(module_path(src_root, m), idents=True, module=m, no_decls=True, ws=ws,
                         use_cache=use_cache)
 
 
@@ -166,9 +167,9 @@ def record_fixture(src_root, prefix, roots, olean_dir, out_dir, ws=None):
         open(dg, 'w', encoding='utf-8').write('\n'.join(decls + sorted(rest[:-1]) + rest[-1:]) + '\n')
         out = ['decl_graph.jsonl']
         for m in mods:
-            data = leaninfo.raw(module_path(src_root, m), parse_only=True, ws=ws, idents=True)
+            data = leaninfo.raw(module_path(src_root, m), ws=ws, idents=True, module=m, no_decls=True)
             data['file'] = os.path.relpath(module_path(src_root, m), src_root)
-            rel = os.path.relpath(module_path(src_root, m), src_root)[:-5] + '.parse.json'
+            rel = os.path.relpath(module_path(src_root, m), src_root)[:-5] + '.info.json'
             os.makedirs(os.path.dirname(os.path.join(out_dir, rel)), exist_ok=True)
             with open(os.path.join(out_dir, rel), 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=1, sort_keys=True)
@@ -321,6 +322,33 @@ def _head_kind(h):
     return h['kind'].rsplit('.', 1)[-1]
 
 
+@dataclass
+class Reading:
+    """What Lean resolved one identifier token to, from the elaborated port (LeanInfo `resolved`).
+    `head`: the constants the token's name part denotes (empty for a local: a bound or section
+    variable, a hypothesis), `span` its byte range; `consts`: every constant recorded inside the
+    token, fields included (`A.coord_eq` with `A : Space`: head local, consts {Space.coord_eq});
+    `entries`: [(start, end, name)] ('' for a local)."""
+    head: tuple
+    span: tuple
+    consts: set
+    entries: list
+    field: bool = False       # the head is a structure-instance field name (`{ w := 0 }`)
+
+    @property
+    def local(self):
+        return not self.head
+
+
+def last_component(text_bytes, a, b):
+    """Byte range of the last component of the name written at [a, b) (`Space.size_eq` ->
+    `size_eq`; a `«…»` component may contain dots)."""
+    t = text_bytes[a:b]
+    stop = t.rfind(b'\xc2\xab') if t.endswith(b'\xc2\xbb') else len(t)
+    i = t.rfind(b'.', 0, stop if stop >= 0 else len(t))
+    return a + i + 1, b
+
+
 class Graph:
     """The declaration graph of a development: nodes (declaration commands), module DAG, name
     resolution. `Graph.load(decl_graph.jsonl, src_root)` reads the module infos (recorded
@@ -330,6 +358,10 @@ class Graph:
         self.consts, self.imports, self.ext_ns, self.infos = consts, imports, ext_ns, infos
         self.modules = sorted(infos)
         self._closure_cache = {}
+        self._readings = {}
+        # identifier tokens read from text because Lean recorded nothing for them, that the
+        # text-based reading took for project constants: (module, line, token)
+        self.fallbacks = []
         self._build_modules()
         self._build_nodes()
         self._build_names()
@@ -340,7 +372,7 @@ class Graph:
         consts, imports, ext = load_decl_graph(decl_graph)
         infos = {}
         for m in imports:
-            rec = module_path(src_root, m)[:-5] + '.parse.json'
+            rec = module_path(src_root, m)[:-5] + '.info.json'
             if os.path.exists(rec):
                 infos[m] = leaninfo.parse(json.load(open(rec, encoding='utf-8')),
                                           open(module_path(src_root, m), 'rb').read())
@@ -554,6 +586,40 @@ class Graph:
                         out += self.open_targets(idn['name'], c.namespace, m)
         return list(dict.fromkeys(out))
 
+    def reading(self, info, c, idn):
+        """What Lean resolved identifier idn of command c to (a Reading), or None when the
+        elaborated port recorded nothing there (a module read without elaborating, a command
+        that failed, a token that is not a term: then the text-based reading is the fallback)."""
+        if c.resolved is None:
+            return None
+        key = (info.path, c.index)
+        idx = self._readings.get(key)
+        if idx is None:
+            # [a, b, name] for a term, [a, b, name, 'f'] for a structure-instance field
+            ents = sorted((x[0], x[1], x[2], len(x) > 3) for x in c.resolved)
+            idx = self._readings[key] = ([(a, b, n) for a, b, n, _ in ents], [a for a, _, _, _ in ents],
+                                         {(a, b) for a, b, _, f in ents if f})
+        ents, starts, fields = idx
+        s0, e0 = idn['start'], idn['end']
+        lo = bisect.bisect_left(starts, s0 - 1)
+        hi = bisect.bisect_left(starts, e0)
+        mine = [x for x in ents[lo:hi] if x[1] <= e0 and x[1] > s0]
+        if not mine:
+            return None
+        at = [x for x in mine if x[0] <= s0]
+        if not at:
+            return None
+        hb = min(b for _, b, _ in at)
+        hs = min(a for a, b, _ in at if b == hb)
+        head = tuple(sorted({n for a, b, n in at if b == hb and n}))
+        return Reading(head, (hs, hb), {n for _, _, n in mine if n}, mine, (hs, hb) in fields)
+
+    def is_project(self, n):
+        return n in self.owner
+
+    def note_fallback(self, info, c, idn):
+        self.fallbacks.append((info.path, c.start.line, idn['name']))
+
     def resolve(self, tok, ns, opens, m, used=None, field=False):
         """The project constants (env names) identifier `tok` may denote in module m, namespace ns,
         with project namespaces `opens` open. Over-approximates: every reading Lean could take,
@@ -643,10 +709,19 @@ class Graph:
                     used.update(x['t'])
                     used.update(x['v'])
         for idn in c.idents or []:
-            if idn['role'] != 'ref' or (before is not None and idn['start'] >= before):
+            if idn['role'] not in ('ref', 'dot') or (before is not None and idn['start'] >= before):
                 continue
-            for n in self.resolve(idn['name'], decl_ns(c), opens, m, used,
-                                  field=is_field(info, idn)):
+            r = self.reading(info, c, idn)
+            if r is not None:
+                names = sorted(r.consts)
+            elif idn['role'] != 'ref':
+                continue
+            else:
+                names = self.resolve(idn['name'], decl_ns(c), opens, m, used,
+                                     field=is_field(info, idn))
+                if names:
+                    self.note_fallback(info, c, idn)
+            for n in names:
                 o = self.owner.get(n)
                 if not o or o == me:
                     continue
@@ -1914,6 +1989,7 @@ class Carver:
         self.tag = hashlib.sha1(('\n'.join(sorted(keep)) + salt).encode()).hexdigest()[:6]
         self.re_count = collections.Counter()
         rename = dict(rename or {})
+        self.rename = rename
         mods = g.topo({g.nodes[k].module for k in keep})
         kept_cmds = {m: {g.nodes[k].cmd for k in keep if g.nodes[k].module == m} for m in mods}
         # pass 1: what goes, per module (independent of namespaces)
@@ -1943,14 +2019,23 @@ class Carver:
         return ''.join(out)
 
     # ---------------------------------------------------------- what goes
-    def _gone(self, tok, c, m, have, opens, bound=()):
-        """Does identifier tok, read in command c's scope, name only gone project declarations?
-        No guessing for fields of locals: a binder that does not elaborate is cut by
-        p2mlib.repair from Lean's own error (guessing dropped needed binders: Erdős 3 v2 B107,
-        B167, B248)."""
+    def _gone(self, tok, c, m, have, opens, bound=(), idn=None):
+        """Does identifier tok, read in command c's scope, need a project declaration the carved
+        file does not have? With `idn` (its LeanInfo identifier) and the elaborated port's record
+        of it, exactly: some project constant Lean resolved inside the token (a field included:
+        `S.big` with `S` a variable needs Space.big) is gone. Without a record, the text-based
+        reading: every project declaration it may name is gone; no guessing for fields of locals
+        then (guessing dropped needed binders: Erdős 3 v2 B107, B167, B248)."""
+        g = self.g
+        if idn is not None:
+            r = g.reading(g.infos[m], c, idn)
+            if r is not None:
+                return any(g.is_project(n) and pubname(n) not in have for n in r.consts)
         if tok.split('.')[0] in bound:
             return False
-        hits = self.g.resolve_lean(tok, c.namespace, opens, m)
+        hits = g.resolve_lean(tok, c.namespace, opens, m)
+        if hits and idn is not None:
+            g.note_fallback(g.infos[m], c, idn)
         return bool(hits) and all(pubname(h) not in have for h in hits)
 
     def _drops(self, m, kept, have):
@@ -1971,7 +2056,7 @@ class Carver:
             if c.short_kind in NOTATION or c.short_kind == 'attribute':
                 opens = g.scope_opens(info, c, m)
                 refs = [i for i in c.idents or [] if i['role'] == 'ref']
-                gone = [i for i in refs if self._gone(i['name'], c, m, have, opens)]
+                gone = [i for i in refs if self._gone(i['name'], c, m, have, opens, idn=i)]
                 if c.short_kind in NOTATION and gone:
                     drop.add(c.index)
                 elif c.short_kind == 'attribute' and refs and len(gone) == len(refs):
@@ -2084,7 +2169,7 @@ class Carver:
             if k in ('include', 'omit'):
                 ids = [i for i in c.idents or [] if i['role'] in ('ref', 'binder')]
                 bad = [i for i in ids if i['name'] in dropped_vars or
-                       self._gone(i['name'], c, m, have, opens)]
+                       self._gone(i['name'], c, m, have, opens, idn=i)]
                 if bad and len(bad) == len(ids):
                     drop.add(c.index)
                 elif bad:
@@ -2097,8 +2182,8 @@ class Carver:
                 # with the bundle that declares its target
                 here = keep_names if (REDUCIBILITY.search(txt) and not _is_local(txt)) else None
                 refs = [i for i in c.idents or [] if i['role'] == 'ref']
-                gone = [i for i in refs if self._gone(i['name'], c, m, have, opens) or
-                        (here is not None and self._gone(i['name'], c, m, here, opens))]
+                gone = [i for i in refs if self._gone(i['name'], c, m, have, opens, idn=i) or
+                        (here is not None and self._gone(i['name'], c, m, here, opens, idn=i))]
                 if gone and len(gone) == len(refs):
                     drop.add(c.index)
                 elif gone:
@@ -2203,7 +2288,7 @@ class Carver:
                 continue
             opens = g.scope_opens(info, vc, m)
             refs = [i for i in vc.idents or [] if i['role'] == 'ref']
-            if any(self._gone(i['name'], vc, m, have, opens) for i in refs):
+            if any(self._gone(i['name'], vc, m, have, opens, idn=i) for i in refs):
                 continue
             short = pubname(ik).rsplit('.', 1)[-1] if ik else \
                 (decl['name'].rsplit('.', 1)[-1] if decl else 'localInst')
@@ -2226,12 +2311,13 @@ class Carver:
             for j, grp in enumerate(groups):
                 if j in bad or set(grp['names']) & protected:
                     continue
-                # a token right after `.` is a field (`(e a).Bounds`): never read as a name
+                # a token right after `.` is a field (`(e a).Bounds`): read only as Lean resolved
+                # it, never by its text
                 inside = [i for i in refs if grp['start'] <= i['start'] < grp['end'] and
-                          not is_field(info, i)]
+                          (not is_field(info, i) or self.g.reading(info, c, i) is not None)]
                 gtxt = info.text_bytes[grp['start']:grp['end']].decode('utf-8')
                 if any(_uses_token(gtxt, tk) for tk in dead_tokens) or any(i['name'].split('.')[0] in lost - set(grp['names']) or
-                       self._gone(i['name'], c, m, have, opens, bound - lost) for i in inside):
+                       self._gone(i['name'], c, m, have, opens, bound - lost, idn=i) for i in inside):
                     bad.add(j)
                     changed = True
         # a name bound again here is a new variable, not the dropped one
@@ -2352,9 +2438,34 @@ class Carver:
         return cache[m].get(c.index)
 
     def _rename_edits(self, info, c, m, opens, rename):
-        """Rename references Lean resolves to a renamed declaration, and its declId."""
+        """Rename references Lean resolved to a renamed declaration, and its declId: in every
+        identifier token, each part the elaborated port recorded as a renamed constant gets the new
+        last component (`D.localize` -> `D.localize_s2`, `(e).f` -> `(e).f_oai`, `ZG.wcl` left alone
+        while `AZ.wcl` is renamed). A token with no record falls back to `_rename_text`."""
         g, edits = self.g, []
         if not rename:
+            return edits
+        done, rest = set(), []
+        for i in c.idents or []:
+            if i['role'] not in ('decl', 'ref', 'dot'):
+                continue
+            r = g.reading(info, c, i)
+            if r is None:
+                rest.append(i)
+                continue
+            for a, b, n in r.entries:
+                if n in rename:
+                    span = last_component(info.text_bytes, a, b)
+                    if span not in done:
+                        done.add(span)
+                        edits.append((span[0], span[1], rename[n]))
+        return edits + self._rename_text(info, c, m, opens, rename, rest)
+
+    def _rename_text(self, info, c, m, opens, rename, idents):
+        """The text-based rename of identifiers the elaborated port has no record of (the fallback;
+        each fix below is a case where the text reading had disagreed with Lean)."""
+        g, edits = self.g, []
+        if not idents:
             return edits
         # a field-style use (`D.localize`, `(…).f`) of a renamed declaration: its short name, when
         # exactly one renamed declaration has it (Erdős 3 v2: pieces kept `D.localize` for the
@@ -2374,7 +2485,7 @@ class Carver:
         k = g.cmd_node.get((m, c.index))
         own = set(g.nodes[k].names) | {k} if k else set()
         vs = c.value_start.byte if c.value_start else None
-        for i in c.idents or []:
+        for i in idents:
             if i['role'] == 'decl':
                 full = i['name'][len('_root_.'):] if i['name'].startswith('_root_.') else \
                     join(c.namespace, i['name'])
@@ -2407,6 +2518,7 @@ class Carver:
             else:
                 continue
             if hits:
+                g.note_fallback(info, c, i)
                 parts = i['name'].split('.')
                 parts[-1] = rename[hits[0]]
                 edits.append((i['start'], i['end'], '.'.join(parts)))
@@ -2423,7 +2535,7 @@ class Carver:
             if hk in ('omit', 'include'):
                 refs = [i for i in ids if i['role'] in ('ref', 'binder')]
                 bad = [i for i in refs if i['name'] in dropped_vars or
-                       self._gone(i['name'], c, m, have, opens)]
+                       self._gone(i['name'], c, m, have, opens, idn=i)]
                 if refs and len(bad) == len(refs):
                     cut.append(span)
                 else:
@@ -2462,8 +2574,28 @@ class Carver:
         out = []
         for i in c.idents or []:
             tok = i['name']
-            if i['role'] != 'ref' or i['start'] >= body_end or i['start'] in taken or \
-                    tok.startswith('_root_.') or tok.split('.')[0] in binders:
+            if i['role'] != 'ref' or i['start'] >= body_end or tok.startswith('_root_.') or \
+                    any(i['start'] <= a < i['end'] for a in taken):
+                continue
+            r = g.reading(info, c, i)
+            if r is not None:
+                # Lean's own reading: the constant the name part denotes. Write it in full when the
+                # carved file, where modules the original never imported sit side by side, would
+                # read that text as some other project declaration (a library constant included:
+                # a project `CD.Finset.foo` in the file would capture `Finset.foo`)
+                if len(r.head) != 1 or r.field or is_field(info, i) or \
+                        r.head[0].startswith('_private.') or r.head[0] in self.rename:
+                    continue                       # a field (`(e).f`, `{ f := … }`): typed, not named
+                orig = r.head[0]
+                a, b = r.span
+                if a < i['start'] or info.text_bytes[a:b].startswith(b'.'):
+                    continue                       # a dot-identifier: resolved by its expected type
+                htxt = info.text_bytes[a:b].decode('utf-8')
+                now, k2 = g.lean_hits(htxt, c.namespace, opens, lambda n: pubname(n) in have)
+                if k2 == 0 and now and {pubname(n) for n in now} != {pubname(orig)}:
+                    out.append((a, b, '_root_.' + pubname(orig)))
+                continue
+            if tok.split('.')[0] in binders:
                 continue
             src, k = g.lean_hits(tok, c.namespace, opens, lambda n: g.visible(n, m))
             if len(src) != 1 or k:
