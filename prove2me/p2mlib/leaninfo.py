@@ -72,12 +72,13 @@ class Command:
     # with run(idents=True) in elaborate mode (lean/LeanInfo.lean, "--idents when elaborating"):
     # [[start, end, name]] what Lean resolved inside each identifier token ('' a local); the
     # instances its terms use that are not global library instances (`insts`; `sig_insts` those of
-    # the statement, before the value); the classes instance search solved (`inst_classes`); and
-    # [[name, class]] the constants its declaration names bind (class '' unless an instance)
+    # the statement, before the value); what instance search solved (`inst_keys`, 'Class Head …');
+    # and [[name, class, [heads]]] the constants its declaration names bind (class '' unless an
+    # instance)
     resolved: list = None
     insts: list = None
     sig_insts: list = None
-    inst_classes: list = None
+    inst_keys: list = None
     declares: list = None
 
     @property
@@ -165,7 +166,7 @@ def parse(data, text_bytes=b''):
                     [(x['opener'], x['cmds']) for x in c.get('context') or []],
                     [(_pos(x['start']), _pos(x['end'])) for x in c.get('ids') or []],
                     c.get('idents'), c.get('heads'), c.get('binders'), c.get('doc'), c.get('private'),
-                    c.get('resolved'), c.get('insts'), c.get('sig_insts'), c.get('inst_classes'),
+                    c.get('resolved'), c.get('insts'), c.get('sig_insts'), c.get('inst_keys'),
                     c.get('declares'))
             for i, c in enumerate(data['commands'])]
     decls = []

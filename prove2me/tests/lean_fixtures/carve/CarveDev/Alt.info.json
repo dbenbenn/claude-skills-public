@@ -24,7 +24,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -54,7 +54,8 @@
    "declares": [
     [
      "CD.List.headOr",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -119,8 +120,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -202,7 +203,8 @@
    "declares": [
     [
      "CD.List.headOr_nil",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -245,8 +247,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -319,7 +321,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -357,7 +359,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -423,13 +425,16 @@
     }
    ],
    "ids": [],
-   "inst_classes": [
-    "Applicative",
+   "inst_keys": [
+    "Applicative ReaderT",
     "Bind",
-    "Lean.MonadQuotation",
-    "Lean.MonadRef",
-    "Monad",
-    "Pure"
+    "Bind Lean.MacroM",
+    "Lean.MonadQuotation Lean.MacroM",
+    "Lean.MonadRef Lean.MacroM",
+    "Monad EStateM",
+    "Monad ReaderT",
+    "Pure",
+    "Pure Lean.MacroM"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.macro",
@@ -487,7 +492,8 @@
    "declares": [
     [
      "CD.Mac.useMac",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -524,10 +530,11 @@
      }
     }
    ],
-   "inst_classes": [
-    "Add",
+   "inst_keys": [
+    "Add Nat",
     "HAdd",
-    "OfNat"
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -595,7 +602,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -626,7 +633,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],

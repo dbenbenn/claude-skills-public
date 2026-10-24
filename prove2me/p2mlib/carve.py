@@ -343,9 +343,12 @@ class Reading:
 
 
 def _alternative_name(info, idn):
-    """Is identifier idn the name of a case alternative (`| zero =>` of `induction … with`,
-    `case succ =>`), where Lean accepts no qualified name ("Invalid alternative name")?"""
+    """Is identifier idn the name of a case alternative (`| zero =>` or `| @inv h … =>` of
+    `induction … with`, `case succ =>`), where Lean accepts no qualified name ("Invalid
+    alternative name")? Also true of a `match` pattern's constructor, where a pin is never needed."""
     before = info.text_bytes[max(0, idn['start'] - 40):idn['start']].rstrip()
+    if before.endswith(b'@'):          # `| @inv h a … =>` (RationalHitting list_hits)
+        before = before[:-1].rstrip()
     return before.endswith(b'|') or re.search(rb'(?:^|\s)(?:case|next)$', before) is not None
 
 
@@ -794,18 +797,22 @@ class Graph:
         nd = self.nodes[k]
         return nd.instance and _local_instance(self.infos[nd.module], self.infos[nd.module].commands[nd.cmd])[0]
 
-    def inst_classes(self, k):
-        """The classes node k's elaboration asked instance search for (None: no record)."""
+    def inst_problems(self, k):
+        """[(class, {argument heads})]: what instance search solved in node k's elaboration
+        (LeanInfo `inst_keys`); None without a record."""
         nd = self.nodes[k]
-        return self.infos[nd.module].commands[nd.cmd].inst_classes
+        keys = self.infos[nd.module].commands[nd.cmd].inst_keys
+        if keys is None:
+            return None
+        return [(x.split()[0], set(x.split()[1:])) for x in keys]
 
     def instance_class(self, k):
-        """The class instance node k provides (from its command's LeanInfo `declares`), or None."""
+        """(class, [argument heads]) of instance node k's conclusion (LeanInfo `declares`), or None."""
         nd = self.nodes[k]
         names = set(nd.names)
-        for n, cls in self.infos[nd.module].commands[nd.cmd].declares or ():
-            if n in names and cls:
-                return cls
+        for x in self.infos[nd.module].commands[nd.cmd].declares or ():
+            if x[0] in names and x[1]:
+                return x[1], x[2]
         return None
 
     def inst_owners(self, names, me, m, idx):
@@ -1884,9 +1891,11 @@ def instance_leaks(g, plan):
     search may then take another path: RationalHitting (2026-10-24), the instance witnessCharZero
     of Generator.lean reached the carved list_hits (Certificates.lean) through a bundle, and
     `algebraMap ℚ` elaborated through it, so a `rwa [RingHom.ext_rat …]` no longer matched.
-    Only an instance of a class the declaration's elaboration asked instance search for can take
-    part (LeanInfo `inst_classes`: the classes of the instance arguments of every constant its terms
-    use; witnessCharZero is a CharZero, which `algebraMap ℚ` asks for through algebraRat). Without
+    Only an instance that could answer a problem instance search solved in the declaration's
+    elaboration is reported (LeanInfo `inst_keys`: the class and argument heads of every instance
+    application in its terms; witnessCharZero is a `CharZero` of the type list_hits' `algebraMap ℚ`
+    needed one for, through algebraRat): same class, and the instance's own argument heads among
+    the problem's. A problem a binder answered is not one (a local instance comes first). Without
     that record, an instance whose type mentions something the declaration uses (or only library
     types). A warning: whether type class search takes the new path there is not known."""
     pos, bimp, _ = _plan_index(plan)
@@ -1908,12 +1917,13 @@ def instance_leaks(g, plan):
             if k not in g.nodes:
                 continue
             uses = g.nodes[k].deps | g.nodes[k].sig
-            asked = g.inst_classes(k)
+            asked = g.inst_problems(k)
             for i in sorted(cand):
                 if i == k or saw(k, i):
                     continue
                 if asked is not None:
-                    if g.instance_class(i) in asked:
+                    ci = g.instance_class(i)
+                    if ci and any(cls == ci[0] and set(ci[1]) <= hs for cls, hs in asked):
                         out.append((item, k, i))
                     continue
                 td = g.nodes[i].tdeps - {i}

@@ -264,9 +264,27 @@ With `--idents` in elaborate mode every command also reports, from its info tree
   instances, and anything a `local`/`scoped` attribute or `open scoped` made an instance. An
   instance of a `Prop` class is a theorem used silently by instance search; this is where its use
   shows.
-* `inst_classes`: the classes of every instance those terms use, library ones included (what
-  type class search solved there; the carver's leak check compares an instance's class with it).
+* `inst_keys`: what instance search solved there, library instances included: for every
+  application of an instance in those terms, `"Class H1 H2 …"`, the class of the instance's
+  conclusion at those arguments and the head constants of its arguments (`algebraRat` at a field
+  `K`: `CharZero K…`'s heads). The carver's leak check asks whether an instance a carved file
+  newly shows could have answered one of these problems.
+* `declares`: `[name, class, [heads]]` for the constants its declaration names bind (class `""`
+  unless an instance; heads: of the instance's conclusion, generic arguments left out).
 -/
+
+/-- An instance applied to `args`: its class and the head constants of the conclusion's
+arguments (`"OfNat TimeBound"`), or none. -/
+def problemKey (env : Environment) (c : Name) (args : Array Expr) : Option (Name × Array Name) := do
+  let ci ← env.find? c
+  let mut ty := ci.type
+  for x in args do
+    match ty with
+    | .forallE _ _ b _ => ty := b.instantiate1 x
+    | _ => break
+  let body := ty.getForallBody
+  let cls ← body.getAppFn.constName?
+  return (cls, body.getAppArgs.filterMap (·.getAppFn.constName?))
 
 /-- The ranges of a command's identifier tokens, sorted by start. -/
 def tokenRanges (stx : Syntax) : Array (Nat × Nat) :=
@@ -292,6 +310,7 @@ structure Facts where
   seen : Std.HashSet (Nat × Nat × String) := {}
   consts : NameSet := {}
   sigConsts : NameSet := {}     -- of the terms elaborated before the value (the statement)
+  keys : Std.HashSet String := {}
   declares : NameSet := {}      -- what its declaration names bind (an anonymous instance's name too)
 
 /-- Every constant of `e`, each shared subterm visited once. -/
@@ -306,11 +325,40 @@ unsafe def constsOf (e : Expr) (acc : PtrSet Expr × NameSet) : PtrSet Expr × N
   | .mdata _ b | .proj _ _ b => constsOf b acc
   | _ => acc
 
+/-- The instance problems of `e` (see `inst_keys`): every application of an instance, each
+shared subterm visited once. -/
+unsafe def instKeysOf (env : Environment) (e : Expr) (acc : PtrSet Expr × Std.HashSet String) :
+    PtrSet Expr × Std.HashSet String :=
+  if acc.1.contains e then acc else
+  let acc := (acc.1.insert e, acc.2)
+  match e with
+  | .app f a =>
+    let acc := match e.getAppFn with
+      | .const c _ =>
+        if Meta.isInstanceCore env c then
+          match problemKey env c e.getAppArgs with
+          | some (k, hs) => (acc.1, acc.2.insert (" ".intercalate ((#[k] ++ hs).map toString).toList))
+          | none => acc
+        else acc
+      | _ => acc
+    instKeysOf env a (instKeysOf env f acc)
+  | .const c _ =>
+    if Meta.isInstanceCore env c then
+      match problemKey env c #[] with
+      | some (k, hs) => (acc.1, acc.2.insert (" ".intercalate ((#[k] ++ hs).map toString).toList))
+      | none => acc
+    else acc
+  | .lam _ t b _ | .forallE _ t b _ => instKeysOf env b (instKeysOf env t acc)
+  | .letE _ t v b _ => instKeysOf env b (instKeysOf env v (instKeysOf env t acc))
+  | .mdata _ b | .proj _ _ b => instKeysOf env b acc
+  | _ => acc
+
 /-- Walk a command's info trees: identifier readings inside its tokens, and the constants of every
 term elaborated inside its range. -/
-unsafe def factsOf (toks : Array (Nat × Nat)) (lo hi vs : Nat) (trees : Array InfoTree) : IO Facts := do
+unsafe def factsOf (env : Environment) (toks : Array (Nat × Nat)) (lo hi vs : Nat) (trees : Array InfoTree) : IO Facts := do
   let st ← IO.mkRef ({} : Facts)
   let vis ← IO.mkRef (mkPtrSet (α := Expr) 1024)
+  let kvis ← IO.mkRef (mkPtrSet (α := Expr) 1024)
   let svis ← IO.mkRef (mkPtrSet (α := Expr) 64)
   let rec go (ctx? : Option ContextInfo) (t : InfoTree) : IO Unit := do
     match t with
@@ -342,6 +390,10 @@ unsafe def factsOf (toks : Array (Nat × Nat)) (lo hi vs : Nat) (trees : Array I
               let (p, ns) := constsOf e ((← vis.get), (← st.get).consts)
               vis.set p
               st.modify fun f => { f with consts := ns }
+              unless ti.isBinder do   -- a declaration's own name answers no problem
+                let (p, ks) := instKeysOf env e ((← kvis.get), (← st.get).keys)
+                kvis.set p
+                st.modify fun f => { f with keys := ks }
               if a < vs then
                 let (p, ns) := constsOf e ((← svis.get), (← st.get).sigConsts)
                 svis.set p
@@ -358,52 +410,30 @@ unsafe def factsOf (toks : Array (Nat × Nat)) (lo hi vs : Nat) (trees : Array I
   for t in trees do go none t
   st.get
 
-/-- The class an instance constant provides: the head of its type's conclusion. -/
-def instClass (env : Environment) (c : Name) : Option Name := do
-  let ci ← env.find? c
-  ci.type.getForallBody.getAppFn.constName?
-
-/-- The classes a constant's instance-implicit binders ask for (`algebraMap` asks for `Algebra`). -/
-def binderClasses (env : Environment) (c : Name) : Array Name := Id.run do
-  let some ci := env.find? c | return #[]
-  let mut ty := ci.type
-  let mut out := #[]
-  while true do
-    match ty with
-    | .forallE _ d b bi =>
-      if bi.isInstImplicit then
-        if let some k := d.getForallBody.getAppFn.constName? then out := out.push k
-      ty := b
-    | _ => break
-  return out
-
-/-- The `resolved`, `insts` and `inst_classes` fields of a command (see above). -/
+/-- The `resolved`, `insts`, `inst_keys` and `declares` fields of a command (see above). -/
 unsafe def factsJ (env headerEnv : Environment) (stx : Syntax) (trees : Array InfoTree) : IO (List (String × Json)) := do
   let some r := stx.getRange? | return []
   let vs := ((valueStart? stx).map (·.byteIdx)).getD r.stop.byteIdx
-  let f ← factsOf (tokenRanges stx) r.start.byteIdx r.stop.byteIdx vs trees
+  let f ← factsOf env (tokenRanges stx) r.start.byteIdx r.stop.byteIdx vs trees
   let local? (c : Name) : Bool := Meta.isInstanceCore env c &&
     ((match env.getModuleIdxFor? c with
       | none => true
       | some idx => ourModule env.header.moduleNames[idx.toNat]!) || !Meta.isInstanceCore headerEnv c)
-  let mut classes : NameSet := {}
-  for c in f.consts.toList do
-    for k in binderClasses env c do classes := classes.insert k
-    if Meta.isInstanceCore env c then
-      if let some k := instClass env c then classes := classes.insert k
   let names (s : NameSet) : Json := toJson ((s.toList.map toString).toArray.qsort (· < ·))
   let insts := f.consts.toList.filter local?
   let sigInsts := f.sigConsts.toList.filter local?
   let res := f.resolved.qsort fun x y => x.1 < y.1 || (x.1 == y.1 && x.2.1 < y.2.1)
   let decl := f.declares.toList.map fun c =>
-    Json.arr #[toJson (toString c), toJson (if Meta.isInstanceCore env c then ((instClass env c).map toString).getD "" else "")]
+    match (if Meta.isInstanceCore env c then problemKey env c #[] else none) with
+    | some (k, hs) => Json.arr #[toJson (toString c), toJson (toString k), toJson (hs.map toString)]
+    | none => Json.arr #[toJson (toString c), toJson "", toJson (#[] : Array String)]
   return [("resolved", Json.arr <| res.map fun (a, b, v) =>
             Json.arr (#[toJson a, toJson b, toJson v] ++
               (if f.fieldRanges.contains (a, b) then #[toJson "f"]
                else if f.binderRanges.contains (a, b) then #[toJson "b"] else #[]))),
           ("insts", names (insts.foldl (·.insert ·) {})),
           ("sig_insts", names (sigInsts.foldl (·.insert ·) {})),
-          ("inst_classes", names classes),
+          ("inst_keys", toJson (f.keys.toArray.qsort (· < ·))),
           ("declares", Json.arr decl.toArray)]
 
 /-- Commands that set context for the rest of their scope and end with it -- what a command moved

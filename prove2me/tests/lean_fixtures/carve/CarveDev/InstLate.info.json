@@ -24,7 +24,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -54,7 +54,10 @@
    "declares": [
     [
      "CD.LI.boxInhabited",
-     "Inhabited"
+     "Inhabited",
+     [
+      "CD.LI.Box"
+     ]
     ]
    ],
    "doc": {
@@ -101,9 +104,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "Inhabited",
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [
     "CD.LI.boxInhabited"
@@ -168,7 +170,8 @@
    "declares": [
     [
      "CD.LI.defaultBox",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -211,8 +214,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "Inhabited"
+   "inst_keys": [
+    "Inhabited CD.LI.Box"
    ],
    "insts": [
     "CD.LI.boxInhabited"
@@ -287,7 +290,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -318,7 +321,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],

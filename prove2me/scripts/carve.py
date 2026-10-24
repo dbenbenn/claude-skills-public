@@ -148,6 +148,20 @@ def costs(cfg, g):
     return cost
 
 
+def report_fallbacks(g, limit=10):
+    """Identifiers read from text because the elaborated port recorded nothing for them (a module
+    with errors, a notation body): the text reading is a guess (p2mlib.carve.Graph.reading)."""
+    fb = sorted(set(g.fallbacks))
+    if fb:
+        print('%d identifiers read from text (no record of what Lean resolved them to):' % len(fb))
+        for f, line, tok in fb[:limit]:
+            print('  %s:%d %s' % (f, line, tok))
+        if len(fb) > limit:
+            print('  ... %d more' % (len(fb) - limit))
+    if g.lost_instances:
+        print('%d local instances used but not re-emitted: %s' % (len(g.lost_instances), g.lost_instances[:limit]))
+
+
 def warn_leaks(g, P, limit=30):
     """Instances a carved file shows a declaration its module never saw (C.instance_leaks): if a
     file then fails where the port compiled (a rewrite no longer matching, a different
@@ -182,6 +196,7 @@ def main(argv):
                 print('LeanInfo %d/%d %s' % (i + 1, len(mods), futs[f]), flush=True)
         g = load_graph(cfg)
         print('%d modules, %d declaration nodes' % (len(g.modules), len(g.nodes)))
+        report_fallbacks(g)
     elif cmd == 'split':
         g = load_graph(cfg)
         P = json.load(open(plan_path(cfg)))
@@ -248,6 +263,7 @@ def main(argv):
         for f in r['files']:
             print('%9d  %s' % (r['sizes'][f], f))
         warn_leaks(g, P)
+        report_fallbacks(g)
         for f in r['over_cap']:
             print('OVER 1 MiB', f)
         if r['patches_unused'] and names is None:

@@ -73,4 +73,10 @@ theorem Tree.size_pos (t : Tree) : 0 < t.size := by
   | leaf => exact Nat.one_pos
   | node l r hl _ => simp only [Tree.size]; omega
 
+open Other in
+theorem Tree.size_pos' (t : Tree) : 0 < t.size := by
+  cases t with
+  | @leaf => exact Nat.one_pos
+  | @node l r => simp only [Tree.size]; have := Tree.size_pos l; omega
+
 end CD

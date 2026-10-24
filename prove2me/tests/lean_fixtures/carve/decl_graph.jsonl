@@ -184,6 +184,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.Fields","n":"CD.Tree.size.eq_2","p":true,"r":null,"s":false,"t":["CD.Tree","CD.Tree.node","CD.Tree.size"],"u":[],"v":["CD.Tree","CD.Tree.node","CD.Tree.size"]}
 {"i":false,"k":"theorem","m":"CarveDev.Fields","n":"CD.Tree.size.eq_def","p":true,"r":null,"s":false,"t":["CD.Tree","CD.Tree.size","CD.Tree.size.match_1"],"u":[],"v":["CD.Tree","CD.Tree.below","CD.Tree.brecOn","CD.Tree.leaf","CD.Tree.node","CD.Tree.rec","CD.Tree.size","CD.Tree.brecOn.eq","CD.Tree.brecOn.go","CD.Tree.size.match_1","_private.CarveDev.Fields.0.CD.Tree.size.match_1.splitter"]}
 {"i":false,"k":"theorem","m":"CarveDev.Fields","n":"CD.Tree.size_pos","p":true,"r":[71,0,74,49],"s":false,"t":["CD.Tree","CD.Tree.size"],"u":[],"v":["CD.Tree","CD.Tree.node","CD.Tree.rec","CD.Tree.size"]}
+{"i":false,"k":"theorem","m":"CarveDev.Fields","n":"CD.Tree.size_pos'","p":true,"r":[77,0,80,70],"s":false,"t":["CD.Tree","CD.Tree.size"],"u":[],"v":["CD.Tree","CD.Tree.casesOn","CD.Tree.leaf","CD.Tree.node","CD.Tree.size","CD.Tree.size_pos"]}
 {"i":false,"k":"theorem","m":"CarveDev.Fields","n":"CD.ZG.wcl","p":true,"r":[31,0,31,30],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Fields","n":"CD.fqm","p":true,"r":[15,0,15,29],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Fields","n":"CD.outer_dot","p":true,"r":[27,0,27,78],"s":false,"t":["CD.Outer","CD.Inner.val","CD.Outer.inner"],"u":[],"v":["CD.Outer","CD.Outer.fqm"]}
@@ -203,7 +204,8 @@
 {"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.Box.mk.injEq","p":true,"r":null,"s":false,"t":["CD.LI.Box","CD.LI.Box.mk"],"u":[],"v":["CD.LI.Box","CD.LI.Box.mk","CD.LI.Box.mk.inj"]}
 {"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.Box.mk.sizeOf_spec","p":true,"r":null,"s":false,"t":["CD.LI.Box","CD.LI.Box.mk","CD.LI.Box.rec"],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.PropC.out","p":true,"r":[34,2,34,5],"s":false,"t":["CD.LI.PropC"],"u":[],"v":["CD.LI.PropC"]}
-{"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.box_default","p":true,"r":[46,0,48,84],"s":false,"t":["CD.LI.Box","CD.LI.Box.b","CD.LI.Box.get"],"u":[],"v":["CD.LI.Box","CD.LI.Box.get"]}
+{"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.box_default","p":true,"r":[48,0,50,50],"s":false,"t":["CD.LI.Box","CD.LI.boxInhabitedA","CD.LI.Box.b"],"u":[],"v":["CD.LI.Box","CD.LI.boxInhabitedA","CD.LI.Box.b"]}
+{"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.box_default_local","p":true,"r":[52,0,54,90],"s":false,"t":["CD.LI.Box","CD.LI.Box.b","CD.LI.Box.get"],"u":[],"v":["CD.LI.Box","CD.LI.Box.get"]}
 {"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.box_get","p":true,"r":[41,0,41,46],"s":false,"t":["CD.LI.Box","CD.LI.Box.b","CD.LI.Box.get"],"u":[],"v":["CD.LI.Box","CD.LI.Box.get"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.NoteNs.uses_x","p":true,"r":[164,0,164,33],"s":false,"t":["CD.Wide","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.Wide.w"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.Space.cd_unused_simp","p":true,"r":[120,0,124,21],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
@@ -235,6 +237,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.uses_sorry","p":true,"r":[27,0,27,43],"s":false,"t":["CD.usesSorried"],"u":[],"v":["CD.usesSorried"]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"_private.CarveDev.Top.0.CD.helper","p":true,"r":[16,0,16,37],"s":false,"t":[],"u":[],"v":[]}
 {"i":true,"k":"def","m":"CarveDev.InstBase","n":"CD.Ex.instCodingNat","p":false,"r":[23,0,23,29],"s":false,"t":["CD.Ex.Coding"],"u":[],"v":["CD.Ex.Coding.mk"]}
+{"i":true,"k":"def","m":"CarveDev.InstBase","n":"CD.LI.boxInhabitedA","p":false,"r":[46,0,46,47],"s":false,"t":["CD.LI.Box"],"u":[],"v":["CD.LI.Box","CD.LI.Box.mk"]}
 {"i":true,"k":"def","m":"CarveDev.InstLate","n":"CD.LI.boxInhabited","p":false,"r":[5,0,6,46],"s":false,"t":["CD.LI.Box"],"u":[],"v":["CD.LI.Box","CD.LI.Box.mk"]}
 {"imports":["Init","Init","CarveDev.Base"],"module":"CarveDev.Alt"}
 {"imports":["Init","Init","CarveDev.Base"],"module":"CarveDev.Fields"}

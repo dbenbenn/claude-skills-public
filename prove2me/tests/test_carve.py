@@ -1320,24 +1320,25 @@ def test_an_instance_a_carved_declaration_never_saw_is_reported(g):
     # RationalHitting (2026-10-24): the instance witnessCharZero (Generator.lean) reached the carved
     # list_hits piece's Certificates.lean declarations through a bundle; `algebraMap ℚ` elaborated
     # through it there, and a `rwa [RingHom.ext_rat …]` no longer matched. Detected, as a warning.
-    t, u = 'CD.LI.box_default', 'CD.LI.box_get'
+    t, u, v = 'CD.LI.box_default', 'CD.LI.box_get', 'CD.LI.box_default_local'
     p = {'bundles': [{'name': 'L0', 'nodes': ['CD.LI.Box', 'CD.LI.Box.get', 'CD.LI.boxInhabited',
-                                              'CD.LI.defaultBox'], 'imports': []}],
-         'nodes': [t, u], 'external_defs': {}, 'external': [],
-         'stubs': {t: {'bundles': ['L0']}, u: {'bundles': ['L0']}},
-         'pieces': {t: {'keep': [t], 'imports': [], 'bundles': ['L0']},
-                    u: {'keep': [u], 'imports': [], 'bundles': ['L0']}}}
+                                              'CD.LI.boxInhabitedA', 'CD.LI.defaultBox'], 'imports': []}],
+         'nodes': [t, u, v], 'external_defs': {}, 'external': [],
+         'stubs': {x: {'bundles': ['L0']} for x in (t, u, v)},
+         'pieces': {x: {'keep': [x], 'imports': [], 'bundles': ['L0']} for x in (t, u, v)}}
     leaks = C.instance_leaks(g, p)
-    # box_default asks instance search for an `Inhabited Box`: the later boxInhabited could take part
+    # box_default's instance search solved an `Inhabited Box`: the later boxInhabited could answer it
     assert ('piece:' + t, t, 'CD.LI.boxInhabited') in leaks
     assert ('statement:' + t, t, 'CD.LI.boxInhabited') in leaks
-    # box_get and Box.get ask for no Inhabited instance (the old rule, which matched the
-    # instance's type against what they use, reported both: 16-63 such warnings per real carve)
-    assert not [x for x in leaks if x[1] in (u, 'CD.LI.Box.get')]
+    # box_get and Box.get solve no Inhabited problem, box_default_local's binder answers its own
+    # (the old rule, which matched the instance's type against what a declaration uses, reported
+    # all three: 16-63 such warnings per real carve)
+    assert not [x for x in leaks if x[1] in (u, v, 'CD.LI.Box.get')]
     # defaultBox's module declares the instance before it; the structure itself uses nothing
     assert not [x for x in leaks if x[1] in ('CD.LI.defaultBox', 'CD.LI.Box')]
     # without the instance in reach there is nothing to report; a local instance never leaks
     p['bundles'][0]['nodes'].remove('CD.LI.boxInhabited')
+    p['bundles'][0]['nodes'].remove('CD.LI.boxInhabitedA')
     assert C.instance_leaks(g, p) == []
     assert not C._global_instance(g, 'CD.LI.instPropCOfNatNat')
     # grouped for the command line: one line per instance
@@ -1415,6 +1416,9 @@ def test_names_declared_or_naming_a_case_are_never_written_in_full(g):
     have = g.have_names({'CD.Tree.size_pos', 'CD.Tree', 'CD.Tree.size', 'CD.Other.leaf'})
     out = C.Carver(g).carve({'CD.Tree.size_pos'}, have)
     assert '  | leaf => exact Nat.one_pos' in out, out
+    # `| @leaf =>` too (RationalHitting list_hits: `| @_root_.….Formula.Eval.inv h a … =>`)
+    out = C.Carver(g).carve({"CD.Tree.size_pos'"}, have | {'CD.Tree.size_pos'})
+    assert '  | @leaf => exact Nat.one_pos' in out, out
     # the case name is Lean's CD.Tree.leaf, the opened CD.Other.leaf would be the text's reading
     c = g.infos['CarveDev.Fields'].commands[g.nodes['CD.Tree.size_pos'].cmd]
     leaf = next(i for i in c.idents if i['name'] == 'leaf')

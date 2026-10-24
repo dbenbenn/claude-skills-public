@@ -17,7 +17,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.moduleDoc",
    "names": [],
@@ -55,7 +55,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.universe",
    "names": [],
@@ -95,7 +95,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -127,7 +127,8 @@
    "declares": [
     [
      "CD.pick",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -198,7 +199,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -277,15 +278,18 @@
    "declares": [
     [
      "CD.Space.carrier",
-     ""
+     "",
+     []
     ],
     [
      "CD.Space.pt",
-     ""
+     "",
+     []
     ],
     [
      "CD.Space",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -338,7 +342,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -402,7 +406,8 @@
    "declares": [
     [
      "CD.Space.size",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -455,8 +460,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -527,7 +532,8 @@
    "declares": [
     [
      "CD.Space.size_eq",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -582,8 +588,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -667,7 +673,8 @@
    "declares": [
     [
      "CD.double",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -728,9 +735,10 @@
      }
     }
    ],
-   "inst_classes": [
-    "Add",
-    "HAdd"
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -809,7 +817,8 @@
    "declares": [
     [
      "CD.double_eq",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -882,9 +891,10 @@
      }
     }
    ],
-   "inst_classes": [
-    "Add",
-    "HAdd"
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -973,7 +983,8 @@
    "declares": [
     [
      "CD.unusedDef",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1010,8 +1021,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -1069,7 +1080,8 @@
    "declares": [
     [
      "CD.unused_thm",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1112,8 +1124,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -1176,7 +1188,8 @@
    "declares": [
     [
      "CD.sorried",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -1217,8 +1230,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -1276,7 +1289,8 @@
    "declares": [
     [
      "CD.usesSorried",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1337,8 +1351,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -1406,7 +1420,8 @@
    "declares": [
     [
      "CD._example",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1430,8 +1445,8 @@
     }
    ],
    "ids": [],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -1480,7 +1495,8 @@
    "declares": [
     [
      "CD.Space.big",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -1533,8 +1549,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -1613,11 +1629,13 @@
    "declares": [
     [
      "CD.Wide.w",
-     ""
+     "",
+     []
     ],
     [
      "CD.Wide",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -1664,7 +1682,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -1722,7 +1740,8 @@
    "declares": [
     [
      "CD.pred",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -1781,7 +1800,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -1854,7 +1873,8 @@
    "declares": [
     [
      "CD.Wide.succ",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -1913,7 +1933,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -1991,7 +2011,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.section",
    "names": [],
@@ -2039,7 +2059,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.open",
    "names": [],
@@ -2077,7 +2097,8 @@
    "declares": [
     [
      "CD.succ_pos_cd",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -2148,9 +2169,9 @@
      }
     }
    ],
-   "inst_classes": [
-    "LT",
-    "OfNat"
+   "inst_keys": [
+    "LT Nat",
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -2250,7 +2271,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -2292,7 +2313,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.section",
    "names": [],
@@ -2340,7 +2361,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.open",
    "names": [],
@@ -2378,7 +2399,8 @@
    "declares": [
     [
      "CD.natAbs_cd",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -2455,7 +2477,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -2559,7 +2581,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -2608,7 +2630,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -2644,7 +2666,8 @@
    "declares": [
     [
      "CD.Int.cdId",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -2703,7 +2726,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -2792,7 +2815,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -2829,7 +2852,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.section",
    "names": [],
@@ -2865,7 +2888,10 @@
    "declares": [
     [
      "CD.cdLocalInst",
-     "Inhabited"
+     "Inhabited",
+     [
+      "CD.Wide"
+     ]
     ]
    ],
    "doc": {
@@ -2912,9 +2938,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "Inhabited",
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [
     "CD.cdLocalInst"
@@ -2985,7 +3010,8 @@
    "declares": [
     [
      "CD.uses_local_inst",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -3046,9 +3072,9 @@
      }
     }
    ],
-   "inst_classes": [
-    "Inhabited",
-    "OfNat"
+   "inst_keys": [
+    "Inhabited CD.Wide",
+    "OfNat Nat"
    ],
    "insts": [
     "CD.cdLocalInst"
@@ -3129,7 +3155,8 @@
    "declares": [
     [
      "CD.no_inst_use",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -3182,8 +3209,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -3295,9 +3322,9 @@
     }
    ],
    "ids": [],
-   "inst_classes": [
-    "Inhabited",
-    "OfNat"
+   "inst_keys": [
+    "Inhabited CD.Wide",
+    "OfNat Nat"
    ],
    "insts": [
     "CD.cdLocalInst"
@@ -3362,7 +3389,8 @@
    "declares": [
     [
      "CD.uses_hdef",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -3436,9 +3464,9 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
-   "inst_classes": [
-    "Inhabited",
-    "OfNat"
+   "inst_keys": [
+    "Inhabited CD.Wide",
+    "OfNat Nat"
    ],
    "insts": [
     "CD.cdLocalInst"
@@ -3526,7 +3554,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -3563,7 +3591,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.section",
    "names": [],
@@ -3617,7 +3645,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.notation",
    "names": [],
@@ -3659,7 +3687,10 @@
    "declares": [
     [
      "CD.cdLocalInst2",
-     "Inhabited"
+     "Inhabited",
+     [
+      "CD.Wide"
+     ]
     ]
    ],
    "end": {
@@ -3702,9 +3733,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "Inhabited",
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [
     "CD.cdLocalInst2"
@@ -3820,9 +3850,9 @@
     }
    ],
    "ids": [],
-   "inst_classes": [
-    "Inhabited",
-    "OfNat"
+   "inst_keys": [
+    "Inhabited CD.Wide",
+    "OfNat Nat"
    ],
    "insts": [
     "CD.cdLocalInst2"
@@ -3887,7 +3917,8 @@
    "declares": [
     [
      "CD.uses_hdef2",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -3961,9 +3992,9 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
-   "inst_classes": [
-    "Inhabited",
-    "OfNat"
+   "inst_keys": [
+    "Inhabited CD.Wide",
+    "OfNat Nat"
    ],
    "insts": [
     "CD.cdLocalInst2"
@@ -4051,7 +4082,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -4095,7 +4126,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -4135,7 +4166,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -4167,7 +4198,8 @@
    "declares": [
     [
      "CD.Perm.cdPerm",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -4204,8 +4236,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -4275,7 +4307,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -4315,7 +4347,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -4347,7 +4379,8 @@
    "declares": [
     [
      "CD.Pkg.succ_le_succ",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -4414,8 +4447,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "LE"
+   "inst_keys": [
+    "LE Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -4521,7 +4554,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -4561,7 +4594,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -4593,7 +4626,8 @@
    "declares": [
     [
      "CD.Aux.auxOnly",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -4630,8 +4664,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -4701,7 +4735,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.notation",
    "names": [],
@@ -4759,7 +4793,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.attribute",
    "names": [],
@@ -4797,7 +4831,8 @@
    "declares": [
     [
      "CD.Aux.aux_eq",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -4834,8 +4869,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -4905,7 +4940,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -4945,7 +4980,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -5001,7 +5036,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.notation",
    "names": [],
@@ -5051,7 +5086,8 @@
    "declares": [
     [
      "CDScope.anchor",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -5092,8 +5128,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -5163,7 +5199,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -5196,7 +5232,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],

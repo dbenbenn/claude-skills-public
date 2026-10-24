@@ -17,7 +17,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.moduleDoc",
    "names": [],
@@ -55,7 +55,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -85,7 +85,8 @@
    "declares": [
     [
      "CD.fqm",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -128,7 +129,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -188,11 +189,13 @@
    "declares": [
     [
      "CD.Inner",
-     ""
+     "",
+     []
     ],
     [
      "CD.Inner.val",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -235,7 +238,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -291,7 +294,8 @@
    "declares": [
     [
      "CD.Inner.fqm",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -352,10 +356,11 @@
      }
     }
    ],
-   "inst_classes": [
-    "Add",
+   "inst_keys": [
+    "Add Nat",
     "HAdd",
-    "OfNat"
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -452,11 +457,13 @@
    "declares": [
     [
      "CD.Outer.inner",
-     ""
+     "",
+     []
     ],
     [
      "CD.Outer",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -505,7 +512,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -566,7 +573,8 @@
    "declares": [
     [
      "CD.Outer.fqm",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -663,10 +671,11 @@
      }
     }
    ],
-   "inst_classes": [
-    "Add",
+   "inst_keys": [
+    "Add Nat",
     "HAdd",
-    "OfNat"
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -773,7 +782,8 @@
    "declares": [
     [
      "CD.outer_dot",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -858,10 +868,11 @@
      }
     }
    ],
-   "inst_classes": [
-    "Add",
+   "inst_keys": [
+    "Add Nat",
     "HAdd",
-    "OfNat"
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -980,7 +991,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -1014,7 +1025,8 @@
    "declares": [
     [
      "CD.ZG.wcl",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1051,10 +1063,11 @@
      }
     }
    ],
-   "inst_classes": [
-    "Add",
+   "inst_keys": [
+    "Add Nat",
     "HAdd",
-    "OfNat"
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -1126,7 +1139,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -1168,7 +1181,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -1202,7 +1215,8 @@
    "declares": [
     [
      "CD.AZ.wcl",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1239,10 +1253,11 @@
      }
     }
    ],
-   "inst_classes": [
-    "Add",
+   "inst_keys": [
+    "Add Nat",
     "HAdd",
-    "OfNat"
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -1314,7 +1329,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -1344,7 +1359,8 @@
    "declares": [
     [
      "CD.cp",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1399,7 +1415,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -1470,7 +1486,8 @@
    "declares": [
     [
      "CD.Outer.cp",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1561,8 +1578,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -1664,7 +1681,8 @@
    "declares": [
     [
      "CD.uses_outer_cp",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1755,8 +1773,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -1868,7 +1886,8 @@
    "declares": [
     [
      "CD.transfer",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1923,7 +1942,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -1994,11 +2013,13 @@
    "declares": [
     [
      "CD.Step.transfer",
-     ""
+     "",
+     []
     ],
     [
      "CD.Step",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -2089,7 +2110,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -2181,15 +2202,18 @@
    "declares": [
     [
      "CD.Tree.node",
-     ""
+     "",
+     []
     ],
     [
      "CD.Tree",
-     ""
+     "",
+     []
     ],
     [
      "CD.Tree.leaf",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -2250,7 +2274,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -2324,7 +2348,8 @@
    "declares": [
     [
      "CD.Tree.size",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -2403,10 +2428,11 @@
      }
     }
    ],
-   "inst_classes": [
-    "Add",
+   "inst_keys": [
+    "Add Nat",
     "HAdd",
-    "OfNat"
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -2521,7 +2547,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -2555,7 +2581,8 @@
    "declares": [
     [
      "CD.Other.leaf",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -2592,8 +2619,8 @@
      }
     }
    ],
-   "inst_classes": [
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
@@ -2665,7 +2692,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -2695,7 +2722,8 @@
    "declares": [
     [
      "CD.Tree.size_pos",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -2805,9 +2833,9 @@
     }
    ],
    "inner_kind": "Lean.Parser.Command.declaration",
-   "inst_classes": [
-    "LT",
-    "OfNat"
+   "inst_keys": [
+    "LT Nat",
+    "OfNat Nat"
    ],
    "insts": [],
    "kind": "Lean.Parser.Command.in",
@@ -2923,23 +2951,272 @@
      "opener": 1
     }
    ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Tree.size_pos'",
+     "",
+     []
+    ]
+   ],
+   "end": {
+    "byte": 2384,
+    "col": 70,
+    "line": 80
+   },
+   "heads": [
+    {
+     "end": 2215,
+     "kind": "Lean.Parser.Command.open",
+     "start": 2201
+    }
+   ],
+   "idents": [
+    {
+     "end": 2211,
+     "name": "Other",
+     "role": "open",
+     "start": 2206
+    },
+    {
+     "end": 2237,
+     "name": "Tree.size_pos'",
+     "role": "decl",
+     "start": 2223
+    },
+    {
+     "end": 2240,
+     "name": "t",
+     "role": "binder",
+     "start": 2239
+    },
+    {
+     "end": 2247,
+     "name": "Tree",
+     "role": "ref",
+     "start": 2243
+    },
+    {
+     "end": 2261,
+     "name": "t.size",
+     "role": "ref",
+     "start": 2255
+    },
+    {
+     "end": 2277,
+     "name": "t",
+     "role": "ref",
+     "start": 2276
+    },
+    {
+     "end": 2292,
+     "name": "leaf",
+     "role": "ref",
+     "start": 2288
+    },
+    {
+     "end": 2313,
+     "name": "Nat.one_pos",
+     "role": "ref",
+     "start": 2302
+    },
+    {
+     "end": 2323,
+     "name": "node",
+     "role": "ref",
+     "start": 2319
+    },
+    {
+     "end": 2325,
+     "name": "l",
+     "role": "ref",
+     "start": 2324
+    },
+    {
+     "end": 2327,
+     "name": "r",
+     "role": "ref",
+     "start": 2326
+    },
+    {
+     "end": 2351,
+     "name": "Tree.size",
+     "role": "ref",
+     "start": 2342
+    },
+    {
+     "end": 2359,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 2359
+    },
+    {
+     "end": 2375,
+     "name": "Tree.size_pos",
+     "role": "ref",
+     "start": 2362
+    },
+    {
+     "end": 2377,
+     "name": "l",
+     "role": "ref",
+     "start": 2376
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 2237,
+      "col": 22,
+      "line": 77
+     },
+     "start": {
+      "byte": 2223,
+      "col": 8,
+      "line": 77
+     }
+    }
+   ],
+   "inner_kind": "Lean.Parser.Command.declaration",
+   "inst_keys": [
+    "LT Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.in",
+   "names": [
+    "CD.Tree.size_pos'"
+   ],
+   "namespace": "CD",
+   "opens": [],
+   "resolved": [
+    [
+     2223,
+     2237,
+     "CD.Tree.size_pos'",
+     "b"
+    ],
+    [
+     2223,
+     2237,
+     "",
+     "b"
+    ],
+    [
+     2239,
+     2240,
+     "",
+     "b"
+    ],
+    [
+     2243,
+     2247,
+     "CD.Tree"
+    ],
+    [
+     2255,
+     2256,
+     ""
+    ],
+    [
+     2255,
+     2261,
+     "CD.Tree.size"
+    ],
+    [
+     2257,
+     2261,
+     "CD.Tree.size"
+    ],
+    [
+     2276,
+     2277,
+     ""
+    ],
+    [
+     2288,
+     2292,
+     "CD.Tree.leaf"
+    ],
+    [
+     2302,
+     2313,
+     "Nat.one_pos"
+    ],
+    [
+     2319,
+     2323,
+     "CD.Tree.node"
+    ],
+    [
+     2324,
+     2325,
+     "",
+     "b"
+    ],
+    [
+     2326,
+     2327,
+     "",
+     "b"
+    ],
+    [
+     2342,
+     2351,
+     "CD.Tree.size"
+    ],
+    [
+     2362,
+     2375,
+     "CD.Tree.size_pos"
+    ],
+    [
+     2376,
+     2377,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "start": {
+    "byte": 2201,
+    "col": 0,
+    "line": 76
+   },
+   "value_start": {
+    "byte": 2262,
+    "col": 47,
+    "line": 77
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
    "declares": [],
    "end": {
-    "byte": 2207,
+    "byte": 2392,
     "col": 6,
-    "line": 76
+    "line": 82
    },
    "heads": [],
    "idents": [
     {
-     "end": 2207,
+     "end": 2392,
      "name": "CD",
      "role": "scope",
-     "start": 2205
+     "start": 2390
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -2948,9 +3225,9 @@
    "resolved": [],
    "sig_insts": [],
    "start": {
-    "byte": 2201,
+    "byte": 2386,
     "col": 0,
-    "line": 76
+    "line": 82
    }
   },
   {
@@ -2963,14 +3240,14 @@
    ],
    "declares": [],
    "end": {
-    "byte": 2208,
+    "byte": 2393,
     "col": 0,
-    "line": 77
+    "line": 83
    },
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],
@@ -2979,9 +3256,9 @@
    "resolved": [],
    "sig_insts": [],
    "start": {
-    "byte": 2208,
+    "byte": 2393,
     "col": 0,
-    "line": 77
+    "line": 83
    }
   }
  ],

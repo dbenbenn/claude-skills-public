@@ -17,7 +17,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.moduleDoc",
    "names": [],
@@ -55,7 +55,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -85,11 +85,13 @@
    "declares": [
     [
      "CD.Ex.Word",
-     ""
+     "",
+     []
     ],
     [
      "CD.Ex.Word.val",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -132,7 +134,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -188,11 +190,13 @@
    "declares": [
     [
      "CD.Ex.Coding.code",
-     ""
+     "",
+     []
     ],
     [
      "CD.Ex.Coding",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -247,9 +251,7 @@
      }
     }
    ],
-   "inst_classes": [
-    "CD.Ex.Coding"
-   ],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -334,9 +336,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [
-    "CD.Ex.Coding"
-   ],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.export",
    "names": [],
@@ -372,7 +372,10 @@
    "declares": [
     [
      "CD.Ex.instCodingNat",
-     "CD.Ex.Coding"
+     "CD.Ex.Coding",
+     [
+      "Nat"
+     ]
     ]
    ],
    "end": {
@@ -402,9 +405,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [
-    "CD.Ex.Coding"
-   ],
+   "inst_keys": [],
    "insts": [
     "CD.Ex.instCodingNat"
    ],
@@ -459,7 +460,8 @@
    "declares": [
     [
      "CD.Ex.Word.len",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -514,7 +516,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -595,7 +597,8 @@
    "declares": [
     [
      "CD.Ex.word_len",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -656,7 +659,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -764,7 +767,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -802,7 +805,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -832,11 +835,13 @@
    "declares": [
     [
      "CD.LI.PropC",
-     ""
+     "",
+     []
     ],
     [
      "CD.LI.PropC.out",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -897,9 +902,7 @@
      }
     }
    ],
-   "inst_classes": [
-    "CD.LI.PropC"
-   ],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -971,11 +974,13 @@
    "declares": [
     [
      "CD.LI.Box",
-     ""
+     "",
+     []
     ],
     [
      "CD.LI.Box.b",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1018,7 +1023,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -1074,7 +1079,8 @@
    "declares": [
     [
      "CD.LI.Box.get",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1129,7 +1135,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -1210,7 +1216,8 @@
    "declares": [
     [
      "CD.LI.box_get",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -1271,7 +1278,7 @@
      }
     }
    ],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -1367,7 +1374,8 @@
    "declares": [
     [
      "CD.LI.needsPropC",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -1438,9 +1446,7 @@
      }
     }
    ],
-   "inst_classes": [
-    "CD.LI.PropC"
-   ],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
@@ -1517,115 +1523,195 @@
      "opener": 9
     }
    ],
-   "decl_kind": "Lean.Parser.Command.theorem",
+   "decl_kind": "Lean.Parser.Command.instance",
    "declares": [
     [
-     "CD.LI.box_default",
-     ""
+     "CD.LI.boxInhabitedA",
+     "Inhabited",
+     [
+      "CD.LI.Box"
+     ]
     ]
    ],
-   "doc": {
-    "end": 1474,
-    "start": 1299
-   },
    "end": {
-    "byte": 1559,
-    "col": 84,
-    "line": 48
+    "byte": 1354,
+    "col": 47,
+    "line": 46
    },
    "heads": [],
    "idents": [
     {
-     "end": 1494,
-     "name": "box_default",
+     "end": 1321,
+     "name": "boxInhabitedA",
      "role": "decl",
-     "start": 1483
+     "start": 1308
     },
     {
-     "end": 1505,
+     "end": 1333,
      "name": "Inhabited",
      "role": "ref",
-     "start": 1496
+     "start": 1324
     },
     {
-     "end": 1509,
+     "end": 1337,
      "name": "Box",
      "role": "ref",
-     "start": 1506
-    },
-    {
-     "end": 1514,
-     "name": "[anonymous]",
-     "role": "ref",
-     "start": 1514
-    },
-    {
-     "end": 1521,
-     "name": "default",
-     "role": "ref",
-     "start": 1514
-    },
-    {
-     "end": 1527,
-     "name": "Box",
-     "role": "ref",
-     "start": 1524
-    },
-    {
-     "end": 1532,
-     "name": "get",
-     "role": "ref",
-     "start": 1529
-    },
-    {
-     "end": 1536,
-     "name": "[anonymous]",
-     "role": "ref",
-     "start": 1536
-    },
-    {
-     "end": 1543,
-     "name": "default",
-     "role": "ref",
-     "start": 1536
-    },
-    {
-     "end": 1549,
-     "name": "Box",
-     "role": "ref",
-     "start": 1546
-    },
-    {
-     "end": 1552,
-     "name": "b",
-     "role": "ref",
-     "start": 1551
-    },
-    {
-     "end": 1559,
-     "name": "rfl",
-     "role": "ref",
-     "start": 1556
+     "start": 1334
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 1494,
-      "col": 19,
-      "line": 48
+      "byte": 1321,
+      "col": 22,
+      "line": 46
      },
      "start": {
-      "byte": 1483,
-      "col": 8,
-      "line": 48
+      "byte": 1308,
+      "col": 9,
+      "line": 46
      }
     }
    ],
-   "inst_classes": [
-    "Inhabited"
+   "inst_keys": [
+    "OfNat Nat"
    ],
-   "insts": [],
+   "insts": [
+    "CD.LI.boxInhabitedA"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.LI.boxInhabitedA"
+   ],
+   "namespace": "CD.LI",
+   "opens": [],
+   "resolved": [
+    [
+     1308,
+     1321,
+     "CD.LI.boxInhabitedA",
+     "b"
+    ],
+    [
+     1308,
+     1321,
+     "",
+     "b"
+    ],
+    [
+     1324,
+     1333,
+     "Inhabited"
+    ],
+    [
+     1334,
+     1337,
+     "CD.LI.Box"
+    ]
+   ],
+   "sig_insts": [
+    "CD.LI.boxInhabitedA"
+   ],
+   "start": {
+    "byte": 1299,
+    "col": 0,
+    "line": 46
+   },
+   "value_start": {
+    "byte": 1338,
+    "col": 39,
+    "line": 46
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 9
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.LI.box_default",
+     "",
+     []
+    ]
+   ],
+   "doc": {
+    "end": 1536,
+    "start": 1356
+   },
+   "end": {
+    "byte": 1587,
+    "col": 50,
+    "line": 50
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1556,
+     "name": "box_default",
+     "role": "decl",
+     "start": 1545
+    },
+    {
+     "end": 1560,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1560
+    },
+    {
+     "end": 1567,
+     "name": "default",
+     "role": "ref",
+     "start": 1560
+    },
+    {
+     "end": 1573,
+     "name": "Box",
+     "role": "ref",
+     "start": 1570
+    },
+    {
+     "end": 1576,
+     "name": "b",
+     "role": "ref",
+     "start": 1575
+    },
+    {
+     "end": 1587,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1584
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1556,
+      "col": 19,
+      "line": 50
+     },
+     "start": {
+      "byte": 1545,
+      "col": 8,
+      "line": 50
+     }
+    }
+   ],
+   "inst_keys": [
+    "Inhabited CD.LI.Box",
+    "OfNat Nat"
+   ],
+   "insts": [
+    "CD.LI.boxInhabitedA"
+   ],
    "kind": "Lean.Parser.Command.declaration",
    "names": [
     "CD.LI.box_default"
@@ -1634,73 +1720,247 @@
    "opens": [],
    "resolved": [
     [
-     1483,
-     1494,
+     1545,
+     1556,
      "CD.LI.box_default",
      "b"
     ],
     [
-     1483,
-     1494,
+     1545,
+     1556,
      "",
      "b"
     ],
     [
-     1496,
-     1505,
-     "Inhabited"
-    ],
-    [
-     1506,
-     1509,
-     "CD.LI.Box"
-    ],
-    [
-     1514,
-     1521,
+     1560,
+     1567,
      "Inhabited.default"
     ],
     [
-     1524,
-     1527,
+     1570,
+     1573,
      "CD.LI.Box"
     ],
     [
-     1529,
-     1532,
-     "CD.LI.Box.get"
-    ],
-    [
-     1536,
-     1543,
-     "Inhabited.default"
-    ],
-    [
-     1546,
-     1549,
-     "CD.LI.Box"
-    ],
-    [
-     1551,
-     1552,
+     1575,
+     1576,
      "CD.LI.Box.b"
     ],
     [
-     1556,
-     1559,
+     1584,
+     1587,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [
+    "CD.LI.boxInhabitedA"
+   ],
+   "start": {
+    "byte": 1356,
+    "col": 0,
+    "line": 48
+   },
+   "value_start": {
+    "byte": 1581,
+    "col": 44,
+    "line": 50
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 9
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.LI.box_default_local",
+     "",
+     []
+    ]
+   ],
+   "doc": {
+    "end": 1738,
+    "start": 1589
+   },
+   "end": {
+    "byte": 1829,
+    "col": 90,
+    "line": 54
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1764,
+     "name": "box_default_local",
+     "role": "decl",
+     "start": 1747
+    },
+    {
+     "end": 1775,
+     "name": "Inhabited",
+     "role": "ref",
+     "start": 1766
+    },
+    {
+     "end": 1779,
+     "name": "Box",
+     "role": "ref",
+     "start": 1776
+    },
+    {
+     "end": 1784,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1784
+    },
+    {
+     "end": 1791,
+     "name": "default",
+     "role": "ref",
+     "start": 1784
+    },
+    {
+     "end": 1797,
+     "name": "Box",
+     "role": "ref",
+     "start": 1794
+    },
+    {
+     "end": 1802,
+     "name": "get",
+     "role": "ref",
+     "start": 1799
+    },
+    {
+     "end": 1806,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1806
+    },
+    {
+     "end": 1813,
+     "name": "default",
+     "role": "ref",
+     "start": 1806
+    },
+    {
+     "end": 1819,
+     "name": "Box",
+     "role": "ref",
+     "start": 1816
+    },
+    {
+     "end": 1822,
+     "name": "b",
+     "role": "ref",
+     "start": 1821
+    },
+    {
+     "end": 1829,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1826
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1764,
+      "col": 25,
+      "line": 54
+     },
+     "start": {
+      "byte": 1747,
+      "col": 8,
+      "line": 54
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "CD.LI.box_default_local"
+   ],
+   "namespace": "CD.LI",
+   "opens": [],
+   "resolved": [
+    [
+     1747,
+     1764,
+     "CD.LI.box_default_local",
+     "b"
+    ],
+    [
+     1747,
+     1764,
+     "",
+     "b"
+    ],
+    [
+     1766,
+     1775,
+     "Inhabited"
+    ],
+    [
+     1776,
+     1779,
+     "CD.LI.Box"
+    ],
+    [
+     1784,
+     1791,
+     "Inhabited.default"
+    ],
+    [
+     1794,
+     1797,
+     "CD.LI.Box"
+    ],
+    [
+     1799,
+     1802,
+     "CD.LI.Box.get"
+    ],
+    [
+     1806,
+     1813,
+     "Inhabited.default"
+    ],
+    [
+     1816,
+     1819,
+     "CD.LI.Box"
+    ],
+    [
+     1821,
+     1822,
+     "CD.LI.Box.b"
+    ],
+    [
+     1826,
+     1829,
      "rfl"
     ]
    ],
    "sig_insts": [],
    "start": {
-    "byte": 1299,
+    "byte": 1589,
     "col": 0,
-    "line": 46
+    "line": 52
    },
    "value_start": {
-    "byte": 1553,
-    "col": 78,
-    "line": 48
+    "byte": 1823,
+    "col": 84,
+    "line": 54
    }
   },
   {
@@ -1717,21 +1977,21 @@
    ],
    "declares": [],
    "end": {
-    "byte": 1570,
+    "byte": 1840,
     "col": 9,
-    "line": 50
+    "line": 56
    },
    "heads": [],
    "idents": [
     {
-     "end": 1570,
+     "end": 1840,
      "name": "CD.LI",
      "role": "scope",
-     "start": 1565
+     "start": 1835
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -1740,9 +2000,9 @@
    "resolved": [],
    "sig_insts": [],
    "start": {
-    "byte": 1561,
+    "byte": 1831,
     "col": 0,
-    "line": 50
+    "line": 56
    }
   },
   {
@@ -1755,14 +2015,14 @@
    ],
    "declares": [],
    "end": {
-    "byte": 1571,
+    "byte": 1841,
     "col": 0,
-    "line": 51
+    "line": 57
    },
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],
@@ -1771,9 +2031,9 @@
    "resolved": [],
    "sig_insts": [],
    "start": {
-    "byte": 1571,
+    "byte": 1841,
     "col": 0,
-    "line": 51
+    "line": 57
    }
   }
  ],

@@ -43,8 +43,14 @@ theorem box_get (x : Box) : x.get = x.b := rfl
 /-- Asks instance search for a `PropC n`: a statement using it at `3` needs the local instance. -/
 def needsPropC (n : Nat) [PropC n] : Nat := n
 
-/-- Instance search solves an `Inhabited Box` here (from the binder): a global instance of that
-class that this module never saw, visible in a carved file, could take part. -/
-theorem box_default [Inhabited Box] : (default : Box).get = (default : Box).b := rfl
+instance boxInhabitedA : Inhabited Box := ⟨⟨1⟩⟩
+
+/-- Instance search solves an `Inhabited Box` here (with boxInhabitedA): InstLate's later
+`boxInhabited`, visible in a carved file, would win instead, and this `rfl` would fail. -/
+theorem box_default : (default : Box).b = 1 := rfl
+
+/-- A binder supplies the `Inhabited Box`: a local instance comes before every global one, so
+no instance a carved file newly shows can take part. -/
+theorem box_default_local [Inhabited Box] : (default : Box).get = (default : Box).b := rfl
 
 end CD.LI

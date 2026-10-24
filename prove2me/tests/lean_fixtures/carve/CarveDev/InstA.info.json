@@ -24,7 +24,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.namespace",
    "names": [],
@@ -54,7 +54,10 @@
    "declares": [
     [
      "CD.LI.instPropCOfNatNat",
-     "CD.LI.PropC"
+     "CD.LI.PropC",
+     [
+      "OfNat.ofNat"
+     ]
     ]
    ],
    "end": {
@@ -78,9 +81,8 @@
     }
    ],
    "ids": [],
-   "inst_classes": [
-    "CD.LI.PropC",
-    "OfNat"
+   "inst_keys": [
+    "OfNat Nat"
    ],
    "insts": [
     "CD.LI.instPropCOfNatNat"
@@ -131,7 +133,8 @@
    "declares": [
     [
      "CD.LI.uses_propc_a",
-     ""
+     "",
+     []
     ]
    ],
    "end": {
@@ -174,9 +177,9 @@
      }
     }
    ],
-   "inst_classes": [
-    "CD.LI.PropC",
-    "OfNat"
+   "inst_keys": [
+    "CD.LI.PropC OfNat.ofNat",
+    "OfNat Nat"
    ],
    "insts": [
     "CD.LI.instPropCOfNatNat"
@@ -239,7 +242,8 @@
    "declares": [
     [
      "CD.LI.uses_propc_sig",
-     ""
+     "",
+     []
     ]
    ],
    "doc": {
@@ -286,9 +290,9 @@
      }
     }
    ],
-   "inst_classes": [
-    "CD.LI.PropC",
-    "OfNat"
+   "inst_keys": [
+    "CD.LI.PropC OfNat.ofNat",
+    "OfNat Nat"
    ],
    "insts": [
     "CD.LI.instPropCOfNatNat"
@@ -365,7 +369,7 @@
     }
    ],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.end",
    "names": [],
@@ -396,7 +400,7 @@
    "heads": [],
    "idents": [],
    "ids": [],
-   "inst_classes": [],
+   "inst_keys": [],
    "insts": [],
    "kind": "Lean.Parser.Command.eoi",
    "names": [],
