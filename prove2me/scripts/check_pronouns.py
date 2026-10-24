@@ -42,6 +42,15 @@ def blank_code(line):
     return CODE_SPAN.sub(lambda m: ' ' * len(m.group(0)), line)
 
 
+FENCE = re.compile(r'^```.*?^```[ \t]*$', re.M | re.S)
+
+
+def blank_fences(text):
+    """Markdown with its fenced code blocks blanked (line breaks kept): a Lean binder `he` in a
+    rendered statement is code, not a pronoun (carve_prep.py prose-template, 2026-10-24)."""
+    return FENCE.sub(lambda m: re.sub(r'[^\n]', ' ', m.group(0)), text)
+
+
 def lean_prose_only(text):
     """Keep only comment and docstring text, blanking the code around it."""
     out = [' '] * len(text)
@@ -76,6 +85,8 @@ def scan_local(dirs):
                 # so this is the last moment a pronoun in one can be caught
                 if fn.endswith('.lean'):
                     text = lean_prose_only(text)
+                elif fn.endswith('.md'):
+                    text = blank_fences(text)
                 lines = text.split('\n')
                 for i, line in enumerate(lines, 1):
                     if 'PRON' in line or 're.finditer' in line:

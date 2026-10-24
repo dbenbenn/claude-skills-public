@@ -1636,10 +1636,29 @@ transformations are in `p2mlib.oaiport`, and `tests/test_oaiport.py` pins the bu
 5. **A bundle that needs a statement imports it.** With `bundles_import_statements` (the default),
    a bundle imports a forced theorem that definitions need. That import is allowed only once the
    theorem is Proved, so `publish_order` puts the bundle after the statement's piece.
-6. **Before publishing:** `carve_prep.py publish-prep`, write the prose and explanations as files,
-   `carve_prep.py bundle-prose`, then `carve_prep.py check-text`. The last checks the explanation
-   rules, that every backticked name exists, and that no stub contains a comment. Credit OpenAI
-   and the result family in every description and explanation.
+6. **Before publishing:** `carve_prep.py publish-prep`, then `carve_prep.py prose-template DIR`,
+   then write by hand only what it lists as "needs written prose", then `carve_prep.py check-text`.
+   The last checks the explanation rules, that every backticked name exists, and that no stub
+   contains a comment. Credit OpenAI and the result family in every description and explanation.
+   - **Template prose for intermediate items; written prose only for the goal and the forced
+     named results** (dbenbenn, 2026-10-24: a carved intermediate item's prose is rarely read soon
+     and stays patchable, and model-written prose had become the biggest cost of a carve).
+     `prose-template` makes no model call. From the plan, `publish/out/`, `work/decl_graph.jsonl`
+     and `DIR/oai_meta.json` (title, date, family, full commit, paper URL, OpenAI module
+     prefixes; `p2mlib/prosetemplate.py` has the format), it writes three kinds of file:
+     - a statement's prose: the OpenAI credit, the GitHub link to the declaration at the commit,
+       the published Lean in a code block, the split's declarations Lean records the statement
+       using, and which items import it;
+     - each bundle's prose: its declarations by kind, its modules, what it imports and what
+       imports it;
+     - each piece's explanation in prove.md's form.
+
+     It makes no mathematical claim the Lean does not show. It skips the goal and every `forced`
+     node and lists them as needing written prose. Generated files carry `template:` in their
+     front matter (prose) and a sha1 in `.template.json`; a rerun regenerates only unchanged
+     templates and keeps written prose unless `--force`. `bundle-prose` (a hand template) remains
+     for a carve that wants written bundle prose. Fenced code blocks are code to `check-text` and
+     `check_pronouns.py` (a binder `he` is not a pronoun).
 
 The compatibility block lives in namespace `OAI` by default (`--root-compat` restores the old
 form). Two bundles that both declared a root-level `ite_eq_left` would clash. A namespaced

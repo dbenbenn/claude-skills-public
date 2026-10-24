@@ -38,6 +38,14 @@ usage:
   carve_prep.py bundle-prose PUBLISH_DIR TEMPLATE.md
       prose/<NAME>.md for every bundle: TEMPLATE with {NAME}, {MODULES} (the bundle's `-- module`
       markers), {IMPORTS} (its bundle imports) and {EXTRA} (extra_<NAME>.md beside the template).
+  carve_prep.py prose-template DIR [--meta oai_meta.json] [--force]
+      after publish-prep, with no model call (p2mlib.prosetemplate): DIR/publish/prose/<slug>.md for
+      every intermediate statement and prose/<NAME>.md for every bundle, explanations/<slug>.md
+      for every piece proving an intermediate statement, from the plan, out/, work/decl_graph.jsonl
+      and DIR/oai_meta.json ({"title", "date", "family", "commit" (full), "paper", "prefixes",
+      optional "lean_root"}). The goal and every `forced` node are skipped and listed as needing
+      written prose. A file that exists and is not an unchanged template (prose front matter
+      `template:`, sha1 in .template.json) is kept unless --force. Run check-text after.
   carve_prep.py check-text PUBLISH_DIR [--search FILE ...] [--allow NAME ...]
       explanation rules (p2mlib.explanation) for explanations/*.md; every Lean-looking name in
       backticks in prose/ and explanations/ must occur in out/, the --search files, Mathlib or Lean
@@ -396,6 +404,7 @@ def stub_comments(texts):
 def missing_names(md_text, local, in_library, skip=()):
     """The Lean-looking names in backticks found neither in `local` text nor by `in_library`."""
     md_text = re.sub(r'^---\n.*?\n---\n', '', md_text, flags=re.S)      # front matter: source URLs
+    md_text = re.sub(r'^```.*?^```[ \t]*$', '', md_text, flags=re.M | re.S)   # fenced Lean: verbatim code
     bad = []
     for span in sorted(set(re.findall(r'`([^`\n]+)`', md_text))):
         if '/' in span or span.endswith('.lean'):
@@ -468,9 +477,27 @@ def cmd_check_text(argv):
     sys.exit(1 if bad else 0)
 
 
+def cmd_prose_template(argv):
+    from p2mlib import prosetemplate as T
+    pos = positional(argv, ('--meta',))
+    if len(pos) != 1:
+        sys.exit(__doc__)
+    meta = json.load(open(opt(argv, '--meta'), encoding='utf-8')) if '--meta' in argv else None
+    rep = T.write_templates(pos[0], meta, force='--force' in argv)
+    for r in rep['written']:
+        print('wrote', r)
+    for r in rep['kept']:
+        print('kept (written prose; --force to replace)', r)
+    for r in rep['needs_written']:
+        print('needs written prose:', r)
+    print('%d written, %d kept, %d need written prose; next: carve_prep.py check-text %s/publish' % (
+        len(rep['written']), len(rep['kept']), len(rep['needs_written']), pos[0].rstrip('/')))
+
+
 CMDS = {'config': cmd_config, 'ext-defs': cmd_ext_defs, 'filter-patches': cmd_filter_patches,
         'publish-prep': lambda a: print(publish_prep(a[0], a[1], a[2].split(','))[1]) if len(a) == 3 else sys.exit(__doc__),
-        'bundle-prose': cmd_bundle_prose, 'check-text': cmd_check_text}
+        'bundle-prose': cmd_bundle_prose, 'prose-template': cmd_prose_template,
+        'check-text': cmd_check_text}
 
 
 def main(argv):
