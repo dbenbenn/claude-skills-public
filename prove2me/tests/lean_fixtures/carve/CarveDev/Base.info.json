@@ -27,11 +27,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 0,
     "col": 0,
     "line": 1
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -67,11 +69,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 89,
     "col": 0,
     "line": 3
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -109,11 +113,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 101,
     "col": 0,
     "line": 5
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -257,11 +263,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 115,
     "col": 0,
     "line": 7
    },
+   "used_keys": [],
    "value_start": {
     "byte": 195,
     "col": 34,
@@ -392,11 +400,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 201,
     "col": 0,
     "line": 10
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -513,11 +523,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 279,
     "col": 0,
     "line": 15
    },
+   "used_keys": [],
    "value_start": {
     "byte": 355,
     "col": 34,
@@ -658,11 +670,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 360,
     "col": 0,
     "line": 17
    },
+   "used_keys": [],
    "value_start": {
     "byte": 415,
     "col": 55,
@@ -804,11 +818,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 423,
     "col": 0,
     "line": 19
    },
+   "used_keys": [],
    "value_start": {
     "byte": 450,
     "col": 27,
@@ -972,11 +988,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 460,
     "col": 0,
     "line": 21
    },
+   "used_keys": [],
    "value_start": {
     "byte": 507,
     "col": 47,
@@ -1071,11 +1089,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 515,
     "col": 0,
     "line": 23
    },
+   "used_keys": [],
    "value_start": {
     "byte": 535,
     "col": 20,
@@ -1181,11 +1201,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 541,
     "col": 0,
     "line": 25
    },
+   "used_keys": [],
    "value_start": {
     "byte": 576,
     "col": 35,
@@ -1284,11 +1306,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 584,
     "col": 0,
     "line": 27
    },
+   "used_keys": [],
    "value_start": {
     "byte": 705,
     "col": 31,
@@ -1417,11 +1441,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 715,
     "col": 0,
     "line": 30
    },
+   "used_keys": [],
    "value_start": {
     "byte": 737,
     "col": 22,
@@ -1494,11 +1520,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 779,
     "col": 0,
     "line": 32
    },
+   "used_keys": [],
    "value_start": {
     "byte": 802,
     "col": 23,
@@ -1630,11 +1658,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 810,
     "col": 0,
     "line": 34
    },
+   "used_keys": [],
    "value_start": {
     "byte": 929,
     "col": 33,
@@ -1748,11 +1778,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 944,
     "col": 0,
     "line": 37
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -1878,11 +1910,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1016,
     "col": 0,
     "line": 41
    },
+   "used_keys": [],
    "value_start": {
     "byte": 1116,
     "col": 25,
@@ -2013,11 +2047,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1122,
     "col": 0,
     "line": 44
    },
+   "used_keys": [],
    "value_start": {
     "byte": 1237,
     "col": 32,
@@ -2057,11 +2093,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1243,
     "col": 0,
     "line": 47
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -2107,11 +2145,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1251,
     "col": 0,
     "line": 48
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -2273,11 +2313,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1260,
     "col": 0,
     "line": 49
    },
+   "used_keys": [],
    "value_start": {
     "byte": 1578,
     "col": 43,
@@ -2328,11 +2370,13 @@
    ],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1596,
     "col": 0,
     "line": 53
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -2367,11 +2411,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1601,
     "col": 0,
     "line": 55
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -2417,11 +2463,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1609,
     "col": 0,
     "line": 56
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -2591,11 +2639,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1618,
     "col": 0,
     "line": 57
    },
+   "used_keys": [],
    "value_start": {
     "byte": 1956,
     "col": 54,
@@ -2646,11 +2696,13 @@
    ],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1963,
     "col": 0,
     "line": 61
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -2692,11 +2744,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1968,
     "col": 0,
     "line": 63
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -2826,11 +2880,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1982,
     "col": 0,
     "line": 64
    },
+   "used_keys": [],
    "value_start": {
     "byte": 2076,
     "col": 39,
@@ -2881,11 +2937,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 2081,
     "col": 0,
     "line": 66
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -2920,11 +2978,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 2090,
     "col": 0,
     "line": 68
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -3039,11 +3099,13 @@
    "sig_insts": [
     "CD.cdLocalInst"
    ],
+   "sig_used_keys": [],
    "start": {
     "byte": 2098,
     "col": 0,
     "line": 69
    },
+   "used_keys": [],
    "value_start": {
     "byte": 2342,
     "col": 44,
@@ -3186,11 +3248,17 @@
    "sig_insts": [
     "CD.cdLocalInst"
    ],
+   "sig_used_keys": [
+    "Inhabited CD.Wide"
+   ],
    "start": {
     "byte": 2359,
     "col": 0,
     "line": 72
    },
+   "used_keys": [
+    "Inhabited CD.Wide"
+   ],
    "value_start": {
     "byte": 2408,
     "col": 49,
@@ -3310,11 +3378,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 2415,
     "col": 0,
     "line": 73
    },
+   "used_keys": [],
    "value_start": {
     "byte": 2626,
     "col": 36,
@@ -3427,11 +3497,17 @@
    "sig_insts": [
     "CD.cdLocalInst"
    ],
+   "sig_used_keys": [
+    "Inhabited CD.Wide"
+   ],
    "start": {
     "byte": 2868,
     "col": 0,
     "line": 79
-   }
+   },
+   "used_keys": [
+    "Inhabited CD.Wide"
+   ]
   },
   {
    "attrs": [],
@@ -3584,11 +3660,17 @@
    "sig_insts": [
     "CD.cdLocalInst"
    ],
+   "sig_used_keys": [
+    "Inhabited CD.Wide"
+   ],
    "start": {
     "byte": 2909,
     "col": 0,
     "line": 80
    },
+   "used_keys": [
+    "Inhabited CD.Wide"
+   ],
    "value_start": {
     "byte": 2968,
     "col": 43,
@@ -3634,11 +3716,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 2976,
     "col": 0,
     "line": 82
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -3673,11 +3757,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 2981,
     "col": 0,
     "line": 84
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -3737,11 +3823,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 2989,
     "col": 0,
     "line": 85
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -3854,11 +3942,13 @@
    "sig_insts": [
     "CD.cdLocalInst2"
    ],
+   "sig_used_keys": [],
    "start": {
     "byte": 3232,
     "col": 0,
     "line": 88
    },
+   "used_keys": [],
    "value_start": {
     "byte": 3277,
     "col": 45,
@@ -3971,11 +4061,17 @@
    "sig_insts": [
     "CD.cdLocalInst2"
    ],
+   "sig_used_keys": [
+    "Inhabited CD.Wide"
+   ],
    "start": {
     "byte": 3289,
     "col": 0,
     "line": 89
-   }
+   },
+   "used_keys": [
+    "Inhabited CD.Wide"
+   ]
   },
   {
    "attrs": [],
@@ -4128,11 +4224,17 @@
    "sig_insts": [
     "CD.cdLocalInst2"
    ],
+   "sig_used_keys": [
+    "Inhabited CD.Wide"
+   ],
    "start": {
     "byte": 3331,
     "col": 0,
     "line": 90
    },
+   "used_keys": [
+    "Inhabited CD.Wide"
+   ],
    "value_start": {
     "byte": 3392,
     "col": 44,
@@ -4178,11 +4280,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3401,
     "col": 0,
     "line": 92
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -4224,11 +4328,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3406,
     "col": 0,
     "line": 94
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -4266,11 +4372,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3581,
     "col": 0,
     "line": 98
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -4360,11 +4468,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3599,
     "col": 0,
     "line": 99
    },
+   "used_keys": [],
    "value_start": {
     "byte": 3616,
     "col": 17,
@@ -4411,11 +4521,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3621,
     "col": 0,
     "line": 100
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -4453,11 +4565,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3634,
     "col": 0,
     "line": 102
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -4613,11 +4727,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3651,
     "col": 0,
     "line": 103
    },
+   "used_keys": [],
    "value_start": {
     "byte": 3697,
     "col": 44,
@@ -4664,11 +4780,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3714,
     "col": 0,
     "line": 104
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -4706,11 +4824,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3726,
     "col": 0,
     "line": 106
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -4800,11 +4920,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3744,
     "col": 0,
     "line": 108
    },
+   "used_keys": [],
    "value_start": {
     "byte": 3762,
     "col": 18,
@@ -4859,11 +4981,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3768,
     "col": 0,
     "line": 110
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [
@@ -4919,11 +5043,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3801,
     "col": 0,
     "line": 112
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -5015,11 +5141,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3832,
     "col": 0,
     "line": 114
    },
+   "used_keys": [],
    "value_start": {
     "byte": 3857,
     "col": 25,
@@ -5066,11 +5194,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 3865,
     "col": 0,
     "line": 116
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -5108,11 +5238,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 4072,
     "col": 0,
     "line": 120
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -5186,11 +5318,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 4090,
     "col": 0,
     "line": 121
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -5284,11 +5418,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 4135,
     "col": 0,
     "line": 122
    },
+   "used_keys": [],
    "value_start": {
     "byte": 4244,
     "col": 17,
@@ -5335,11 +5471,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 4249,
     "col": 0,
     "line": 124
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -5370,11 +5508,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 4261,
     "col": 0,
     "line": 125
-   }
+   },
+   "used_keys": []
   }
  ],
  "decls": [],

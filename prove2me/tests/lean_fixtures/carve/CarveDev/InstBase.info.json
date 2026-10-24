@@ -27,11 +27,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 22,
     "col": 0,
     "line": 3
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -67,11 +69,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 710,
     "col": 0,
     "line": 13
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -174,11 +178,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 727,
     "col": 0,
     "line": 15
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -304,11 +310,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 761,
     "col": 0,
     "line": 18
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -360,11 +368,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 811,
     "col": 0,
     "line": 21
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -445,11 +455,15 @@
    "sig_insts": [
     "CD.Ex.instCodingNat"
    ],
+   "sig_used_keys": [],
    "start": {
     "byte": 833,
     "col": 0,
     "line": 23
    },
+   "used_keys": [
+    "CD.Ex.Coding"
+   ],
    "value_start": {
     "byte": 855,
     "col": 22,
@@ -584,11 +598,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 868,
     "col": 0,
     "line": 25
    },
+   "used_keys": [],
    "value_start": {
     "byte": 898,
     "col": 30,
@@ -744,11 +760,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 908,
     "col": 0,
     "line": 27
    },
+   "used_keys": [],
    "value_start": {
     "byte": 952,
     "col": 44,
@@ -793,11 +811,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 960,
     "col": 0,
     "line": 29
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -833,11 +853,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 971,
     "col": 0,
     "line": 31
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -974,11 +996,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 988,
     "col": 0,
     "line": 33
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -1081,11 +1105,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1038,
     "col": 0,
     "line": 36
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -1215,11 +1241,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1069,
     "col": 0,
     "line": 39
    },
+   "used_keys": [],
    "value_start": {
     "byte": 1097,
     "col": 28,
@@ -1375,11 +1403,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1105,
     "col": 0,
     "line": 41
    },
+   "used_keys": [],
    "value_start": {
     "byte": 1145,
     "col": 40,
@@ -1530,11 +1560,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1153,
     "col": 0,
     "line": 43
    },
+   "used_keys": [],
    "value_start": {
     "byte": 1293,
     "col": 41,
@@ -1644,11 +1676,13 @@
    "sig_insts": [
     "CD.LI.boxInhabitedA"
    ],
+   "sig_used_keys": [],
    "start": {
     "byte": 1299,
     "col": 0,
     "line": 46
    },
+   "used_keys": [],
    "value_start": {
     "byte": 1338,
     "col": 39,
@@ -1789,11 +1823,17 @@
    "sig_insts": [
     "CD.LI.boxInhabitedA"
    ],
+   "sig_used_keys": [
+    "Inhabited CD.LI.Box"
+   ],
    "start": {
     "byte": 1356,
     "col": 0,
     "line": 48
    },
+   "used_keys": [
+    "Inhabited CD.LI.Box"
+   ],
    "value_start": {
     "byte": 1581,
     "col": 44,
@@ -1988,11 +2028,13 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1589,
     "col": 0,
     "line": 52
    },
+   "used_keys": [],
    "value_start": {
     "byte": 1823,
     "col": 84,
@@ -2037,11 +2079,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1831,
     "col": 0,
     "line": 56
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -2070,11 +2114,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 1841,
     "col": 0,
     "line": 57
-   }
+   },
+   "used_keys": []
   }
  ],
  "decls": [],

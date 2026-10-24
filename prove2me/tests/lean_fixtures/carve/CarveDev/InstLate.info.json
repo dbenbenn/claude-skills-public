@@ -34,11 +34,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 26,
     "col": 0,
     "line": 3
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -174,11 +176,17 @@
    "sig_insts": [
     "CD.LI.boxInhabitedA"
    ],
+   "sig_used_keys": [
+    "Inhabited CD.LI.Box"
+   ],
    "start": {
     "byte": 43,
     "col": 0,
     "line": 5
    },
+   "used_keys": [
+    "Inhabited CD.LI.Box"
+   ],
    "value_start": {
     "byte": 275,
     "col": 45,
@@ -292,11 +300,13 @@
    "sig_insts": [
     "CD.LI.boxInhabited"
    ],
+   "sig_used_keys": [],
    "start": {
     "byte": 283,
     "col": 0,
     "line": 9
    },
+   "used_keys": [],
    "value_start": {
     "byte": 401,
     "col": 38,
@@ -402,11 +412,15 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 419,
     "col": 0,
     "line": 12
    },
+   "used_keys": [
+    "Inhabited CD.LI.Box"
+   ],
    "value_start": {
     "byte": 440,
     "col": 21,
@@ -451,11 +465,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 452,
     "col": 0,
     "line": 14
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -484,11 +500,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 462,
     "col": 0,
     "line": 15
-   }
+   },
+   "used_keys": []
   }
  ],
  "decls": [],

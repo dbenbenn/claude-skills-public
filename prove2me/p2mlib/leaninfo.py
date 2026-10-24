@@ -80,6 +80,8 @@ class Command:
     sig_insts: list = None
     inst_keys: list = None
     declares: list = None
+    used_keys: list = None        # 'Class Head …' of each class-typed constant of ours it uses
+    sig_used_keys: list = None    # the same, for its statement
     declares_kinds: list = None   # syntax kinds a notation command adds
     kinds_used: list = None       # this file's notation kinds the command's syntax contains
 
@@ -169,7 +171,8 @@ def parse(data, text_bytes=b''):
                     [(_pos(x['start']), _pos(x['end'])) for x in c.get('ids') or []],
                     c.get('idents'), c.get('heads'), c.get('binders'), c.get('doc'), c.get('private'),
                     c.get('resolved'), c.get('insts'), c.get('sig_insts'), c.get('inst_keys'),
-                    c.get('declares'), c.get('declares_kinds'), c.get('kinds_used'))
+                    c.get('declares'), c.get('used_keys'), c.get('sig_used_keys'),
+                    c.get('declares_kinds'), c.get('kinds_used'))
             for i, c in enumerate(data['commands'])]
     decls = []
     for d in data.get('decls') or []:

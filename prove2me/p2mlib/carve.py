@@ -2407,6 +2407,10 @@ class Carver:
         if c.insts is None:
             return None
         used = set(c.sig_insts if sorried else c.insts)
+        # the class keys of what it uses ('Fact LT.lt'): Lean may have shared an equal proof that
+        # another module declared instead of naming the local instance instance search found
+        # (Problem340, MapSignal's input_eq_baseInput_of_mem_Ico)
+        used |= {'key:' + x for x in ((c.sig_used_keys if sorried else c.used_keys) or ())}
         k = self.g.cmd_node.get((m, c.index))
         if k:
             for n in self.g.nodes[k].names:
@@ -2441,7 +2445,8 @@ class Carver:
             if is_inst and used is not None:
                 ik0 = g.cmd_node.get((m, vi))
                 names = {x[0] for x in vc.declares or ()} or set(g.nodes[ik0].names if ik0 else ())
-                if not names & used:
+                keys = {'key:' + ' '.join([x[1]] + list(x[2])) for x in vc.declares or () if x[1]}
+                if not (names | keys) & used:
                     continue
             # ik None: a local instance that is nobody's node. An instance of a Prop class is a
             # theorem, and Lean lets sibling modules declare the same one under one generated name

@@ -1393,7 +1393,7 @@ def g_text():
     for info in g2.infos.values():
         for c in info.commands:
             c.resolved = c.insts = c.sig_insts = c.inst_keys = c.declares = None
-            c.declares_kinds = c.kinds_used = None
+            c.declares_kinds = c.kinds_used = c.used_keys = c.sig_used_keys = None
     return C.Graph(g2.consts, g2.imports, g2.ext_ns, g2.infos)
 
 

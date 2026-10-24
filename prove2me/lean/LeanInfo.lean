@@ -432,11 +432,34 @@ unsafe def factsJ (env headerEnv : Environment) (stx : Syntax) (trees : Array In
   let some r := stx.getRange? | return []
   let vs := ((valueStart? stx).map (·.byteIdx)).getD r.stop.byteIdx
   let f ← factsOf env (tokenRanges stx) r.start.byteIdx r.stop.byteIdx vs trees
+  -- and the constants of what it declared: a tactic proof's instance arguments are assigned after
+  -- the info trees' terms were recorded (Problem340: `exact AddCircle.liftIco_zero_coe_apply ht`
+  -- used the module's `local instance : Fact ((0 : ℝ) < 100)` only in the final proof term). Read
+  -- here, the names agree with the info trees' (a generated instance name can differ from the
+  -- compiled port's when sibling modules declare the same one)
+  let mut f := f
+  for c in f.declares.toList do
+    if let some ci := env.find? c then
+      f := { f with consts := ci.type.getUsedConstants.foldl (·.insert ·) f.consts,
+                    sigConsts := ci.type.getUsedConstants.foldl (·.insert ·) f.sigConsts }
+      if let some v := ci.value? (allowOpaque := true) then
+        f := { f with consts := v.getUsedConstants.foldl (·.insert ·) f.consts }
   let local? (c : Name) : Bool := Meta.isInstanceCore env c &&
     ((match env.getModuleIdxFor? c with
       | none => true
       | some idx => ourModule env.header.moduleNames[idx.toNat]!) || !Meta.isInstanceCore headerEnv c)
   let names (s : NameSet) : Json := toJson ((s.toList.map toString).toArray.qsort (· < ·))
+  -- every constant of ours whose type is a class (an instance, or a proof Lean shared with one:
+  -- Problem340's theorems name a sibling module's equal `Fact ((0 : ℝ) < 100)` constant, not the
+  -- local instance instance search found), as "Class Head …"
+  let ours (c : Name) : Bool := match env.getModuleIdxFor? c with
+    | none => true
+    | some idx => ourModule env.header.moduleNames[idx.toNat]!
+  let classKey (c : Name) : Option String := do
+    let (k, hs) ← problemKey env c #[]
+    guard (isClass env k)
+    return " ".intercalate ((#[k] ++ hs).map toString).toList
+  let keysOf (s : NameSet) : Json := toJson ((s.toList.filter (fun c => ours c && !f.declares.contains c) |>.filterMap classKey |>.toArray).qsort (· < ·) |>.toList.eraseDups.toArray)
   let insts := f.consts.toList.filter local?
   let sigInsts := f.sigConsts.toList.filter local?
   let res := f.resolved.qsort fun x y => x.1 < y.1 || (x.1 == y.1 && x.2.1 < y.2.1)
@@ -451,6 +474,7 @@ unsafe def factsJ (env headerEnv : Environment) (stx : Syntax) (trees : Array In
           ("insts", names (insts.foldl (·.insert ·) {})),
           ("sig_insts", names (sigInsts.foldl (·.insert ·) {})),
           ("inst_keys", toJson (f.keys.toArray.qsort (· < ·))),
+          ("used_keys", keysOf f.consts), ("sig_used_keys", keysOf f.sigConsts),
           ("declares", Json.arr decl.toArray)]
 
 /-- Commands that set context for the rest of their scope and end with it -- what a command moved

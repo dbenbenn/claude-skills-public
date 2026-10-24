@@ -34,11 +34,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 26,
     "col": 0,
     "line": 3
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -110,11 +112,15 @@
    "sig_insts": [
     "CD.LI.instPropCOfNatNat"
    ],
+   "sig_used_keys": [],
    "start": {
     "byte": 43,
     "col": 0,
     "line": 5
    },
+   "used_keys": [
+    "CD.LI.PropC"
+   ],
    "value_start": {
     "byte": 68,
     "col": 25,
@@ -221,11 +227,15 @@
     ]
    ],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 82,
     "col": 0,
     "line": 7
    },
+   "used_keys": [
+    "CD.LI.PropC OfNat.ofNat"
+   ],
    "value_start": {
     "byte": 113,
     "col": 31,
@@ -338,11 +348,17 @@
    "sig_insts": [
     "CD.LI.instPropCOfNatNat"
    ],
+   "sig_used_keys": [
+    "CD.LI.PropC OfNat.ofNat"
+   ],
    "start": {
     "byte": 131,
     "col": 0,
     "line": 9
    },
+   "used_keys": [
+    "CD.LI.PropC OfNat.ofNat"
+   ],
    "value_start": {
     "byte": 406,
     "col": 42,
@@ -387,11 +403,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 414,
     "col": 0,
     "line": 14
-   }
+   },
+   "used_keys": []
   },
   {
    "attrs": [],
@@ -420,11 +438,13 @@
    "opens": [],
    "resolved": [],
    "sig_insts": [],
+   "sig_used_keys": [],
    "start": {
     "byte": 424,
     "col": 0,
     "line": 15
-   }
+   },
+   "used_keys": []
   }
  ],
  "decls": [],
