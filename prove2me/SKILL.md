@@ -1319,6 +1319,27 @@ back WA. The lessons:
   declaration elaborated. The last is only detected: `carve.py plan` and `gen` print the
   instances a carved file shows declarations whose modules never saw them. Most of them are
   harmless, so read that list first when a carved file fails where the port compiled.
+- **`carve_measure.py` checks every import edge, and fails the carve on a false one.** The
+  carver infers dependencies partly from source text, so it can emit an `import Theorems.*` a
+  piece never uses; the file compiles, and the false edge goes into the published graph
+  (PosteriorReplicas 2026-10-23, caught only by hand: drop each import, recompile). After each
+  file compiles, `lean/EdgeUses.lean` reads its .olean (a piece compiles as module
+  `EdgeChk.Chk_<name>` for this) and lists the constants each import supplies to what `solution`
+  reaches (for a bundle or statement, to every declaration). Each import it finds unused is
+  confirmed by one compile without it, because a `dsimp only [rfl_lemma]`, a notation or an `open`
+  leaves no constant behind. Checked: every `import Theorems.*`, and a bundle's imports of this
+  carve's other bundles. The report is `work/false_edges.json`, which lists each false edge (with
+  the bundle to import instead when the statement only brought one in), imports used only by dead
+  code, and **orphaned statements**: no file imports them any more, and they are neither target nor
+  forced, so drop them from the plan, as was done by hand for PosteriorReplicas. Results are cached
+  in `work/edges.json`. `--drop-false-edges` cuts the false import lines and records the cuts in
+  `work/repairs.json`, so they survive `carve.py gen`. `--allow-false-edges` reports without
+  failing; `--no-edge-check` skips the check. Recompiling once per import gives the same answers
+  except for an import that is also reached through a bundle, which it calls false. It is only the
+  fallback, used when the scan fails. On the 17 hand-checked carves of 2026-10-23/24 (106 edges)
+  the check agreed with the hand results: one false edge (PosteriorReplicas, with its orphaned
+  statement) and every other edge used. It added 3–14% to the measure time, about 5 s per file
+  that has an edge to check.
 - **The soundness guard refuses the token `prelude`, even as an identifier** (WLTime 2026-10-23:
   OpenAI's `def prelude` failed a published bundle). Both port routes rename it to `prelude_`.
   `carve.py gen`, `split_run.py` and `submit_solution.py` refuse any file the guard would refuse
