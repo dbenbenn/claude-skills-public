@@ -1346,7 +1346,12 @@ back WA. The lessons:
   few per carve, inside some `simp`/`simpa` argument lists); `graph` and `gen` list them. The
   case-by-case fixes of 2026-10-16..24 were all places where the text reading disagreed with
   Lean; their tests run against the records now, and one test runs the old rules with the records
-  removed.
+  removed. Rechecked on five plain carves of 2026-10-23/24 (Problem355, PermanentBorder,
+  RationalHitting, Problem340, PosteriorReplicas), regenerated without their `carve_patches.json`:
+  every bundle, statement and piece compiles and the import-edge check finds no false edge, both
+  from the published plans and from fresh plans (PosteriorReplicas' fresh plan no longer has the
+  false edge and the two orphaned statements that were removed by hand). The patches were all
+  for bugs this removed. A post-carve patch is again only for a proof fix.
 - **`carve_measure.py` checks every import edge, and fails the carve on a false one.** The
   carver infers dependencies partly from source text, so it can emit an `import Theorems.*` a
   piece never uses; the file compiles, and the false edge goes into the published graph
