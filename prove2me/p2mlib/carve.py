@@ -1003,6 +1003,22 @@ def module_costs(g, times, scale=1.5, default=2.0, overhead=0.5):
     return cost
 
 
+def bundle_time(times, name):
+    """A bundle's measurement in a times.json: carve_measure.py keys it `bundle:<name>`; older
+    files used the bare name."""
+    return times.get('bundle:' + name) or times.get(name)
+
+
+def slow_bundles(bundles, times, limit):
+    """The bundles measured (and compiled) over `limit` seconds, in plan order."""
+    out = []
+    for b in bundles:
+        t = bundle_time(times, b['name'])
+        if t and t.get('ok') and t['secs'] > limit:
+            out.append(b['name'])
+    return out
+
+
 def calibrate_costs(cost, bundles, times, scale=1.5, overhead=5.0, floor=0.5):
     """Estimates corrected by measurement: each bundle built locally at -j1 in `secs` gets its
     declarations' costs rescaled (shares kept) to (secs - overhead) * scale, the import overhead
@@ -1011,7 +1027,7 @@ def calibrate_costs(cost, bundles, times, scale=1.5, overhead=5.0, floor=0.5):
     estimates put every bundle at 60 s; measured, 5 of 132 ran over 40 s local, up to 69 s)."""
     out = dict(cost)
     for b in bundles:
-        t = times.get(b['name'])
+        t = bundle_time(times, b['name'])
         if not t or not t.get('ok'):
             continue
         est = sum(cost.get(k, 0.0) for k in b['nodes'])

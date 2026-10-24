@@ -1160,6 +1160,22 @@ def test_measured_bundle_times_rescale_the_estimates_of_their_declarations():
     assert cost['a'] == 1.0                                    # input not mutated
 
 
+def test_measured_times_keyed_as_carve_measure_writes_them():
+    # carve_measure.py keys work/times.json by publish item (`bundle:OAIEG012`); calibrate_costs and
+    # `carve.py split` looked bundles up by bare name, so Eilenberg–Ganea's 284 s bundle was never
+    # split ("26 bundles -> 26", 2026-10-25)
+    cost = {'a': 1.0, 'b': 3.0}
+    bundles = [{'name': 'X0', 'nodes': ['a', 'b']}]
+    out = C.calibrate_costs(cost, bundles, {'bundle:X0': {'secs': 25.0, 'ok': True}})
+    assert out['a'] + out['b'] == pytest.approx((25.0 - 5.0) * 1.5)
+    assert C.bundle_time({'bundle:X0': {'secs': 25.0, 'ok': True}}, 'X0')['secs'] == 25.0
+    assert C.bundle_time({'X0': {'secs': 7.0, 'ok': True}}, 'X0')['secs'] == 7.0
+    assert C.bundle_time({'piece:X0': {'secs': 7.0, 'ok': True}}, 'X0') is None
+    assert C.slow_bundles(bundles + [{'name': 'X1', 'nodes': []}],
+                          {'bundle:X0': {'secs': 61.0, 'ok': True},
+                           'bundle:X1': {'secs': 99.0, 'ok': False}}, 60.0) == ['X0']
+
+
 def test_a_variable_with_nothing_kept_after_it_goes(g):
     out = C.Carver(g).carve({'CD.trail_kept'}, g.have_names({'CD.trail_kept'}))
     assert 'variable (q : Nat)' in out

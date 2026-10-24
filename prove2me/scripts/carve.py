@@ -249,8 +249,7 @@ def main(argv):
         P = json.load(open(plan_path(cfg)))
         times = json.load(open(os.path.expanduser(rest[0])))
         limit = float(rest[rest.index('--limit') + 1]) if '--limit' in rest else 60.0
-        slow = [b['name'] for b in P['bundles']
-                if times.get(b['name'], {}).get('ok') and times[b['name']]['secs'] > limit]
+        slow = C.slow_bundles(P['bundles'], times, limit)
         scale = cfg.get('time_scale', 1.5)
         overhead = cfg.get('import_overhead', 5.0)
         cost = C.calibrate_costs(costs(cfg, g), P['bundles'], times, scale, overhead)
@@ -264,7 +263,7 @@ def main(argv):
         json.dump(Q, open(plan_path(cfg), 'w'), indent=1)
         old = {b['name'] for b in P['bundles']}
         for n in slow:
-            print('split %s (%.0f s): %s' % (n, times[n]['secs'], ' '.join(
+            print('split %s (%.0f s): %s' % (n, C.bundle_time(times, n)['secs'], ' '.join(
                 b['name'] for b in Q['bundles'] if b['name'] == n or
                 (b['name'] not in old and set(b['nodes']) <= set(next(x for x in P['bundles'] if x['name'] == n)['nodes'])))))
         print('%d bundles -> %d; old plan saved as %s' % (len(P['bundles']), len(Q['bundles']), backup))
