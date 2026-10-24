@@ -1875,6 +1875,14 @@ def check_plan(g, plan):
     return probs
 
 
+def _could_match(g, k, i):
+    """Could instance i answer an instance problem of declaration k? Its type mentions a project
+    declaration k uses, or only library types (a coarse test: types are compared by the project
+    declarations they mention)."""
+    td = g.nodes[i].tdeps - {i}
+    return not td or bool(td & (g.nodes[k].deps | g.nodes[k].sig))
+
+
 def _global_instance(g, k):
     """Is node k an instance every importer of its file sees (not `local`/`scoped`)?"""
     nd = g.nodes[k]
@@ -1923,7 +1931,6 @@ def instance_leaks(g, plan):
         for k in sorted(keep):
             if k not in g.nodes:
                 continue
-            uses = g.nodes[k].deps | g.nodes[k].sig
             asked = g.inst_problems(k)
             for i in sorted(cand):
                 if i == k or saw(k, i):
@@ -1931,8 +1938,7 @@ def instance_leaks(g, plan):
                 ci = g.instance_class(i)
                 if asked is not None and ci and ci[0] not in {cls for cls, _ in asked}:
                     continue
-                td = g.nodes[i].tdeps - {i}
-                if not td or td & uses:
+                if _could_match(g, k, i):
                     out.append((item, k, i))
         return out
     leaks = []
@@ -2117,15 +2123,20 @@ class Carver:
         Generator.lean, visible in the carved list_hits through a bundle, changed how
         `algebraMap ℚ WitnessField` elaborated in Certificates.lean, and a `rwa` no longer matched).
         An instance from a later module of the file is not declared yet; one kept from an earlier
-        module, or imported, is."""
+        module, or imported, is. Only instances whose type could match a problem of the section's
+        declarations: it mentions a project declaration one of them uses, or only library types
+        (`_could_match`; hiding every unseen instance cost PosteriorReplicas 19,889 names)."""
         g = self.g
         if not hasattr(g, '_global_insts'):
             g._global_insts = sorted(k for k in g.nodes if _global_instance(g, k))
         names = getattr(g, 'instance_names', None) or {}
+        mine = [k for k in self.keep if g.nodes[k].module == m]
         out = []
         for i in g._global_insts:
             nd = g.nodes[i]
             if nd.module == m or g.sees(m, nd.module):
+                continue
+            if not any(_could_match(g, k, i) for k in mine):
                 continue
             if i in self.keep:
                 if i not in earlier:
