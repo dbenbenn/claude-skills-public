@@ -750,3 +750,18 @@ def test_eventually_empty_or_univ_renamed():
     out = O.core_rewrites("  rw [Filter.eventuallyEmptyOrUniv_iff']\n  exact foo.eventuallyEmptyOrUniv_iff'.mp h\n")
     assert "rw [Filter.eventuallyConst_set']" in out
     assert "foo.eventuallyConst_set'.mp h" in out
+
+
+# d13f23b renames (StandardMap, 2026-10-25): `StrictMono.range_inj_of_wellFoundedLT` is our `StrictMono.range_inj`;
+# `TopologicalSpace.NonemptyCompacts.dist_eq` is `Metric.NonemptyCompacts.dist_eq`;
+# `TopologicalSpace.NonemptyCompacts.lipschitz_infDist_const x` is `Metric.lipschitz_infDist_set x`.
+
+def test_range_inj_and_nonempty_compacts_renames():
+    src = ("exact (f.strictMono.range_inj_of_wellFoundedLT g.strictMono).mp hh\n"
+           "rw [← TopologicalSpace.NonemptyCompacts.dist_eq] at hh\n"
+           "have := TopologicalSpace.NonemptyCompacts.lipschitz_infDist_const x\n")
+    out = O.core_rewrites(src)
+    assert "f.strictMono.range_inj g.strictMono" in out
+    assert "range_inj_of_wellFoundedLT" not in out
+    assert "← Metric.NonemptyCompacts.dist_eq" in out
+    assert "Metric.lipschitz_infDist_set x" in out
