@@ -584,3 +584,13 @@ def test_compat_has_mvpolynomial_monomial_mul_monomial():
                             'compat_4_34.lean')).read()
     assert 'theorem _root_.MvPolynomial.monomial_mul_monomial' in src
     assert 'Mathlib.Algebra.MvPolynomial.Basic' in O.COMPAT_NARROW_IMPORTS
+
+
+# d13f23b: `CStarAlgebra.norm_mem_spectrum_of_nonneg a ha`; ours has `a` implicit (Kirchberg–Rørdam, 2026-10-25).
+
+def test_norm_mem_spectrum_of_nonneg_drops_explicit_element():
+    src = ("exact spectrum.algebraMap_mem ℂ (CStarAlgebra.norm_mem_spectrum_of_nonneg b hb)\n"
+           "exact CStarAlgebra.norm_mem_spectrum_of_nonneg hb\n")
+    out = O.core_rewrites(src)
+    assert "(CStarAlgebra.norm_mem_spectrum_of_nonneg hb)" in out
+    assert out.count("norm_mem_spectrum_of_nonneg hb") == 2
