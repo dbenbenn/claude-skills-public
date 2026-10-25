@@ -496,3 +496,19 @@ def test_subset_lemmas_prime_and_zero_suffix_do_not_cross():
     assert out[1] == "exact Finset.prod_le_prod_of_subset_of_le_one' h a b"
     assert out[2] == "exact prod_le_prod_of_subset_of_le_one hE h"
     assert out[3] == "exact Finset.prod_le_prod_of_subset_of_one_le hE h"
+
+
+# d13f23b's `Measure.map_smul c (hf : AEMeasurable f μ)` takes a measurability proof; ours is `map_smul c μ f`
+# with none. Dropping the proof argument leaves a bare `Measure.map_smul` for `rw`/`simp`
+# (SingleLatticeCovering Isotropy/Desmoothing/GaussianSections, 2026-10-25).
+
+def test_measure_map_smul_drops_measurability_argument():
+    src = ("rw [Measure.map_smul _ (by fun_prop),map_add_right_eq_self]\n"
+           "rw [Measure.map_smul _ em.measurable.aemeasurable,hrestr]\n"
+           "rw [Measure.map_smul _ hf.aemeasurable]\n"
+           "exact Measure.map_smul c μ f\n")
+    out = O.core_rewrites(src)
+    assert "rw [Measure.map_smul,map_add_right_eq_self]" in out
+    assert "rw [Measure.map_smul,hrestr]" in out
+    assert "rw [Measure.map_smul]\n" in out
+    assert "exact Measure.map_smul c μ f" in out

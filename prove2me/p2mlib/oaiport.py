@@ -312,6 +312,10 @@ def core_rewrites(text, compat_ns='OAI'):
     # (same statement; Markov superreflexivity 2026-10-25)
     text = re.sub(r"(?<![\w'])(Finsupp\.)?mapDomain_apply_of_injective(?![\w'])",
                   lambda m: (m.group(1) or '') + 'mapDomain_apply', text)
+    # d13f23b's `Measure.map_smul c hf` takes an AEMeasurable proof; ours is `map_smul c μ f` with none
+    # (SingleLatticeCovering 2026-10-25)
+    text = re.sub(r"(?<![\w.'])((?:MeasureTheory\.)?Measure\.map_smul) _ "
+                  r"(?:\(by fun_prop\)|[\w.]+\.aemeasurable)(?![\w.'])", r"\1", text)
     # d13f23b renamed the ordered-monoid `Finset.prod_le_prod'` (one hypothesis) to
     # `Finset.prod_le_prod`, and our nonnegative `prod_le_prod` to `prod_le_prod₀` (the compat
     # aliases map that one back, after this). So an unsuffixed use is our primed lemma
