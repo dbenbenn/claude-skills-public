@@ -15,14 +15,52 @@ import time
 from . import runlock, snapshot, workspace as wslib
 
 STEPS = ['fetch', 'filter_patches', 'port', 'build', 'wsbuild', 'config', 'graph', 'extdefs', 'plan', 'gen',
-         'order', 'measure', 'publish_prep', 'prose', 'check_text', 'dryrun', 'publish']
+         'order', 'measure', 'calibrate', 'publish_prep', 'prose', 'check_text', 'dryrun', 'publish']
 DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
               'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags']
 
 
+LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
+MAX_REPLANS = 2
+MAX_SCALE = 8.0
+
+
 class StepFailed(Exception):
     pass
+
+
+def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR):
+    """Does the cost model's `scale` (time_scale) fit this carve's measured times?
+    Returns {'over': [(item, secs, cost)], 'ratio', 'new_scale', 'limit', 'measured', 'slowest'}.
+
+    Batch 3 (2026-10-25): the first plans of QuarticPowerFree and KirchbergRordam were made with the
+    default scale and measured at 85-128 s per bundle against a budget of 55 s; a 128 s bundle timed
+    out three times at the verifier. Re-planned with time_scale 2.2 and 4.5, every item fitted. One
+    sample of pieces cannot predict this (per-item error ran 0.3-1.4x at the final scale, so a
+    small sample would have called Kirchberg's first plan fine), but the full measurement that
+    precedes publishing already holds every item: an item measured over `limit_factor` x budget,
+    that is not frozen (published), sets the scale to scale x (its measured seconds / its planned
+    cost), the worst item deciding, so that its share is split next time. Items measured
+    under the limit never lower the scale: a pessimistic estimate costs a few more bundles, a
+    timeout costs three publish attempts."""
+    limit = budget * limit_factor
+    over, measured, slowest = [], 0, None
+    items = [('bundle:' + b['name'], b['name'], b.get('cost') or 0) for b in plan.get('bundles', [])]
+    items += [('piece:' + n, n, p.get('cost') or 0) for n, p in (plan.get('pieces') or {}).items()]
+    for key, name, cost in items:
+        t = times.get(key) or (times.get(name) if key.startswith('bundle:') else None)
+        if not t or not t.get('ok'):
+            continue
+        measured += 1
+        if slowest is None or t['secs'] > slowest[1]:
+            slowest = (key, t['secs'])
+        if t['secs'] > limit and name not in frozen:
+            over.append((key, t['secs'], cost))
+    ratio = max((secs / max(cost, 1.0) for _, secs, cost in over), default=1.0)
+    new_scale = round(min(MAX_SCALE, max(scale * 1.1, scale * ratio)), 1) if over else scale
+    return {'over': over, 'ratio': ratio, 'new_scale': new_scale, 'limit': limit, 'measured': measured,
+            'slowest': slowest}
 
 
 def module_root_name(rootmod, prefixes, files):
@@ -206,6 +244,40 @@ class Pipeline:
     def step_measure(self):
         self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *(self.p.get('measure_flags') or []))])
 
+    def step_calibrate(self):
+        cfg = json.load(open(os.path.join(self.d, 'config.json')))
+        work = os.path.expanduser(cfg.get('work') or os.path.join(self.d, 'carve_work'))
+        plan_path = os.path.expanduser(cfg.get('plan') or os.path.join(work, 'plan.json'))
+        times_path = os.path.join(work, 'times.json')
+        if not (os.path.exists(plan_path) and os.path.exists(times_path)):
+            return 'skipped'                                       # nothing was measured
+        plan, times = json.load(open(plan_path)), json.load(open(times_path))
+        fz = (cfg.get('frozen') or {}).get('bundles') or ()
+        res = calibration(plan, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz)
+        log = os.path.join(self.d, 'logs', 'calibrate.log')
+        os.makedirs(os.path.dirname(log), exist_ok=True)
+        lines = ['%s: measured %d items against budget %g (limit %.0f s), slowest %s' % (
+            _now(), res['measured'], cfg.get('budget', 55), res['limit'], res['slowest'])]
+        for key, secs, cost in res['over']:
+            lines.append('  over: %s measured %.0f s, planned %.0f s' % (key, secs, cost))
+        if not res['over']:
+            open(log, 'a').write('\n'.join(lines + ['fits the model; time_scale %g kept' % cfg.get('time_scale', 1.5)]) + '\n')
+            return None
+        n = self.state.get('replans', 0)
+        if n >= MAX_REPLANS:
+            open(log, 'a').write('\n'.join(lines) + '\n')
+            raise StepFailed("step 'calibrate': %d re-plans did not fit the budget; items over the limit:\n%s\n"
+                             "split by hand (carve.py split) or raise time_scale; log %s" % (n, '\n'.join(lines[1:]), log))
+        lines.append('re-planning %d/%d: time_scale %g -> %g' % (n + 1, MAX_REPLANS, cfg.get('time_scale', 1.5),
+                                                               res['new_scale']))
+        open(log, 'a').write('\n'.join(lines) + '\n')
+        cfg['time_scale'] = res['new_scale']
+        json.dump(cfg, open(os.path.join(self.d, 'config.json'), 'w'), indent=1)
+        self.state['replans'] = n + 1
+        self.invalidate('plan')
+        self.restart = True
+        print('calibrate: %s' % lines[-1], file=sys.stderr, flush=True)
+
     def source_line(self):
         m = json.load(open(self.meta))
         return ('OpenAI, %s, OpenAI Math Release, %s, https://github.com/openai/math (result family %s), '
@@ -235,6 +307,15 @@ class Pipeline:
 
     # -- driver -----------------------------------------------------------------------------
     def run(self, stop_after=None, only_redo=()):
+        redo = set(only_redo)
+        while True:
+            self.restart = False
+            self._run_once(stop_after, redo)
+            if not self.restart:
+                return self.state
+            redo = set()               # a re-plan invalidated what follows the plan: run it again
+
+    def _run_once(self, stop_after, only_redo):
         for s in STEPS:
             rec = self.state['steps'].get(s)
             if rec and rec['status'] in ('done', 'skipped') and s not in only_redo:
@@ -254,9 +335,12 @@ class Pipeline:
                 raise
             rec.update(status=res or 'done', finished=_now())
             self.save()
+            if self.restart:
+                self.state['steps'].pop(s, None)                   # re-run this step after the re-plan
+                self.save()
+                return
             if s == stop_after:
                 break
-        return self.state
 
 
 def lock(d):

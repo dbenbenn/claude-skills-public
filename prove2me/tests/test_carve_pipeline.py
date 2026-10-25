@@ -256,3 +256,107 @@ def test_module_root_name():
     assert module_root_name('OAI.A.B.Sub.Main', ['OAI.A.B'], ['Sub_Main.lean']) == 'Sub_Main'
     assert module_root_name('OAI.A.B.Sub.Main', ['OAI.A.B'], ['Q_Sub_Main.lean', 'Main.lean']) == 'Q_Sub_Main'
     assert module_root_name('OAI.A.B', ['OAI.A.B'], ['B.lean']) == 'B'
+
+
+# ---------------------------------------------------------------- calibration of the cost model
+
+from p2mlib import carvepipeline as CP
+
+
+def _plan(costs, pieces=None):
+    return {'bundles': [{'name': n, 'cost': c} for n, c in costs.items()],
+            'pieces': {n: {'cost': c} for n, c in (pieces or {}).items()}}
+
+
+def _t(secs, ok=True):
+    return {'secs': secs, 'ok': ok}
+
+
+def test_calibration_leaves_a_model_that_fits_alone():
+    r = CP.calibration(_plan({'B0': 55, 'B1': 55}, {'P': 50}),
+                       {'bundle:B0': _t(15), 'bundle:B1': _t(80), 'piece:P': _t(60)}, 1.2, 55)
+    assert r['over'] == [] and r['new_scale'] == 1.2 and r['measured'] == 3
+    assert r['slowest'] == ('bundle:B1', 80)
+
+
+def test_calibration_scales_by_the_worst_item_over_the_limit():
+    # Kirchberg's first plan: bundles of planned cost 55 measured 85-128 s (limit 1.6 x 55 = 88 s)
+    r = CP.calibration(_plan({'B0': 55, 'B1': 55, 'B2': 30}, {'P': 50}),
+                       {'bundle:B0': _t(85), 'bundle:B1': _t(128), 'bundle:B2': _t(20), 'piece:P': _t(90)},
+                       1.2, 55)
+    assert [x[0] for x in r['over']] == ['bundle:B1', 'piece:P']
+    assert r['new_scale'] == round(1.2 * 128 / 55, 1) == 2.8
+    # the old key form of times.json (the bare bundle name) counts
+    assert CP.calibration(_plan({'B0': 55}), {'B0': _t(128)}, 1.2, 55)['over']
+
+
+def test_calibration_ignores_published_failed_and_unmeasured_items_and_caps_the_scale():
+    plan = _plan({'B0': 55, 'B1': 55, 'B2': 55, 'B3': 1})
+    r = CP.calibration(plan, {'bundle:B0': _t(200), 'bundle:B1': _t(200, ok=False), 'bundle:B3': _t(500)},
+                       2.0, 55, frozen=['B0'])
+    assert [x[0] for x in r['over']] == ['bundle:B3']             # B0 is live, B1 failed, B2 unmeasured
+    assert r['new_scale'] == CP.MAX_SCALE                          # 500 s against a planned 1 s
+    assert CP.calibration(_plan({'B': 55}), {'bundle:B': _t(89)}, 2.0, 55)['new_scale'] == 3.2
+    # always a real step up, never the same scale again
+    assert CP.calibration(_plan({'B': 100}), {'bundle:B': _t(89)}, 2.0, 55)['new_scale'] == 2.2
+
+
+CALIBRATING_MEASURE = textwrap.dedent('''
+    import json, os, sys
+    d = os.path.join(os.getcwd(), 'carve_work')
+    n = len(open(os.environ['STUB_LOG']).read().split('"tool": "carve_measure"')) - 1
+    after = os.environ.get('STUB_TIMES_AFTER')
+    with open(os.environ['STUB_LOG'], 'a') as f:
+        f.write(json.dumps({'tool': 'carve_measure', 'version': 'cal', 'file': os.path.abspath(__file__),
+                            'argv': sys.argv[1:], 'cwd': os.getcwd(), 'skill': os.environ.get('P2M_SKILL_ROOT')}) + '\\n')
+    if after and n >= 1:
+        open(os.path.join(d, 'times.json'), 'w').write(after)
+''')
+
+
+def _calibration_setup(env, monkeypatch, after):
+    work = env.dir / 'carve_work'
+    work.mkdir(parents=True, exist_ok=True)
+    (work / 'plan.json').write_text(json.dumps(_plan({'B0': 55, 'B1': 55})))
+    (work / 'times.json').write_text(json.dumps({'bundle:B0': _t(20), 'bundle:B1': _t(128)}))
+    (env.repo / 'prove2me' / 'scripts' / 'carve_measure.py').write_text(CALIBRATING_MEASURE)
+    git(env.repo, 'add', '-A')
+    git(env.repo, 'commit', '-qm', 'calibrating measure stub')
+    if after is not None:
+        monkeypatch.setenv('STUB_TIMES_AFTER', json.dumps(after))
+
+
+def test_a_measure_over_the_limit_raises_the_scale_and_replans_before_anything_is_published(env, monkeypatch):
+    _calibration_setup(env, monkeypatch, {'bundle:B0': _t(30), 'bundle:B1': _t(50)})
+    r = run(env, *ARGS, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}))
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    first = [i for i, t in enumerate(seq) if t == ('carve', 'plan')]
+    assert len(first) == 2 and [t[0] for t in seq].count('carve_measure') == 2
+    assert seq[first[1]:first[1] + 5] == [('carve', 'plan'), ('carve', 'gen'), ('carve', 'order'),
+                                          ('carve_measure', 'config.json'), ('carve_prep', 'publish-prep')]
+    cfg = json.load(open(env.dir / 'config.json'))
+    assert cfg['time_scale'] == round(1.2 * 128 / 55, 1)
+    assert json.load(open(env.dir / 'pipeline_state.json'))['replans'] == 1
+    assert 'time_scale 1.2 -> 2.8' in (env.dir / 'logs' / 'calibrate.log').read_text()
+    # a resume does not plan again
+    n = len(calls(env))
+    assert run(env).returncode == 0 and len(calls(env)) == n
+
+
+def test_a_carve_that_still_does_not_fit_after_two_replans_stops_with_the_offenders(env, monkeypatch):
+    _calibration_setup(env, monkeypatch, None)
+    r = run(env, *ARGS, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}))
+    assert r.returncode == 1
+    assert 'bundle:B1' in r.stderr and 'carve.py split' in r.stderr
+    assert json.load(open(env.dir / 'pipeline_state.json'))['replans'] == CP.MAX_REPLANS
+    assert [t[0] for t in tools_called(env)].count('carve_measure') == CP.MAX_REPLANS + 1
+
+
+def test_a_measure_that_fits_calibrates_nothing(env, monkeypatch):
+    _calibration_setup(env, monkeypatch, None)
+    (env.dir / 'carve_work' / 'times.json').write_text(json.dumps({'bundle:B0': _t(20), 'bundle:B1': _t(70)}))
+    r = run(env, *ARGS, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert [t[0] for t in tools_called(env)].count('carve_measure') == 1
+    assert 'kept' in (env.dir / 'logs' / 'calibrate.log').read_text()

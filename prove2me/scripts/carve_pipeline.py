@@ -22,11 +22,16 @@ DIR is the carve directory. The first run needs the parameters, which are stored
   --tags T              publish-prep tags (default openai-math)
 
 Steps (STEPS in p2mlib.carvepipeline): fetch, filter_patches, port, build, wsbuild, config, graph,
-extdefs, plan, gen, order, measure, publish_prep, prose, check_text, dryrun (split_run.py without
+extdefs, plan, gen, order, measure, calibrate, publish_prep, prose, check_text, dryrun (split_run.py without
 --go: lookups only), and with --publish the real `split_run.py --go`. Each step is idempotent and
 resumable: its result is recorded in DIR/pipeline_state.json, its output in DIR/logs/STEP.log, and the
 first failure stops the run with the log's tail (re-run the same command to resume). --redo STEP
 re-runs one step; --from STEP forgets it and everything after; --stop-after STEP stops there.
+
+`calibrate` reads what `measure` found: an item (not frozen) measured over 1.6 x the budget raises
+config `time_scale` to scale x (its measured seconds / its planned cost), forgets plan..measure and
+runs them again (cached files are not re-measured), at most twice; then it stops and lists the
+offenders. Nothing is published before it. See p2mlib.carvepipeline.calibration.
 
 The driver re-executes itself from a read-only snapshot of the skill (p2mlib.snapshot) and calls
 every sub-tool from that snapshot, so editing or pushing the live skill never affects a running

@@ -1737,6 +1737,15 @@ and new `carve.py` inside one carve. So:
   (`~/.cache/p2m/skill/<sha>/`; `--allow-dirty` snapshots an uncommitted tree) and calls every tool from
   there, recording the sha; a resume stays on its snapshot (`--upgrade` moves to HEAD). Editing or pushing
   the live skill cannot reach a running carve.
+- **The cost model is calibrated by the measurement, automatically** (batch 3, 2026-10-25). The first plans
+  of QuarticPowerFree and KirchbergRordam measured 85–128 s per bundle against a 55 s budget (a 128 s bundle
+  timed out three times) and needed `time_scale` 2.2 and 4.5. The `calibrate` step after `measure` takes any
+  unfrozen item measured over 1.6 × budget, sets `time_scale` to scale × (its measured seconds / planned
+  cost), re-plans, re-generates and re-measures (unchanged files are cached), at most twice, and stops with
+  the offenders listed (then `carve.py split` or a manual `time_scale`). Never publish before it passes. It
+  only raises the scale: a small sample cannot calibrate it down, since the per-item error is 0.3–1.4× even
+  at a fitted scale. Outside the pipeline the manual rule is the same: measure everything, and if any item
+  is over ~90 s, multiply `time_scale` by the worst measured/planned ratio and plan again.
 - To change a tool: change the skill (tests first), commit, push; new runs pick it up, running ones do not.
   A tool fix a running carve needs: `--upgrade --redo STEP`. Any remaining shell script in the skill has
   its body in `main() { …; }; main "$@"; exit` (`tests/test_shell_scripts.py`).
