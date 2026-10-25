@@ -46,6 +46,7 @@ theorem _root_.MvPolynomial.monomial_mul_monomial {σ R : Type*} [CommSemiring R
     {a b : R} : MvPolynomial.monomial s a * MvPolynomial.monomial s' b =
       MvPolynomial.monomial (s + s') (a * b) := MvPolynomial.monomial_mul
 /-- Mathlib d13f23b's `YoungDiagram.card_transpose`. -/
+@[simp]
 theorem _root_.YoungDiagram.card_transpose (μ : YoungDiagram) : μ.transpose.card = μ.card := by
   unfold YoungDiagram.card
   apply Finset.card_bij (fun c _ => c.swap)

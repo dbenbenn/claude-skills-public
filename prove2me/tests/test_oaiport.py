@@ -603,4 +603,5 @@ def test_compat_has_youngdiagram_card_transpose():
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                             'compat_4_34.lean')).read()
     assert 'theorem _root_.YoungDiagram.card_transpose' in src
+    assert '@[simp]\ntheorem _root_.YoungDiagram.card_transpose' in src  # d13f23b's is a simp lemma
     assert 'Mathlib.Combinatorics.Young.YoungDiagram' in O.COMPAT_NARROW_IMPORTS
