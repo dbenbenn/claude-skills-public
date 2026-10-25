@@ -506,11 +506,13 @@ def test_measure_map_smul_drops_measurability_argument():
     src = ("rw [Measure.map_smul _ (by fun_prop),map_add_right_eq_self]\n"
            "rw [Measure.map_smul _ em.measurable.aemeasurable,hrestr]\n"
            "rw [Measure.map_smul _ hf.aemeasurable]\n"
+           "simp only [unitSphereLaw,Measure.map_smul _ (sphereIsometryMap_measurable e).aemeasurable]\n"
            "exact Measure.map_smul c μ f\n")
     out = O.core_rewrites(src)
     assert "rw [Measure.map_smul,map_add_right_eq_self]" in out
     assert "rw [Measure.map_smul,hrestr]" in out
     assert "rw [Measure.map_smul]\n" in out
+    assert "simp only [unitSphereLaw,Measure.map_smul]" in out
     assert "exact Measure.map_smul c μ f" in out
 
 
