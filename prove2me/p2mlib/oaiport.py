@@ -450,13 +450,13 @@ def inline_module_macros(sources):
 
 def demodule(text):
     """A file of Lean's module system as a plain file: its `module` line dropped and each
-    `public import` / `meta import` / `public meta import` made a plain `import` (Ryser
+    `public import` / `meta import` / `public meta import` / `import all` made a plain `import` (Ryser
     FiniteSetEstimates 2026-10-25: the Compat import went in front of `module`, and every import
     after it then failed to parse)."""
     hdr = header_end(text) if 'header_end' in globals() else len(text)
     head, body = text[:hdr], text[hdr:]
     head = re.sub(r'^module[ \t]*\n', '', head, flags=re.M)
-    head = re.sub(r'^(?:public[ \t]+)?(?:meta[ \t]+)?import[ \t]+', 'import ', head, flags=re.M)
+    head = re.sub(r'^(?:public[ \t]+)?(?:meta[ \t]+)?import[ \t]+(?:all[ \t]+)?', 'import ', head, flags=re.M)
     return head + body
 
 
