@@ -1573,3 +1573,68 @@ def test_the_text_reading_remains_the_logged_fallback(g, g_text):
     # every local instance in scope comes back, used or not (the rule before the records)
     out = C.Carver(g_text).carve({'CD.no_inst_use'}, g_text.have_names({'CD.no_inst_use', 'CD.Wide'}))
     assert re.search(r'^local instance cdLocalInst_r', out, re.M), out
+
+
+# ---------------------------------------------------------------- coercions and foreign attributes
+
+def _coer_plan(g, targets, bundle_budget=100):
+    return C.make_plan(g, targets, budget=100, bundle_budget=bundle_budget,
+                       cost=C.size_costs(g), bundle_prefix='CO', chunker='schedule')
+
+
+def test_a_coercion_instance_that_elaborates_away_is_a_dependency(g):
+    # Kirchberg–Rørdam (batch 3): `↑p` elaborates to `p.carrier` and `f n` to `f.toFun n`, so the
+    # CoeSort/CoeFun instances were in no constant and no record, and the bundles lost them
+    # ("Function expected"); the agent pinned them by hand
+    assert 'CD.Co.instCoeSortPackType' in g.nodes['CD.Co.Pack.first'].deps
+    assert 'CD.Co.coeFnFn' in g.nodes['CD.Co.fn_double_apply'].deps
+    # in the statement's binders and type too
+    assert 'CD.Co.instCoeSortPackType' in g.nodes['CD.Co.Pack.first'].sig
+    # a declaration that does not use the coerced function does not need the instance
+    assert 'CD.Co.coeFnFn' not in g.nodes['CD.Co.rdef'].deps
+    assert 'CD.Co.instCoeSortPackType' not in g.nodes['CD.Co.Fn.double'].deps
+
+
+def test_the_bundle_of_a_coerced_declaration_carries_the_coercion_instance(g):
+    p = _coer_plan(g, ['CD.Co.fn_double_apply'])
+    holders = {n for b in p['bundles'] for n in b['nodes']}
+    assert {'CD.Co.coeFnFn', 'CD.Co.Fn.double'} <= holders
+
+
+@pytest.mark.lean
+def test_coercion_instances_compile(g, tmp_path):
+    _compile_in_publish_order(g, _coer_plan(g, ['CD.Co.fn_double_apply', 'CD.Co.pack_first_eq']), tmp_path)
+
+
+def test_a_global_attribute_the_file_may_not_set_is_not_repeated_where_a_bundle_carries_it(g):
+    # `attribute [instance_reducible] rdef` on a declaration a bundle defines: Lean refuses it in
+    # another file ("failed to set reducibility status, `rdef` has not been defined in this file,
+    # consider using the `local` modifier"). The carver knew only reducible/irreducible/semireducible.
+    keep, have = {'CD.Co.rdef_pos'}, g.have_names({'CD.Co.rdef_pos', 'CD.Co.rdef'})
+    out = C.Carver(g).carve(keep, have)
+    assert 'theorem rdef_pos' in out
+    # Lean lets only rdef's own file set it, so the command is in rdef's module and the bundle
+    # holding rdef carries it (a persistent attribute)
+    assert not re.search(r'^attribute', out, re.M), out
+    # where the declaration is, the global attribute stays
+    out = C.Carver(g).carve({'CD.Co.rdef', 'CD.Co.rdef_pos'}, g.have_names({'CD.Co.rdef', 'CD.Co.rdef_pos'}))
+    assert re.search(r'^attribute \[instance_reducible\] rdef$', out, re.M), out
+    assert 'local instance_reducible' not in out
+
+
+@pytest.mark.lean
+def test_foreign_attributes_compile(g, tmp_path):
+    p = C.make_plan(g, ['CD.Co.rdef_pos'], budget=100, bundle_budget=100, cost=C.size_costs(g),
+                    bundle_prefix='AT', chunker='schedule', pinned=[['CD.Co.rdef']])
+    _compile_in_publish_order(g, p, tmp_path)
+
+
+def test_every_attribute_lean_restricts_to_the_declaring_file_is_known():
+    # measured with Lean 4.33.1 (an attribute command in a file importing `foo`)
+    for a in ('reducible', 'irreducible', 'semireducible', 'instance_reducible', 'inline', 'noinline',
+              'macro_inline', 'always_inline', 'specialize', 'nospecialize', 'never_extract',
+              'match_pattern', 'elab_as_elim', 'export', 'unbox', 'implemented_by', 'extern'):
+        assert C.restricted_attribute('attribute [%s] foo' % a), a
+    for a in ('simp', 'instance', 'ext', 'coe', 'default_instance'):
+        assert not C.restricted_attribute('attribute [%s] foo' % a), a
+    assert not C.restricted_attribute('attribute [local instance_reducible] foo')

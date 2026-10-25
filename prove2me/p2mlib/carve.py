@@ -44,7 +44,42 @@ NOTATION = {'notation', 'mixfix', 'notation3'}
 # the platform refuses these in any submitted file (prove2me SKILL: "notation ok, macros refused")
 REFUSED = {'macro', 'syntax', 'macro_rules', 'elab', 'elab_rules', 'syntaxAbbrev', 'syntaxCat',
            'declare_syntax_cat'}
-REDUCIBILITY = re.compile(r'\[\s*(?:local\s+|scoped\s+)?(?:reducible|irreducible|semireducible)\b')
+COERCION_CLASSES = {'Coe', 'CoeTC', 'CoeOut', 'CoeOTC', 'CoeHead', 'CoeHTC', 'CoeTail', 'CoeHTCT', 'CoeDep',
+                    'CoeT', 'CoeFun', 'CoeSort'}
+# attributes Lean lets only the file declaring the target set ("failed to set reducibility status
+# … has not been defined in this file"; "Cannot add attribute `[inline]` … because it is in an
+# imported module"), measured on Lean 4.33.1; simp, instance, ext, coe, default_instance are free
+RESTRICTED_ATTRIBUTES = {'reducible', 'irreducible', 'semireducible', 'instance_reducible', 'inline',
+                         'noinline', 'macro_inline', 'always_inline', 'specialize', 'nospecialize',
+                         'never_extract', 'match_pattern', 'elab_as_elim', 'export', 'unbox',
+                         'implemented_by', 'extern', 'computed_field'}
+
+
+def attribute_entries(txt):
+    """The comma-separated entries of an `attribute [...] targets` command's list, or None."""
+    m = re.search(r'\battribute\s*\[', txt)
+    if not m:
+        return None
+    depth, start, out = 1, m.end(), []
+    for j in range(m.end(), len(txt)):
+        ch = txt[j]
+        if ch in '([{':
+            depth += 1
+        elif ch in ')]}':
+            depth -= 1
+            if depth == 0:
+                out.append(txt[start:j].strip())
+                return [e for e in out if e]
+        elif ch == ',' and depth == 1:
+            out.append(txt[start:j].strip())
+            start = j + 1
+    return None
+
+
+def restricted_attribute(txt):
+    """Does an `attribute [...]` command set, globally, an attribute only the declaring file may?"""
+    return any(e.split()[0] in RESTRICTED_ATTRIBUTES for e in attribute_entries(txt) or ()
+               if e.split())
 DIAGNOSTIC = {'check', 'eval', 'print', 'printAxioms', 'reduce', 'check_failure', 'synth',
               'evalBang', 'exit'}
 OPENERS = {'namespace', 'section', 'noncomputableSection'}
@@ -385,6 +420,7 @@ class Graph:
         self._build_modules()
         self._build_nodes()
         self._build_names()
+        self._add_coercion_instances()
         self._build_deps()
 
     @classmethod
@@ -812,6 +848,45 @@ class Graph:
         for k, nd in self.nodes.items():
             nd.deps = nd.term | nd.sdeps | nd.ndeps | nd.ideps
         self._build_scoped_deps()
+
+    def _add_coercion_instances(self):
+        """Record the uses of coercion instances that elaborate away. `↑p` with `CoeSort Pack Type`
+        becomes `p.carrier`, `f n` with a `CoeFun` instance `f.toFun n`: Lean unfolds the instance,
+        so no constant and no `insts` entry names it (Kirchberg–Rørdam, batch 3: "Function
+        expected" in the bundles). The coercion function stays, so a declaration whose constants
+        name one that an instance of a coercion class wraps (its value's project constants other
+        than its own type's) is taken to use that instance. An over-estimate when the function is
+        also written out: the instance then comes along, which costs nothing."""
+        wraps = {}
+        for k, nd in self.nodes.items():
+            cls = self.instance_class(k) if nd.instance else None
+            if not cls or cls[0] not in COERCION_CLASSES:
+                continue
+            ts, vs = set(), set()
+            for n in nd.names:
+                x = self.consts.get(n) or {}
+                ts.update(x.get('t', ()))
+                vs.update(x.get('v', ()))
+            w = vs - ts - set(nd.names)
+            if w:
+                wraps[k] = w
+        if not wraps:
+            return
+        for k, nd in self.nodes.items():
+            c = self.infos[nd.module].commands[nd.cmd]
+            if c.insts is None or k in wraps:
+                continue
+            tc, vc = set(), set()
+            for n in nd.names:
+                x = self.consts.get(n) or {}
+                tc.update(x.get('t', ()))
+                vc.update(x.get('v', ()))
+            for ik, w in wraps.items():
+                if w & (tc | vc):
+                    c.insts = list(c.insts) + [n for n in self.nodes[ik].names if n not in c.insts]
+                    if w & tc:
+                        c.sig_insts = list(c.sig_insts or ()) + \
+                            [n for n in self.nodes[ik].names if n not in (c.sig_insts or ())]
 
     def is_local_instance(self, k):
         """Is node k a `local instance` (visible only in the rest of its own section)?"""
@@ -2359,15 +2434,31 @@ class Carver:
                 continue
             if k == 'attribute':
                 txt = leanedit.text(info, c.index)
-                # a global reducibility change may only touch this file's declarations ("failed to
-                # set reducibility status, `auxOnly` has not been defined in this file"): it stays
-                # with the bundle that declares its target
-                here = keep_names if (REDUCIBILITY.search(txt) and not _is_local(txt)) else None
                 refs = [i for i in c.idents or [] if i['role'] == 'ref']
-                gone = [i for i in refs if self._gone(i['name'], c, m, have, opens, idn=i) or
-                        (here is not None and self._gone(i['name'], c, m, here, opens, idn=i))]
+                gone = [i for i in refs if self._gone(i['name'], c, m, have, opens, idn=i)]
+                ents = attribute_entries(txt) if restricted_attribute(txt) else None
                 if gone and len(gone) == len(refs):
                     drop.add(c.index)
+                elif ents is not None:
+                    # attributes Lean lets only the declaring file set: the command is in its
+                    # target's module (the port compiled), so the bundle that declares the target
+                    # carries it, persistently; this file keeps it only for its own declarations
+                    # (Kirchberg–Rørdam: a piece re-emitted `attribute [instance_reducible]
+                    # PauliData.finite`, a bundle's declaration). The other attributes of the
+                    # command stay on every target the file has.
+                    mine = [i for i in refs if i not in gone and not self._gone(i['name'], c, m, keep_names, opens, idn=i)]
+                    names = lambda L: ' '.join(t[i['start']:i['end']].decode('utf-8') for i in L)
+                    rest = [e for e in ents if not restricted_attribute('attribute [%s] x' % e)]
+                    res = [e for e in ents if e not in rest]
+                    out = []
+                    if rest and refs and len(gone) < len(refs):
+                        out.append('attribute [%s] %s' % (', '.join(rest), names([i for i in refs if i not in gone])))
+                    if mine:
+                        out.append('attribute [%s] %s' % (', '.join(res), names(mine)))
+                    if out:
+                        reps[c.index] = '\n'.join(out)
+                    else:
+                        drop.add(c.index)
                 elif gone:
                     reps[c.index] = _cmd_text(info, c, [(i['start'], _skip_ws(t, i['end']), '') for i in gone])
                 continue

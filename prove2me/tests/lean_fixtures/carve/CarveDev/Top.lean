@@ -4,6 +4,7 @@ import CarveDev.Fields
 import CarveDev.InstA
 import CarveDev.InstB
 import CarveDev.InstLate
+import CarveDev.Coer
 
 universe u
 
