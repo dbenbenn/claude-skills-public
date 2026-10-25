@@ -1352,6 +1352,22 @@ back WA. The lessons:
   from the published plans and from fresh plans (PosteriorReplicas' fresh plan no longer has the
   false edge and the two orphaned statements that were removed by hand). The patches were all
   for bugs this removed. A post-carve patch is again only for a proof fix.
+- **Heavy computations do not belong in bundles; publish them as statements.** Eilenberg–Ganea
+  (2026-10-25): OpenAI's chain-contraction certificate is about 850 `decide +kernel` lemmas (the
+  module: 900 s, 23 GiB), and a *definition* (`contraction`) rests on their aggregates, so the
+  carver put them all in 17 bundles of about 58 s. Each published alone, but every bundle
+  importing several of them failed with `dependency_oom` ("Failed to compile modules …: Lean
+  exited with code 137"): a cold worker builds the imported bundles in parallel and runs out of
+  memory. Unchanged retries failed the same way. The fix: `forced` the facts the definition needs
+  (statements whose names are ASCII; `pinned` the definitions their statements mention, or the
+  plan has a cycle), so bundles import cheap `sorry` stubs and the computation moves into
+  pieces. When such a fact is proved directly from hundreds of per-index lemmas, the planner
+  promotes each lemma to its own statement (561 here). Add block lemmas first, by a port patch
+  that proves the aggregate from blocks (`interval_cases` over a range, then the per-index
+  lemmas; `omega` picks the block); then it promotes blocks. Size blocks by the measured cost per
+  lemma: 30 lemmas at 2.8 s made an 84 s block. Generator: `p2m-standalone/openai-ports/
+  eilenberg-ganea-carve/gen_block_patches.py`; fold it into `carve_prep.py` the next time a carve
+  needs it.
 - **`carve_measure.py` checks every import edge, and fails the carve on a false one.** The
   carver infers dependencies partly from source text, so it can emit an `import Theorems.*` a
   piece never uses; the file compiles, and the false edge goes into the published graph
