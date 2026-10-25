@@ -2905,6 +2905,20 @@ class Carver:
         edits += self._pin_edits(info, c, m, have, opens, body_end, {e[0] for e in edits})
         return edits
 
+    def _seen_at(self, n, m, c):
+        """Could command c of module m name constant n? A constant of the same module counts only
+        when declared before c: KernelEllipsoid's `BlockCount` comes after the commands that meant
+        MemoryPrecision.BlockCount, and treating the module as seen whole left them unpinned, so a
+        file that also has the later one read it (MemoryPrecision, 2026-10-25)."""
+        g = self.g
+        if not g.visible(n, m):
+            return False
+        x = g.consts[n]
+        r = x.get('r')
+        if x['m'] == m and r and not n.startswith('_private.') and (r[0], r[1]) >= (c.start.line, c.start.col):
+            return False
+        return True
+
     def _pin_edits(self, info, c, m, have, opens, body_end, taken):
         """A reference that meant one declaration in its module but would read ambiguously or
         differently in the carved file, where modules the original never imported sit side by
@@ -2940,14 +2954,14 @@ class Carver:
                 # the same candidates the original module saw: Lean chose among them there and
                 # will choose the same way here (PermanentBorder: `Plane` read both
                 # FrobeniusPlane.Plane and another, in the port too)
-                src, k = g.lean_hits(htxt, c.namespace, opens, lambda n: g.visible(n, m))
+                src, k = g.lean_hits(htxt, c.namespace, opens, lambda n: self._seen_at(n, m, c))
                 if k == 0 and {pubname(n) for n in src} == {pubname(n) for n in now}:
                     continue
                 out.append((a, b, '_root_.' + pubname(orig)))
                 continue
             if tok.split('.')[0] in binders:
                 continue
-            src, k = g.lean_hits(tok, c.namespace, opens, lambda n: g.visible(n, m))
+            src, k = g.lean_hits(tok, c.namespace, opens, lambda n: self._seen_at(n, m, c))
             if len(src) != 1 or k:
                 continue
             now, k2 = g.lean_hits(tok, c.namespace, opens, lambda n: pubname(n) in have)
