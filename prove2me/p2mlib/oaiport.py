@@ -345,6 +345,10 @@ def core_rewrites(text, compat_ns='OAI'):
                   lambda m: 'isClosed_of_discrete' + (' (H :=' if m.group(1) else ''), text)
     # d13f23b's `Set.equivOfEq h` is our `Equiv.setCongr h` (QuarticPowerFree 2026-10-25)
     text = re.sub(r"(?<![\w.'])Set\.equivOfEq(?![\w'])", 'Equiv.setCongr', text)
+    # d13f23b's `(Continuous)LinearMap.nonneg_iff_isPositive` has the operator implicit; ours takes it
+    # explicitly (Kirchberg-Rordam 2026-10-25)
+    text = re.sub(r"(?<![\w.'])((?:ContinuousLinearMap|LinearMap)\.nonneg_iff_isPositive)\.(mpr|mp|1|2)(?![\w'])",
+                  r"(\1 _).\2", text)
     # d13f23b renamed the ordered-monoid `Finset.prod_le_prod'` (one hypothesis) to
     # `Finset.prod_le_prod`, and our nonnegative `prod_le_prod` to `prod_le_prod₀` (the compat
     # aliases map that one back, after this). So an unsuffixed use is our primed lemma

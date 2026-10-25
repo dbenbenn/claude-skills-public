@@ -549,3 +549,16 @@ def test_set_equiv_of_eq_becomes_setcongr():
     out = O.core_rewrites("(Equiv.ofInjective j hjj).trans (Set.equivOfEq hJr)\nexact Set.equivOfEq_foo\n")
     assert "(Equiv.setCongr hJr)" in out
     assert "Set.equivOfEq_foo" in out
+
+
+# d13f23b's `ContinuousLinearMap.nonneg_iff_isPositive` has the operator implicit (`.mp hT` works); ours takes it
+# explicitly (Kirchberg–Rørdam Representations, 2026-10-25).
+
+def test_nonneg_iff_ispositive_gets_explicit_argument():
+    src = ("have ht := ContinuousLinearMap.nonneg_iff_isPositive.mp hT\n"
+           "exact LinearMap.nonneg_iff_isPositive.mpr h\n"
+           "rw [ContinuousLinearMap.nonneg_iff_isPositive T]\n")
+    out = O.core_rewrites(src)
+    assert "(ContinuousLinearMap.nonneg_iff_isPositive _).mp hT" in out
+    assert "(LinearMap.nonneg_iff_isPositive _).mpr h" in out
+    assert "nonneg_iff_isPositive T]" in out
