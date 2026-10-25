@@ -618,3 +618,70 @@ def test_compat_has_probability_map_instances_for_projections():
                             'compat_4_34.lean')).read()
     for name in ('isProbabilityMeasure_map_fst', 'isProbabilityMeasure_map_snd', 'isProbabilityMeasure_map_subtype_val'):
         assert 'instance ' + name in src
+
+
+# ---------------------------------------------------------------- the batch-3 rewrites, pinned (2026-10-25)
+# The rewrites of Kirchberg–Rørdam, SingleLatticeCovering, SquareDifference, QuarticPowerFree and
+# SphericalPerceptron went in one at a time; their tests were the one example each. These pin what a rewrite
+# must not do: change a neighbour, be applied twice, or miss a spelling of the same call.
+
+BATCH3_SOURCE = (
+    "exact Finset.prod_le_prod_of_subset_of_one_le (subset_univ T) h\n"
+    "exact Finset.single_le_prod h i\n"
+    "exact Finset.prod_le_prod h1 h2\n"
+    "rw [Measure.map_smul _ (sphereIsometryMap_measurable e).aemeasurable]\n"
+    "rw [MeasureTheory.Measure.map_smul _ (h (f x)).aemeasurable]\n"
+    "exact (AddSubgroup.isClosed_of_discreteTopology (U := L))\n"
+    "exact (Equiv.ofInjective j hjj).trans (Set.equivOfEq hJr)\n"
+    "have ht := ContinuousLinearMap.nonneg_iff_isPositive.mp hT\n"
+    "exact CStarAlgebra.norm_mem_spectrum_of_nonneg b hb\n"
+    "exact Finsupp.mapDomain_apply_of_injective hf x\n")
+
+
+def test_core_rewrites_applied_twice_change_nothing_more():
+    # (not `prod_le_prod_of_subset_of_le_one₀`: d13f23b's name for our unsuffixed lemma, which a second
+    # pass would prime as it does d13f23b's unsuffixed one)
+    once = O.core_rewrites(BATCH3_SOURCE)
+    assert once != BATCH3_SOURCE
+    assert O.core_rewrites(once) == once
+
+
+def test_the_measurability_argument_may_be_a_parenthesised_application():
+    # `(h (f x)).aemeasurable`: one level of nested parentheses (SphericalPerceptron, 2026-10-25)
+    out = O.core_rewrites("rw [MeasureTheory.Measure.map_smul _ (h (f x)).aemeasurable]\n"
+                          "rw [Measure.map_smul _ (g x).aemeasurable, a]\n")
+    assert "rw [MeasureTheory.Measure.map_smul]\n" in out
+    assert "rw [Measure.map_smul, a]\n" in out
+
+
+def test_batch3_rewrites_leave_their_neighbours_alone():
+    src = ("exact Measure.map_smul c μ f\n"
+           "exact Measure.map_smul_apply c\n"
+           "exact Subgroup.isClosed_of_discrete h\n"
+           "exact Set.equivOfEq_foo\n"
+           "exact Finset.single_le_prod' h i\n"
+           "exact prod_le_prod_of_subset_of_le_one' h a b\n"
+           "exact CStarAlgebra.norm_mem_spectrum_of_nonneg hb\n"
+           "exact Finsupp.mapDomain_apply hf x\n")
+    assert O.core_rewrites(src) == src
+
+
+def test_the_element_argument_of_norm_mem_spectrum_ends_with_its_line():
+    # a call with only the positivity proof, followed by the next line, took the proof for the element
+    # and the next line's first word for the proof ("norm_mem_spectrum_of_nonneg exact Finsupp…")
+    out = O.core_rewrites("exact CStarAlgebra.norm_mem_spectrum_of_nonneg hb\nexact foo x\n"
+                          "exact CStarAlgebra.norm_mem_spectrum_of_nonneg b hb\n")
+    assert out == "exact CStarAlgebra.norm_mem_spectrum_of_nonneg hb\nexact foo x\n" \
+                  "exact CStarAlgebra.norm_mem_spectrum_of_nonneg hb\n"
+
+
+@pytest.mark.lean
+def test_the_batch3_rewrites_and_compat_lemmas_elaborate_against_the_workspace_mathlib(tmp_path):
+    # the rewritten forms exist in our Mathlib with the shapes the rewrites assume, and each compat lemma
+    # is usable as d13f23b's (simp lemma, instance found by search, argument order)
+    from p2mlib import carve as C
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    f = tmp_path / 'Rewrites.lean'
+    f.write_text('import Mathlib\n\n' + block + '\n' + O.core_rewrites(fix('rewrite_targets.lean')),
+                 encoding='utf-8')
+    C.compile_file(str(f), None, str(tmp_path / 'olean'))
