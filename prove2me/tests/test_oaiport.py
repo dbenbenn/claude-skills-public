@@ -399,3 +399,38 @@ def test_mathlib_has_flags_only_missing_mathlib_modules(tmp_path):
 def test_demodule_import_all():
     assert O.demodule('module\nimport all Mathlib.X\npublic import all Mathlib.Y\n\ndef a := 1\n') == \
         'import Mathlib.X\nimport Mathlib.Y\n\ndef a := 1\n'
+
+
+# OpenAI's Mathlib (d13f23b) has `Finsupp.mapDomain_apply_of_injective hf x a`; ours (0df444a) names
+# the same statement `Finsupp.mapDomain_apply` (Markov superreflexivity, 2026-10-25).
+
+def test_mapdomain_apply_of_injective_becomes_mapdomain_apply():
+    src = 'exact Finsupp.mapDomain_apply_of_injective (fun _ _ h => h) x i\nsimp [mapDomain_apply_of_injective hf]'
+    out = O.core_rewrites(src)
+    assert 'Finsupp.mapDomain_apply (fun _ _ h => h) x i' in out
+    assert 'mapDomain_apply_of_injective' not in out
+    assert O.core_rewrites('Finsupp.mapDomain_apply hf x a') == 'Finsupp.mapDomain_apply hf x a'
+
+
+# d13f23b has `SimpleGraph.Walk.length_le_bypass_length_iff : p.length ≤ p.bypass.length ↔ p.bypass = p`;
+# ours has only the one-way `bypass_eq_self_of_length_le_length_bypass` and `length_bypass_le_length`
+# (PlanarFPP minimizing_walk_isPath, 2026-10-25). A `_root_` lemma in the compat block keeps `p.…` dot notation.
+
+def test_compat_has_walk_length_le_bypass_length_iff():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem _root_.SimpleGraph.Walk.length_le_bypass_length_iff' in src
+
+
+
+# Our `Measure.map f μ` is 0 for a non-AEMeasurable `f` (d13f23b: a Dirac mass), so d13f23b's
+# unconditional instance `IsProbabilityMeasure (μ.map f)` is false here and cannot be shimmed. For a
+# measurable equivalence it holds, and the compat block has it (Problem336, 2026-10-25).
+
+def test_compat_has_probability_measure_map_equiv_instance():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'instance isProbabilityMeasure_map_measurableEquiv' in src
+    assert 'isProbabilityMeasure_map_any' not in src

@@ -32,6 +32,18 @@ theorem freeGroupInductionOn {α : Type*} {C : FreeGroup α → Prop} (z : FreeG
     (of : ∀ x, C (FreeGroup.of x)) (inv_of : ∀ x, C (FreeGroup.of x) → C (FreeGroup.of x)⁻¹)
     (mul : ∀ x y, C x → C y → C (x * y)) : C z :=
   FreeGroup.induction_on z one of inv_of mul
+/-- Mathlib's newer `SimpleGraph.Walk.length_le_bypass_length_iff` (ours has the two directions
+separately). `_root_`, so `p.length_le_bypass_length_iff` resolves by dot notation. -/
+theorem _root_.SimpleGraph.Walk.length_le_bypass_length_iff {V : Type*} {G : SimpleGraph V}
+    [DecidableEq V] {u v : V} (p : G.Walk u v) : p.length ≤ p.bypass.length ↔ p.bypass = p :=
+  ⟨p.bypass_eq_self_of_length_le_length_bypass, fun h => by rw [h]⟩
+/-- For a measurable equivalence `e`, `IsProbabilityMeasure (μ.map e)` is found by instance search
+(Mathlib d13f23b finds it for every map `f`: there `Measure.map` of a non-measurable map is a Dirac
+mass, here it is `0`, so only the measurable case can be shimmed). -/
+instance isProbabilityMeasure_map_measurableEquiv {α β : Type*} [MeasurableSpace α]
+    [MeasurableSpace β] {μ : MeasureTheory.Measure α} [MeasureTheory.IsProbabilityMeasure μ]
+    (e : α ≃ᵐ β) : MeasureTheory.IsProbabilityMeasure (μ.map e) :=
+  MeasureTheory.Measure.isProbabilityMeasure_map e.measurable.aemeasurable
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod
