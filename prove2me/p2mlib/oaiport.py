@@ -291,6 +291,29 @@ def guard_renames(text):
     return text
 
 
+def split_partial_namespaces(text):
+    """`namespace A.B` that a shorter `end B` closes becomes `namespace A` + `namespace B` (same meaning;
+    the carver's scope mirror counts a dotted namespace as one scope). Others are left alone."""
+    lines = text.split('\n')
+    stack = []                                     # (kind, name, line index)
+    split = []
+    for i, l in enumerate(lines):
+        m = re.match(r'namespace\s+(\S+)\s*$', l)
+        if m:
+            stack.append(('ns', m.group(1), i)); continue
+        if re.match(r'(?:noncomputable\s+)?section(?:\s+\S+)?\s*$', l):
+            stack.append(('sec', None, i)); continue
+        m = re.match(r'end(?:\s+(\S+))?\s*$', l)
+        if m and stack:
+            k, n, j = stack.pop()
+            if k == 'ns' and m.group(1) and m.group(1) != n and n.endswith('.' + m.group(1)):
+                split.append((j, n, m.group(1)))
+    for j, n, short in split:
+        head = n[:-len(short) - 1]
+        lines[j] = 'namespace %s\nnamespace %s' % (head, short)
+    return '\n'.join(lines)
+
+
 def core_rewrites(text, compat_ns='OAI'):
     """Lean core/Mathlib renames every port needs. OpenAI's `TensorProduct.inductionOn z tmul add`
     (Mathlib d13f23b) takes its zero case from `tmul 0 0`; ours has only `induction_on`, which
@@ -331,7 +354,7 @@ def core_rewrites(text, compat_ns='OAI'):
     # (same statements; SquareDifference ReflectionLaw 2026-10-25)
     text = re.sub(r"(?<![\w'])((?:Finset\.)?prod_le_prod_of_subset_of_(?:le_one|one_le))₀(?![\w'])",
                   r"\1", text)
-    return text
+    return split_partial_namespaces(text)
 
 
 # ---------------------------------------------------------------- the StdSimplex compatibility shim

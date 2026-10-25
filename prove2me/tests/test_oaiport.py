@@ -524,3 +524,20 @@ def test_isclosed_of_discretetopology_renamed():
     assert "AddSubgroup.isClosed_of_discrete (H := L.toAddSubgroup)" in out
     assert "toAddSubgroup.isClosed_of_discrete\n" in out
     assert 'Topology' not in out
+
+
+# `namespace A.B` closed by `end B` leaves `A` open. The carver's scope mirror counts a dotted namespace as
+# one scope, so the declarations after the `end B` lost `A` (Zarankiewicz OrderedExteriorPaths,
+# "Unknown identifier FiniteIntersectionDrawing" in a bundle, 2026-10-25). The port opens the components
+# as separate namespaces when (and only when) a shorter `end` closes the dotted one.
+
+def test_partially_closed_dotted_namespace_is_split():
+    src = ("namespace OAI\nnamespace Zarankiewicz.DrawingPassages\nvariable (x : Nat)\nend DrawingPassages\n"
+           "namespace PolygonalExterior\nend PolygonalExterior\nend Zarankiewicz\nend OAI\n")
+    out = O.core_rewrites(src)
+    assert "namespace Zarankiewicz\nnamespace DrawingPassages\n" in out
+    assert "namespace Zarankiewicz.DrawingPassages" not in out
+    whole = "namespace A.B\ndef x := 1\nend A.B\nnamespace C.D\nend D\nend C\n"
+    out = O.core_rewrites(whole)
+    assert out.startswith("namespace A.B\ndef x := 1\nend A.B\n")
+    assert "namespace C\nnamespace D\nend D\nend C" in out
