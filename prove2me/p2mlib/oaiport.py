@@ -343,6 +343,8 @@ def core_rewrites(text, compat_ns='OAI'):
     # (SingleLatticeCovering 2026-10-25)
     text = re.sub(r"(?<=\.)isClosed_of_discreteTopology(?![\w'])( \(U :=)?",
                   lambda m: 'isClosed_of_discrete' + (' (H :=' if m.group(1) else ''), text)
+    # d13f23b's `Set.equivOfEq h` is our `Equiv.setCongr h` (QuarticPowerFree 2026-10-25)
+    text = re.sub(r"(?<![\w.'])Set\.equivOfEq(?![\w'])", 'Equiv.setCongr', text)
     # d13f23b renamed the ordered-monoid `Finset.prod_le_prod'` (one hypothesis) to
     # `Finset.prod_le_prod`, and our nonnegative `prod_le_prod` to `prod_le_prod₀` (the compat
     # aliases map that one back, after this). So an unsuffixed use is our primed lemma

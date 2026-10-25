@@ -541,3 +541,11 @@ def test_partially_closed_dotted_namespace_is_split():
     out = O.core_rewrites(whole)
     assert out.startswith("namespace A.B\ndef x := 1\nend A.B\n")
     assert "namespace C\nnamespace D\nend D\nend C" in out
+
+
+# d13f23b has `Set.equivOfEq h : s ≃ t`; ours calls it `Equiv.setCongr h` (QuarticPowerFree Jacobians, 2026-10-25).
+
+def test_set_equiv_of_eq_becomes_setcongr():
+    out = O.core_rewrites("(Equiv.ofInjective j hjj).trans (Set.equivOfEq hJr)\nexact Set.equivOfEq_foo\n")
+    assert "(Equiv.setCongr hJr)" in out
+    assert "Set.equivOfEq_foo" in out
