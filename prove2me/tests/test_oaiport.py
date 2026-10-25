@@ -452,3 +452,17 @@ def test_module_route_compat_can_import_narrowly():
     assert all(('import %s' % m) in head for m in O.COMPAT_NARROW_IMPORTS)
     assert O.module_files(src, 'Solutions.G', (), '', compat_imports=['Mathlib.Logic.Basic'])['Compat.lean'].startswith(
         'import Mathlib.Logic.Basic\n\n')
+
+
+# d13f23b names the nonnegative-factor lemmas `Finset.prod_le_prod_of_subset_of_le_one₀` / `…_of_one_le₀`;
+# ours (0df444a) has the same statements without the `₀` (SquareDifference ReflectionLaw, 2026-10-25).
+
+def test_prod_le_prod_of_subset_drops_zero_suffix():
+    src = ('  prod_le_prod_of_subset_of_le_one₀ hE (fun _ _ => h)\n'
+           'exact Finset.prod_le_prod_of_subset_of_one_le₀ h a b\n'
+           'exact Finset.prod_le_prod_of_subset_of_le_one\' h\n')
+    out = O.core_rewrites(src)
+    assert 'prod_le_prod_of_subset_of_le_one hE' in out
+    assert 'Finset.prod_le_prod_of_subset_of_one_le h a b' in out
+    assert '₀' not in out
+    assert "prod_le_prod_of_subset_of_le_one' h" in out
