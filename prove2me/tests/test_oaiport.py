@@ -765,3 +765,13 @@ def test_range_inj_and_nonempty_compacts_renames():
     assert "range_inj_of_wellFoundedLT" not in out
     assert "← Metric.NonemptyCompacts.dist_eq" in out
     assert "Metric.lipschitz_infDist_set x" in out
+
+
+# `convert h using n; ring` (OpenAI) leaves, in ours, instance-diamond / lambda-form goals before the ring goal
+# (UnitDistances, Mahler, 2026-10-25): close every goal with `rfl` or `ring`.
+
+def test_convert_using_semicolon_ring_closes_all_goals():
+    src = "    convert hBern using 1; ring\n  have x := 1\n    convert h using 2; ring_nf\n    convert h using 1; simp\n"
+    out = O.core_rewrites(src)
+    assert "convert hBern using 1 <;> first | rfl | ring\n" in out
+    assert "convert h using 2; ring_nf" in out and "convert h using 1; simp" in out

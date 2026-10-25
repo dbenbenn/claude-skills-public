@@ -393,6 +393,8 @@ def core_rewrites(text, compat_ns='OAI'):
     # (SingleLatticeCovering 2026-10-25)
     text = re.sub(r"(?<=\.)isClosed_of_discreteTopology(?![\w'])( \(U :=)?",
                   lambda m: 'isClosed_of_discrete' + (' (H :=' if m.group(1) else ''), text)
+    # `convert h using n; ring` leaves instance-diamond / lambda-form goals first in ours: close all by rfl or ring
+    text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*ring[ \t]*$", r"\1 <;> first | rfl | ring", text)
     # d13f23b renames (StandardMap 2026-10-25)
     text = re.sub(r"\brange_inj_of_wellFoundedLT\b", 'range_inj', text)
     text = re.sub(r"(?<![\w.'])TopologicalSpace\.NonemptyCompacts\.dist_eq(?![\w'])", 'Metric.NonemptyCompacts.dist_eq', text)
