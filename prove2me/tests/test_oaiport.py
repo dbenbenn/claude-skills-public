@@ -573,3 +573,14 @@ def test_compat_has_cstar_norm_le_norm_of_le_of_nonneg():
                             'compat_4_34.lean')).read()
     assert 'theorem _root_.CStarAlgebra.norm_le_norm_of_le_of_nonneg' in src
     assert 'Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Order' in O.COMPAT_NARROW_IMPORTS
+
+
+# d13f23b has `MvPolynomial.monomial_mul_monomial` (ours: `MvPolynomial.monomial_mul`); QuarticPowerFree
+# uses it under `open MvPolynomial` (2026-10-25). A compat theorem with the new name.
+
+def test_compat_has_mvpolynomial_monomial_mul_monomial():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem _root_.MvPolynomial.monomial_mul_monomial' in src
+    assert 'Mathlib.Algebra.MvPolynomial.Basic' in O.COMPAT_NARROW_IMPORTS

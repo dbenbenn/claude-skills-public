@@ -41,6 +41,10 @@ theorem _root_.SimpleGraph.Walk.length_le_bypass_length_iff {V : Type*} {G : Sim
 theorem _root_.CStarAlgebra.norm_le_norm_of_le_of_nonneg {A : Type*} [NonUnitalCStarAlgebra A]
     [PartialOrder A] [StarOrderedRing A] {a b : A} (hab : a ≤ b) (ha : 0 ≤ a) : ‖a‖ ≤ ‖b‖ :=
   CStarAlgebra.norm_le_norm_of_nonneg_of_le ha hab
+/-- Mathlib d13f23b's `MvPolynomial.monomial_mul_monomial`; ours is `MvPolynomial.monomial_mul`. -/
+theorem _root_.MvPolynomial.monomial_mul_monomial {σ R : Type*} [CommSemiring R] {s s' : σ →₀ ℕ}
+    {a b : R} : MvPolynomial.monomial s a * MvPolynomial.monomial s' b =
+      MvPolynomial.monomial (s + s') (a * b) := MvPolynomial.monomial_mul
 /-- For a measurable equivalence `e`, `IsProbabilityMeasure (μ.map e)` is found by instance search
 (Mathlib d13f23b finds it for every map `f`: there `Measure.map` of a non-measurable map is a Dirac
 mass, here it is `0`, so only the measurable case can be shimmed). -/
