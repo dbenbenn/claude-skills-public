@@ -719,3 +719,25 @@ def test_compat_has_spectral_radius_eq_of_unital():
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                             'compat_4_34.lean')).read()
     assert 'theorem spectralRadius_eq_of_unital' in src
+
+
+# d13f23b's `eLpNorm_one_eq_lintegral_enorm hf` takes an AEStronglyMeasurable proof; ours has none
+# (MemoryPrecision JointL1/LabelTranslations, 2026-10-25). The argument may be a long parenthesised term and may
+# follow named arguments such as `(f := ...)`.
+
+def test_elpnorm_one_drops_measurability_argument():
+    src = ("rw [memLp_iff, eLpNorm_one_eq_lintegral_enorm hFm.aestronglyMeasurable]\n"
+           "rw [\u2190 eLpNorm_one_eq_lintegral_enorm\n"
+           "  ((show Measurable (fun p : \u03a9 \u00d7 Y => F (p.1, p.2 + \u03b4 \u2022 u))\n"
+           "    from by fun_prop).aestronglyMeasurable)]\n"
+           "rw [eLpNorm_one_eq_lintegral_enorm\n"
+           "  (f := fun point => a point - F point)\n"
+           "  (haverage.aestronglyMeasurable.sub hF.aestronglyMeasurable)]\n"
+           "exact (eLpNorm_one_eq_lintegral_enorm (by fun_prop)).symm\n"
+           "simp [eLpNorm_one_eq_lintegral_enorm, foo]\n")
+    out = O.core_rewrites(src)
+    assert "rw [memLp_iff, eLpNorm_one_eq_lintegral_enorm]" in out
+    assert "rw [\u2190 eLpNorm_one_eq_lintegral_enorm]" in out
+    assert "rw [eLpNorm_one_eq_lintegral_enorm\n  (f := fun point => a point - F point)]" in out
+    assert "exact (eLpNorm_one_eq_lintegral_enorm).symm" in out
+    assert "simp [eLpNorm_one_eq_lintegral_enorm, foo]" in out

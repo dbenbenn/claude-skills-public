@@ -314,6 +314,44 @@ def split_partial_namespaces(text):
     return '\n'.join(lines)
 
 
+def _drop_positional_arg(text, name):
+    """Drop the first positional argument after `name` (a balanced `( ... )` group or a plain term),
+    skipping named arguments `(x := ...)`. A use with no argument is left alone."""
+    out, i = [], 0
+    pat = re.compile(r"(?<![\w.'])" + re.escape(name) + r"(?![\w'])")
+    while True:
+        m = pat.search(text, i)
+        if not m:
+            out.append(text[i:])
+            return ''.join(out)
+        j = m.end()
+        out.append(text[i:j])
+        i = j
+        k = j
+        while True:
+            m2 = re.compile(r"\s+").match(text, k)
+            q = m2.end() if m2 else k
+            if m2 is None or q >= len(text):
+                break
+            if text[q] == '(':
+                depth, r = 0, q
+                while r < len(text):
+                    depth += (text[r] == '(') - (text[r] == ')')
+                    r += 1
+                    if depth == 0:
+                        break
+                if re.match(r"\(\w+ :=", text[q:]):
+                    out.append(text[i:r])
+                    i = k = r
+                    continue
+                i = r
+                break
+            m3 = re.compile(r"[\w.']+").match(text, q)
+            if m3 and not text[q:].startswith('<|') and m3.group(0) not in ('at', 'with', 'using', 'from', 'only'):
+                i = m3.end()
+            break
+
+
 def core_rewrites(text, compat_ns='OAI'):
     """Lean core/Mathlib renames every port needs. OpenAI's `TensorProduct.inductionOn z tmul add`
     (Mathlib d13f23b) takes its zero case from `tmul 0 0`; ours has only `induction_on`, which
@@ -346,6 +384,9 @@ def core_rewrites(text, compat_ns='OAI'):
     _a = r"(?:\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|[\w.']+)"
     text = re.sub(r"(?<![\w.'])(eLpNorm_eq_lintegral_rpow_enorm_toReal\s+" + _a + r"\s+" + _a + r")\s+"
                   r"[\w.']*\.aestronglyMeasurable(?![\w'])", r"\1", text)
+    # d13f23b's `eLpNorm_one_eq_lintegral_enorm hf` has a measurability argument; ours has none
+    # (MemoryPrecision, 2026-10-25)
+    text = _drop_positional_arg(text, 'eLpNorm_one_eq_lintegral_enorm')
     # d13f23b's `(Add)Subgroup.isClosed_of_discreteTopology (U := L)` is ours `isClosed_of_discrete (H := L)`
     # (SingleLatticeCovering 2026-10-25)
     text = re.sub(r"(?<=\.)isClosed_of_discreteTopology(?![\w'])( \(U :=)?",
