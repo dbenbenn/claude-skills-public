@@ -605,3 +605,14 @@ def test_compat_has_youngdiagram_card_transpose():
     assert 'theorem _root_.YoungDiagram.card_transpose' in src
     assert '@[simp]\ntheorem _root_.YoungDiagram.card_transpose' in src  # d13f23b's is a simp lemma
     assert 'Mathlib.Combinatorics.Young.YoungDiagram' in O.COMPAT_NARROW_IMPORTS
+
+
+# d13f23b finds `IsProbabilityMeasure (μ.map f)` for every f (its Measure.map is total). The measurable projections
+# and the subtype coercion are common enough to shim (SphericalPerceptron Entropy_Quantile, 2026-10-25).
+
+def test_compat_has_probability_map_instances_for_projections():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for name in ('isProbabilityMeasure_map_fst', 'isProbabilityMeasure_map_snd', 'isProbabilityMeasure_map_subtype_val'):
+        assert 'instance ' + name in src

@@ -45,6 +45,20 @@ theorem _root_.CStarAlgebra.norm_le_norm_of_le_of_nonneg {A : Type*} [NonUnitalC
 theorem _root_.MvPolynomial.monomial_mul_monomial {σ R : Type*} [CommSemiring R] {s s' : σ →₀ ℕ}
     {a b : R} : MvPolynomial.monomial s a * MvPolynomial.monomial s' b =
       MvPolynomial.monomial (s + s') (a * b) := MvPolynomial.monomial_mul
+/-- The first projection of a probability measure on a product: found by instance search in d13f23b
+(total `Measure.map`), here a measurable map. -/
+instance isProbabilityMeasure_map_fst {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+    {μ : MeasureTheory.Measure (α × β)} [MeasureTheory.IsProbabilityMeasure μ] :
+    MeasureTheory.IsProbabilityMeasure (μ.map Prod.fst) :=
+  MeasureTheory.Measure.isProbabilityMeasure_map measurable_fst.aemeasurable
+instance isProbabilityMeasure_map_snd {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+    {μ : MeasureTheory.Measure (α × β)} [MeasureTheory.IsProbabilityMeasure μ] :
+    MeasureTheory.IsProbabilityMeasure (μ.map Prod.snd) :=
+  MeasureTheory.Measure.isProbabilityMeasure_map measurable_snd.aemeasurable
+instance isProbabilityMeasure_map_subtype_val {α : Type*} [MeasurableSpace α] {p : α → Prop}
+    {μ : MeasureTheory.Measure {a // p a}} [MeasureTheory.IsProbabilityMeasure μ] :
+    MeasureTheory.IsProbabilityMeasure (μ.map Subtype.val) :=
+  MeasureTheory.Measure.isProbabilityMeasure_map measurable_subtype_coe.aemeasurable
 /-- Mathlib d13f23b's `YoungDiagram.card_transpose`. -/
 @[simp]
 theorem _root_.YoungDiagram.card_transpose (μ : YoungDiagram) : μ.transpose.card = μ.card := by
