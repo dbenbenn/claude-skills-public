@@ -1718,8 +1718,30 @@ Problem336).** Fix each at the cause; none needs a macro.
   `simp only [Matrix.mul_apply]` on matrix products. `oai_port_modules.py --compat-imports narrow` gives Compat only the
   Mathlib files its lemmas need (`oaiport.COMPAT_NARROW_IMPORTS`); set the carve's `collapse_mathlib` to false so the
   carved files keep OpenAI's own narrow imports too. A module that then misses a name needs its import added by a patch.
-- *Never edit a running `plain_carve.sh`*: bash reads a script as it runs, and an edit made mid-run executed garbage
-  in a second carve.
+- *Never edit a running shell driver*: bash reads a script as it runs, and an edit made mid-run executed garbage
+  in a second carve (2026-10-25). There are no job-dir drivers any more: see the next paragraph.
+
+**Run carves with `scripts/carve_pipeline.py`, from a snapshot; never write a job-dir driver** (dbenbenn,
+2026-10-25). Agents kept hand-writing bash drivers (`plain_carve.sh`, `plain_pipeline3.sh`,
+`ext_publish.sh`, ...); one was edited while two carves ran it, and a skill fix pushed mid-carve mixed old
+and new `carve.py` inside one carve. So:
+- `carve_pipeline.py DIR --folder F --root-module M --target T --bundle-prefix P [--def …] [--forced …]
+  [--patches …] [--compat-imports narrow] [--budget N] [--config-set JSON] [--fetch]` is the whole module
+  route of step 4 and 6 above: fetch, filter-patches, port, build, workspace build, config, graph,
+  ext-defs, plan, gen, order, measure (edge check on), publish-prep, prose-template, check-text, and a
+  `split_run` dry run (`--publish` adds `split_run --go`). Each step is idempotent, logged in
+  `DIR/logs/STEP.log`, recorded in `DIR/pipeline_state.json`; the first failure stops the run with the log's
+  tail and the same command resumes. Parameters are stored in `DIR/pipeline.json`. Written prose for the goal
+  and `forced` items is still yours (it is listed, not generated).
+- It re-execs itself from `scripts/skill_snapshot.py`'s read-only copy of the skill at HEAD
+  (`~/.cache/p2m/skill/<sha>/`; `--allow-dirty` snapshots an uncommitted tree) and calls every tool from
+  there, recording the sha; a resume stays on its snapshot (`--upgrade` moves to HEAD). Editing or pushing
+  the live skill cannot reach a running carve.
+- To change a tool: change the skill (tests first), commit, push; new runs pick it up, running ones do not.
+  A tool fix a running carve needs: `--upgrade --redo STEP`. Any remaining shell script in the skill has
+  its body in `main() { …; }; main "$@"; exit` (`tests/test_shell_scripts.py`).
+- Long single tools outside the pipeline (a one-off `carve.py` call) should likewise run from
+  `python3 "$(scripts/skill_snapshot.py)"/prove2me/scripts/X.py`.
 
 **`TensorProduct.inductionOn` becomes the compat eliminator `OAI.tensorInductionOn`** (2026-10-24).
 OpenAI's Mathlib (d13f23b) has `TensorProduct.inductionOn z tmul add`, with the zero case taken
@@ -1776,6 +1798,7 @@ script prints its usage when run with no arguments.
 | `build_solutions.py` | Build a mission's solutions from its development's check files: one file per statement. |
 | `carve.py` | Split a large ported Lean development into published Definitions bundles, intermediate statements and one carved proof piece per statement. |
 | `carve_measure.py` | Compile every generated bundle, statement stub and piece of a carve (carve.py gen), one Lean at a time, -j1, in publish order (p2mlib.carve.publish_order), and record CPU seconds and errors. |
+| `carve_pipeline.py` | The one driver for the module-route carve of a ported openai/math result; runs from a skill snapshot. |
 | `carve_prep.py` | The small steps around carving a ported openai/math result (oai_port_modules.py, oai_build_modules.py, then carve.py graph/plan/gen, carve_measure.py, carve.py split). |
 | `caveat_audit.py` | Audit the prose that explains a source-audit gap: does the natural-language statement's note account for each gap accurately, and does it claim anything the Lean or a citation does not back? |
 | `check_complete.py` | Is a mission's development complete? |
@@ -1806,6 +1829,7 @@ script prints its usage when run with no arguments.
 | `publish_status.py` | Where has a Submit got to? |
 | `resolve_imports.py` | Make a merged solution file self-contained: import what is published, inline what is not. |
 | `rewire.py` | Make a solution import the published theorems it re-derives, so each is a graph edge. |
+| `skill_snapshot.py` | Materialise the skill at a commit as a read-only snapshot and print its path. |
 | `source_audit.py` | Source-side audit: what does the source sentence claim, and does the formalization say it? |
 | `split_run.py` | Publish a carved split in waves (p2mlib.splitrun). |
 | `stage_auditor.py` | Stage a sealed working directory for one blind auditor, and tear it down after. |
