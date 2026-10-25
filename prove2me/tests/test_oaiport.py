@@ -480,3 +480,19 @@ def test_single_le_prod_gets_prime_but_qualified_others_do_not():
     assert "exact Finset.single_le_prod' h i" in out
     assert "List.single_le_prod h" in out and "Multiset.single_le_prod h x" in out
     assert "single_le_prod'' " not in out and "single_le_prod' h\n" in out
+
+
+# The unsuffixed `prod_le_prod_of_subset_of_one_le` / `_of_le_one` of d13f23b are the ordered-monoid lemmas
+# (hypothesis `1 ≤ f i`), i.e. our primed ones; its `…₀` versions are our unsuffixed ones. The prime must be
+# added before the `₀` is dropped (SquareDifference CircleDistance, 2026-10-25).
+
+def test_subset_lemmas_prime_and_zero_suffix_do_not_cross():
+    src = ("exact prod_le_prod_of_subset_of_one_le (subset_univ T) h\n"
+           "exact Finset.prod_le_prod_of_subset_of_le_one h a b\n"
+           "exact prod_le_prod_of_subset_of_le_one₀ hE h\n"
+           "exact Finset.prod_le_prod_of_subset_of_one_le₀ hE h\n")
+    out = O.core_rewrites(src).split('\n')
+    assert out[0] == "exact prod_le_prod_of_subset_of_one_le' (subset_univ T) h"
+    assert out[1] == "exact Finset.prod_le_prod_of_subset_of_le_one' h a b"
+    assert out[2] == "exact prod_le_prod_of_subset_of_le_one hE h"
+    assert out[3] == "exact Finset.prod_le_prod_of_subset_of_one_le hE h"

@@ -312,16 +312,18 @@ def core_rewrites(text, compat_ns='OAI'):
     # (same statement; Markov superreflexivity 2026-10-25)
     text = re.sub(r"(?<![\w'])(Finsupp\.)?mapDomain_apply_of_injective(?![\w'])",
                   lambda m: (m.group(1) or '') + 'mapDomain_apply', text)
-    # d13f23b's `prod_le_prod_of_subset_of_le_one₀` / `…_of_one_le₀` are our unsuffixed lemmas
-    # (same statements; SquareDifference ReflectionLaw 2026-10-25)
-    text = re.sub(r"(?<![\w'])((?:Finset\.)?prod_le_prod_of_subset_of_(?:le_one|one_le))₀(?![\w'])",
-                  r"\1", text)
     # d13f23b renamed the ordered-monoid `Finset.prod_le_prod'` (one hypothesis) to
     # `Finset.prod_le_prod`, and our nonnegative `prod_le_prod` to `prod_le_prod₀` (the compat
     # aliases map that one back, after this). So an unsuffixed use is our primed lemma
     # (wave 2, 2026-10-25: BinaryMatching, QuantitativeVanDerWaerden, PeriodicTiling).
-    return re.sub(r"(?<![\w.'])((?:Finset\.)?(?:prod_le_prod|prod_le_one|one_le_prod|single_le_prod))(?![\w'₀])",
+    text = re.sub(r"(?<![\w.'])((?:Finset\.)?(?:prod_le_prod|prod_le_one|one_le_prod|single_le_prod"
+                  r"|prod_le_prod_of_subset_of_le_one|prod_le_prod_of_subset_of_one_le))(?![\w'₀])",
                   r"\1'", text)
+    # d13f23b's `prod_le_prod_of_subset_of_le_one₀` / `…_of_one_le₀` are our unsuffixed lemmas
+    # (same statements; SquareDifference ReflectionLaw 2026-10-25)
+    text = re.sub(r"(?<![\w'])((?:Finset\.)?prod_le_prod_of_subset_of_(?:le_one|one_le))₀(?![\w'])",
+                  r"\1", text)
+    return text
 
 
 # ---------------------------------------------------------------- the StdSimplex compatibility shim
