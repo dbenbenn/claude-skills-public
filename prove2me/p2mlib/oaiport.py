@@ -341,6 +341,11 @@ def core_rewrites(text, compat_ns='OAI'):
                   r"(?:\(by fun_prop\)|(?:[\w.]+|\((?:[^()]|\([^()]*\))*\))\.aemeasurable)(?![\w.'])", r"\1 _ _ _", text)
     text = re.sub(r"(?<![\w.'])((?:MeasureTheory\.)?Measure\.map_smul) _ "
                   r"(?:\(by fun_prop\)|(?:[\w.]+|\((?:[^()]|\([^()]*\))*\))\.aemeasurable)(?![\w.'])", r"\1", text)
+    # d13f23b's `eLpNorm_eq_lintegral_rpow_enorm_toReal hp0 hptop hf` has a third, measurability argument;
+    # ours has two (MemoryPrecision, 2026-10-25)
+    _a = r"(?:\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|[\w.']+)"
+    text = re.sub(r"(?<![\w.'])(eLpNorm_eq_lintegral_rpow_enorm_toReal\s+" + _a + r"\s+" + _a + r")\s+"
+                  r"[\w.']*\.aestronglyMeasurable(?![\w'])", r"\1", text)
     # d13f23b's `(Add)Subgroup.isClosed_of_discreteTopology (U := L)` is ours `isClosed_of_discrete (H := L)`
     # (SingleLatticeCovering 2026-10-25)
     text = re.sub(r"(?<=\.)isClosed_of_discreteTopology(?![\w'])( \(U :=)?",

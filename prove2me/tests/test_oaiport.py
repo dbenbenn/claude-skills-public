@@ -693,3 +693,19 @@ def test_the_batch3_rewrites_and_compat_lemmas_elaborate_against_the_workspace_m
     f.write_text('import Mathlib\n\n' + block + '\n' + O.core_rewrites(fix('rewrite_targets.lean')),
                  encoding='utf-8')
     C.compile_file(str(f), None, str(tmp_path / 'olean'))
+
+
+# d13f23b's `eLpNorm_eq_lintegral_rpow_enorm_toReal hp0 hptop hf` takes an AEStronglyMeasurable proof; ours has
+# only the two hypotheses (MemoryPrecision FiniteDensity/PointwiseMain/MeasurableTests, 2026-10-25).
+
+def test_elpnorm_rpow_enorm_drops_measurability_argument():
+    src = ("    rw [eLpNorm_eq_lintegral_rpow_enorm_toReal (by exact_mod_cast (by omega : p \u2260 0))\n"
+           "      (by finiteness) hG.ennreal_toReal.aestronglyMeasurable]\n"
+           "  erw [eLpNorm_eq_lintegral_rpow_enorm_toReal (by exact_mod_cast hp) (by finiteness)\n"
+           "      hFc.aestronglyMeasurable,\n"
+           "    eLpNorm_eq_lintegral_rpow_enorm_toReal hpE (by finiteness)]\n")
+    out = O.core_rewrites(src)
+    assert "p \u2260 0))\n      (by finiteness)]" in out
+    assert "(by finiteness),\n" in out
+    assert "aestronglyMeasurable" not in out
+    assert "eLpNorm_eq_lintegral_rpow_enorm_toReal hpE (by finiteness)]" in out
