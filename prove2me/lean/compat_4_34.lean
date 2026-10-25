@@ -37,6 +37,10 @@ separately). `_root_`, so `p.length_le_bypass_length_iff` resolves by dot notati
 theorem _root_.SimpleGraph.Walk.length_le_bypass_length_iff {V : Type*} {G : SimpleGraph V}
     [DecidableEq V] {u v : V} (p : G.Walk u v) : p.length ≤ p.bypass.length ↔ p.bypass = p :=
   ⟨p.bypass_eq_self_of_length_le_length_bypass, fun h => by rw [h]⟩
+/-- Mathlib d13f23b's `CStarAlgebra.norm_le_norm_of_le_of_nonneg hab ha`; ours is `norm_le_norm_of_nonneg_of_le ha hab`. -/
+theorem _root_.CStarAlgebra.norm_le_norm_of_le_of_nonneg {A : Type*} [NonUnitalCStarAlgebra A]
+    [PartialOrder A] [StarOrderedRing A] {a b : A} (hab : a ≤ b) (ha : 0 ≤ a) : ‖a‖ ≤ ‖b‖ :=
+  CStarAlgebra.norm_le_norm_of_nonneg_of_le ha hab
 /-- For a measurable equivalence `e`, `IsProbabilityMeasure (μ.map e)` is found by instance search
 (Mathlib d13f23b finds it for every map `f`: there `Measure.map` of a non-measurable map is a Dirac
 mass, here it is `0`, so only the measurable case can be shimmed). -/

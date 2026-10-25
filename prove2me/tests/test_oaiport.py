@@ -562,3 +562,14 @@ def test_nonneg_iff_ispositive_gets_explicit_argument():
     assert "(ContinuousLinearMap.nonneg_iff_isPositive _).mp hT" in out
     assert "(LinearMap.nonneg_iff_isPositive _).mpr h" in out
     assert "nonneg_iff_isPositive T]" in out
+
+
+# d13f23b: `CStarAlgebra.norm_le_norm_of_le_of_nonneg (hab) (ha)`; ours: `norm_le_norm_of_nonneg_of_le (ha) (hab)`
+# (Kirchberg–Rørdam, 2026-10-25). A compat lemma with d13f23b's argument order.
+
+def test_compat_has_cstar_norm_le_norm_of_le_of_nonneg():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem _root_.CStarAlgebra.norm_le_norm_of_le_of_nonneg' in src
+    assert 'Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Order' in O.COMPAT_NARROW_IMPORTS
