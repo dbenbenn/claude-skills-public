@@ -18,6 +18,8 @@ def test_fetch_writes_server_shape_and_skips_unchanged(tmp_path, monkeypatch, ca
             return {'theorems': [{'theorem_name': 'N_defs', 'id': 'D'}]}
         if p.startswith('/theorems?theorem_name='):
             return {'theorems': []}                                   # not published yet
+        if p.startswith('/definitions?q='):
+            return {'definitions': []}
         if p == '/theorems/T':
             return {'theorem_name': 'N.t', 'status': 'Open', 'preamble': 'import Mathlib',
                     'formal_statement': 'namespace N\n\ntheorem t : True := by\n  sorry\n\nend N'}
@@ -216,3 +218,19 @@ def test_publish_refuses_a_new_item_whose_prose_is_in_python(folder, monkeypatch
     with pytest.raises(SystemExit) as e:
         PS.main()
     assert 'prose/<name>.md' in str(e.value) and ('thm', 'Q.t') not in fake.posted
+
+
+def test_names_finds_a_bundle_by_name(tmp_path, monkeypatch):
+    # 2026-10-25: `--names OAIQWKAP000` wrote nothing: /theorems?theorem_name= does not find bundles
+    def call(m, p, b=None):
+        if p.startswith('/theorems?theorem_name='):
+            return {'theorems': []}
+        if p.startswith('/definitions?q=B0'):
+            return {'definitions': [{'definition_name': 'B0', 'definition_id': 'D'}]}
+        if p == '/theorems/D':
+            return {'theorem_name': 'B0', 'status': 'Definition', 'definition': 'import Mathlib\n\ndef N.k := 1'}
+        raise AssertionError(p)
+    monkeypatch.setattr(F, 'call', call)
+    monkeypatch.setattr(F.sys, 'argv', ['fetch_theorems.py', '--names', 'B0', '--out', str(tmp_path)])
+    F.main()
+    assert (tmp_path / 'Definitions' / 'Def_B0.lean').read_text().endswith('def N.k := 1\n')
