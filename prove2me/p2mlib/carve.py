@@ -2153,7 +2153,9 @@ class Carver:
                     alive.update(ns_prefixes(full + '.x'))
             sec = self._module(m, kept_cmds[m], drops[m], have, set(alive), deprivatize,
                                {g.nodes[k].cmd for k in sorry if g.nodes[k].module == m}, rename)
-            hide = self._unseen_instances(m, have, earlier, rename)
+            # an instance with no name this file can write is skipped: `attribute [-instance] `
+            # with nothing after it does not parse (Heisenberg 2026-10-25)
+            hide = [h for h in self._unseen_instances(m, have, earlier, rename) if h and h.strip()]
             if hide:
                 head = 'section\n-- module %s\n' % m
                 sec = head + 'attribute [-instance] %s\n' % ' '.join(hide) + sec[len(head):]
