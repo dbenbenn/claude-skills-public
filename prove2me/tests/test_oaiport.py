@@ -741,3 +741,12 @@ def test_elpnorm_one_drops_measurability_argument():
     assert "rw [eLpNorm_one_eq_lintegral_enorm\n  (f := fun point => a point - F point)]" in out
     assert "exact (eLpNorm_one_eq_lintegral_enorm).symm" in out
     assert "simp [eLpNorm_one_eq_lintegral_enorm, foo]" in out
+
+
+# d13f23b's `Filter.eventuallyEmptyOrUniv_iff'` is our `Filter.eventuallyConst_set'` (same statement,
+# `s =ᶠ[l] ∅ ∨ s =ᶠ[l] univ`; FiniteFactor TorusErgodic, 2026-10-25).
+
+def test_eventually_empty_or_univ_renamed():
+    out = O.core_rewrites("  rw [Filter.eventuallyEmptyOrUniv_iff']\n  exact foo.eventuallyEmptyOrUniv_iff'.mp h\n")
+    assert "rw [Filter.eventuallyConst_set']" in out
+    assert "foo.eventuallyConst_set'.mp h" in out
