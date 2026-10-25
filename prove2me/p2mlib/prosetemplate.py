@@ -348,9 +348,10 @@ def bundle_prose(ctx, b):
            "development (%s, [github.com/openai/math](%s) at commit %s, Apache License 2.0) and %s. "
            "The declarations and their proofs are OpenAI's." % (
                _names(ctx.targets), ctx.release(), REPO, ctx.meta['commit'][:7], ctx.ported()), '']
-    line = '**Contents.** It holds %s of OpenAI\'s Lean: %s.' % (
+    line = '**Contents.** It holds %s of OpenAI\'s Lean%s.' % (
         _plural(len(b['nodes']), 'declaration', 'declarations'),
-        ', '.join(kinds[:-1]) + ' and ' + kinds[-1] if len(kinds) > 1 else kinds[0])
+        # a bundle whose declarations have no recorded kind (PinchedHartogs extension 2026-10-25)
+        '' if not kinds else ': ' + (', '.join(kinds[:-1]) + ' and ' + kinds[-1] if len(kinds) > 1 else kinds[0]))
     if types:
         cap = 40
         shown = sorted(types)[:cap]
