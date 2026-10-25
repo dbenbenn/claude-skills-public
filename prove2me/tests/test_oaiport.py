@@ -384,3 +384,13 @@ def test_compat_dite_lemmas_are_rewritable():
                             'compat_4_34.lean')).read()
     assert 'dite p a b = a h := dif_pos h' in src and 'dite p a b = b h := dif_neg h' in src
     assert 'then a hp else b hp' not in src
+
+
+def test_mathlib_has_flags_only_missing_mathlib_modules(tmp_path):
+    # d13f23b's `Mathlib.Basic.Real.Basic` does not exist here; the module route imports Mathlib
+    (tmp_path / 'Mathlib' / 'Data' / 'Real').mkdir(parents=True)
+    (tmp_path / 'Mathlib' / 'Data' / 'Real' / 'Basic.lean').write_text('')
+    assert O.mathlib_has('Mathlib.Data.Real.Basic', root=str(tmp_path))
+    assert not O.mathlib_has('Mathlib.Basic.Real.Basic', root=str(tmp_path))
+    assert O.mathlib_has('OAI.Foo', root=str(tmp_path))
+    assert O.mathlib_has(O.STDSIMPLEX_MISSING_IMPORTS[0], root=str(tmp_path))

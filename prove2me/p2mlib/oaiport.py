@@ -448,6 +448,21 @@ def inline_module_macros(sources):
             for oai, (short, _) in sources.items()}
 
 
+def mathlib_has(module, root=None):
+    """False only for a `Mathlib.*` module our Mathlib (0df444a) lacks: d13f23b moved files
+    (`Mathlib.Basic.Real.Basic`, MatroidSecretary 2026-10-25), and a module route import of one
+    fails with "object file ... does not exist". Such an import becomes `import Mathlib`. The
+    StdSimplex shim's missing imports are left to it. True when the Mathlib tree is not found."""
+    if not module.startswith('Mathlib.') or module in STDSIMPLEX_MISSING_IMPORTS:
+        return True
+    root = root or os.path.join(os.environ.get('P2M_WORKSPACE') or
+                                os.path.expanduser('~/claude/prove2me_workspace'),
+                                '.lake', 'packages', 'mathlib')
+    if not os.path.isdir(os.path.join(root, 'Mathlib')):
+        return True
+    return os.path.exists(os.path.join(root, *module.split('.')) + '.lean')
+
+
 def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsimplex='auto'):
     """The workspace modules of a module-route port before the patches: {file name: text} under
     Lean prefix `mod` (e.g. Solutions.OAIQW_X), Compat.lean not included. `sources` as
@@ -471,6 +486,8 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
                 return 'import %s.%s' % (mod, names[n])
             if n.split('.')[0] in ('OAI', 'ComparatorChallenges'):
                 missing.add('%s (imported by %s)' % (n, oai))
+            if not mathlib_has(n):
+                return 'import Mathlib'
             return m.group(0)
         t = re.sub(r'^import (\S+)', rep, t, flags=re.M)
         if not re.search(r'^import %s\.' % re.escape(mod), t, re.M):
