@@ -448,6 +448,18 @@ def inline_module_macros(sources):
             for oai, (short, _) in sources.items()}
 
 
+def demodule(text):
+    """A file of Lean's module system as a plain file: its `module` line dropped and each
+    `public import` / `meta import` / `public meta import` made a plain `import` (Ryser
+    FiniteSetEstimates 2026-10-25: the Compat import went in front of `module`, and every import
+    after it then failed to parse)."""
+    hdr = header_end(text) if 'header_end' in globals() else len(text)
+    head, body = text[:hdr], text[hdr:]
+    head = re.sub(r'^module[ \t]*\n', '', head, flags=re.M)
+    head = re.sub(r'^(?:public[ \t]+)?(?:meta[ \t]+)?import[ \t]+', 'import ', head, flags=re.M)
+    return head + body
+
+
 def mathlib_has(module, root=None):
     """False only for a `Mathlib.*` module our Mathlib (0df444a) lacks: d13f23b moved files
     (`Mathlib.Basic.Real.Basic`, MatroidSecretary 2026-10-25), and a module route import of one
@@ -489,7 +501,7 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
             if not mathlib_has(n):
                 return 'import Mathlib'
             return m.group(0)
-        t = re.sub(r'^import (\S+)', rep, t, flags=re.M)
+        t = re.sub(r'^import (\S+)', rep, demodule(t), flags=re.M)
         if not re.search(r'^import %s\.' % re.escape(mod), t, re.M):
             # after `import Mathlib`, else first (Compat imports Mathlib, so a module with narrower
             # Mathlib imports pays nothing more)
