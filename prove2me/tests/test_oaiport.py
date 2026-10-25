@@ -512,3 +512,15 @@ def test_measure_map_smul_drops_measurability_argument():
     assert "rw [Measure.map_smul,hrestr]" in out
     assert "rw [Measure.map_smul]\n" in out
     assert "exact Measure.map_smul c μ f" in out
+
+
+# d13f23b: `AddSubgroup.isClosed_of_discreteTopology (U := L)`; ours: `AddSubgroup.isClosed_of_discrete (H := L)`
+# (SingleLatticeCovering GridCounts/CircuitErrors, 2026-10-25).
+
+def test_isclosed_of_discretetopology_renamed():
+    src = ("exact AddSubgroup.isClosed_of_discreteTopology (U := L.toAddSubgroup)\n"
+           "    L.module.toAddSubgroup.isClosed_of_discreteTopology\n")
+    out = O.core_rewrites(src)
+    assert "AddSubgroup.isClosed_of_discrete (H := L.toAddSubgroup)" in out
+    assert "toAddSubgroup.isClosed_of_discrete\n" in out
+    assert 'Topology' not in out
