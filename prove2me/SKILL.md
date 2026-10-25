@@ -1368,6 +1368,15 @@ back WA. The lessons:
   lemma: 30 lemmas at 2.8 s made an 84 s block. Generator: `p2m-standalone/openai-ports/
   eilenberg-ganea-carve/gen_block_patches.py`; fold it into `carve_prep.py` the next time a carve
   needs it.
+- **Uses the elaborated term cannot show** (batch 3, 2026-10-25; `pinned` groups and `synthInstance.maxHeartbeats`
+  patches are no longer needed for these). (1) A `CoeSort`/`CoeFun`/`Coe…` instance that elaborates away
+  (`↑p` is `p.carrier`, `f n` is `f.toFun n`) is a dependency of every declaration naming the function it wraps
+  (`Carver._add_coercion_instances`). (2) Attributes only the declaring file may set (reducibility including
+  `instance_reducible`, `inline`, `specialize`, `export`, `implemented_by`, `extern`, … `RESTRICTED_ATTRIBUTES`) stay in the file
+  that has their target; elsewhere the bundle holding the target already carries them. (3) A local instance that
+  won a subproblem but left no constant comes back when an `inst_keys` problem of the declaration has its
+  class and heads. (4) An instance that only a `variable` binder needs (`NeZero n` for `W.x 0 0`) is a
+  dependency of the declarations in its scope.
 - **`carve_measure.py` checks every import edge, and fails the carve on a false one.** The
   carver infers dependencies partly from source text, so it can emit an `import Theorems.*` a
   piece never uses; the file compiles, and the false edge goes into the published graph
