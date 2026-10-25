@@ -516,6 +516,14 @@ def test_measure_map_smul_drops_measurability_argument():
     assert "exact Measure.map_smul c μ f" in out
 
 
+# `exact Measure.map_smul _ (by fun_prop)` must keep its three explicit arguments (no bare name:
+# "typeclass instance problem is stuck"; MemoryPrecision, 2026-10-25).
+
+def test_measure_map_smul_exact_keeps_explicit_arguments():
+    out = O.core_rewrites("    exact Measure.map_smul _ (by fun_prop)\n")
+    assert "exact Measure.map_smul _ _ _\n" in out
+
+
 # d13f23b: `AddSubgroup.isClosed_of_discreteTopology (U := L)`; ours: `AddSubgroup.isClosed_of_discrete (H := L)`
 # (SingleLatticeCovering GridCounts/CircuitErrors, 2026-10-25).
 
