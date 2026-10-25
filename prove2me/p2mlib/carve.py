@@ -794,6 +794,9 @@ class Graph:
         return out
 
     def _build_deps(self):
+        self._variable_insts = {m: [(c.index, c.insts) for c in info.commands
+                                    if c.short_kind == 'variable' and c.insts]
+                                for m, info in self.infos.items()}
         for k, nd in self.nodes.items():
             info = self.infos[nd.module]
             c = info.commands[nd.cmd]
@@ -813,6 +816,14 @@ class Graph:
             # theorem whose use need not show anywhere else)
             nd.ideps = self.inst_owners(c.insts or (), k, nd.module, c.index)
             nd.sig |= self.inst_owners(c.sig_insts or (), k, nd.module, c.index)
+            # a `variable` binder in scope stays in the carved file even when this declaration does
+            # not use it, and elaborating it may need an instance that nothing else names
+            # (Kirchberg–Rørdam: `variable (h0 : W.x 0 0 * v = v)` needs `NeZero rankNum`)
+            for vi, vnames in self._variable_insts.get(nd.module, ()):
+                if vi < c.index and _in_scope(info, vi, c):
+                    owners = self.inst_owners(vnames, k, nd.module, vi)
+                    nd.ideps |= owners
+                    nd.sig |= owners
         # `attribute [simp] foo` marks foo; a notation in force is a dependency of what follows
         # that uses it: by Lean's record, the commands whose syntax contains the notation's kind
         # (and, through a notation written with another, that one's too); without a record, of
@@ -1991,6 +2002,23 @@ def _could_match(g, k, i):
     return not td or bool(td & (g.nodes[k].deps | g.nodes[k].sig))
 
 
+def _could_answer(inst_cmd, c):
+    """Did instance search solve, in command c, a problem that the instance declared by inst_cmd
+    could answer: the same class, with the instance's head constants among the problem's? An
+    instance can win a subproblem and then be replaced by a defeq one in the final term, leaving no
+    constant and no `insts` entry (Kirchberg–Rørdam `local instance : SMul ℂ Defect`, used while
+    elaborating `Defect →ₗ[ℂ] A`; carved away, instance search timed out). The class problems are
+    LeanInfo's `inst_keys`."""
+    asked = [x.split() for x in c.inst_keys or ()]
+    for d in inst_cmd.declares or ():
+        if not d[1] or not d[2]:
+            continue
+        heads = set(d[2])
+        if any(p[0] == d[1] and heads <= set(p[1:]) for p in asked):
+            return True
+    return False
+
+
 def _global_instance(g, k):
     """Is node k an instance every importer of its file sees (not `local`/`scoped`)?"""
     nd = g.nodes[k]
@@ -2569,7 +2597,7 @@ class Carver:
                 ik0 = g.cmd_node.get((m, vi))
                 names = {x[0] for x in vc.declares or ()} or set(g.nodes[ik0].names if ik0 else ())
                 keys = {'key:' + ' '.join([x[1]] + list(x[2])) for x in vc.declares or () if x[1]}
-                if not (names | keys) & used:
+                if not (names | keys) & used and not (not sorried and _could_answer(vc, c)):
                     continue
             # ik None: a local instance that is nobody's node. An instance of a Prop class is a
             # theorem, and Lean lets sibling modules declare the same one under one generated name

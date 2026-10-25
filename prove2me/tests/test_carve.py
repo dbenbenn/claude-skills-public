@@ -1638,3 +1638,36 @@ def test_every_attribute_lean_restricts_to_the_declaring_file_is_known():
     for a in ('simp', 'instance', 'ext', 'coe', 'default_instance'):
         assert not C.restricted_attribute('attribute [%s] foo' % a), a
     assert not C.restricted_attribute('attribute [local instance_reducible] foo')
+
+
+def test_a_local_instance_that_won_a_subproblem_comes_back_though_no_term_names_it():
+    # Kirchberg–Rørdam (batch 3): `local instance : SMul ℂ Defect` answered a subproblem while
+    # `Defect →ₗ[ℂ] A` was elaborated, and the final term kept a defeq instance instead: no constant,
+    # no `insts` entry. Carved without it, instance search timed out (the agent raised
+    # synthInstance.maxHeartbeats). The problems instance search solved (`inst_keys`) still show it.
+    for asked, comes_back in ((['Inhabited CD.Wide'], True), (['Inhabited CD.Wide CD.Other'], True),
+                              (['Inhabited CD.Other'], False), (['Nonempty CD.Wide'], False), ([], False)):
+        g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+        user = g.nodes['CD.uses_local_inst']
+        c = g.infos[user.module].commands[user.cmd]
+        c.insts, c.sig_insts, c.used_keys, c.sig_used_keys, c.inst_keys = [], [], [], [], list(asked)
+        for n in user.names:           # its compiled constants do not name the instance either
+            g.consts[n]['t'] = [x for x in g.consts[n]['t'] if x != 'CD.cdLocalInst']
+            g.consts[n]['v'] = [x for x in g.consts[n]['v'] if x != 'CD.cdLocalInst']
+        out = C.Carver(g).carve({'CD.uses_local_inst'}, g.have_names({'CD.uses_local_inst', 'CD.Wide'}))
+        assert bool(re.search(r'^local instance cdLocalInst_r\w+ : Inhabited Wide', out, re.M)) == comes_back, \
+            (asked, out)
+
+
+def test_an_instance_only_a_variable_binder_needs_is_a_dependency_of_the_declarations_in_scope(g):
+    # Kirchberg–Rørdam bundle: `variable (h0 : W.x 0 0 * v = v)` elaborates `OfNat (Fin rankNum) 0`
+    # through the global `NeZero rankNum` instance; the declarations below do not use h0, so none
+    # named the instance, the bundle lacked it and its `variable` line failed
+    assert 'CD.Co.instPosFive' in g.nodes['CD.Co.var_user'].deps
+    assert 'CD.Co.instPosFive' in g.nodes['CD.Co.var_user'].sig
+    assert 'CD.Co.instPosFive' not in g.nodes['CD.Co.rdef'].deps
+
+
+@pytest.mark.lean
+def test_variable_binders_needing_an_instance_compile(g, tmp_path):
+    _compile_in_publish_order(g, _coer_plan(g, ['CD.Co.var_user'], bundle_budget=0.0001), tmp_path)

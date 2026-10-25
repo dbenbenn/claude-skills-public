@@ -36,4 +36,21 @@ attribute [instance_reducible] rdef
 
 theorem rdef_pos : 0 < rdef 0 := by decide
 
+
+class Pos (n : Nat) : Prop where
+  out : 0 < n
+
+instance instPosFive : Pos 5 := ⟨by decide⟩
+
+def needsPos (n : Nat) [Pos n] : Nat := n
+
+section
+-- Elaborating this binder needs `Pos 5`; no declaration below mentions the binder, so no
+-- declaration's constants name the instance (Kirchberg–Rørdam: `variable (h0 : W.x 0 0 * v = v)`
+-- needed `NeZero rankNum`).
+variable (h : needsPos 5 = 5)
+
+theorem var_user : 1 = 1 := rfl
+end
+
 end CD.Co
