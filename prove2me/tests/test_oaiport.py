@@ -434,3 +434,21 @@ def test_compat_has_probability_measure_map_equiv_instance():
                             'compat_4_34.lean')).read()
     assert 'instance isProbabilityMeasure_map_measurableEquiv' in src
     assert 'isProbabilityMeasure_map_any' not in src
+
+
+# `import Mathlib` in Compat puts every Mathlib instance in scope of every ported module, which
+# OpenAI's own narrow imports never saw. Problem336 IncidenceCirculation (2026-10-25): with
+# Mathlib.Analysis.CStarAlgebra.CStarMatrix loaded (our `CStarMatrix` is still a type copy of
+# `Matrix`), `ext v e; simp only [Matrix.mul_apply]` on a product of matrices fails. The module
+# route can give Compat narrow imports instead (`--compat-imports narrow`).
+
+def test_module_route_compat_can_import_narrowly():
+    src = {'OAI.G.A': ('A', 'import Mathlib.Data.Finset.Basic\nnamespace OAI.G\ntheorem a : True := trivial\nend OAI.G\n')}
+    wide = O.module_files(src, 'Solutions.G', (), '')
+    assert wide['Compat.lean'].startswith('import Mathlib\n\n')
+    narrow = O.module_files(src, 'Solutions.G', (), '', compat_imports=O.COMPAT_NARROW_IMPORTS)
+    head = narrow['Compat.lean'].split('\n\n')[0]
+    assert 'import Mathlib\n' not in narrow['Compat.lean'].split('namespace')[0] + '\n'
+    assert all(('import %s' % m) in head for m in O.COMPAT_NARROW_IMPORTS)
+    assert O.module_files(src, 'Solutions.G', (), '', compat_imports=['Mathlib.Logic.Basic'])['Compat.lean'].startswith(
+        'import Mathlib.Logic.Basic\n\n')

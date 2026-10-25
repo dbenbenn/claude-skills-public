@@ -1700,6 +1700,27 @@ already published still export root names: UniversalFInfinity's `OAIQWUFI004` (`
 `ite_eq_right`, `dite_eq_left`, `dite_eq_right`) and ESB's `OAIQWESB000` (`alias
 Finset.prod_le_prod₀`). A port that imports either of them must not declare those names again.
 
+**Mathlib drift that recurs in module-route ports (Sonnet trial, 2026-10-25: Markov, PlanarFPP, SymmetricMahler,
+Problem336).** Fix each at the cause; none needs a macro.
+- *Pi-form vs lambda-form (`to_fun`).* Our `HasDerivAt.mul/neg/sum/pow`, `DifferentiableAt.sum` conclude `c * d`, `-f`,
+  `∑ i, f i` as functions; OpenAI's conclude the lambda. A `convert … using 1` then leaves extra goals (a function
+  equality, an instance diamond like `Complex.addCommGroup = …CStarAlgebra…`). Use the `fun_` variant where it exists
+  (`fun_mul`, `fun_neg`, `fun_sum`, `fun_pow`) and close what is left with `all_goals first | rfl | …`. `ContDiffAt.mul`
+  has no `fun_` form: `convert … using 1 <;> first | rfl | (funext z; simp …)`.
+- *Total `Measure.map`.* d13f23b's `Measure.map f μ` of a non-AEMeasurable `f` is a Dirac mass, so `IsProbabilityMeasure
+  (μ.map f)` is an unconditional instance and `ProbabilityMeasure.map ν f` takes no proof. Ours is 0 there: no instance
+  (a measurable *equivalence* has one in the compat block), `ProbabilityMeasure.map` wants `AEMeasurable f ν`. Patch the
+  site with `Measure.isProbabilityMeasure_map hf.aemeasurable` / `μ.map hf.aemeasurable`. It cannot be shimmed.
+- *`import all`.* OpenAI reaches Mathlib's *private* declarations (`import all …IsGaussianProcess` for
+  `Finset.orderEmbOfFinWithBot`) with `import all`, which a non-`module` file cannot use. Copy the private declarations
+  into the module (root names; the private ones are mangled, so nothing clashes).
+- *`import Mathlib` in Compat leaks instances.* Mathlib's `CStarMatrix` (a type copy of `Matrix` here) breaks
+  `simp only [Matrix.mul_apply]` on matrix products. `oai_port_modules.py --compat-imports narrow` gives Compat only the
+  Mathlib files its lemmas need (`oaiport.COMPAT_NARROW_IMPORTS`); set the carve's `collapse_mathlib` to false so the
+  carved files keep OpenAI's own narrow imports too. A module that then misses a name needs its import added by a patch.
+- *Never edit a running `plain_carve.sh`*: bash reads a script as it runs, and an edit made mid-run executed garbage
+  in a second carve.
+
 **`TensorProduct.inductionOn` becomes the compat eliminator `OAI.tensorInductionOn`** (2026-10-24).
 OpenAI's Mathlib (d13f23b) has `TensorProduct.inductionOn z tmul add`, with the zero case taken
 from `tmul 0 0`; ours (0df444a) has only `induction_on`, which asks for a `zero` case. The ports

@@ -4,7 +4,7 @@ single-file route is oai_port.py).
 
 usage: oai_port_modules.py LEAN_ROOT FOLDER PREFIX [PREFIX ...] [--patches P.json] [--header H.lean]
                            [--compat-ns NS | --root-compat] [--compat FILE] [--ws WORKSPACE]
-                           [--stdsimplex auto|structure|subtype|off]
+                           [--stdsimplex auto|structure|subtype|off] [--compat-imports narrow|M1,M2,…]
 
   LEAN_ROOT   the fetched lean/ tree (oai_fetch.py DEST ROOT_MODULE, then DEST/lean)
   FOLDER      the workspace folder: modules land in Solutions/FOLDER/ as Solutions.FOLDER.*
@@ -18,6 +18,9 @@ usage: oai_port_modules.py LEAN_ROOT FOLDER PREFIX [PREFIX ...] [--patches P.jso
   --compat-ns the namespace of the Compat module's lemmas (default OAI, which every ported module
               is inside); `alias` lines become rewrites of the sources (p2mlib.oaiport.compat_block)
   --root-compat  the old root-level block (two bundles both declaring root `ite_eq_left` clash)
+  --compat-imports  Compat imports these Mathlib modules (`narrow`: oaiport.COMPAT_NARROW_IMPORTS) instead of
+              all of Mathlib, which puts every instance in scope of every module (CStarMatrix breaks
+              Matrix.mul_apply: Problem336 IncidenceCirculation, 2026-10-25)
   --compat    the compatibility block (default lean/compat_4_34.lean in this skill)
   --stdsimplex the StdSimplex shim (p2mlib.oaiport.stdsimplex_mode): auto (default) adds the module
               StdSimplexCompat (lean/StdSimplexCompat.lean: the d13f23b `Convexity.StdSimplex` API
@@ -59,7 +62,7 @@ def write_changed(out, files):
 
 
 def main(argv):
-    valued = ('--patches', '--header', '--compat-ns', '--compat', '--ws', '--stdsimplex')
+    valued = ('--patches', '--header', '--compat-ns', '--compat', '--ws', '--stdsimplex', '--compat-imports')
     skip = {argv.index(o) + 1 for o in valued if o in argv}
     pos = [a for i, a in enumerate(argv) if not a.startswith('--') and i not in skip]
     if len(pos) < 3:
@@ -69,10 +72,12 @@ def main(argv):
     patches = json.load(open(opt(argv, '--patches'))) if '--patches' in argv else []
     header = open(opt(argv, '--header'), encoding='utf-8').read() if '--header' in argv else ''
     ns = None if '--root-compat' in argv else opt(argv, '--compat-ns', 'OAI')
+    ci = opt(argv, '--compat-imports')
+    cimp = O.COMPAT_NARROW_IMPORTS if ci == 'narrow' else (ci.split(',') if ci else None)
     try:
         files = O.module_files(O.module_sources(lean_root, prefixes), 'Solutions.' + folder, patches,
                                open(opt(argv, '--compat', COMPAT), encoding='utf-8').read(), ns, header,
-                               opt(argv, '--stdsimplex', 'auto'))
+                               opt(argv, '--stdsimplex', 'auto'), cimp)
     except O.PortError as e:
         sys.exit(str(e))
     out = os.path.join(ws, 'Solutions', folder)

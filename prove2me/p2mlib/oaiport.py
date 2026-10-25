@@ -527,14 +527,31 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
     return files
 
 
-def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', header='', stdsimplex='auto'):
+# the Mathlib files the compat block's declarations need, for `module_files(compat_imports=…)`
+COMPAT_NARROW_IMPORTS = (
+    'Mathlib.Algebra.Order.BigOperators.Ring.Finset',
+    'Mathlib.Algebra.Order.BigOperators.Group.Finset',
+    'Mathlib.Combinatorics.SimpleGraph.Paths',
+    'Mathlib.Data.List.Nodup',
+    'Mathlib.GroupTheory.FreeGroup.Basic',
+    'Mathlib.LinearAlgebra.TensorProduct.Basic',
+    'Mathlib.MeasureTheory.Measure.Typeclasses.Probability',
+    'Mathlib.MeasureTheory.MeasurableSpace.Embedding',
+    'Mathlib.MeasureTheory.MeasurableSpace.Constructions',
+)
+
+
+def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', header='', stdsimplex='auto',
+                 compat_imports=None):
     """module_texts, then the patches for the module route (each exactly its count over all files;
     single-file-only ones skipped, see single_file_only), Compat.lean holding
     compat_block(compat_text, compat_ns), and StdSimplexCompat.lean (the shim) when a module
-    needs it."""
+    needs it. `compat_imports`: Mathlib modules for Compat to import instead of all of Mathlib (it
+    puts every Mathlib instance in scope of every module; COMPAT_NARROW_IMPORTS)."""
     files = apply_patches(module_texts(sources, mod, compat_text, compat_ns, header, stdsimplex),
                           patches, route='modules')
-    files['Compat.lean'] = 'import Mathlib\n\n' + compat_block(compat_text, compat_ns)[0]
+    cimp = '\n'.join('import ' + m for m in compat_imports) if compat_imports else 'import Mathlib'
+    files['Compat.lean'] = cimp + '\n\n' + compat_block(compat_text, compat_ns)[0]
     if any(('import %s.%s\n' % (mod, STDSIMPLEX_MODULE)) in x for x in files.values()):
         files[STDSIMPLEX_MODULE + '.lean'] = stdsimplex_shim()
     return files
