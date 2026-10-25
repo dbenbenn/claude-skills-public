@@ -709,3 +709,13 @@ def test_elpnorm_rpow_enorm_drops_measurability_argument():
     assert "(by finiteness),\n" in out
     assert "aestronglyMeasurable" not in out
     assert "eLpNorm_eq_lintegral_rpow_enorm_toReal hpE (by finiteness)]" in out
+
+
+# d13f23b has `spectralRadius_eq_of_unital` (the spectral radius as the supremum over the spectrum); ours has only
+# the definition (BrownMeasure, StructuralCrouzeix, NumericalRange, 2026-10-25). A compat theorem with the new name.
+
+def test_compat_has_spectral_radius_eq_of_unital():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem spectralRadius_eq_of_unital' in src
