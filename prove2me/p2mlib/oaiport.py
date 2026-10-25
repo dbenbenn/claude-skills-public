@@ -320,7 +320,7 @@ def core_rewrites(text, compat_ns='OAI'):
     # `Finset.prod_le_prod`, and our nonnegative `prod_le_prod` to `prod_le_prod₀` (the compat
     # aliases map that one back, after this). So an unsuffixed use is our primed lemma
     # (wave 2, 2026-10-25: BinaryMatching, QuantitativeVanDerWaerden, PeriodicTiling).
-    return re.sub(r"(?<![\w.'])((?:Finset\.)?(?:prod_le_prod|prod_le_one|one_le_prod))(?![\w'₀])",
+    return re.sub(r"(?<![\w.'])((?:Finset\.)?(?:prod_le_prod|prod_le_one|one_le_prod|single_le_prod))(?![\w'₀])",
                   r"\1'", text)
 
 

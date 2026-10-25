@@ -466,3 +466,17 @@ def test_prod_le_prod_of_subset_drops_zero_suffix():
     assert 'Finset.prod_le_prod_of_subset_of_one_le h a b' in out
     assert '₀' not in out
     assert "prod_le_prod_of_subset_of_le_one' h" in out
+
+
+# d13f23b's `Finset.single_le_prod` (ordered monoid, hypothesis `1 ≤ f i`) is our `Finset.single_le_prod'`
+# (SquareDifference PrimaryKernel, 2026-10-25), like prod_le_prod above.
+
+def test_single_le_prod_gets_prime_but_qualified_others_do_not():
+    src = ("exact_mod_cast single_le_prod (fun j hj => h j hj) hiT\n"
+           "exact Finset.single_le_prod h i\nexact List.single_le_prod h\nexact Multiset.single_le_prod h x\n"
+           "exact single_le_prod' h\n")
+    out = O.core_rewrites(src)
+    assert "cast single_le_prod' (fun" in out
+    assert "exact Finset.single_le_prod' h i" in out
+    assert "List.single_le_prod h" in out and "Multiset.single_le_prod h x" in out
+    assert "single_le_prod'' " not in out and "single_le_prod' h\n" in out
