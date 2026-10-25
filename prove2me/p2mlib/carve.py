@@ -2013,10 +2013,23 @@ def publish_order(plan, external=()):
     its bundles; none for `external` nodes, published by someone else), `piece:NODE` (after its
     own statement, the statements it imports and its bundles)."""
     deps = {}
+
+    def proved_after(names):
+        # a statement is Proved once its piece and, transitively, the pieces of the statements
+        # that piece imports are accepted (an accepted reduction leaves it Open: Eilenberg–Ganea
+        # OAIEGC001, 2026-10-25)
+        out, todo = [], list(names)
+        while todo:
+            x = todo.pop()
+            if x in out or x not in plan['pieces']:
+                continue
+            out.append(x)
+            todo.extend(plan['pieces'][x].get('imports', ()))
+        return sorted(out)
     for b in plan['bundles']:
-        # a bundle may import a statement only once it is Proved: after its piece is accepted
+        # a bundle may import a statement only once it is Proved
         deps['bundle:' + b['name']] = ['bundle:' + x for x in b['imports']] + \
-            ['piece:' + x for x in b.get('statements', ())]
+            ['piece:' + x for x in proved_after(b.get('statements', ()))]
     for n, s in plan['stubs'].items():
         if n not in external:
             deps['statement:' + n] = ['bundle:' + x for x in s['bundles']]

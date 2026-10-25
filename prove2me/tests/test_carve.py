@@ -1147,6 +1147,26 @@ def test_an_open_shadowed_by_a_project_namespace_elsewhere_is_rooted(g):
     assert re.search(r'^open _root_\.Nat$', out, re.M), out
 
 
+def test_a_bundle_waits_for_every_piece_its_statements_rest_on():
+    # Eilenberg–Ganea (2026-10-25): bundle OAIEGC001 imports the statement d1_basis_cert, whose
+    # piece imports eleven block statements; the piece came back SKETCH_ACCEPTED, the statement
+    # stayed Open until the blocks were proved, and the bundle was refused ("Imported platform
+    # theorems must be Proved at submission time"). The bundle waits for the whole closure.
+    plan = {'bundles': [{'name': 'B0', 'nodes': [], 'imports': []},
+                        {'name': 'B1', 'nodes': [], 'imports': ['B0'], 'statements': ['S']}],
+            'nodes': ['S', 'T', 'U', 'X'],
+            'stubs': {'S': {'bundles': ['B0']}, 'T': {'bundles': ['B0']}, 'U': {'bundles': ['B0']},
+                      'X': {'bundles': ['B0']}},
+            'pieces': {'S': {'bundles': ['B0'], 'imports': ['T', 'E']},
+                       'T': {'bundles': ['B0'], 'imports': ['U']},
+                       'U': {'bundles': ['B0'], 'imports': []},
+                       'X': {'bundles': ['B0'], 'imports': []}},
+            'external': ['E']}
+    deps = C.publish_order(plan, external=['E'])['deps']['bundle:B1']
+    assert {'piece:S', 'piece:T', 'piece:U'} <= set(deps)
+    assert 'piece:X' not in deps and 'piece:E' not in deps
+
+
 def test_measured_bundle_times_rescale_the_estimates_of_their_declarations():
     cost = {'a': 1.0, 'b': 3.0, 'c': 2.0, 'd': 5.0}
     bundles = [{'name': 'X0', 'nodes': ['a', 'b']}, {'name': 'X1', 'nodes': ['c']}, {'name': 'X2', 'nodes': ['d']}]
