@@ -576,6 +576,7 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
 
 # the Mathlib files the compat block's declarations need, for `module_files(compat_imports=…)`
 COMPAT_NARROW_IMPORTS = (
+    'Mathlib.Combinatorics.Young.YoungDiagram',
     'Mathlib.Algebra.MvPolynomial.Basic',
     'Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Order',
     'Mathlib.Algebra.Order.BigOperators.Ring.Finset',

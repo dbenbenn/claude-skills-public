@@ -45,6 +45,21 @@ theorem _root_.CStarAlgebra.norm_le_norm_of_le_of_nonneg {A : Type*} [NonUnitalC
 theorem _root_.MvPolynomial.monomial_mul_monomial {σ R : Type*} [CommSemiring R] {s s' : σ →₀ ℕ}
     {a b : R} : MvPolynomial.monomial s a * MvPolynomial.monomial s' b =
       MvPolynomial.monomial (s + s') (a * b) := MvPolynomial.monomial_mul
+/-- Mathlib d13f23b's `YoungDiagram.card_transpose`. -/
+theorem _root_.YoungDiagram.card_transpose (μ : YoungDiagram) : μ.transpose.card = μ.card := by
+  unfold YoungDiagram.card
+  apply Finset.card_bij (fun c _ => c.swap)
+  · intro c hc
+    have : c ∈ μ.transpose := hc
+    rw [YoungDiagram.mem_transpose] at this
+    exact this
+  · intro a _ b _ h
+    simpa using h
+  · intro b hb
+    refine ⟨b.swap, ?_, by simp⟩
+    show b.swap ∈ μ.transpose
+    rw [YoungDiagram.mem_transpose]
+    simpa using hb
 /-- For a measurable equivalence `e`, `IsProbabilityMeasure (μ.map e)` is found by instance search
 (Mathlib d13f23b finds it for every map `f`: there `Measure.map` of a non-measurable map is a Dirac
 mass, here it is `0`, so only the measurable case can be shimmed). -/

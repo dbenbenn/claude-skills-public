@@ -594,3 +594,13 @@ def test_norm_mem_spectrum_of_nonneg_drops_explicit_element():
     out = O.core_rewrites(src)
     assert "(CStarAlgebra.norm_mem_spectrum_of_nonneg hb)" in out
     assert out.count("norm_mem_spectrum_of_nonneg hb") == 2
+
+
+# d13f23b has `YoungDiagram.card_transpose`; ours does not (BinarySweep DiagonalDimension, 2026-10-25).
+
+def test_compat_has_youngdiagram_card_transpose():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem _root_.YoungDiagram.card_transpose' in src
+    assert 'Mathlib.Combinatorics.Young.YoungDiagram' in O.COMPAT_NARROW_IMPORTS
