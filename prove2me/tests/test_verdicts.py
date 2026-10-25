@@ -30,6 +30,12 @@ CASES = [
     ('FAILED', 'definition does not compile: line 3001: (deterministic) timeout at `whnf`, maximum number of '
                'heartbeats (200000) has been reached', 'heartbeats'),
     ('FAILED', 'formal statement does not compile: line 199: failed to synthesize instance of type class', 'compile_error'),
+    # Eilenberg–Ganea (2026-10-25): the worker's build of the imported bundles was OOM-killed (many
+    # decide-heavy bundles built in parallel); unchanged retries failed the same way
+    ('FAILED', 'definition does not compile: Failed to compile modules Definitions.Def_EilenbergGanea, '
+               'Definitions.Def_OAIEG012: \u2714 [8717/8725] Built Definitions.Def_OAIEG006 (28s)\n'
+               '\u2716 [8718/8725] Building Definitions.Def_OAIEG012 (44s)\nerror: Lean exited with code 137\n'
+               'error: build failed', 'dependency_oom'),
     ('PUBLISHED', None, 'accepted'),
     (None, '<urlopen error [Errno -3] Temporary failure in name resolution>', 'transient'),
 ]
@@ -51,7 +57,7 @@ def test_decide_splits_after_two_own_timeouts():
 
 
 def test_decide_never_retries_a_wrong_or_broken_proof():
-    for k in ('compile_error', 'wrong', 'refused'):
+    for k in ('compile_error', 'wrong', 'refused', 'dependency_oom'):
         assert V.decide(k, {}) == 'stop'
     assert V.decide('accepted', {}) == 'done'
     assert V.decide('heartbeats', {}) == 'raise_heartbeats'

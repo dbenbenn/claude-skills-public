@@ -10,6 +10,10 @@
                  solution module: Module compilation timed out", publish FAILED "Compilation timed
                  out"). Retrying is a lottery (an 84 s piece passed after 129 tries); split instead.
   heartbeats     a deterministic heartbeat timeout: raise maxHeartbeats on that declaration.
+  dependency_oom FAILED "Failed to compile modules <imports>: ... Lean exited with code 137": the
+                 worker was killed (out of memory) building the item's imported bundles, many heavy
+                 ones in parallel. Unchanged retries failed alike (Eilenberg–Ganea 2026-10-25): move
+                 the heavy proofs out of the bundles (publish them as statements) instead.
   compile_error  CE, or FAILED "... does not compile" for a real reason: fix the file.
   wrong          WA: the solution does not prove the published statement (a target renamed wrong,
                  a signature mismatch, an import clash with the statement's own imports).
@@ -30,6 +34,7 @@ _TRANSIENT = re.compile(
     r"Import parser timed out|urlopen error|Connection(?:Reset|Refused)?Error|Temporary failure|"
     r"Network is unreachable|No route to host")
 _OWN = re.compile(r"Verification timed out|Failed to compile solution module|^Compilation timed out")
+_DEP_OOM = re.compile(r"Failed to compile modules .*exited with code 137", re.S)
 _HEART = re.compile(r"\(deterministic\) timeout|maximum number of heartbeats")
 
 
@@ -46,6 +51,8 @@ def classify(status, error_message):
         return 'transient'
     if _OWN.search(m):
         return 'own_timeout'
+    if _DEP_OOM.search(m):
+        return 'dependency_oom'
     if status == 'CE' or 'does not compile' in m or 'Compile error' in m:
         return 'compile_error'
     return 'refused'
