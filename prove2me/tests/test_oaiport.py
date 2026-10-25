@@ -775,3 +775,17 @@ def test_convert_using_semicolon_ring_closes_all_goals():
     out = O.core_rewrites(src)
     assert "convert hBern using 1 <;> first | rfl | ring\n" in out
     assert "convert h using 2; ring_nf" in out and "convert h using 1; simp" in out
+
+
+# d13f23b renames/signatures (UnitDistances, StandardMap 2026-10-25): `finsum_le_finsum` (ordered monoid, finite
+# supports) is our `finsum_le_finsum'`; `Filter.eventuallyEqSet_iff` is `Filter.eventuallyEq_set`;
+# `posLog_le_posLog` asks `-1 ≤ x` there and `0 ≤ x` here.
+
+def test_finsum_eventuallyeq_set_posLog_renames():
+    src = ("apply finsum_le_finsum (hf) (hg)\nexact finsum_le_finsum' h\n"
+           "rw [Filter.eventuallyEqSet_iff]\n"
+           "have h' := (posLog_le_posLog (neg_one_lt_zero.le.trans (v.nonneg x)) hxy).trans h\n")
+    out = O.core_rewrites(src)
+    assert "apply finsum_le_finsum' (hf) (hg)" in out and "finsum_le_finsum'' " not in out
+    assert "Filter.eventuallyEq_set" in out and "eventuallyEqSet_iff" not in out
+    assert "posLog_le_posLog (id (v.nonneg x))" in out
