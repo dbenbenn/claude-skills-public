@@ -69,7 +69,9 @@ def main():
         else:
             wanted = args[1:]           # standalone theorems belong to no mission or proposal
         for n in wanted:
-            tid = lookup(n)
+            # lookup_bundle tries the theorem lookup first, then finds a bundle by name
+            # (`--names OAIQWKAP000` wrote nothing before, 2026-10-25)
+            tid = lookup_bundle(n)
             if tid:
                 ids.append(tid)
             else:
