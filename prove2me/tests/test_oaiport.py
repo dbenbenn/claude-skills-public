@@ -394,3 +394,8 @@ def test_mathlib_has_flags_only_missing_mathlib_modules(tmp_path):
     assert not O.mathlib_has('Mathlib.Basic.Real.Basic', root=str(tmp_path))
     assert O.mathlib_has('OAI.Foo', root=str(tmp_path))
     assert O.mathlib_has(O.STDSIMPLEX_MISSING_IMPORTS[0], root=str(tmp_path))
+
+
+def test_demodule_import_all():
+    assert O.demodule('module\nimport all Mathlib.X\npublic import all Mathlib.Y\n\ndef a := 1\n') == \
+        'import Mathlib.X\nimport Mathlib.Y\n\ndef a := 1\n'
