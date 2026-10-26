@@ -929,3 +929,11 @@ def test_is_local_min_on_renamed_to_localize():
     assert O.core_rewrites("hm.isLocalMinOn.hasFDerivWithinAt_nonneg x; hM.isLocalMaxOn") == \
         "hm.localize.hasFDerivWithinAt_nonneg x; hM.localize"
     assert O.core_rewrites("IsLocalMinOn f s a") == "IsLocalMinOn f s a"
+
+
+def test_unfold_infer_instance_falls_back_to_map_measurability():
+    src = "  unfold gumbelLaw\n  infer_instance\n  unfold a\n  simp\n"
+    out = O.core_rewrites(src)
+    assert "  unfold gumbelLaw\n  first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)\n" in out
+    assert "unfold a\n  simp" in out
+    assert O.core_rewrites(out) == out

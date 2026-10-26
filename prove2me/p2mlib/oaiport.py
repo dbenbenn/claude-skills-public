@@ -436,6 +436,10 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*ring[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
+    # Our `Measure.map` is total (0 for a non-AEMeasurable map): `unfold law; infer_instance` for an
+    # `IsProbabilityMeasure (….map f)` needs the measurability (SKValue/IsingPerceptron 2026-10-26)
+    text = re.sub(r"(?m)^([ \t]*)unfold ([\w.']+)\n\1infer_instance[ \t]*$",
+                  r"\1unfold \2\n\1first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)", text)
     # d13f23b's lambda-form `logDeriv_fun_mul` / `logDeriv_fun_prod` are our `logDeriv_mul` / `logDeriv_prod`
     # (NodalLength, 2026-10-26)
     text = re.sub(r"(?<![\w'])logDeriv_fun_(mul|prod)(?![\w'])", r"logDeriv_\1", text)
