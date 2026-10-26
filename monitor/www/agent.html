@@ -43,10 +43,10 @@ mark{background:#d4a51455;color:inherit}
 <p class="empty" id="empty" hidden>Nothing to show.</p>
 </main>
 <script>
-const TZ = 'Europe/Berlin', NAME = new URLSearchParams(location.search).get('name') || '';
+const TZ = 'Europe/Berlin', tzName = t => new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Berlin',timeZoneName:'short'}).formatToParts(new Date(t*1000)).find(x=>x.type==='timeZoneName').value.replace('GMT+1','CET').replace('GMT+2','CEST'), NAME = new URLSearchParams(location.search).get('name') || '';
 const base = '/agent/' + encodeURIComponent(NAME) + '/';
 const fmtClock = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('de-DE', {timeZone: TZ, hour12: false}); };
-const fmtDT = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('en-CA', {timeZone: TZ, hour12: false}).replace(',', '') + ' CEST'; };
+const fmtDT = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('en-CA', {timeZone: TZ, hour12: false}).replace(',', '') + ' ' + tzName(d.getTime() / 1000); };
 const FILTERS = [['all', 'All'], ['text', 'Text'], ['tools', 'Tools'], ['errors', 'Errors']];
 let filter = 'all', query = '', events = [], pos = 0, startPos = 0, nextId = 0, busy = false;
 const logEl = document.getElementById('log');

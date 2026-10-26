@@ -53,7 +53,7 @@ code{font-size:13px}
 <nav class="nav" aria-label="Views"><a href="#t-sys">System resources</a><a href="#t-quota">Subscription quota</a><a href="#t-agents">Headless agents</a><a href="#sections">Work in progress</a></nav>
 <section class="card" aria-labelledby="t-sys">
 <h2 id="t-sys">System resources</h2>
-<p class="chart-sub">The whole machine, split by what uses it; sampled every 30 s · times in CEST. Memory: each group's own process memory (file cache excluded); the rest is everything else in use.</p>
+<p class="chart-sub">The whole machine, split by what uses it; sampled every 30 s · times in Berlin time (CET/CEST). Memory: each group's own process memory (file cache excluded); the rest is everything else in use.</p>
 <div class="toolbar">
   <div class="seg" role="group" aria-label="Time range" id="ranges"></div>
   <button id="zoomed" hidden>Zoomed in · back to range</button>
@@ -87,10 +87,10 @@ code{font-size:13px}
 <code>python3 ~/.claude/skills/monitor/section.py set my-job --title 'My job' --phase 'Items=3/10'</code>. The <code>monitor</code> skill has the details.</p></details>
 </main>
 <script>
-const TZ = 'Europe/Berlin';
+const TZ = 'Europe/Berlin', tzName = t => new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Berlin',timeZoneName:'short'}).formatToParts(new Date(t*1000)).find(x=>x.type==='timeZoneName').value.replace('GMT+1','CET').replace('GMT+2','CEST');
 const fmtT = t => new Date(t*1000).toLocaleTimeString('de-DE',{timeZone:TZ,hour:'2-digit',minute:'2-digit'});
 const fmtDay = t => new Date(t*1000).toLocaleDateString('en-CA',{timeZone:TZ});
-const fmtAt = t => (fmtDay(t)===fmtDay(Date.now()/1000) ? '' : fmtDay(t)+' ') + fmtT(t) + ' CEST';
+const fmtAt = t => (fmtDay(t)===fmtDay(Date.now()/1000) ? '' : fmtDay(t)+' ') + fmtT(t) + ' ' + tzName(t);
 const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ago = s => s<90 ? `${s} s ago` : s<5400 ? `${Math.round(s/60)} min ago` : `${(s/3600).toFixed(1)} h ago`;
 const fmtWd = t => new Date(t*1000).toLocaleDateString('en-GB',{timeZone:TZ,weekday:'short'});
