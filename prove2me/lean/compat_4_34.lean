@@ -93,7 +93,7 @@ theorem _root_.ProbabilityTheory.condDistrib_ae_eq_of_measure_eq_compProd
     [MeasureTheory.IsFiniteMeasure μ] {X : Ω → β} {Y : Ω → 𝓨}
     (hX : AEMeasurable X μ) (hY : AEMeasurable Y μ)
     {κ : ProbabilityTheory.Kernel β 𝓨} [ProbabilityTheory.IsFiniteKernel κ]
-    (hκ : μ.map (fun x => (X x, Y x)) = μ.map X ⊗ₘ κ) :
+    (hκ : μ.map (fun x => (X x, Y x)) = (μ.map X).compProd κ) :
     ProbabilityTheory.condDistrib Y X μ =ᵐ[μ.map X] κ := by
   have hXY : (fun x => (hX.mk X x, hY.mk Y x)) =ᵐ[μ] fun x => (X x, Y x) := by
     filter_upwards [hX.ae_eq_mk, hY.ae_eq_mk] with x h1 h2 using by simp [h1, h2]
