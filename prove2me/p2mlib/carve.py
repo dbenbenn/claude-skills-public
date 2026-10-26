@@ -2692,10 +2692,14 @@ class Carver:
         bad, changed = set(), True
         while changed:
             changed = False
-            lost = {n for j in bad for n in groups[j]['names']} | dropped_vars
+            lost_all = {n for j in bad for n in groups[j]['names']} | dropped_vars
             for j, grp in enumerate(groups):
                 if j in bad or set(grp['names']) & protected:
                     continue
+                # a name an earlier kept group of this command binds again is that new variable,
+                # not the dropped one (KL invariance 2026-10-26: `{B : Type ub} [CommRing B]
+                # (e : A ≃ₐ[k] B)` after an earlier `{A B : Type ua}` whose B was dropped)
+                lost = lost_all - {n for i in range(j) if i not in bad for n in groups[i]['names']}
                 # a token right after `.` is a field (`(e a).Bounds`): read only as Lean resolved
                 # it, never by its text
                 inside = [i for i in refs if grp['start'] <= i['start'] < grp['end'] and

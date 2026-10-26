@@ -1734,3 +1734,35 @@ def test_attribute_command_whose_targets_are_all_gone_is_dropped(g):
             'CD.double_succ', 'CD.List.headOr_nil'}
     txt = carve(g, keep, have)
     assert 'attribute [-simp]' not in txt
+
+
+class _FakeInfo:
+    def __init__(self, text):
+        self.text_bytes = text.encode()
+
+
+class _FakeCmd:
+    def __init__(self, text, groups):
+        self.binders = groups
+        self.idents = []
+        for grp in groups:
+            for name, pos in grp['refs']:
+                self.idents.append({'role': 'ref', 'name': name, 'start': pos, 'end': pos + len(name)})
+
+
+def test_a_name_bound_again_earlier_in_one_variable_command_is_not_lost_for_its_later_groups():
+    # OpenAI KL invariance (2026-10-26): `{B : Type ub} [CommRing B] [Algebra k B] (e : A ≃ₐ[k] B)`
+    # after an earlier `{A B : Type ua}` whose B was dropped: the later groups mention the new B,
+    # bound by the group just before them, and were cut as if they named the dropped one
+    text = 'variable {B : Type ub} [CommRing B] (e : B)'
+    pos = lambda s, k=0: [m for m in __import__('re').finditer(r'\b%s\b' % s, text)][k].start()
+    groups = [dict(names=['B'], start=9, end=22, refs=[]),
+              dict(names=[], start=23, end=34, refs=[('B', pos('B', 1))]),
+              dict(names=['e'], start=35, end=43, refs=[('B', pos('B', 2))])]
+    c = _FakeCmd(text, groups)
+    carver = C.Carver.__new__(C.Carver)
+    carver._gone = lambda *a, **k: False
+    carver.g = type('G', (), {'reading': staticmethod(lambda *a: None)})()
+    dropped = {'B'}
+    assert carver._variable(_FakeInfo(text), c, 'M', set(), [], dropped, set()) is False
+    assert dropped == set()
