@@ -35,17 +35,20 @@ theorem tensorInductionOn {R M N : Type*} [CommSemiring R] [AddCommMonoid M] [Ad
     (add : ∀ x y, motive x → motive y → motive (x + y)) : motive z :=
   TensorProduct.induction_on z (by simpa using tmul 0 0) tmul add
 /-- The `mpr` direction of Mathlib d13f23b's `unifIntegrable_iff`, whose `UnifIntegrable` takes
-extended-real `ε` and `δ`; ours takes real ones and a measurable set (SLE IntegralLimits, oaiq-027). -/
+extended-real `ε` and `δ` and bounds `eLpNorm (f i) p (μ.restrict s)`; ours takes real ones and a
+measurable set `s` (SLE IntegralLimits, oaiq-027). -/
 theorem unifIntegrable_of_enn {α β ι : Type*} {m : MeasurableSpace α} [NormedAddCommGroup β]
     {f : ι → α → β} {p : ENNReal} {μ : MeasureTheory.Measure α}
     (h : ∀ ε : ENNReal, 0 < ε → ∃ δ : ENNReal, 0 < δ ∧
-      ∀ i s, μ s ≤ δ → MeasureTheory.eLpNorm (s.indicator (f i)) p μ ≤ ε) :
+      ∀ i s, μ s ≤ δ → MeasureTheory.eLpNorm (f i) p (μ.restrict s) ≤ ε) :
     MeasureTheory.UnifIntegrable f p μ := by
   intro ε hε
   obtain ⟨δ, hδ, hb⟩ := h (ENNReal.ofReal ε) (ENNReal.ofReal_pos.2 hε)
   have hne : min δ 1 ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top (min_le_right _ _)
   refine ⟨(min δ 1).toReal, ENNReal.toReal_pos (lt_min hδ one_pos).ne' hne,
-    fun i s _ hs => hb i s (hs.trans ?_)⟩
+    fun i s hsm hs => ?_⟩
+  rw [MeasureTheory.eLpNorm_indicator_eq_eLpNorm_restrict hsm]
+  refine hb i s (hs.trans ?_)
   rw [ENNReal.ofReal_toReal hne]
   exact min_le_left _ _
 /-- Mathlib's newer case names for `FreeGroup.induction_on` (`one`, where ours says `C1`). -/
