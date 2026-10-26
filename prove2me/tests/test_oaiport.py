@@ -899,3 +899,8 @@ def test_convert_closes_instance_diamond_first():
     assert "convert h using 1\n  · simp" in out
     assert "convert h using 1 <;> first | rfl | field_simp" in out
     assert O.core_rewrites(out) == out
+
+
+def test_logderiv_fun_forms_renamed():
+    out = O.core_rewrites("rw [logDeriv_fun_mul (f:=a) z h, logDeriv_fun_prod h2 h3, logDeriv_fun_zpow]")
+    assert out == "rw [logDeriv_mul (f:=a) z h, logDeriv_prod h2 h3, logDeriv_fun_zpow]"

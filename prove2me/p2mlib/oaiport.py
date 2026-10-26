@@ -434,6 +434,9 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*ring[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
+    # d13f23b's lambda-form `logDeriv_fun_mul` / `logDeriv_fun_prod` are our `logDeriv_mul` / `logDeriv_prod`
+    # (NodalLength, 2026-10-26)
+    text = re.sub(r"(?<![\w'])logDeriv_fun_(mul|prod)(?![\w'])", r"logDeriv_\1", text)
     # d13f23b renames (UnitDistances, StandardMap 2026-10-25)
     text = re.sub(r"(?<![\w.'])birkhoffSum_succ_apply'(?![\w'])", "birkhoffSum_succ'", text)
     text = re.sub(r"(?<![\w.'])birkhoffSum_add_right_apply(?![\w'])", "birkhoffSum_add", text)
