@@ -810,3 +810,15 @@ def test_rkhs_posSemidef_tfae_index():
     out = O.core_rewrites("apply (RKHS.posSemidef_tfae.out 1 3).mpr\nexact (RKHS.posSemidef_tfae.out 0 1).mp h\n")
     assert "apply (RKHS.posSemidef_tfae.out 2 0).mp" in out
     assert "RKHS.posSemidef_tfae.out 0 1" in out
+
+
+# d13f23b's `eLpNorm_restrict_eq_of_support_subset` takes a measurability argument first and
+# `eLpNorm_congr_norm_ae` two; ours take none (HotSpots Sobolev, 2026-10-26).
+
+def test_elpnorm_measurability_args_dropped():
+    src = ("rw [eLpNorm_restrict_eq_of_support_subset hf.continuous.aestronglyMeasurable hs']\n"
+           "apply eLpNorm_congr_norm_ae\n  (hf.continuous_fderiv (by simp)).aestronglyMeasurable\n"
+           "  ((foo.comp bar).aestronglyMeasurable)\n  hh\n")
+    out = O.core_rewrites(src)
+    assert "eLpNorm_restrict_eq_of_support_subset hs'" in out
+    assert "eLpNorm_congr_norm_ae\n  hh" in out.replace("  hh", "  hh") or "eLpNorm_congr_norm_ae hh" in out

@@ -396,6 +396,11 @@ def core_rewrites(text, compat_ns='OAI'):
     # d13f23b's `RKHS.posSemidef_tfae` has a fourth item; its `.out 1 3).mpr` is our `.out 2 0).mp`
     # (HotSpots Reciprocal, 2026-10-26)
     text = re.sub(r"\(RKHS\.posSemidef_tfae\.out 1 3\)\.mpr", "(RKHS.posSemidef_tfae.out 2 0).mp", text)
+    # d13f23b's `eLpNorm_restrict_eq_of_support_subset` and `eLpNorm_congr_norm_ae` take measurability
+    # arguments first (one, resp. two); ours take none (HotSpots Sobolev, 2026-10-26)
+    _m = r"(?:\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|[\w']+)(?:\.[\w']+)*"
+    text = re.sub(r"(?<![\w.'])(eLpNorm_restrict_eq_of_support_subset)\s+" + _m + r"(?=\s|\))", r"\1", text)
+    text = re.sub(r"(?<![\w.'])(eLpNorm_congr_norm_ae)\s+" + _m + r"\s+" + _m + r"(?=\s|\))", r"\1", text)
     # `convert h using n; ring` leaves instance-diamond / lambda-form goals first in ours: close all by rfl or ring
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*ring[ \t]*$", r"\1 <;> first | rfl | ring", text)
     # d13f23b renames (UnitDistances, StandardMap 2026-10-25)
