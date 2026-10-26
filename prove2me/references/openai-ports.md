@@ -39,7 +39,10 @@ transformations are in `p2mlib.oaiport`, and `tests/test_oaiport.py` pins the bu
    statement, so others can reuse it. `oai_build_modules.py`, `carve.py` and `carve_measure.py`
    each allow one live run per carve (`p2mlib/runlock.py`). A second copy exits 3 and names the
    pid already running it: wait for that run or stop it, and never start another (2026-10-23, a
-   resumed agent had no record of a pipeline it had restarted an hour before).
+   resumed agent had no record of a pipeline it had restarted an hour before). Stop a run with a
+   plain `kill PID` (SIGTERM), never `kill -9`: a lock holder then stops everything it started
+   (its `lake` and `lean` too) before it lets go of the lock. With `kill -9` they keep compiling for
+   minutes and race the next run over the same `.olean` files (2026-10-26, oaiq-003 and oaiq-012).
 5. **A bundle that needs a statement imports it.** With `bundles_import_statements` (the default),
    a bundle imports a forced theorem that definitions need. That import is allowed only once the
    theorem is Proved, so `publish_order` puts the bundle after the statement's piece.

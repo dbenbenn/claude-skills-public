@@ -3,12 +3,19 @@ naming the run that holds it. The kernel drops a flock when its holder dies, so 
 stale. (2026-10-23: a resumed agent restarted a PosteriorReplicas pipeline it had already started an
 hour before, and two builds wrote the same .olean files.)
 
+A holder that is told to stop (SIGTERM, SIGHUP, SIGINT) first stops every process it started, so its
+lock is never free while its lake/lean children still compile. (2026-10-26, oaiq-003 and oaiq-012:
+killing carve_pipeline left the old lean writing the .olean the restarted run was building.) Only
+kill -9 still orphans them.
+
 Locks live in $P2M_LOCK_DIR, default /tmp/p2m-locks-<uid>; each holds a JSON line saying who has it."""
 import fcntl
 import hashlib
 import json
 import os
+import signal
 import sys
+import threading
 import time
 
 _held = {}            # key -> open file; kept for the life of the process
@@ -79,3 +86,74 @@ def hold(key, what=''):
                         'started': time.strftime('%Y-%m-%d %H:%M:%S %Z')}))
     f.flush()
     _held[key] = f
+    _stop_tree_on_signals()
+
+
+def _descendants(root):
+    """The pids of root's descendants, from /proc."""
+    kids = {}
+    for d in os.listdir('/proc'):
+        if d.isdigit():
+            try:
+                kids.setdefault(int(open('/proc/%s/stat' % d).read().rsplit(')', 1)[1].split()[1]), []).append(int(d))
+            except (OSError, ValueError, IndexError):
+                continue
+    out, todo = [], [root]
+    while todo:
+        for k in kids.get(todo.pop(), []):
+            out.append(k)
+            todo.append(k)
+    return out
+
+
+def _running(pid):
+    try:
+        return open('/proc/%d/stat' % pid).read().rsplit(')', 1)[1].split()[0] != 'Z'
+    except (OSError, IndexError):
+        return False
+
+
+def _send(pid, sig):
+    try:
+        os.kill(pid, sig)
+    except OSError:
+        pass
+
+
+def stop_tree(root=None, grace=5.0):
+    """Stops every descendant of root (default: this process). Freezes them first, so none can start
+    another or leave the tree when its parent dies; then SIGTERM and SIGCONT; SIGKILL what is left
+    after `grace` seconds."""
+    root, frozen = root or os.getpid(), []
+    for _ in range(50):
+        new = [p for p in _descendants(root) if p not in frozen]
+        if not new:
+            break
+        for p in new:
+            _send(p, signal.SIGSTOP)
+        frozen += new
+    for sig in (signal.SIGTERM, signal.SIGCONT):
+        for p in frozen:
+            _send(p, sig)
+    deadline = time.time() + grace
+    while time.time() < deadline and any(_running(p) for p in frozen):
+        time.sleep(0.05)
+    for p in frozen:
+        if _running(p):
+            _send(p, signal.SIGKILL)
+
+
+def _stop_and_exit(signum, frame):
+    stop_tree()
+    if signum == signal.SIGINT:
+        raise KeyboardInterrupt     # as before: finally blocks run, and the exit status says SIGINT
+    signal.signal(signum, signal.SIG_DFL)
+    os.kill(os.getpid(), signum)
+
+
+def _stop_tree_on_signals():
+    if threading.current_thread() is not threading.main_thread():
+        return
+    for s in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+        if signal.getsignal(s) != signal.SIG_IGN:   # a nohup run's ignored hangup stays ignored
+            signal.signal(s, _stop_and_exit)

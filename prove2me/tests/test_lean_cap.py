@@ -23,3 +23,15 @@ def test_is_idempotent_and_leaves_a_missing_cap_alone(tmp_path):
     env2 = {'PATH': '/usr/bin'}
     p2mlib.lean_cap_first(env2, str(tmp_path / 'absent'))
     assert env2['PATH'] == '/usr/bin'
+
+
+def test_p2m_lean_cap_names_the_cap_and_empty_turns_it_off(tmp_path):
+    # the same switch carvepipeline.env() reads; the pipeline tests set it empty to reach their stub lake
+    cap = tmp_path / 'other-cap'
+    cap.mkdir()
+    env = {'PATH': '/usr/bin', 'P2M_LEAN_CAP': str(cap)}
+    p2mlib.lean_cap_first(env)
+    assert env['PATH'].split(os.pathsep)[0] == str(cap)
+    env = {'PATH': '/stub/bin:/usr/bin', 'P2M_LEAN_CAP': ''}
+    p2mlib.lean_cap_first(env)
+    assert env['PATH'] == '/stub/bin:/usr/bin'

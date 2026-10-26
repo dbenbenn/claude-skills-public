@@ -1,6 +1,7 @@
 """p2mlib.runlock: one live run per carve (2026-10-23: a resumed agent restarted a PosteriorReplicas
 pipeline it had already started an hour before, and two builds wrote the same .olean files)."""
 import os
+import signal
 import subprocess
 import sys
 import textwrap
@@ -95,3 +96,66 @@ def test_scripts_refuse_while_their_carve_is_held(lockdir, tmp_path, script, arg
     finally:
         p.kill()
         p.wait()
+
+
+# A holder whose child starts a grandchild, as lake starts lean. SIGHUP and SIGINT are reset to their
+# defaults first, as for a run started in the foreground (this test may itself run under nohup).
+TREE_HOLDER = textwrap.dedent('''
+    import signal, subprocess, sys, time
+    sys.path.insert(0, %r)
+    signal.signal(signal.SIGHUP, signal.SIG_DFL)
+    signal.signal(signal.SIGINT, signal.default_int_handler)
+    if sys.argv[2] == 'nohup':
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    from p2mlib import runlock
+    runlock.hold(sys.argv[1], 'test holder')
+    c = subprocess.Popen(['sh', '-c', 'sleep 60 & echo $!; wait'], stdout=subprocess.PIPE, text=True)
+    print('held', c.pid, c.stdout.readline().strip(), flush=True)
+    c.wait()
+''') % ROOT
+
+
+def running(pid):
+    try:
+        return open('/proc/%s/stat' % pid).read().rsplit(')', 1)[1].split()[0] != 'Z'
+    except OSError:
+        return False
+
+
+def gone(*pids):
+    deadline = time.time() + 5
+    while time.time() < deadline and any(running(x) for x in pids):
+        time.sleep(0.05)
+    return not any(running(x) for x in pids)
+
+
+def start_tree(key, mode='plain'):
+    p = subprocess.Popen([sys.executable, '-c', TREE_HOLDER, key, mode], stdout=subprocess.PIPE, text=True,
+                         env=os.environ.copy())
+    word, child, grandchild = p.stdout.readline().split()
+    assert word == 'held' and running(child) and running(grandchild)
+    return p, child, grandchild
+
+
+@pytest.mark.parametrize('sig', [signal.SIGTERM, signal.SIGHUP, signal.SIGINT])
+def test_stopping_a_holder_stops_everything_it_started(lockdir, sig):
+    # 2026-10-26 (oaiq-003, oaiq-012): killing carve_pipeline left its lake/lean children compiling
+    # for minutes, and the restarted run raced them over the same .olean files
+    from p2mlib import runlock
+    p, child, grandchild = start_tree('build|/ws|T')
+    p.send_signal(sig)
+    assert p.wait(timeout=15) == -sig
+    assert gone(child, grandchild)
+    assert runlock.held_by('build|/ws|T') is None
+
+
+def test_a_nohup_run_survives_a_hangup(lockdir):
+    p, child, grandchild = start_tree('build|/ws|N', 'nohup')
+    try:
+        p.send_signal(signal.SIGHUP)
+        time.sleep(0.5)
+        assert p.poll() is None and running(child) and running(grandchild)
+    finally:
+        p.terminate()
+        p.wait(timeout=15)
+    assert gone(child, grandchild)

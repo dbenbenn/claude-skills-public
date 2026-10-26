@@ -111,7 +111,7 @@ def test_health_flag_is_active_until_a_later_check_leaves_it_out(tmp_path):
 
 
 def test_race_is_active_while_both_jobs_run(tmp_path):
-    f = flags_file(tmp_path, (26, '11:24', ["race: '/home/u/ws|Solutions.OAIQ12_ED.Edit_Defs' started by pid 7 (python3 x) while pid 5 is already on it"]))
+    f = flags_file(tmp_path, (26, '11:24', ["race: '/home/u/ws|Solutions.OAIQ12_ED.Edit_Defs' started by pid 7 (python3 x) while pid 5 is already on it (both still on it after 30 s)"]))
     running = {}
     def alive(pid, needle):
         assert needle == 'Edit_Defs'
