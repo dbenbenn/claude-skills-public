@@ -2009,6 +2009,11 @@ def _could_match(g, k, i):
     return not td or bool(td & (g.nodes[k].deps | g.nodes[k].sig))
 
 
+# classes an instance of the key also answers problems of, through a parent projection
+# (`BorelSpace.opensMeasurable`: an `OpensMeasurableSpace X` problem is solved by a `BorelSpace X` instance)
+_PARENT_CLASSES = {'BorelSpace': ('OpensMeasurableSpace',)}
+
+
 def _could_answer(inst_cmd, c):
     """Did instance search solve, in command c, a problem that the instance declared by inst_cmd
     could answer: the same class, with the instance's head constants among the problem's? An
@@ -2021,7 +2026,8 @@ def _could_answer(inst_cmd, c):
         if not d[1] or not d[2]:
             continue
         heads = set(d[2])
-        if any(p[0] == d[1] and heads <= set(p[1:]) for p in asked):
+        classes = (d[1],) + _PARENT_CLASSES.get(d[1], ())
+        if any(p[0] in classes and heads <= set(p[1:]) for p in asked):
             return True
     return False
 

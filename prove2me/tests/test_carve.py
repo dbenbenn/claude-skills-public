@@ -1766,3 +1766,15 @@ def test_a_name_bound_again_earlier_in_one_variable_command_is_not_lost_for_its_
     dropped = {'B'}
     assert carver._variable(_FakeInfo(text), c, 'M', set(), [], dropped, set()) is False
     assert dropped == set()
+
+
+def test_a_local_borel_space_instance_answers_an_opens_measurable_space_problem():
+    # FKMaps (oaiq-021, 2026-10-26): `local instance : BorelSpace C(unitInterval, ℝ) := ⟨rfl⟩` supplies
+    # `OpensMeasurableSpace C(unitInterval, ℝ)` through `BorelSpace.opensMeasurable`; the problem's class
+    # is the parent, so the instance was carved away and the piece failed to synthesize it.
+    import types
+    inst = types.SimpleNamespace(declares=[('inst', 'BorelSpace', ['ContinuousMap', 'Real'])])
+    asked = types.SimpleNamespace(inst_keys=['OpensMeasurableSpace ContinuousMap Real'])
+    other = types.SimpleNamespace(inst_keys=['Nonempty ContinuousMap Real'])
+    assert C._could_answer(inst, asked)
+    assert not C._could_answer(inst, other)
