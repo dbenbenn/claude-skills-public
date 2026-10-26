@@ -1709,3 +1709,16 @@ def test_a_deriving_instance_command_is_a_declaration_command():
     assert C._is_decl_command(Cmd())
     Cmd.short_kind = 'open'
     assert not C._is_decl_command(Cmd())
+
+
+# `open Aux` in Top comes before the `namespace CD.Aux` block Top ends with. Mid made CD.Aux earlier,
+# but a bundle holding only Top's `laterConst` does not import Mid: the `open` is dead there.
+# The carver counted a namespace made by any command of the module as alive for every `open` of
+# it (PeriodicGroups BooleanCircuits, 2026-10-26: "unknown namespace `Structured.Device.Formula`").
+
+def test_open_before_the_namespace_block_that_makes_it_is_dropped(g):
+    keep = {'CD.main', '_private.CarveDev.Top.0.CD.helper', 'CD.Aux.laterConst'}
+    have = {'CD.Space', 'CD.Space.size', 'CD.double', 'CD.List.headOr', 'CD.size_zero',
+            'CD.double_succ', 'CD.List.headOr_nil'}
+    txt = carve(g, keep, have)
+    assert 'open Aux' not in txt and 'laterConst' in txt

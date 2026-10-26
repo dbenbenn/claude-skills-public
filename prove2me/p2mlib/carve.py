@@ -2217,6 +2217,7 @@ class Carver:
 
     def __init__(self, g):
         self.g = g
+        self.alive_pos = {}
 
     def carve(self, keep, have, deprivatize=False, sorry=(), rename=None, external=()):
         g = self.g
@@ -2251,18 +2252,30 @@ class Carver:
         for p in have - self.keep_names:
             alive.update(ns_prefixes(p))
         by_mod = collections.defaultdict(set)
+        by_pos = collections.defaultdict(dict)           # module -> namespace -> first command making it
         for k in keep:
             for n in g.have_names([k]):
-                by_mod[g.nodes[k].module].update(ns_prefixes(n))
+                m0 = g.nodes[k].module
+                by_mod[m0].update(ns_prefixes(n))
+                for x in ns_prefixes(n):
+                    by_pos[m0][x] = min(by_pos[m0].get(x, g.nodes[k].cmd), g.nodes[k].cmd)
         out = []
         earlier = set()
         for m in mods:
             info = g.infos[m]
+            before = set(alive)
             alive |= by_mod[m]
+            pos = dict(by_pos[m])
             for c in info.commands:
                 if c.short_kind == 'namespace' and c.index not in drops[m]:
                     full = join(c.namespace, leanedit.text(info, c.index).split()[1])
                     alive.update(ns_prefixes(full + '.x'))
+                    for x in ns_prefixes(full + '.x'):
+                        pos[x] = min(pos.get(x, c.index), c.index)
+            # a namespace first made by a later command of this module is not there yet at an
+            # `open` before it (PeriodicGroups BooleanCircuits, 2026-10-26: `open … Device.Formula`
+            # kept in a bundle whose `namespace …Formula` command comes after it)
+            self.alive_pos = {x: i for x, i in pos.items() if x not in before}
             sec = self._module(m, kept_cmds[m], drops[m], have, set(alive), deprivatize,
                                {g.nodes[k].cmd for k in sorry if g.nodes[k].module == m}, rename)
             # an instance with no name this file can write is skipped: `attribute [-instance] `
@@ -2723,7 +2736,7 @@ class Carver:
             known = [x for x in cands if x in g.proj_ns or x in g.ext_ns]
             if not known:
                 continue                      # Mathlib's, say: carving cannot change it
-            now = [x for x in cands if x in g.ext_ns or x in alive]
+            now = [x for x in cands if x in g.ext_ns or (x in alive and self.alive_pos.get(x, -1) < c.index)]
             orig = [x for x in cands if x in g.ext_ns or g.ns_existed(x, m, before=c.index)]
             if not now:
                 dead += 1
@@ -2759,7 +2772,7 @@ class Carver:
             list(dict.fromkeys([join(p, tok) for p in prefixes(c.namespace)] + [join(o, tok) for o in opens]))
         if not any(x in g.proj_ns or x in g.ext_ns for x in cands):
             return []                         # Mathlib's: carving cannot change it
-        now = [x for x in cands if x in g.ext_ns or x in alive]
+        now = [x for x in cands if x in g.ext_ns or (x in alive and self.alive_pos.get(x, -1) < c.index)]
         if not now:
             return None
         gone = []

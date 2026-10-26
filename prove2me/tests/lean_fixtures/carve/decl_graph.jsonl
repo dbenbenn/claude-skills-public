@@ -153,6 +153,7 @@
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD._aux_CarveDev_Mid___unexpand_CD_double_eq_1","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.termDE","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.termWZ","p":false,"r":[70,0,70,24],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.Top","n":"CD.Aux.laterConst","p":false,"r":[38,0,38,25],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"inductive","m":"CarveDev.Base","n":"CD.Space","p":false,"r":[10,0,13,14],"s":false,"t":[],"u":[],"v":["CD.Space.mk"]}
 {"i":false,"k":"inductive","m":"CarveDev.Base","n":"CD.Wide","p":false,"r":[37,0,39,9],"s":false,"t":[],"u":[],"v":["CD.Wide.mk"]}
 {"i":false,"k":"inductive","m":"CarveDev.Coer","n":"CD.Co.Fn","p":false,"r":[24,0,25,19],"s":false,"t":[],"u":[],"v":["CD.Co.Fn.mk"]}

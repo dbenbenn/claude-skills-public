@@ -1389,9 +1389,202 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 767,
+    "byte": 784,
+    "col": 16,
+    "line": 36
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 784,
+     "name": "CD.Aux",
+     "role": "scope",
+     "start": 778
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 768,
     "col": 0,
-    "line": 35
+    "line": 36
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 11
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.Aux.laterConst",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 811,
+    "col": 25,
+    "line": 38
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 800,
+     "name": "laterConst",
+     "role": "decl",
+     "start": 790
+    },
+    {
+     "end": 806,
+     "name": "Nat",
+     "role": "ref",
+     "start": 803
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 800,
+      "col": 14,
+      "line": 38
+     },
+     "start": {
+      "byte": 790,
+      "col": 4,
+      "line": 38
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Aux.laterConst"
+   ],
+   "namespace": "CD.Aux",
+   "opens": [],
+   "resolved": [
+    [
+     790,
+     800,
+     "",
+     "b"
+    ],
+    [
+     790,
+     800,
+     "CD.Aux.laterConst",
+     "b"
+    ],
+    [
+     803,
+     806,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 786,
+    "col": 0,
+    "line": 38
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 807,
+    "col": 21,
+    "line": 38
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 11
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 823,
+    "col": 10,
+    "line": 40
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 823,
+     "name": "CD.Aux",
+     "role": "scope",
+     "start": 817
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.Aux",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 813,
+    "col": 0,
+    "line": 40
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 824,
+    "col": 0,
+    "line": 41
    },
    "heads": [],
    "idents": [],
@@ -1407,9 +1600,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 767,
+    "byte": 824,
     "col": 0,
-    "line": 35
+    "line": 41
    },
    "used_keys": []
   }

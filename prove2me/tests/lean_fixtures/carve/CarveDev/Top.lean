@@ -32,3 +32,9 @@ theorem uses_sized (B : Space) : (sizedZero B).val = 0 := rfl
 theorem uses_scoped : viaScoped 1 = 2 := rfl
 
 end CD
+
+namespace CD.Aux
+
+def laterConst : Nat := 7
+
+end CD.Aux
