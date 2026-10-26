@@ -14,6 +14,10 @@ usage: sync_workspace.py [--no-live]
    course then it's up to you to remember to rerun them sometimes").
 5. Run workspace_audit.py --quiet (also with --no-live): one line on which untracked workspace files
    have no copy on GitHub. Informational; it never changes the exit status.
+6. Count the untriaged lessons the headless workers filed in the lessons inbox ($P2M_LESSONS_INBOX,
+   default ~/claude/p2m-standalone/openai-ports/lessons-inbox, one .md per lesson besides README.md).
+   The main agent triages them into SKILL.md (merged into the existing rule, a tool fix, or dropped)
+   and deletes each file. Informational.
 
 Exit status 1 if the fast-forward fails or a contract test fails.
 """
@@ -28,6 +32,22 @@ from p2m import _workspace  # noqa: E402
 
 def git(ws, *args):
     return subprocess.run(['git', '-C', ws] + list(args), capture_output=True, text=True)
+
+
+INBOX = os.path.expanduser(os.environ.get('P2M_LESSONS_INBOX',
+                                           '~/claude/p2m-standalone/openai-ports/lessons-inbox'))
+
+
+def inbox_line(inbox=INBOX):
+    """One line naming the untriaged lessons in the inbox, or None when there are none."""
+    try:
+        names = [f for f in os.listdir(inbox) if f.endswith('.md') and f != 'README.md']
+    except FileNotFoundError:
+        return None
+    if not names:
+        return None
+    return ('lessons inbox: %d untriaged in %s -- main agent: triage each into the skill '
+            '(merge, tool fix, or drop), then delete it' % (len(names), inbox))
 
 
 def main():
@@ -52,6 +72,9 @@ def main():
     audit = subprocess.run([sys.executable, os.path.join(HERE, 'workspace_audit.py'), '--quiet'],
                            capture_output=True, text=True)
     print((audit.stdout or audit.stderr[-1500:]).rstrip())
+    line = inbox_line()
+    if line:
+        print(line)
     if '--no-live' in sys.argv:
         return
     tests = os.path.join(os.path.dirname(HERE), 'tests', 'test_live_contract.py')
