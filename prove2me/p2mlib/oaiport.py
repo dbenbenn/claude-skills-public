@@ -363,9 +363,9 @@ def core_rewrites(text, compat_ns='OAI'):
     `C1`: every use becomes `freeGroupInductionOn`. `compat_ns` is the compat block's namespace
     (None: root level)."""
     pre = compat_ns + '.' if compat_ns else ''
-    # Mathlib's Matroid files add the global tokens `<m` / `≤m`; `1<m` with a variable `m` then fails
+    # Mathlib adds the global tokens `<m ≤m <i ≤i ≤s <r ≤r ≤c`; `1<m` with a variable `m` then fails
     # to parse. Space them unless written as the notation (` <m `).
-    text = re.sub(r"(?<=[^\s<≤])([<≤])m", r" \1 m", text)
+    text = re.sub(r"(?<=[^\s<≤])([<≤])([misrc])", r" \1 \2", text)
     text = re.sub(r"(?<![\w.'])(?:_root_\.)?TensorProduct\.inductionOn(?![\w'])",
                   pre + 'tensorInductionOn', text)
     # `FreeGroup.induction_on`'s first case is `one` in d13f23b and `C1` here (Eilenberg–Ganea

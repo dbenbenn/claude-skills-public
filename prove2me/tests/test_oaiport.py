@@ -854,3 +854,4 @@ def test_birkhoff_sum_renames():
 def test_measure_map_smul_drops_named_aemeasurable_lemma_application():
     out = O.core_rewrites("rw [potentialMeasure,Measure.map_smul _ (chart_aemeasurable e d),map_chartMeasure e d hd]\n")
     assert "rw [potentialMeasure,Measure.map_smul,map_chartMeasure e d hd]" in out
+    assert O.core_rewrites('(hs : 2≤s) (p.val<s-1) a≤c') == '(hs : 2 ≤ s) (p.val < s-1) a ≤ c'
