@@ -848,3 +848,4 @@ def test_birkhoff_sum_renames():
     assert "rw [birkhoffSum_succ', hb]" in out
     assert "birkhoffSum_add T g m n x" in out
     assert "birkhoffSum_succ_apply]" in out
+    assert O.core_rewrites('(node i<minus i)') == '(node i < minus i)'

@@ -365,7 +365,7 @@ def core_rewrites(text, compat_ns='OAI'):
     pre = compat_ns + '.' if compat_ns else ''
     # Mathlib's Matroid files add the global tokens `<m` / `≤m`; `1<m` with a variable `m` then fails
     # to parse. Space them unless written as the notation (` <m `).
-    text = re.sub(r"(?<=[^\s<≤])([<≤])m(?![\w'.])", r" \1 m", text)
+    text = re.sub(r"(?<=[^\s<≤])([<≤])m", r" \1 m", text)
     text = re.sub(r"(?<![\w.'])(?:_root_\.)?TensorProduct\.inductionOn(?![\w'])",
                   pre + 'tensorInductionOn', text)
     # `FreeGroup.induction_on`'s first case is `one` in d13f23b and `C1` here (Eilenberg–Ganea
