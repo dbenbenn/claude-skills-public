@@ -849,3 +849,8 @@ def test_birkhoff_sum_renames():
     assert "birkhoffSum_add T g m n x" in out
     assert "birkhoffSum_succ_apply]" in out
     assert O.core_rewrites('(node i<minus i)') == '(node i < minus i)'
+
+
+def test_measure_map_smul_drops_named_aemeasurable_lemma_application():
+    out = O.core_rewrites("rw [potentialMeasure,Measure.map_smul _ (chart_aemeasurable e d),map_chartMeasure e d hd]\n")
+    assert "rw [potentialMeasure,Measure.map_smul,map_chartMeasure e d hd]" in out
