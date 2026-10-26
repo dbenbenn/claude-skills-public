@@ -1322,6 +1322,119 @@
    }
   },
   {
+   "attrs": [
+    "simp"
+   ],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      3
+     ],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.simpA",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 800,
+    "col": 40,
+    "line": 34
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 781,
+     "name": "simpA",
+     "role": "decl",
+     "start": 776
+    },
+    {
+     "end": 800,
+     "name": "rfl",
+     "role": "ref",
+     "start": 797
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 781,
+      "col": 21,
+      "line": 34
+     },
+     "start": {
+      "byte": 776,
+      "col": 16,
+      "line": 34
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.simpA"
+   ],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "CD.Aux"
+    }
+   ],
+   "resolved": [
+    [
+     776,
+     781,
+     "",
+     "b"
+    ],
+    [
+     776,
+     781,
+     "CD.simpA",
+     "b"
+    ],
+    [
+     797,
+     800,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 760,
+    "col": 0,
+    "line": 34
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 794,
+    "col": 34,
+    "line": 34
+   }
+  },
+  {
    "attrs": [],
    "context": [
     {
@@ -1340,17 +1453,84 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 766,
-    "col": 6,
-    "line": 34
+    "byte": 825,
+    "col": 23,
+    "line": 36
    },
    "heads": [],
    "idents": [
     {
-     "end": 766,
+     "end": 818,
+     "name": "simp",
+     "role": "ref",
+     "start": 814
+    },
+    {
+     "end": 825,
+     "name": "simpA",
+     "role": "ref",
+     "start": 820
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.attribute",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "CD.Aux"
+    }
+   ],
+   "resolved": [
+    [
+     820,
+     825,
+     "CD.simpA"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 802,
+    "col": 0,
+    "line": 36
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      0
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [
+      3
+     ],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 833,
+    "col": 6,
+    "line": 38
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 833,
      "name": "CD",
      "role": "scope",
-     "start": 764
+     "start": 831
     }
    ],
    "ids": [],
@@ -1370,9 +1550,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 760,
+    "byte": 827,
     "col": 0,
-    "line": 34
+    "line": 38
    },
    "used_keys": []
   },
@@ -1389,17 +1569,17 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 784,
+    "byte": 851,
     "col": 16,
-    "line": 36
+    "line": 40
    },
    "heads": [],
    "idents": [
     {
-     "end": 784,
+     "end": 851,
      "name": "CD.Aux",
      "role": "scope",
-     "start": 778
+     "start": 845
     }
    ],
    "ids": [],
@@ -1414,9 +1594,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 768,
+    "byte": 835,
     "col": 0,
-    "line": 36
+    "line": 40
    },
    "used_keys": []
   },
@@ -1431,7 +1611,7 @@
     },
     {
      "cmds": [],
-     "opener": 11
+     "opener": 13
     }
    ],
    "decl_kind": "Lean.Parser.Command.definition",
@@ -1444,36 +1624,36 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 811,
+    "byte": 878,
     "col": 25,
-    "line": 38
+    "line": 42
    },
    "heads": [],
    "idents": [
     {
-     "end": 800,
+     "end": 867,
      "name": "laterConst",
      "role": "decl",
-     "start": 790
+     "start": 857
     },
     {
-     "end": 806,
+     "end": 873,
      "name": "Nat",
      "role": "ref",
-     "start": 803
+     "start": 870
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 800,
+      "byte": 867,
       "col": 14,
-      "line": 38
+      "line": 42
      },
      "start": {
-      "byte": 790,
+      "byte": 857,
       "col": 4,
-      "line": 38
+      "line": 42
      }
     }
    ],
@@ -1490,35 +1670,35 @@
    "opens": [],
    "resolved": [
     [
-     790,
-     800,
+     857,
+     867,
      "",
      "b"
     ],
     [
-     790,
-     800,
+     857,
+     867,
      "CD.Aux.laterConst",
      "b"
     ],
     [
-     803,
-     806,
+     870,
+     873,
      "Nat"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 786,
+    "byte": 853,
     "col": 0,
-    "line": 38
+    "line": 42
    },
    "used_keys": [],
    "value_start": {
-    "byte": 807,
+    "byte": 874,
     "col": 21,
-    "line": 38
+    "line": 42
    }
   },
   {
@@ -1532,23 +1712,23 @@
     },
     {
      "cmds": [],
-     "opener": 11
+     "opener": 13
     }
    ],
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 823,
+    "byte": 890,
     "col": 10,
-    "line": 40
+    "line": 44
    },
    "heads": [],
    "idents": [
     {
-     "end": 823,
+     "end": 890,
      "name": "CD.Aux",
      "role": "scope",
-     "start": 817
+     "start": 884
     }
    ],
    "ids": [],
@@ -1563,9 +1743,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 813,
+    "byte": 880,
     "col": 0,
-    "line": 40
+    "line": 44
    },
    "used_keys": []
   },
@@ -1582,9 +1762,9 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 824,
+    "byte": 891,
     "col": 0,
-    "line": 41
+    "line": 45
    },
    "heads": [],
    "idents": [],
@@ -1600,9 +1780,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 824,
+    "byte": 891,
     "col": 0,
-    "line": 41
+    "line": 45
    },
    "used_keys": []
   }

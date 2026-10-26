@@ -2533,7 +2533,13 @@ class Carver:
                     else:
                         drop.add(c.index)
                 elif gone:
-                    reps[c.index] = _cmd_text(info, c, [(i['start'], _skip_ws(t, i['end']), '') for i in gone])
+                    new_txt = _cmd_text(info, c, [(i['start'], _skip_ws(t, i['end']), '') for i in gone])
+                    # `attribute [-simp] a b` whose targets are all gone, though `simp` itself is a
+                    # reference that stays: nothing left to apply it to (PeriodicGroups, 2026-10-26)
+                    if re.fullmatch(r'\s*(?:local\s+|scoped\s+)?attribute\s*\[[^\]]*\]\s*', new_txt):
+                        drop.add(c.index)
+                    else:
+                        reps[c.index] = new_txt
                 continue
             if k == 'open':
                 r = self._open(info, c, m, alive, (c.start.byte, c.end.byte))

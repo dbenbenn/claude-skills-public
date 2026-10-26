@@ -1722,3 +1722,15 @@ def test_open_before_the_namespace_block_that_makes_it_is_dropped(g):
             'CD.double_succ', 'CD.List.headOr_nil'}
     txt = carve(g, keep, have)
     assert 'open Aux' not in txt and 'laterConst' in txt
+
+
+# `attribute [-simp] a b` with a and b gone: the command lost its targets but not its `simp` token,
+# and was emitted as `attribute [-simp] ` ("expected identifier" at the next `end`;
+# PeriodicGroups BooleanCircuits, 2026-10-26).
+
+def test_attribute_command_whose_targets_are_all_gone_is_dropped(g):
+    keep = {'CD.main', '_private.CarveDev.Top.0.CD.helper'}
+    have = {'CD.Space', 'CD.Space.size', 'CD.double', 'CD.List.headOr', 'CD.size_zero',
+            'CD.double_succ', 'CD.List.headOr_nil'}
+    txt = carve(g, keep, have)
+    assert 'attribute [-simp]' not in txt

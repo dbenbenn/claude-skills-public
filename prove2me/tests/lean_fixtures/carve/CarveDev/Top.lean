@@ -31,6 +31,10 @@ theorem uses_sized (B : Space) : (sizedZero B).val = 0 := rfl
 
 theorem uses_scoped : viaScoped 1 = 2 := rfl
 
+@[simp] theorem simpA : 1 + 0 = 1 := rfl
+
+attribute [-simp] simpA
+
 end CD
 
 namespace CD.Aux

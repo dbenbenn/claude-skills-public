@@ -153,7 +153,7 @@
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD._aux_CarveDev_Mid___unexpand_CD_double_eq_1","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.termDE","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.termWZ","p":false,"r":[70,0,70,24],"s":false,"t":[],"u":[],"v":[]}
-{"i":false,"k":"def","m":"CarveDev.Top","n":"CD.Aux.laterConst","p":false,"r":[38,0,38,25],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.Top","n":"CD.Aux.laterConst","p":false,"r":[42,0,42,25],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"inductive","m":"CarveDev.Base","n":"CD.Space","p":false,"r":[10,0,13,14],"s":false,"t":[],"u":[],"v":["CD.Space.mk"]}
 {"i":false,"k":"inductive","m":"CarveDev.Base","n":"CD.Wide","p":false,"r":[37,0,39,9],"s":false,"t":[],"u":[],"v":["CD.Wide.mk"]}
 {"i":false,"k":"inductive","m":"CarveDev.Coer","n":"CD.Co.Fn","p":false,"r":[24,0,25,19],"s":false,"t":[],"u":[],"v":["CD.Co.Fn.mk"]}
@@ -276,6 +276,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_witness","p":true,"r":[150,0,150,55],"s":false,"t":["CD.doubleWitness","CD.Aux.auxOnly"],"u":[],"v":["CD.doubleWitness","CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.helper","p":true,"r":[30,0,30,40],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.main","p":true,"r":[19,0,23,53],"s":false,"t":["CD.Space","CD.double","CD.List.headOr","CD.Space.size"],"u":[],"v":["CD.Space","CD.double","CD.double_succ","CD.quad","CD.size_via_coord","CD.size_zero","_private.CarveDev.Top.0.CD.helper","CD.List.headOr","CD.List.headOr_nil","CD.Space.coord","CD.Space.size"]}
+{"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.simpA","p":true,"r":[34,0,34,40],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.top_aux","p":true,"r":[26,0,26,39],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.aux_eq"]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.top_pick","p":true,"r":[13,0,13,85],"s":false,"t":["CD.pick"],"u":["u"],"v":["CD.pick","CD.pick_eq"]}
 {"i":false,"k":"theorem","m":"CarveDev.Top","n":"CD.uses_scoped","p":true,"r":[32,0,32,44],"s":false,"t":["CD.viaScoped"],"u":[],"v":["CD.viaScoped"]}
