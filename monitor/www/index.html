@@ -2,6 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>monitor</title>
 <link rel="stylesheet" href="vendor/uPlot.min.css">
+<link rel="stylesheet" href="agents.css">
 <script src="vendor/uPlot.iife.min.js"></script>
 <style>
 :root{color-scheme:light;--surface-0:#f5f4f1;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7974;--grid:#e4e3df;--series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#8f5bd6;--series-5:#c99a00;--rest:#c9c8c2;--track:#e9e8e4;--good:#008300;--warn:#b26b00;--alarm:#b42318}
@@ -49,6 +50,7 @@ code{font-size:13px}
 <h1 id="h1">monitor</h1>
 <p class="sub" id="upd">Loading…</p>
 <div class="alarm" id="alarm" role="alert" hidden></div>
+<nav class="nav" aria-label="Views"><a href="#t-sys">System resources</a><a href="#t-quota">Subscription quota</a><a href="#t-agents">Headless agents</a><a href="#sections">Work in progress</a></nav>
 <section class="card" aria-labelledby="t-sys">
 <h2 id="t-sys">System resources</h2>
 <p class="chart-sub">The whole machine, split by what uses it; sampled every 30 s · times in CEST. Memory: each group's own process memory (file cache excluded); the rest is everything else in use.</p>
@@ -64,6 +66,20 @@ code{font-size:13px}
 <div class="chart"><h3>Stall pressure</h3><p class="chart-sub" id="s-psi"></p><div id="c-psi"></div></div>
 </div>
 <h3 style="margin-top:16px">Lean processes</h3><div id="lean"></div>
+</section>
+<section class="card" aria-labelledby="t-quota">
+<h2 id="t-quota">Subscription quota</h2>
+<p class="chart-sub" id="quota-sub">Loading…</p>
+<div class="qgrid">
+<div class="chart"><h3>5-hour window (last 48 h)</h3><div id="c-q5"></div></div>
+<div class="chart"><h3>7-day window (last 7 days)</h3><div id="c-q7"></div></div>
+</div>
+<p class="hint">Utilization of the Claude subscription as reported in the agents' rate-limit records. Solid lines mark past resets, the dashed line the next one. Steps change only while some agent is running.</p>
+</section>
+<section class="card" aria-labelledby="t-agents">
+<h2 id="t-agents">Headless agents</h2>
+<p class="chart-sub" id="agents-sub">Loading…</p>
+<div id="agents-box"></div>
 </section>
 <div id="sections"></div>
 <p class="meta" id="problems" hidden></p>
@@ -194,8 +210,8 @@ function drawSystem(sy){
   document.getElementById('lean').innerHTML = L.length ? `<p class="chart-sub">${L.filter(r=>/^lean\b/.test(r.what)).length} Lean, ${L.filter(r=>/^lake\b/.test(r.what)).length} lake</p>` + procTable(L, true) : '<p class="empty">No Lean running.</p>';
 }
 
-window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(() => { if (last) { chartKey = ''; drawSystem(last.system); drawSections(last.sections || []); } }, 200); });
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (last) { chartKey = ''; drawSystem(last.system); drawSections(last.sections || []); } });
+window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(() => { if (last) { chartKey = ''; drawSystem(last.system); drawSections(last.sections || []); drawQuota(); } }, 200); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (last) { chartKey = ''; drawSystem(last.system); drawSections(last.sections || []); drawQuota(); } });
 
 // ---- page ----
 async function load(){
@@ -211,6 +227,7 @@ async function load(){
   al.innerHTML = s.alerts.length ? `<b>${esc(s.host||'machine')} needs attention</b><ul>${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>` : '';
   drawSystem(s.system);
   drawSections(s.sections||[]);
+  if (typeof drawQuota === 'function') drawQuota();
 }
 
 function procTable(rows, withCwd){
@@ -290,4 +307,5 @@ function sectionChart(s, card){
 }
 
 load(); setInterval(load, 30000);
-</script></body></html>
+</script>
+<script src="agents.js"></script></body></html>

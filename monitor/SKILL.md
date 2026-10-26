@@ -84,13 +84,48 @@ normal on a box where Lean may fill RAM and spill to swap), and Lean health flag
 24 h). Project alerts and STALE badges stay in their sections; unreadable section files are listed
 under the sections (`problems` in status.json).
 
+## Headless agents, quota and logs (no tokens)
+
+The main page has two more cards between the system charts and the sections:
+
+- **Subscription quota**: the 5-hour window (last 48 h) and the 7-day window (last 7 days) as step charts,
+  with reset markers (solid = past, dashed = next). The sampler (`agents.update_quota`) reads only the new
+  bytes of each `~/claude/headless-agents/*/transcript.jsonl` and takes the `rate_limit_event`
+  (`rate_limit_info.unifiedWindows.{five_hour,seven_day}.{utilization,resetsAt}`) from the most recently
+  written file. Utilization is a 0..1 fraction there; it is stored and shown as %. The series
+  (`state/quota.json`, 7 days) only moves while some agent is running.
+- **Headless agents**: one card per `headless-agents/<name>/`: running first, then agents finished in the
+  last 24 h. Name (links to its log), state, model, auth (subscription / API key), start-end, cost so far
+  (list price, estimate until the run ends), a cost sparkline (`state/agent_costs.json`, 48 h), the last assistant text
+  (`last_text.txt`) and links to its goals on prove2.me (`https://prove2.me/theorems/<id>`) taken from
+  `headless-agents/queue/registry.json` (batch `name` -> `modules` -> `groups[module].goals/ids`; no lookup file
+  needed). **Phases**: a bar of ten stages (fetch, port, build, graph, plan, gen, measure, prose, check,
+  publish; each covers the `carve_pipeline.py` steps listed in `agents.STAGES`), current one outlined, failed
+  red, plus items live/total from `run_state.json`. Carve dirs are found at `~/.claude/jobs/<agent>/**/` (depth 3)
+  and `~/claude/p2m-standalone/openai-ports/<agent>/`; no state yet shows "setting up" (queue agents only).
+- **Log viewer** `/page/agent.html?name=<agent>`: transcript.jsonl as readable events (assistant text, tool calls
+  with command/description, results cut to 4 lines with expand, clock times in CEST), newest at the bottom,
+  polls every 3 s from the byte offset it has, filters All / Text / Tools / Errors plus a search box, "Load
+  earlier events" for the head of long transcripts.
+
+**Routes** (all in `monitor.py`; page files under `www/` are read per request, so page changes need no restart):
+`/` and `/page/<name>.html` (= `www/<name>.html`), any other `www/` path with extension .js .css .html .svg .png
+.ico (plain path segments only, nothing resolving outside `www/`), `/status.json` (now with `quota.series` rows
+`[t, 5h %, 5h resetsAt, 7d %, 7d resetsAt]`), `/agents.json` (running / recent / hidden; cached 5 s) and
+`/agent/<name>/<file>[?from=N&max=M]` where file is one of transcript.jsonl, state.json, usage.json, meta.json,
+brief.md. The agent route is read-only: the name must be a plain directory name that is not a symlink, the file
+must resolve inside that directory, responses are capped at 512 KiB. For transcripts `from` is a byte offset
+(negative = from the end) and the reply holds whole lines only, with `X-Start`, `X-End`, `X-Size` headers: poll
+again from `X-End`. Code: `agents.py` (summary, phases, safe paths, quota); tests `test_agents.py`,
+`test_server.py`.
+
 ## Changing the monitor
 
 The code is `monitor.py` (sampling, sections, history, the HTTP server), `section.py` (producer
 library and CLI) and `www/index.html` (the page, read fresh on every request, so page edits need no
 restart). Charts use uPlot 1.6.30 (MIT), vendored in `www/vendor/` and served by the monitor itself so
 the page needs no internet; range buttons, drag-to-zoom and a synced cursor are wired in the page.
-To look at the page headless, use Playwright's Chromium; on careyaibox (Ubuntu) it needed four libraries
+To look at the page headless on NixOS use `google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=6000 --screenshot=…` against a throwaway instance (`MONITOR_PORT=8799 MONITOR_HOME=/tmp/monhome python3 monitor.py`; kill it afterwards, never the system unit; a page that scrolls itself may screenshot blank, use `--dump-dom` or screenshot the dumped DOM). On Ubuntu, Playwright's Chromium; on careyaibox (Ubuntu) it needed four libraries
 the machine lacked (libatk1.0-0t64, libatk-bridge2.0-0t64, libxdamage1, libatspi2.0-0t64), fetched with
 `apt-get download`, unpacked with `dpkg-deb -x`, and found through `LD_LIBRARY_PATH`; on NixOS ask
 dbenbenn for a `playwright-driver.browsers` package instead. Tests: `python3 -m pytest -q ~/.claude/skills/monitor/tests`.

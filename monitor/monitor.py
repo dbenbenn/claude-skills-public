@@ -15,6 +15,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import agents as AG
 import section as S
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -23,7 +24,9 @@ INTERVAL = 30
 KEEP = 48 * 3600
 CLK = os.sysconf('SC_CLK_TCK')
 G = 2 ** 30
-VENDOR = {'/vendor/uPlot.iife.min.js': 'text/javascript', '/vendor/uPlot.min.css': 'text/css'}   # uPlot 1.6.30, MIT
+STATIC = {'.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html; charset=utf-8', '.svg': 'image/svg+xml',
+          '.png': 'image/png', '.ico': 'image/x-icon'}    # served from www/ (uPlot 1.6.30, MIT, is in www/vendor)
+SEGMENT = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
 HEALTH_FLAGS = os.path.expanduser('~/.local/state/lean-health.flags')
 
 
@@ -285,6 +288,8 @@ def save_json(p, x):
 
 class State:
     status = b'{}'
+    costs = {}                      # agent -> [[t, cost]], from the sampler
+    agents = (0, b'{}')             # (time, body) cache of /agents.json
 
 
 def step(home, now=None):
@@ -310,6 +315,10 @@ def step(home, now=None):
     seen = {g for r in res['machine'] for g in r['mem']}
     res['labels'] = {g: l for g, l in labels.items() if g in seen}
     track(hist, secs, now)
+    costs = load_json(os.path.join(st, 'agent_costs.json'), {})
+    AG.record_costs(costs, AG.AGENTS_DIR, now)
+    quota = AG.update_quota(load_json(os.path.join(st, 'quota.json'), {}), AG.AGENTS_DIR, now)
+    State.costs = costs
     for s in secs:
         s['history'] = hist.get(s['id'], {})
         pats = [(p['label'], p['match']) for p in s.get('processes', [])]
@@ -319,28 +328,85 @@ def step(home, now=None):
               'free_gib': round(mi['MemAvailable'] / G, 1), 'cores_total': os.cpu_count(),
               'swap_free_gib': round(mi.get('SwapFree', 0) / G, 1), 'swap_total_gib': round(mi.get('SwapTotal', 0) / G, 1)}
     status = build_status(now, secs, problems, system, health_flags(HEALTH_FLAGS, now), lean_view(procs, prev, now))
+    status['quota'] = {'series': quota['series'], 'columns': ['t', 'five_hour %', 'five_hour resets', 'seven_day %', 'seven_day resets']}
     save_json(os.path.join(st, 'resources.json'), res)
     save_json(os.path.join(st, 'history.json'), hist)
+    save_json(os.path.join(st, 'agent_costs.json'), costs)
+    save_json(os.path.join(st, 'quota.json'), quota)
     save_json(os.path.join(st, 'status.json'), status)
     State.status = json.dumps(status, ensure_ascii=False).encode()
 
 
+def www_file(path):
+    """(bytes, content type) for a request path under www/ (an allowlisted extension, plain path
+    segments, nothing resolving outside www/), or None. /page/<name>.html is www/<name>.html."""
+    if path.startswith('/page/'):
+        path = '/' + path[len('/page/'):]
+    segs = path.strip('/').split('/') if path != '/' else ['index.html']
+    ext = os.path.splitext(segs[-1])[1]
+    if ext not in STATIC or not all(SEGMENT.match(x) for x in segs):
+        return None
+    www = os.path.realpath(os.path.join(HERE, 'www'))
+    p = os.path.realpath(os.path.join(www, *segs))
+    if not p.startswith(www + os.sep) or not os.path.isfile(p):
+        return None
+    return open(p, 'rb').read(), STATIC[ext]
+
+
+def agent_file(path, query):
+    """(status, body, content type, extra headers) for /agent/<name>/<file>[?from=N&max=M]."""
+    parts = path.strip('/').split('/')
+    p = AG.safe_path(AG.AGENTS_DIR, parts[1], parts[2]) if len(parts) == 3 else None
+    if not p:
+        return 404, b'not found', 'text/plain', {}
+    q = dict(x.split('=', 1) for x in query.split('&') if '=' in x)
+    try:
+        start, limit = int(q.get('from', '0')), min(int(q.get('max', AG.MAX_BYTES)), AG.MAX_BYTES)
+    except ValueError:
+        return 400, b'bad range', 'text/plain', {}
+    if parts[2] == 'transcript.jsonl':
+        body, s, e, size = AG.read_range(p, start, limit)
+        return 200, body, 'text/plain; charset=utf-8', {'X-Start': s, 'X-End': e, 'X-Size': size}
+    size = os.path.getsize(p)
+    with open(p, 'rb') as f:
+        body = f.read(min(limit, AG.MAX_BYTES))
+    return 200, body, AG.FILES[parts[2]] + '; charset=utf-8', {'X-Start': 0, 'X-End': len(body), 'X-Size': size}
+
+
+def agents_body(now=None):
+    now = now or time.time()
+    if now - State.agents[0] > 5:
+        reg = load_json(os.path.join(AG.AGENTS_DIR, 'queue', 'registry.json'), None)
+        State.agents = (now, json.dumps(AG.agents_json(AG.AGENTS_DIR, now, reg, State.costs), ensure_ascii=False).encode())
+    return State.agents[1]
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        path = self.path.split('?', 1)[0]
-        if path in ('/', '/index.html'):
-            body, ctype = open(os.path.join(HERE, 'www', 'index.html'), 'rb').read(), 'text/html; charset=utf-8'
-        elif path == '/status.json':
-            body, ctype = State.status, 'application/json'
-        elif path in VENDOR:
-            body, ctype = open(os.path.join(HERE, 'www', path.lstrip('/')), 'rb').read(), VENDOR[path]
-        else:
-            self.send_error(404)
-            return
-        self.send_response(200)
+        path, _, query = self.path.partition('?')
+        extra = {}
+        try:
+            code, ctype = 200, 'application/json'
+            if path == '/status.json':
+                body = State.status
+            elif path == '/agents.json':
+                body = agents_body()
+            elif path.startswith('/agent/'):
+                code, body, ctype, extra = agent_file(path, query)
+            else:
+                f = www_file(path)
+                if not f:
+                    self.send_error(404)
+                    return
+                body, ctype = f
+        except Exception as e:                 # a bad request must not kill the thread's connection silently
+            code, body, ctype = 500, repr(e).encode(), 'text/plain'
+        self.send_response(code)
         self.send_header('Content-Type', ctype)
         self.send_header('Cache-Control', 'no-store')
         self.send_header('Content-Length', str(len(body)))
+        for k, v in extra.items():
+            self.send_header(k, str(v))
         self.end_headers()
         self.wfile.write(body)
 

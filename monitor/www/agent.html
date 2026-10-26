@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>agent log</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+main{max-width:1000px}
+.top{position:sticky;top:0;background:var(--surface-0);padding:8px 0 6px;z-index:2;border-bottom:1px solid var(--grid)}
+.bar{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:6px}
+.seg{display:inline-flex;border:1px solid var(--grid);border-radius:7px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;background:transparent;color:var(--text-secondary);border:0;border-left:1px solid var(--grid);padding:4px 10px;cursor:pointer}
+.seg button:first-child{border-left:0}.seg button[aria-pressed="true"]{background:var(--series-1);color:#fff}
+input[type=search]{font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--grid);border-radius:7px;background:var(--surface-1);color:var(--text-primary);min-width:12em}
+.pill{font-size:11px;font-weight:600;border:1px solid var(--grid);border-radius:5px;padding:0 6px;color:var(--text-secondary)}
+.pill.running{color:var(--series-1);border-color:var(--series-1)}.pill.done{color:var(--good);border-color:var(--good)}.pill.failed{color:var(--alarm);border-color:var(--alarm)}
+.ev{display:grid;grid-template-columns:5.2em 1fr;gap:0 10px;padding:6px 0;border-top:1px solid var(--grid)}
+.ev .t{color:var(--text-muted);font-size:12px;font-variant-numeric:tabular-nums;padding-top:2px}
+.ev .b{min-width:0}
+.ev.assistant .b{white-space:pre-wrap;overflow-wrap:anywhere}
+.ev.user .b{color:var(--series-4)}
+.ev .tool{font-weight:600;color:var(--series-1);font-size:13px}.ev .desc{color:var(--text-secondary);font-size:13px}
+pre{margin:3px 0 0;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text-secondary);background:var(--surface-1);border-radius:6px;padding:5px 8px}
+.ev.result pre{color:var(--text-muted)}
+.ev.error pre,.ev.error .tool{color:var(--alarm)}
+.ev.system .b{color:var(--text-muted);font-size:13px}
+a.more{font-size:12px;color:var(--text-muted)}
+mark{background:#d4a51455;color:inherit}
+#more{font:inherit;font-size:13px;background:transparent;color:var(--series-1);border:1px solid var(--series-1);border-radius:7px;padding:3px 10px;cursor:pointer;margin:8px 0}
+</style></head>
+<body><main>
+<div class="top">
+<p class="meta" style="margin:0"><a href="/">← monitor</a> · <a id="lbrief" href="#">brief</a> · <a id="lraw" href="#">raw transcript</a></p>
+<h1 id="h1">agent</h1>
+<p class="sub" id="info" style="margin:0">Loading…</p>
+<div class="bar">
+  <div class="seg" id="filters" role="group" aria-label="Filter"></div>
+  <input type="search" id="q" placeholder="search text" aria-label="Search">
+  <label class="hint"><input type="checkbox" id="follow" checked> follow</label>
+  <span class="hint" id="count"></span>
+</div>
+</div>
+<button id="more" hidden>Load earlier events</button>
+<div id="log"></div>
+<p class="empty" id="empty" hidden>Nothing to show.</p>
+</main>
+<script>
+const TZ = 'Europe/Berlin', NAME = new URLSearchParams(location.search).get('name') || '';
+const base = '/agent/' + encodeURIComponent(NAME) + '/';
+const fmtClock = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('de-DE', {timeZone: TZ, hour12: false}); };
+const fmtDT = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('en-CA', {timeZone: TZ, hour12: false}).replace(',', '') + ' CEST'; };
+const FILTERS = [['all', 'All'], ['text', 'Text'], ['tools', 'Tools'], ['errors', 'Errors']];
+let filter = 'all', query = '', events = [], pos = 0, startPos = 0, nextId = 0, busy = false;
+const logEl = document.getElementById('log');
+
+document.getElementById('h1').textContent = NAME || '(no agent named)';
+document.title = NAME + ' · agent log';
+document.getElementById('lbrief').href = base + 'brief.md';
+document.getElementById('lraw').href = base + 'transcript.jsonl?from=-500000';
+const fbox = document.getElementById('filters');
+fbox.innerHTML = FILTERS.map(([k, l]) => `<button data-k="${k}" aria-pressed="${k === filter}">${l}</button>`).join('');
+fbox.onclick = e => { const b = e.target.closest('button'); if (!b) return; filter = b.dataset.k;
+  fbox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); render(true); };
+document.getElementById('q').oninput = e => { query = e.target.value.trim().toLowerCase(); render(true); };
+
+const clip = (s, n) => s.length > n ? s.slice(0, n) + '…' : s;
+const textOf = c => typeof c === 'string' ? c : Array.isArray(c) ? c.map(b => b.type === 'text' ? b.text : b.type === 'image' ? '[image]' : '').join('\n') : JSON.stringify(c ?? '');
+
+// One transcript record -> zero or more events {kind: text|tool|result|error|system, t, ...}.
+function toEvents(rec){
+  const out = [], t = rec.timestamp || '';
+  if (rec.type === 'assistant' && rec.message && Array.isArray(rec.message.content)) {
+    for (const b of rec.message.content) {
+      if (b.type === 'text' && b.text && b.text.trim()) out.push({kind: 'text', role: 'assistant', t, text: b.text});
+      else if (b.type === 'tool_use') {
+        const i = b.input || {};
+        out.push({kind: 'tool', t, name: b.name, desc: i.description || i.skill || i.file_path || i.path || i.pattern || i.query || i.url || '',
+                  cmd: i.command || i.prompt || (i.description || i.skill || i.file_path || i.path || i.pattern || i.query || i.url ? '' : (Object.keys(i).length ? JSON.stringify(i) : '')), text: [b.name, i.description, i.command, i.file_path, i.pattern, i.prompt].filter(Boolean).join(' ')});
+      }
+    }
+  } else if (rec.type === 'user' && rec.message) {
+    const c = rec.message.content;
+    if (typeof c === 'string') out.push({kind: 'text', role: 'user', t, text: c});
+    else if (Array.isArray(c)) for (const b of c) {
+      if (b.type === 'tool_result') { const s = textOf(b.content);
+        out.push({kind: b.is_error ? 'error' : 'result', t, text: s}); }
+      else if (b.type === 'text' && b.text) out.push({kind: 'text', role: 'user', t, text: b.text});
+    }
+  } else if (rec.type === 'system' && rec.subtype === 'init') {
+    out.push({kind: 'system', t, text: `session started · ${rec.model || ''} · ${rec.cwd || ''}`});
+  } else if (rec.type === 'result') {
+    out.push({kind: rec.is_error ? 'error' : 'system', t, text: `finished: ${rec.subtype || ''} · ${rec.num_turns ?? '?'} turns${rec.total_cost_usd != null ? ' · $' + rec.total_cost_usd.toFixed(2) : ''}${rec.result ? ' · ' + clip(String(rec.result), 300) : ''}`});
+  }
+  return out;
+}
+
+function pass(e){
+  if (filter === 'text' && !(e.kind === 'text' || e.kind === 'system')) return false;
+  if (filter === 'tools' && !(e.kind === 'tool' || e.kind === 'result' || e.kind === 'error')) return false;
+  if (filter === 'errors' && e.kind !== 'error') return false;
+  if (query && !((e.text || '') + ' ' + (e.desc || '') + ' ' + (e.cmd || '') + ' ' + (e.name || '')).toLowerCase().includes(query)) return false;
+  return true;
+}
+
+function el(tag, cls, text){ const x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
+function pre(s, lines){
+  const all = s.split('\n'), shown = clip(all.slice(0, lines).join('\n'), 1500);
+  if (all.length <= lines && s.length <= 1500) return pre1(s);
+  const w = el('div'), p = pre1(shown), m = el('a', 'more', `…${all.length > lines ? all.length - lines + ' more lines' : 'truncated'} (expand)`);
+  m.href = '#'; m.onclick = ev => { ev.preventDefault(); p.textContent = clip(s, 30000); m.remove(); };
+  w.append(p, m); return w;
+}
+function pre1(s){ return el('pre', null, s); }
+
+function build(e){
+  const row = el('div', 'ev ' + (e.kind === 'text' ? e.role : e.kind));
+  row.append(el('div', 't', fmtClock(e.t)));
+  const b = el('div', 'b');
+  if (e.kind === 'text' && e.role === 'user') b.append(pre(e.text, 6));
+  else if (e.kind === 'text') b.textContent = e.text;
+  else if (e.kind === 'tool') {
+    b.append(el('span', 'tool', e.name)); if (e.desc) b.append(el('span', 'desc', '  ' + clip(e.desc, 200)));
+    if (e.cmd) b.append(pre(e.cmd, 6));
+  } else if (e.kind === 'result' || e.kind === 'error') {
+    b.append(el('span', 'tool', e.kind === 'error' ? 'error' : 'result')); b.append(pre(e.text || '(empty)', 4));
+  } else b.textContent = e.text;
+  row.append(b); return row;
+}
+
+function render(full){
+  const vis = events.filter(pass);
+  const atBottom = document.getElementById('follow').checked;
+  if (full) { logEl.textContent = ''; shownVis = 0; }
+  const frag = document.createDocumentFragment();
+  for (const e of vis.slice(shownVis)) frag.append(build(e));
+  logEl.append(frag);
+  shownVis = vis.length;
+  document.getElementById('count').textContent = `${vis.length} of ${events.length} events` + (startPos > 0 ? ' (tail of the transcript)' : '');
+  document.getElementById('empty').hidden = vis.length > 0;
+  if (atBottom && (full || vis.length)) window.scrollTo(0, document.body.scrollHeight);
+}
+let shownVis = 0;
+addEventListener('scroll', () => { document.getElementById('follow').checked = innerHeight + scrollY >= document.documentElement.scrollHeight - 40; });
+
+function parse(text){
+  const out = [];
+  for (const line of text.split('\n')) { if (!line) continue; try { out.push(...toEvents(JSON.parse(line))); } catch (e) {} }
+  return out;
+}
+
+async function fetchRange(from, max){
+  const r = await fetch(base + 'transcript.jsonl?from=' + from + '&max=' + max + '&_=' + Date.now());
+  if (!r.ok) throw new Error(r.status);
+  return {text: await r.text(), start: +r.headers.get('X-Start'), end: +r.headers.get('X-End'), size: +r.headers.get('X-Size')};
+}
+
+async function poll(){
+  if (busy || !NAME) return; busy = true;
+  try {
+    if (pos === 0 && !events.length) {
+      const r = await fetchRange(-400000, 400000);
+      events = parse(r.text); pos = r.end; startPos = r.start;
+      document.getElementById('more').hidden = startPos <= 0; render(true);
+    } else {
+      let r = await fetchRange(pos, 524288), guard = 0;
+      while (true) {
+        if (r.text) { const ev = parse(r.text); events.push(...ev); }
+        pos = r.end; if (r.end >= r.size || !r.text || ++guard > 8) break;
+        r = await fetchRange(pos, 524288);
+      }
+      render(false);
+    }
+  } catch (e) { document.getElementById('count').textContent = 'cannot read the transcript (' + e.message + ')'; }
+  busy = false;
+}
+
+document.getElementById('more').onclick = async () => {
+  const from = Math.max(0, startPos - 400000), r = await fetchRange(from, startPos - from);
+  events = parse(r.text).concat(events); startPos = r.start; if (from === 0) startPos = 0;
+  document.getElementById('more').hidden = startPos <= 0;
+  const y = document.documentElement.scrollHeight; render(true); window.scrollTo(0, document.documentElement.scrollHeight - y);
+};
+
+async function info(){
+  try {
+    const [st, us, me] = await Promise.all(['state.json', 'usage.json', 'meta.json'].map(f => fetch(base + f + '?_=' + Date.now()).then(r => r.json())));
+    const parts = [`<span class="pill ${st.state === 'running' ? 'running' : st.state === 'done' ? 'done' : 'failed'}">${String(st.state).toUpperCase()}</span>`,
+      st.model || me.model || '', st.apiKeySource && st.apiKeySource !== 'none' ? 'API key' : 'subscription',
+      us.estimated_cost_usd != null ? '$' + us.estimated_cost_usd.toFixed(2) + (us.cost_is_exact ? '' : ' (estimate)') : '',
+      st.started ? 'started ' + fmtDT(st.started.replace(/([+-]\d\d)(\d\d)$/, '$1:$2')) : '', st.ended ? 'ended ' + fmtDT(st.ended.replace(/([+-]\d\d)(\d\d)$/, '$1:$2')) : '', st.note || ''];
+    document.getElementById('info').innerHTML = parts.filter(Boolean).map(p => p.startsWith('<span') ? p : p.replace(/[&<>]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c]))).join(' · ');
+  } catch (e) { document.getElementById('info').textContent = 'no such agent'; }
+}
+
+poll(); info();
+setInterval(poll, 3000); setInterval(info, 15000);
+</script></body></html>
