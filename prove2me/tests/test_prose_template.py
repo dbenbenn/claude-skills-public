@@ -356,3 +356,12 @@ def test_cli_reports_written_and_needs_written(tmp_path, capsys):
     assert 'wrote prose/OAI_Fam_Lemmas_lemA.md' in out
     assert 'needs written prose: statement OAI.Fam.named (forced)' in out
     assert 'needs written prose: explanation OAI.main (goal)' in out
+
+
+def test_stub_statement_reads_an_indented_theorem():
+    # OpenAI's VariableWL source starts its theorem lines with one space (2026-10-26)
+    text = ("namespace OAI\n\nnamespace VariableWL\n theorem general_hard : \u2200R : Language, InEXPTIME R \u2192 "
+            "PolytimeReduces R WL := by\n  sorry\nend VariableWL\n\nend OAI\n")
+    decl, ns, opens = T.stub_statement(text)
+    assert decl.strip().startswith('theorem general_hard') and 'sorry' not in decl
+    assert ns == 'OAI.VariableWL'

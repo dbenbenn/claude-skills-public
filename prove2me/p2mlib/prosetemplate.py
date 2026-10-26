@@ -55,7 +55,7 @@ def _plural(n, one, many):
 
 # ---------------------------------------------------------------- reading a stub
 
-DECL = re.compile(r'^(?:@\[[^\]]*\]\s*)?(?:private\s+|protected\s+)?(?:theorem|lemma)\s+(\S+)', re.M)
+DECL = re.compile(r'^[ \t]*(?:@\[[^\]]*\]\s*)?(?:private\s+|protected\s+)?(?:theorem|lemma)\s+(\S+)', re.M)
 
 
 def stub_statement(text):
