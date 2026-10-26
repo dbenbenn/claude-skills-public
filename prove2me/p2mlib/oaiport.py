@@ -483,6 +483,10 @@ def core_rewrites(text, compat_ns='OAI'):
     # (Kirchberg-Rordam 2026-10-25)
     text = re.sub(r"(?<![\w.'])(CStarAlgebra\.norm_(?:or_neg_norm_)?mem_spectrum(?:_of_nonneg)?)[ \t]+[A-Za-z_][\w']*[ \t]+(?=[A-Za-z_(])",
                   r"\1 ", text)
+    # d13f23b's `CStarAlgebra.star_mul_le_algebraMap_norm_sq a` has `a` explicit; ours implicit
+    # (FactorGeneration 2026-10-26). A named `(a := x)` use is fine in both.
+    text = re.sub(r"(?<![\w.'])(CStarAlgebra\.star_mul_le_algebraMap_norm_sq)[ \t]+[A-Za-z_][\w']*(?![\w'.])",
+                  r"\1", text)
     # d13f23b renamed the ordered-monoid `Finset.prod_le_prod'` (one hypothesis) to
     # `Finset.prod_le_prod`, and our nonnegative `prod_le_prod` to `prod_le_prod₀` (the compat
     # aliases map that one back, after this). So an unsuffixed use is our primed lemma

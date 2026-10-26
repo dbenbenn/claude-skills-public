@@ -615,6 +615,16 @@ def test_norm_or_neg_norm_mem_spectrum_drops_explicit_element():
     assert out.count("norm_or_neg_norm_mem_spectrum ha") == 2
 
 
+# d13f23b: `CStarAlgebra.star_mul_le_algebraMap_norm_sq a`; ours has `a` implicit (FactorGeneration, 2026-10-26).
+
+def test_star_mul_le_algebraMap_norm_sq_drops_explicit_element():
+    src = ("sub_nonneg.mpr (CStarAlgebra.star_mul_le_algebraMap_norm_sq a)\n"
+           "(CStarAlgebra.star_mul_le_algebraMap_norm_sq (a := x))\n")
+    out = O.core_rewrites(src)
+    assert "(CStarAlgebra.star_mul_le_algebraMap_norm_sq)" in out
+    assert "star_mul_le_algebraMap_norm_sq (a := x)" in out
+
+
 # d13f23b has `YoungDiagram.card_transpose`; ours does not (BinarySweep DiagonalDimension, 2026-10-25).
 
 def test_compat_has_youngdiagram_card_transpose():
