@@ -5,16 +5,14 @@ description: The machine's monitoring page at http://<hostname>:8765/ (http://ni
 
 # The monitoring page
 
-http://nixos:8765/ (the machine's hostname, port 8765; it was http://careyaibox:8765/ until the
-move to the NixOS box on 2026-10-23) is dbenbenn's one place to see what the machine is doing. On top: the whole
+http://nixos:8765/ (the machine's hostname, port 8765) is dbenbenn's one place to see what the machine is doing. On top: the whole
 machine's memory and CPU (split into Lean, each section's own processes, and the rest), load, kernel
 stall pressure, every Lean/lake process with its working directory, and a red banner for machine trouble.
 Below: **one section per piece of work**, written by whoever runs that work.
 
-It is one process, `monitor.py`, run as a service that starts at boot and runs as dbenbenn. On the
-NixOS box that is the system unit `monitor.service`, declared in `/etc/nixos/configuration.nix`
-(`systemd.services.monitor`, `User = "dbenbenn"`); on a conventional distro, `monitor.service` in this
-folder works as a systemd user unit with linger on. It samples every 30 s, keeps 48 h, and serves the
+It is one process, `monitor.py`, run as a service that starts at boot and runs as dbenbenn: the NixOS
+system unit `monitor.service`, declared in `~/nixos-config/configuration.nix`
+(`systemd.services.monitor`, `User = "dbenbenn"`). It samples every 30 s, keeps 48 h, and serves the
 page itself. No Claude involvement.
 
 ## Publishing your work's section
@@ -125,10 +123,7 @@ The code is `monitor.py` (sampling, sections, history, the HTTP server), `sectio
 library and CLI) and `www/index.html` (the page, read fresh on every request, so page edits need no
 restart). Charts use uPlot 1.6.30 (MIT), vendored in `www/vendor/` and served by the monitor itself so
 the page needs no internet; range buttons, drag-to-zoom and a synced cursor are wired in the page.
-To look at the page headless on NixOS use `google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=6000 --screenshot=…` against a throwaway instance (`MONITOR_PORT=8799 MONITOR_HOME=/tmp/monhome python3 monitor.py`; kill it afterwards, never the system unit; a page that scrolls itself may screenshot blank, use `--dump-dom` or screenshot the dumped DOM). On Ubuntu, Playwright's Chromium; on careyaibox (Ubuntu) it needed four libraries
-the machine lacked (libatk1.0-0t64, libatk-bridge2.0-0t64, libxdamage1, libatspi2.0-0t64), fetched with
-`apt-get download`, unpacked with `dpkg-deb -x`, and found through `LD_LIBRARY_PATH`; on NixOS ask
-dbenbenn for a `playwright-driver.browsers` package instead. Tests: `python3 -m pytest -q ~/.claude/skills/monitor/tests`.
-After changing `monitor.py` the service must restart: on the NixOS box it is a system unit, so that is
-`sudo systemctl restart monitor`, which dbenbenn runs (ask); with the user unit elsewhere it is
-`systemctl --user restart monitor`. Commit and push this skill (claude-skills-public) in the same turn.
+To look at the page headless on NixOS use `google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=6000 --screenshot=…` against a throwaway instance (`MONITOR_PORT=8799 MONITOR_HOME=/tmp/monhome python3 monitor.py`; kill it afterwards, never the system unit; a page that scrolls itself may screenshot blank, use `--dump-dom` or screenshot the dumped DOM). If Playwright is ever needed, ask
+dbenbenn for a `playwright-driver.browsers` package. Tests: `python3 -m pytest -q ~/.claude/skills/monitor/tests`.
+After changing `monitor.py` the service must restart: `sudo systemctl restart monitor`, which dbenbenn
+runs (ask). Commit and push this skill (claude-skills-public) in the same turn.
