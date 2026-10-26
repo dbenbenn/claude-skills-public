@@ -1679,6 +1679,7 @@ def test_a_restricted_attribute_on_an_external_declaration_is_kept_local(g):
     # No bundle of the carve carries it and Lean lets only Face's file set it globally.
     keep, have = {'CD.Co.rdef_pos'}, g.have_names({'CD.Co.rdef_pos', 'CD.Co.rdef'})
     out = C.Carver(g).carve(keep, have, external={'CD.Co.rdef'})
-    assert re.search(r'^attribute \[local instance_reducible\] rdef$', out, re.M), out
+    assert re.search(r'^attribute \[local instance_reducible\] _root_\.CD\.Co\.rdef$', out, re.M), out
+    assert out.index('attribute [local') < out.index('-- module')          # at the top: the port's is global
     out = C.Carver(g).carve(keep, have)
     assert not re.search(r'^attribute', out, re.M), out

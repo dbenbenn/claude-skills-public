@@ -2214,6 +2214,7 @@ class Carver:
     def carve(self, keep, have, deprivatize=False, sorry=(), rename=None, external=()):
         g = self.g
         self.external = set(external)
+        self.pre = set()
         keep = set(keep)
         self.keep = keep
         have = set(have) | g.have_names(keep)
@@ -2265,7 +2266,8 @@ class Carver:
                 sec = head + 'attribute [-instance] %s\n' % ' '.join(hide) + sec[len(head):]
             out.append(sec)
             earlier |= {k for k in keep if g.nodes[k].module == m}
-        return ''.join(out)
+        # reducibility of an external declaration, once at the top: the port's attribute is global
+        return ''.join(sorted(self.pre)) + ''.join(out)
 
     def _unseen_instances(self, m, have, earlier, rename):
         """The global instances this file shows module m's section that m never saw (declared in a
@@ -2325,9 +2327,12 @@ class Carver:
         return bool(hits) and all(pubname(h) not in have for h in hits)
 
     def _external_ref(self, idn, c, m):
-        """Does the identifier resolve to a declaration of an external (published) bundle?"""
+        """The name of the external (published bundle) declaration the identifier resolves to, or None."""
         r = self.g.reading(self.g.infos[m], c, idn)
-        return r is not None and any(pubname(n) in self.external for n in r.consts)
+        for n in (r.consts if r is not None else ()):
+            if pubname(n) in self.external:
+                return pubname(n)
+        return None
 
     def _drops(self, m, kept, have):
         g, info = self.g, self.g.infos[m]
@@ -2488,17 +2493,17 @@ class Carver:
                     # no bundle of this carve, and Lean lets only its own file set the attribute
                     # globally: keep it here, `local` (reducibility needs allowUnsafeReducibility)
                     # (Coboundary: `attribute [reducible] Face`, Face in Def_CoboundaryExpanders)
-                    theirs = [i for i in refs if i not in gone and i not in mine and
-                              self._external_ref(i, c, m)]
+                    theirs = [self._external_ref(i, c, m) for i in refs
+                              if i not in gone and i not in mine]
                     out = []
-                    if theirs:
+                    for full in [x for x in theirs if x]:
                         for e in res:
                             kw = e.split()[0]
                             if kw in ('reducible', 'irreducible', 'semireducible'):
-                                out.append('set_option allowUnsafeReducibility true in\n'
-                                           'attribute [local %s] %s' % (e, names(theirs)))
+                                self.pre.add('set_option allowUnsafeReducibility true in\n'
+                                             'attribute [local %s] _root_.%s\n' % (e, full))
                             elif kw == 'instance_reducible':
-                                out.append('attribute [local %s] %s' % (e, names(theirs)))
+                                self.pre.add('attribute [local %s] _root_.%s\n' % (e, full))
                     if rest and refs and len(gone) < len(refs):
                         out.append('attribute [%s] %s' % (', '.join(rest), names([i for i in refs if i not in gone])))
                     if mine:
