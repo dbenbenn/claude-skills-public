@@ -1201,3 +1201,11 @@ def test_egorov_real_epsilon():
     out = O.core_rewrites(src)
     assert "hc\n      (half_pos hε)\n" in out
     assert "ofReal_pos" not in out
+
+
+# d13f23b's `PosSemidef.dotProduct_mulVec_zero_iff` has `x` implicit; ours takes it explicitly
+# (CAT0Fillings Determinant, oaiq-029).
+
+def test_posSemidef_dotProduct_mulVec_zero_iff_explicit_x():
+    out = O.core_rewrites("    have hz := hP.dotProduct_mulVec_zero_iff.1 heq.symm\n")
+    assert "(hP.dotProduct_mulVec_zero_iff _).1 heq.symm" in out
