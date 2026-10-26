@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>monitor</title>
+<link rel="icon" id="favicon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="vendor/uPlot.min.css">
 <link rel="stylesheet" href="agents.css">
 <script src="vendor/uPlot.iife.min.js"></script>
@@ -222,6 +223,7 @@ async function load(){
   document.getElementById('upd').textContent = 'Updated ' + fmtAt(s.updated) + ' · refreshes every 30 s';
   const al = document.getElementById('alarm');
   al.hidden = !s.alerts.length;
+  document.getElementById('favicon').href = s.alerts.length ? '/favicon-alarm.svg' : '/favicon.svg';
   const pr = document.getElementById('problems'), P = s.problems || [];
   pr.hidden = !P.length; pr.textContent = P.length ? 'Section files the page could not read: ' + P.join('; ') : '';
   al.innerHTML = s.alerts.length ? `<b>${esc(s.host||'machine')} needs attention</b><ul>${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>` : '';
