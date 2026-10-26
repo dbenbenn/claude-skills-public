@@ -513,6 +513,10 @@ def core_rewrites(text, compat_ns='OAI'):
     # 2026-10-24): the compat block's `freeGroupInductionOn` has d13f23b's names
     text = re.sub(r"(?<![\w.'])(?:_root_\.)?FreeGroup\.induction_on(?![\w'])",
                   pre + 'freeGroupInductionOn', text)
+    # d13f23b's `unifIntegrable_iff.mpr` (extended-real ε, δ) is the compat block's `unifIntegrable_of_enn`
+    # (SLE IntegralLimits, oaiq-027); `.mp` and the primed form have no shim
+    text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?unifIntegrable_iff\.mpr(?![\w'])",
+                  pre + 'unifIntegrable_of_enn', text)
     # d13f23b's `Finsupp.mapDomain_apply_of_injective hf x a` is our `Finsupp.mapDomain_apply`
     # (same statement; Markov superreflexivity 2026-10-25)
     text = re.sub(r"(?<![\w'])(Finsupp\.)?mapDomain_apply_of_injective(?![\w'])",

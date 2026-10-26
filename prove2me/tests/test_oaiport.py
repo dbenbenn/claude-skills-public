@@ -1161,3 +1161,21 @@ def test_fst_map_prodmk_drops_its_first_measurability_argument():
     # CompactFactors AlgebraModels: d13f23b `Measure.fst_map_prodMk hq measurable_id`, ours takes only the second
     out = O.core_rewrites("  simpa only [Measure.fst_map_prodMk hq measurable_id, Measure.fst_compProd] using he\n")
     assert "Measure.fst_map_prodMk measurable_id," in out
+
+
+# OpenAI's Mathlib (d13f23b) states `UnifIntegrable` with extended-real ε, δ and has
+# `unifIntegrable_iff`; ours (0df444a) has the real-ε definition and no such iff (SLE IntegralLimits,
+# ExponentialMartingales, oaiq-027). `unifIntegrable_iff.mpr ?_` becomes the compat block's
+# `unifIntegrable_of_enn`, which takes the same extended-real hypothesis.
+
+def test_unif_integrable_iff_mpr_uses_the_compat_lemma():
+    src = '  refine ⟨unifIntegrable_iff.mpr ?_, C, ?_⟩\n  apply MeasureTheory.unifIntegrable_iff.mpr\n'
+    out = O.core_rewrites(src)
+    assert out == '  refine ⟨OAI.unifIntegrable_of_enn ?_, C, ?_⟩\n  apply OAI.unifIntegrable_of_enn\n'
+    assert O.core_rewrites('unifIntegrable_iff.mpr', None) == 'unifIntegrable_of_enn'
+    assert O.core_rewrites('unifIntegrable_iff\'.2') == 'unifIntegrable_iff\'.2'
+
+
+def test_the_compat_block_declares_unif_integrable_of_enn():
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^theorem unifIntegrable_of_enn\b', block, re.M)
