@@ -904,3 +904,10 @@ def test_convert_closes_instance_diamond_first():
 def test_logderiv_fun_forms_renamed():
     out = O.core_rewrites("rw [logDeriv_fun_mul (f:=a) z h, logDeriv_fun_prod h2 h3, logDeriv_fun_zpow]")
     assert out == "rw [logDeriv_mul (f:=a) z h, logDeriv_prod h2 h3, logDeriv_fun_zpow]"
+
+
+# d13f23b's `IsChain.linearOrder` takes an `IsChain (· < ·)`; ours an `IsChain (· ≤ ·)` (Coboundary Windows, 2026-10-26).
+
+def test_ischain_lt_of_le_linearOrder():
+    out = O.core_rewrites("let : LinearOrder (s : Set P) := hchain.lt_of_le.linearOrder\n")
+    assert "hchain.linearOrder\n" in out
