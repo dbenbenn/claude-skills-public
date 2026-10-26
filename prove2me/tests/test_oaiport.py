@@ -796,6 +796,14 @@ def test_convert_using_semicolon_ring_closes_all_goals():
     assert "convert h using 2; ring_nf" in out and "convert h using 1; simp" in out
 
 
+def test_convert_using_semicolon_parenthesised_first_closes_all_goals():
+    # KServer (oaiq-017, 2026-10-26): `convert h using 1; (first | rfl | ring)` runs only on the first goal
+    src = "    convert hm using 1; (first | rfl | ring)\n    convert h using 1; (first | rfl | simp)\n"
+    out = O.core_rewrites(src)
+    assert "convert hm using 1 <;> first | rfl | ring\n" in out
+    assert "convert h using 1; (first | rfl | simp)" in out
+
+
 # d13f23b renames/signatures (UnitDistances, StandardMap 2026-10-25): `finsum_le_finsum` (ordered monoid, finite
 # supports) is our `finsum_le_finsum'`; `Filter.eventuallyEqSet_iff` is `Filter.eventuallyEq_set`;
 # `posLog_le_posLog` asks `-1 ≤ x` there and `0 ≤ x` here.

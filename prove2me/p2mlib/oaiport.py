@@ -440,7 +440,7 @@ def core_rewrites(text, compat_ns='OAI'):
     for _n in ('eLpNorm_le_of_ae_bound', 'eLpNorm_le_of_ae_nnnorm_bound'):    # SKValue, 2026-10-26
         text = _drop_positional_arg(text, _n)     # GreenOperator, 2026-10-26
     text = _drop_positional_arg(_drop_positional_arg(text, 'eLpNorm_congr_norm_ae'), 'eLpNorm_congr_norm_ae')
-    text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*ring[ \t]*$", r"\1 <;> first | rfl | ring", text)
+    text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
     # Our `Measure.map` is total (0 for a non-AEMeasurable map): `unfold law; infer_instance` for an
