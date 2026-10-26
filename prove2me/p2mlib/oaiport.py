@@ -352,6 +352,32 @@ def _drop_positional_arg(text, name):
             break
 
 
+
+_CONVERT = re.compile(r"(?m)^([ \t]*)(convert\b[^\n]*(?:\n\1[ \t]+[^\n]*)*)\n")
+_CONVERT_BULLET = re.compile(r"(?m)^([ \t]*)(· )(convert\b[^\n]*(?:\n\1[ \t]{3,}[^\n]*)*)\n")
+
+
+def _convert_close_diamonds(text):
+    """`convert h using n` (statement ending in `using n`) leaves, in our Mathlib, an instance-diamond
+    goal (`Real.instPreorder.toLE = Real.instLE`) before the goals OpenAI's version leaves; the
+    tactics that follow then hit the wrong goal. Close those first with reducible-instances `rfl`
+    (CompleteCrossing/TriangleRemoval/NodalLength 2026-10-26). Skipped when a bullet, `<;>` or
+    `case` follows, or when the convert is already combined with `;`/`<;>`."""
+    def sub(rx, src):
+        return rx.sub(lambda m: rep(m, src), src)
+
+    def rep(m, src):
+        bullet = m.re is _CONVERT_BULLET
+        body = m.group(3 if bullet else 2)
+        if not re.search(r"using \d+[ \t]*$", body) or ';' in body.split('using')[-1]:
+            return m.group(0)
+        rest = src[m.end():].lstrip(' \t\n')
+        if re.match(r"(·|<;>|case\b|next\b|all_goals try with_reducible_and_instances rfl)", rest):
+            return m.group(0)
+        pad = m.group(1) + ('  ' if bullet else '')
+        return m.group(0) + pad + "all_goals try with_reducible_and_instances rfl\n"
+    return sub(_CONVERT_BULLET, sub(_CONVERT, text))
+
 def core_rewrites(text, compat_ns='OAI'):
     """Lean core/Mathlib renames every port needs. OpenAI's `TensorProduct.inductionOn z tmul add`
     (Mathlib d13f23b) takes its zero case from `tmul 0 0`; ours has only `induction_on`, which
@@ -406,6 +432,8 @@ def core_rewrites(text, compat_ns='OAI'):
     text = _drop_positional_arg(text, 'eLpNorm_le_mul_eLpNorm_of_ae_le_mul')     # GreenOperator, 2026-10-26
     text = _drop_positional_arg(_drop_positional_arg(text, 'eLpNorm_congr_norm_ae'), 'eLpNorm_congr_norm_ae')
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*ring[ \t]*$", r"\1 <;> first | rfl | ring", text)
+    text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
+    text = _convert_close_diamonds(text)
     # d13f23b renames (UnitDistances, StandardMap 2026-10-25)
     text = re.sub(r"(?<![\w.'])birkhoffSum_succ_apply'(?![\w'])", "birkhoffSum_succ'", text)
     text = re.sub(r"(?<![\w.'])birkhoffSum_add_right_apply(?![\w'])", "birkhoffSum_add", text)

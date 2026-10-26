@@ -887,3 +887,15 @@ def test_isometry_lipschitzWith_and_aemeasurable_of_eval():
     assert "U.isometry.lipschitz\n" in out
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean', 'compat_4_34.lean')).read()
     assert 'theorem _root_.AEMeasurable.of_eval' in src
+
+
+def test_convert_closes_instance_diamond_first():
+    src = ("  have h := 1\n  convert (foo x\n      (bar y)) using 1\n  rfl\n"
+           "  · convert hh using 2\n    simp\n"
+           "  convert h using 1\n  · simp\n  convert h using 1; first | rfl | field_simp\n")
+    out = O.core_rewrites(src)
+    assert "using 1\n  all_goals try with_reducible_and_instances rfl\n  rfl\n" in out
+    assert "convert hh using 2\n    all_goals try with_reducible_and_instances rfl\n    simp" in out
+    assert "convert h using 1\n  · simp" in out
+    assert "convert h using 1 <;> first | rfl | field_simp" in out
+    assert O.core_rewrites(out) == out
