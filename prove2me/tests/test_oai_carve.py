@@ -424,3 +424,10 @@ def test_stdsimplex_shim_compiles_and_covers_openai_names(tmp_path):
 def test_text_check_skips_auto_named_instances():
     md = 'Uses `Ns.Specht.instFintypeTabloid` and `Ns.instDecidableEqSwitchIndex`.\n'
     assert CP.missing_names(md, 'noncomputable instance : Fintype (Tabloid m) := x', lambda n: False) == []
+
+
+def test_ported_modules_restore_the_old_isdefeq_transparency():
+    # Lean now checks implicit arguments at implicit transparency; OpenAI's Mathlib did not
+    # (Lech/Dutta port, oaiq-032: rw/simp failed on `(F.obj K).X i` vs `K.X i ⊗ Q`)
+    files = port()
+    assert 'set_option backward.isDefEq.respectTransparency false\n' in files['Sub_B.lean']
