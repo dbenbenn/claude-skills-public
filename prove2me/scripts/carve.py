@@ -80,7 +80,7 @@ publishing it. `order` prints waves: everything in a wave publishes concurrently
 waves are published (bundles, then statements after their bundles, then pieces). Publishing and
 submitting stay with the mission's own scripts and publish_standalone.py / submit_solution.py.
 
-Lessons (SKILL.md, "Splitting a large ported proof"): a piece of about 60 s or less at `-j1`
+Lessons (references/openai-ports.md, "Splitting a large ported proof"): a piece of about 60 s or less at `-j1`
 passes the 300 s verifier; splitting only helps when it removes shared recomputation (a
 definition re-elaborated by every piece costs every piece); no macro or syntax commands (the
 carver refuses to keep one; notation is fine).

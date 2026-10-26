@@ -31,9 +31,11 @@ added the moderation loop, all unread while a proposal was being drafted against
 
 This file is in three parts. **The algorithm** is the order of work for one mission, one line per
 step. **The double-check list** is step 9 written out. **The expansions** say what each step means
-and record what the docs do not say, learned by doing. General Lean/Mathlib tactic pitfalls are in
-`references/lean-pitfalls.md`; the upload pipeline's mechanics in `references/publishing-pipeline.md`;
-the measurements behind the audit rules in `references/audit-evidence.md`.
+and record what the docs do not say, learned by doing. In `references/`: `lean-pitfalls.md`
+(general Lean/Mathlib tactic pitfalls), `verifier-failures.md` (the detail behind the *Verifier
+failures* table), `openai-ports.md` (porting and carving openai/math results),
+`publishing-pipeline.md` (the full-project upload pipeline) and `audit-evidence.md` (the
+measurements behind the audit rules).
 
 ## The algorithm
 
@@ -56,17 +58,9 @@ the measurements behind the audit rules in `references/audit-evidence.md`.
    `IMPORTS` lines; re-run whenever the Lean changes. **Then a source-side audit on every
    statement** with `scripts/source_audit.py`: it lists what the source sentence claims before it
    sees the read-back, and a verdict that is not `faithful` blocks the hand-over until each gap
-   has a written disposition. **The definitions bundle gets a source audit too** (it also checks each
-   definition in every role a statement uses it — assumed or concluded — and that the bundle note
-   quotes each defining sentence with its subject; references/audit-evidence.md): give it
-   `source_pages` in `mission.py` and run `source_audit.py stage MISSION_DIR Def_<name>`. Phase 1
-   inventories every object the source defines on those pages (with the implicit claims a
-   definition carries, "the subgroup … given by" asserting a subgroup); phase 2 marks each one
-   LITERAL, ENCODED, STAND-IN or MISSING against the bundle's read-back. Run it before the
-   statement audits: statement audits skip bundle-level encodings, so without it nobody compares
-   the bundle with the source. Monod's G, H and amenable relations were missing or stood in for
-   until the gap review (2026-09-29). `draft.py verify` also flags bundle docstrings that assert
-   a relationship ("`H = H(ℝ)` is `H ⊤`"). → *Expansion 6.*
+   has a written disposition. **The definitions bundle gets a source audit too, run first**:
+   statement audits skip bundle-level encodings, so without it nobody compares the bundle with the
+   source. → *Expansion 6.*
 6b. **Gap review with the human** -- the second approval step, after the item list. Run
    `scripts/source_audit.py decisions MISSION_DIR`: it writes `DECISIONS.md`, one row per finding
    on the goal and every milestone (each MISSING / WEAKER claim, each EXTRA hypothesis, each
@@ -163,8 +157,10 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   comments as well, so they are as unauditable and unfixable as a statement's were. They earn
   their place anyway for one reason a statement cannot claim: a bundle holds many declarations
   and has a single description for the lot, so a per-declaration docstring is the only
-  per-declaration documentation a reader of the code gets. Keep them to what the object *is* and
-  where in the source it comes from. Every sentence that asserts a *relationship* to the paper —
+  per-declaration documentation a reader of the code gets. Keep them, and the module docstring, to
+  what the object *is* and where in the source it comes from; no author pronouns, and nothing
+  asserted that the mission does not prove (`draft.py verify` flags a docstring asserting a
+  relationship, "`H = H(ℝ)` is `H ⊤`"). Every sentence that asserts a *relationship* to the paper —
   that this agrees with the author's notation, that it is equivalent to their definition, why a
   formalization choice was made — belongs in `natural_language_statement`, which is patchable and
   is what the blind auditor's testimony is compared against. Two of ours show the stakes: the
@@ -215,7 +211,9 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   live Draft and compared word for word, punctuation included, with the rendered page. Do it
   last, after every upload, and preferably by an agent that did not write them: a check of your
   own transcription does not see what a script did to it afterwards (three Garrido quotes shipped
-  as "Tarskis" and "Carathéodorys").
+  as "Tarskis" and "Carathéodorys", from `'Tarski''s'` in a Python string; the echo check passed
+  because the server held exactly the damaged text). Grep the fields for words ending in `s`
+  where the source has `'s`.
 - Each natural-language statement says what the Lean says, written from that Lean and not from a
   sibling; siblings audited against each other. **In particular it may restate the source in the
   source's own notation ("that is, $aua = (u_1, u_0)$") only if the Lean proves everything that
@@ -248,13 +246,11 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   which the Lean does not assert.
 - The description opens "This mission formalizes <citation with DOI link>"; has Setting,
   the seven sections of the platform's `mission_description.md` (Motivation, Setting, Target,
-  Significance, Difficulty, Formalization scope with what is left out, Selected references). **Run `scripts/check_description.py` on it** — the
-  opening sentence, the required sections, display-line length, author pronouns, rulebook
-  phrases, first person and word count are all mechanical, and I have shipped a description
-  that never named its source while this very rule sat here unread; display math only for a formula short enough to fit on one line, since a display
-  line does not wrap (a sentence set in `$$…$$` ran off the page on the Chou draft); identifiers in
-  backticks;
-  no citation paragraph duplicating References; the process kept out.
+  Significance, Difficulty, Formalization scope with what is left out, Selected references).
+  **Run `scripts/check_description.py` on it**: the opening sentence, the required sections,
+  display-line length, author pronouns, rulebook phrases, first person and word count are
+  mechanical (a description that never named its source shipped while this rule sat here unread).
+  Identifiers in backticks; no citation paragraph duplicating References; the process kept out.
 - Setting (rulebook §2, "define the object operationally, from scratch … introduce every symbol")
   is read as: define the *goal's* objects operationally, and introduce every symbol the
   description itself uses before using it; it is not a restatement of the definitions bundle.
@@ -263,8 +259,6 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
 - Backticked Lean names in the prose must be live: `draft.py verify` resolves every backticked
   head name (`Monod.H ⊥` -> `Monod.H`) against the mission's declarations, `#check` with its
   imports, and the platform, and reports a renamed or removed name as BAD.
-- No pronoun for an author whose pronouns the paper does not establish: the surname or "the
-  paper".
 - No phrase lifted from the platform's rulebook ("the shape of the truth", "who cares and why"):
   the rules say what a section must contain, not how to word it, and their register is not the
   description's.
@@ -498,16 +492,9 @@ independent `v` is too loose; `Type (max u v)` keeps "every `X`" and always cont
 `ULift G`. And **re-run every local check file whenever a definition changes**: the universe
 check written for exactly this had been failing silently since the edit that broke it.
 
-**Doc comments inside a published definition are an unaudited surface.** A read-back audits the
-statement; a natural-language statement is audited against the Lean; a doc comment is neither,
-and it is published and read on trust. Either prove what it claims somewhere in the mission and
-say where, or do not assert it. The module docstring is equally frozen: no pronouns for authors,
-no claims about equivalence to the paper.
-
 When Lean needs a structure the paper takes for granted (a quotient known abelian, a rank),
-build it so the instance exists by construction and say in the docstring that the object is
-isomorphic to the paper's; the read-back will render the construction and the description
-explains it.
+build it so the instance exists by construction and say in the natural-language statement that
+the object is isomorphic to the paper's; the read-back will render the construction.
 
 ## Expansion 5 — the statements
 
@@ -626,9 +613,7 @@ MISSION_DIR [NAME…] [--teardown]`: driven by the same `mission.py` as `draft.p
 theorem as its exact publish payload with the bundles it imports, save each prompt to a file, and
 file the testimony under the names `draft.py` reads -- a pair that is missing a file or fails a
 check goes to `readbacks/_failed/` and never replaces a good read-back. `stage` strips every
-comment from what it stages, so pass the real files; it did not until 2026-09-24, when a bundle
-auditor was found quoting a docstring, and the Garrido II and III bundle read-backs were re-run.
-The prompt's reply asks for five lines: conventions settled and whether source
+comment from what it stages, so pass the real files. The prompt's reply asks for five lines: conventions settled and whether source
 settled them, anything unsettled, the name check, unused imported files.
 
 **Two files from one blind reading.** `readback.md` is testimony, published beside the statement
@@ -644,11 +629,8 @@ read-back described. Only draft proposal items carry testimony on the platform (
 `.lean` text staged into its directory, but `./probe` elaborates against the workspace's
 *compiled* libraries. Edit a definition, stage the new text, and the probe still sees the old
 `.olean`: the auditor reasons about one artifact and tests another, and nothing in the sealed
-directory shows it. On the Garrido re-audit an auditor noticed the disagreement itself and said
-so — luck, not a check. `stage_auditor.py stage` now runs `lake build` on every project module
-the artifact reads before sealing anything, and refuses to stage if that build fails. Let
-**lake** decide what is out of date: it tracks content, not timestamps, and a first version of
-this gate compared mtimes and refused after a `touch` that changed nothing. The same trap
+directory shows it. `stage_auditor.py stage` therefore runs `lake build` on every project module
+the artifact reads before sealing anything, and refuses to stage if that build fails. The same trap
 catches the captain: a checker that elaborates `preamble + formal_statement` proves nothing
 about an edit whose module has not been rebuilt.
 
@@ -683,6 +665,15 @@ agent works from the other side, in two phases the tool enforces:
 like the rest. An item may name `context_pages` where the notions its sentence uses are defined
 (Garrido's Theorem 4.1 needs Definition 1.13 on p. 4 and the class EG on p. 7).
 
+**The bundle's source audit.** Give the bundle `source_pages` in `mission.py` and run
+`source_audit.py stage MISSION_DIR Def_<name>`. Phase 1 inventories every object the source
+defines on those pages, with the implicit claims a definition carries ("the subgroup … given by"
+asserts a subgroup); phase 2 marks each one LITERAL, ENCODED, STAND-IN or MISSING against the
+bundle's read-back. It also checks each definition in every role a statement uses it (assumed or
+concluded), and that the bundle note quotes each defining sentence with its subject
+(`references/audit-evidence.md`). Monod's G, H and amenable relations were missing or stood in for
+until the gap review (2026-09-29).
+
 `collect` files both beside the read-back and exits 1 unless the verdict is `faithful`. Then write
 the dispositions (the double-check list says how), fix, and re-run only what changed: a fresh
 read-back of the changed statement, and phase 2 against it -- the claims do not change while the
@@ -699,10 +690,9 @@ the papers' own sentences about their context: quote "we will show that…", "ra
 of whether…"; never paraphrase a cited problem or credit an answer from memory. Then **Setting**
 (each definition with its Lean name in backticks and the reading chosen for any ambiguous term,
 "normal series" say), **Target** (the goal quoted with page, how it is stated, the milestone
-plan), **Formalization scope** (conventions, and what is left out with reasons), **Selected references**. Display math renders but does not wrap, so use `$$…$$` only for a formula that fits on one
-line; a whole sentence set as display math ran off the page on the Chou draft and reads fine as a
-quoted sentence with inline math. The References never repeated as a paragraph; nothing about the process ("an
-independent audit verified…"). Keep every statement about what the mission does and does not
+plan), **Formalization scope** (conventions, and what is left out with reasons), **Selected
+references**. Display math renders but does not wrap, so use `$$…$$` only for a formula that fits
+on one line; a whole sentence set as display math ran off the page on the Chou draft. Keep every statement about what the mission does and does not
 prove: that honesty is what makes the rest credible.
 
 **Milestone descriptions are the source's statement.** `mission_captain.md` defines the field as
@@ -712,14 +702,6 @@ sentence in quotation marks with its page, first; then, if it earns its paragrap
 *External.* For an unnumbered step the paper does not state, paraphrase and quote only what it
 does say. The paper's words never appear outside quotation marks. Keep descriptions in one file
 and PATCH them through the milestones endpoint with an echo check.
-
-**Check the quote after the script writes it, not before.** Checking a transcription against the
-page image certifies what you typed, not what the file holds. On the Garrido draft three quotes
-lost their apostrophes ("Tarskis theorem") because the script wrote `'Tarski''s'` in a Python
-single-quoted string, which is two adjacent literals, not an escaped quote; the echo check passed,
-since the server held exactly the damaged text, and dbenbenn found it reading M6. After generating
-prose, re-read the written field against the page, and grep it for words that end in `s` where the
-source has `'s`.
 
 **Natural-language statements say what the Lean says**, written from the declaration in front of
 you and not from a sibling: what it asserts, where it is stronger or weaker than the source,
@@ -734,8 +716,6 @@ the claim; take the verb from the source and grep the proposal for the word you 
 milestone title indexes the source's lemma and may name a result stronger than what is
 formalized; the NL and the read-back describe this declaration. Judge each by its yardstick.
 
-**Pronouns.** Use the surname or "the paper". A frozen docstring on one published bundle still
-carries a pronoun nobody could justify.
 
 ## Expansion 8 — upload and verify
 
@@ -746,27 +726,19 @@ keeps its prose out of Python: `prose/<name>.md` per item, a front matter of `ti
 `milestone_title:` lines, the natural-language statement as the body, and an optional
 `## Milestone` section for the milestone description. `p2mlib.mission.load` merges the files
 into `mission.py`'s items by name and refuses a field set in both places or a file naming no
-item. Raw Python strings let a stray `\'` reach a live Draft. Older missions keep their layout.
-The same holds for a p2m-standalone folder (`publish_standalone.py`), which now refuses to publish
-a new item whose prose is in `mission.py`: the Lusin–Novikov package copied the older standalone
-template, kept its prose in a Python `PROSE` dict, and published `\"Borel\"` with the backslash in
-five statements (2026-10-03). Write the `.md` files themselves (Write/Edit; when the background
-guard refuses a direct write, Write into the job's tmp directory and `cp` the file in) and pass
-paths to the scripts. Generating them from a bash heredoc or a Python string brings the string
-layer back: an unquoted heredoc expanded `$[0, \infty]$` as arithmetic in three Garrido prose
-files, and a Python literal is one habitual `\"` away from the Borel mistake (dbenbenn,
-2026-10-03: "you have to pass file names around, not heredocs"). Every mission
-through Garrido III copied its own uploader and verifier instead, and most of those verifiers
-only checked that a read-back was non-empty. The upload creates the proposal once, posts
+item. Older missions keep their layout. A p2m-standalone folder (`publish_standalone.py`) works
+the same way and refuses a new item whose prose is in `mission.py`. Write the `.md` files
+themselves (Write/Edit; when the background guard refuses a direct write, Write into the job's tmp
+directory and `cp` the file in) and pass paths to the scripts. A Python string or a bash heredoc
+brings the escaping layer back: Lusin–Novikov published `\"Borel\"` with the backslash in five
+statements, and an unquoted heredoc expanded `$[0, \infty]$` as arithmetic in three Garrido prose
+files (dbenbenn, 2026-10-03: "you have to pass file names around, not heredocs"). The upload creates the proposal once, posts
 definitions with their read-backs, reference items, draft theorems, `main_item_id`,
 `item_order` and the milestones -- and on every later run re-posts only what differs from the
 live Draft, so an unchanged item never loses a confirmation. The verifier compares every field
 to the repo, normalising whitespace, flags live items and milestones the repo lacks, and prints
-`BAD 0`. Every field means the prose fields too: title, natural-language statement
-and source of each item, not only statements and read-backs. On the Milnor draft a pronoun fixed
-in the repo's item file stayed on the server all afternoon because only milestone prose and the
-description had upload scripts of their own; an item's prose changes only when the item is
-PATCHed or re-POSTed, and a verifier that skips those fields cannot see the gap. Ids live in `proposal.json`. Order: definition references, definition
+`BAD 0`. Every field means the prose fields too (title, natural-language statement, source), not
+only statements and read-backs. Ids live in `proposal.json`. Order: definition references, definition
 bundles, the lemmas, the reference milestones, the goal last; milestones in that order too, since
 the milestones endpoint's own order is what the human sees numbered.
 
@@ -854,23 +826,16 @@ together all had verdicts within 15 minutes, against about 13 minutes per verdic
 - `submit_solution.py --go` refuses without one that passes `p2mlib.explanation`.
 - `patch_explanations.py` patches explanations onto submissions already made.
 
-On 2026-10-04, 480 of our 1,053 accepted submissions had no explanation: the tooling never sent one,
-and prove.md calls it "very IMPORTANT". The backfill for the live missions is in
-`p2m-standalone/maintenance/explanations`.
-
 **A statement proved meanwhile gets our proof only if ours is meaningfully different**: correct
 edges, or different mathematics (dbenbenn, 2026-10-04). `submit_solution.py` reads the live proofs
 at submission time, since a batch built hours earlier can find the theorem proved in between.
 - `submit_verify.post_verify` itself refuses a theorem with a live proof (accepted, sketch-accepted
   or pending) unless given `also="<why ours differs or what it replaces>"` (CLI `--also`);
-  `submit_solution.py` passes `checked=True` after its fuller check. Erdős 3, 2026-10-18: a hand
-  call to `post_verify` put a line-for-line duplicate of a ten-day-old `erdos_3` reduction live.
+  `submit_solution.py` passes `checked=True` after its fuller check.
 - The same Lean source is a `DUPLICATE`, never submitted.
 - A proof with an edge that no live proof has goes in, and the log says what it adds. Our edges are
   checked to be used, so this is a different decomposition, or the other proof inlined a milestone.
-- A proof whose edges a live proving proof already includes is held: `ALREADY-PROVED`. Two full
-  proofs land here; the old graph-only check never compared them, because a full proof has no
-  sketch node.
+- A proof whose edges a live proving proof already includes is held: `ALREADY-PROVED`.
 - A held proof waits for a decision, and the decision means reading the other proof. The script
   saves it, Lean and explanation, under `solutions/others/`. Compare the route, the key lemma and
   the edges (`edge_audit.py MISSION` judges whether its edges are false or missing). Then write
@@ -878,23 +843,18 @@ at submission time, since a batch built hours earlier can find the theorem prove
   and run `submit_all.py` again. A "Different" proof is submitted with the comparison as
   `--differs`; a "Same" one is recorded `SKIPPED` and settled.
 
-The case behind it: Nickrobbins95 proved the Lodha–Moore torsion-free milestone 7 hours before our
-batch reached it, with a 252-line direct proof. Ours, 20 lines through `G0 ≤ H(ℝ)` and Monod's
-torsion-free theorem, would still go in, because it records the paper's route as edges.
+(Lodha–Moore's torsion-free milestone: another user's 252-line direct proof landed first; ours, 20
+lines through `G0 ≤ H(ℝ)` and Monod's theorem, still went in, because it records the paper's route
+as edges.)
 
-**Build each solution with `scripts/build_solution.py`** (merge the development module and its
-closure, drop the OTHER milestones so they are imported once Proved, generate the `solution`
-wrapper from the published statement, then `resolve_imports.py` and `prune_solution.py --check`),
-and submit with `submit_solution.py`. A proof can import any statement the platform has
-published, Open or Proved, from a live mission or one still in review; the import is what puts the
-dependency on the graph, and while an import is unproved the verdict is `SKETCH_ACCEPTED`, promoted
-when the import is proved. What it cannot import is a statement the publish queue has not reached
-(a draft stub): `submit_all.py` holds such a solution back, unrecorded, until the import publishes. Check the goal's
-imports before submitting: on QFS the goal's development proof repeated Lemma A.1's argument
-rather than calling it, so the graph would have missed goal ← Lemma A.1 until the proof was
-rewritten to use the milestone. Deprecated theorems are copied in, never imported (all four tools
-agree). **A private mission's theorems are private**: a proof of a PUBLIC theorem cannot import
-them (`unknown import`), so such proofs wait until the mission is made public.
+**How a solution is built and what it may import** is in Expansion 11 (*Solutions*). Three
+points matter at Submit time: a proof can import any published statement, Open or Proved, from a
+live mission or one still in review, but not one the publish queue has not reached (a draft stub;
+`submit_all.py` holds such a solution back until the import publishes); deprecated theorems are
+copied in, never imported; and **a private mission's theorems are private**, so a proof of a
+public theorem cannot import them (`unknown import`) until the mission is made public. Check the
+goal's imports especially: on QFS the goal's proof repeated Lemma A.1's argument rather than
+calling it, which would have dropped the edge goal ← Lemma A.1.
 
 ## Expansion 11 — after launch
 
@@ -992,132 +952,74 @@ in memory and rewrites it. Stop it, record the submission (e.g.
 `"SKETCH_ACCEPTED <sid>"`), and restart it with the same arguments, adding any new check modules.
 Otherwise the entry is overwritten, or the statement is submitted twice.
 
-**Analytic stand-ins for probability, when Mathlib has no path space:**
-- A random walk's law is a convolution power. Use `Finsupp` convolution:
-  `ν.sum fun g a => μ.sum fun h b => single (g*h) (a*b)`, because `MonoidAlgebra` is a structure
-  in this Mathlib.
-- A.s. stabilisation becomes ℓ¹-Cauchy laws, with the changes bounded by Green-function terms.
-- Transience comes from a variational inequality, f(o)² ≤ C·E_μ(f), together with
-  E_μ(u_N) ≤ 2u_N(o) for the truncated Green function.
-
-**Published statements in the workspace.** After Submit, `scripts/fetch_theorems.py MISSION…`
-writes every published theorem and bundle of the missions into `Theorems/` and `Definitions/` in
-server shape and builds them, so solutions import exactly what the verifier compiles against; it
-asks the platform for the list, where the per-mission fetchers read a hand-kept id file.
-
 **A script that has had a bug is tracked and reused.** Every per-mission copy of a job carried its
-own defects -- collectors that dropped `FAIL` lines, deprecate scripts that kept a deprecated
-proof, forks without later fixes -- and each fix stayed stranded in one repo. When a one-off
-script needs a fix, or the same job is about to be written a second time, it moves into
-`scripts/` here.
-
-**Graph hygiene: rewire, submit, audit.** A proof's graph edges are exactly its `import
-Theorems.*` lines, so they are wrong in two ways: an import only dead code used (a false edge;
-`prune_solution.py` now drops it) and a published theorem re-derived inline instead of imported
-(a missing edge). `scripts/rewire.py FILE --target NAME -o OUT` turns each inline copy into a call
-to the published theorem, adds the import, prunes and compiles; `scripts/submit_solution.py THEOREM
-FILE --replaces OLD_SID…` submits (refusing a `theorem solution` declared inside a `namespace`:
-the checker wants it at top level and answers WA "Unknown identifier `solution`", measured
-2026-09-26; close the namespace and write `open Ns in`; and refusing `macro`/`syntax`/`elab`, which the verifier's soundness guard rejects even when merged in unused from a module), requires the new sketch's edges to equal
-the file's imports, and retires the old proof through `deprecate.py`. It also refuses a
-submission whose edges equal those of a live proof of the same theorem (DUPLICATE), unless
-`--replaces` names that proof. `scripts/edge_audit.py MISSION…` checks every live proof of a
-mission and reports INCORRECT, MISSING, SHARED and UNCHECKED. It reads each proof's own source from
-`GET /submissions/:id/solution` and has Lean elaborate it (cached by content), so an import is
-judged by what the declarations reachable from `solution` actually use, and a copy is found by its
-statement as well as its name. Run the audit after a mission's solutions land;
-`edge_audit.py --local SOLUTIONS_DIR` runs the same checks on built files before submitting.
+own defects, and each fix stayed stranded in one repo. When a one-off script needs a fix, or the
+same job is about to be written a second time, it moves into `scripts/` here.
 
 **The platform serves every submission's Lean source.** `GET /submissions/:id/solution` returns
-`content`, the exact `solution.lean`, for any submission, including other users' and failed ones
-(discover.md, since 0.6.3). Use it to compare proofs, to audit edges, and to read how someone else
-proved a lemma. Do not infer a proof from local files. Until 2026-10-02 the edge audit and a memory
-note claimed the platform never serves code; the claim was wrong.
+`content`, the exact `solution.lean`, for any submission, other users' and failed ones included.
+Use it to compare proofs, to audit edges, and to read how someone else proved a lemma; never infer
+a proof from local files.
 
 **Write each milestone's proof against its siblings' stubs.** A proof that needs a sibling
-imports `Theorems.Thm_<NS>_<sibling>` (installed by `stubs.py`), not a copy of it. The edge is
-then written deliberately, following the source, instead of recovered afterwards. A proof
-importing an unproved sibling is a reduction, as on the platform. The development is complete
-when every milestone's proof compiles, its only `sorry`s come through sibling imports, every
-imported sibling has a proof, and the imports among milestones are acyclic:
-`scripts/check_complete.py MISSION_DIR CHECK_MODULE…` checks exactly that, from LeanInfo's
-`rests_on`/`uses_sorry`, and also catches a `chk_` proof that states something other than its
-milestone (Lodha–Moore's torsion proof took milestone 1 as a hypothesis). Developments before
-Lodha–Moore cited primed copies (`isMarginal_EBad'`) to keep every check `sorry`-free, and rewire
-had to recover the edges, missing some (the 2026-09-24 sweep, Moore's `bijOn`). Rewire remains for
-a development lemma that turns out to restate a milestone.
+imports `Theorems.Thm_<NS>_<sibling>` (installed by `stubs.py`), not a copy of it, so the edge is
+written deliberately, following the source, instead of recovered afterwards. A proof importing an
+unproved sibling is a reduction, as on the platform. The development is complete when every
+milestone's proof compiles, its only `sorry`s come through sibling imports, every imported sibling
+has a proof, and the imports among milestones are acyclic: `scripts/check_complete.py MISSION_DIR
+CHECK_MODULE…` checks exactly that, and also catches a `chk_` proof that states something other
+than its milestone (Lodha–Moore's torsion proof took milestone 1 as a hypothesis).
 
-**Build order for a mission's solutions: merge → `rewire.py` → `prune_solution.py --check` →
-`submit_solution.py`.** When the development is an ordinary Lean project rather than `Solutions/` modules (QFS,
-2026-09-26), merge its modules each wrapped in `section … end` and run
-`scripts/resolve_imports.py BODY OUT --src DIR`: it imports each unknown name that is published
-and Proved and inlines the rest from the source tree, round by round, before the prune. A development written before Submit can only use its own primed copies of
-sibling statements (`XT1_mul_XT1'`), so every assembled solution carries them; rewiring is not a
-repair for the odd mistake but a required step, run with no `--only` after `fetch_theorems.py` so
-every published name is in `Theorems/`. CFP §5's builder skipped it: Lemmas 5.5 and 5.6 shipped
-with an inline p. 236 identity and no edge, found only by the post-launch edge audit. V's
-development has the same pattern across 11 of its 22 statements. `submit_solution.py` now refuses
-a file declaring a copy of a *different* published theorem whose module it does not import (a
-rewired copy, whose proof calls the imported theorem, passes); `--allow-copy NAME` for a genuine
-name clash. The guard only knows names in `Theorems/`, so fetch first. The 2026-09-24 audit found 36 false edges on 19 theorems,
-missing edges on 11, and two false edges on sketches submitted from test files.
+**Solutions: merge → `rewire.py` → `prune_solution.py --check` → `submit_solution.py`.**
+- **Fetch first.** After Submit, `scripts/fetch_theorems.py MISSION…` writes every published
+  theorem and bundle into `Theorems/` and `Definitions/` in server shape and builds them, so
+  solutions import exactly what the verifier compiles against, and the guards below know every
+  published name.
+- **Merge.** Keep the development as small modules that import each other, and concatenate with
+  `scripts/merge.py OUT MODULE…` (each module its own section; drops a declaration repeated
+  verbatim, refuses one whose full name repeats with different text, or a `theorem solution`),
+  ending with `theorem solution` stated verbatim. `build_solution.py` does this for one theorem.
+  An ordinary Lean project rather than `Solutions/` modules (QFS) is merged module by module in
+  `section … end`, then `scripts/resolve_imports.py BODY OUT --src DIR` imports each unknown name
+  that is published and Proved and inlines the rest.
+- **Rewire**, always, not as a repair: `scripts/rewire.py FILE --target NAME -o OUT` asks Lean which
+  theorems of the file state a published theorem under any name, turns each into a call to the
+  published theorem, adds the import, prunes and compiles. It cannot see a lemma that is a *part*
+  or a *consequence* of a published statement, nor a definition rebuilt inline (Moore's
+  `reduced_unique` and `exists_reduced_equiv` are the two halves of a published `∃!`; CFP §7 shipped
+  five such solutions, among them Theorem 7.2 with the published Δ₁ conjugation rebuilt inline).
+  `edge_audit.py --local SOLUTIONS_DIR` catches those: its SHARED section lists each pair of
+  solutions whose top proofs name a common declaration of their own while neither reaches the
+  other. Read each pair; a shared basic lemma is fine, and when the step *is* the sibling's
+  statement, take it from the published theorem.
+- **Prune** with `scripts/prune_solution.py FILE --check`. Concatenation pulls in whole modules
+  (one Chou submission was 684 lines, 205 reachable), and an unused copy of a published theorem
+  reads as a missing edge that someone will "fix" into a false one. It keeps what Lean says is
+  reachable from `solution`, treats every attributed declaration and `instance` as a root, and
+  `--check` re-elaborates with `-DautoImplicit=false`, as the verifier does. Then re-elaborate the
+  published statement locally and discharge it with `solution <binders>`: that is the server's
+  type check.
+- **Submit** with `scripts/submit_solution.py THEOREM FILE [--replaces OLD_SID…]` (it calls
+  `submit_verify.py`, the bare `POST /verify`). It refuses a `theorem solution` inside a
+  `namespace` (close it and write `open Ns in`), `macro`/`syntax`/`elab` (the soundness guard
+  rejects them even unused), and a copy of a different published theorem whose module the file
+  does not import (`--allow-copy NAME` for a genuine name clash); it requires the new sketch's
+  edges to equal the file's imports, refuses edges equal to a live proof's (DUPLICATE) unless
+  `--replaces` names it, and retires replaced proofs through `deprecate.py`.
+- **Audit** with `scripts/edge_audit.py MISSION…` after a mission's solutions land: it reads every
+  live proof's source and has Lean judge each import, reporting INCORRECT, MISSING, SHARED and
+  UNCHECKED.
 
-**Rewiring finds copies by statement, but not parts of one.** Since 2026-10-02 `rewire.py` asks
-Lean which theorems of the file state a published theorem under any name: equal statements after
-renaming universes, unfolding the file's own predicates and erasing proofs (Moore's `reduced_iff`,
-written with a local `CommonCaret`, is now found; it had been rewired by hand). It cannot see a
-lemma that is a *part* or a *consequence* of a sibling's statement, nor a definition rebuilt
-inline: Moore's `reduced_unique` and `exists_reduced_equiv` are the two halves of a published
-`∃!`. The edge audit matches by name only. CFP §7 shipped five such solutions, all accepted:
-- Theorem 7.2 was `mulEquivF.trans psiEquiv`, with `psiEquiv` the published Δ₁ conjugation
-  rebuilt inline.
-- Two Farey lemmas re-proved one direction of the published criterion as `subsimplex_of_farey`.
-- restrict/glue re-proved the published unique-map lemma as `mob_unique`.
-- index two rebuilt "PIP is a group" as `pipSubgroup`.
-
-After the build, run `scripts/edge_audit.py --local SOLUTIONS_DIR` (`edge_overlap.py` is now this). Its
-SHARED section lists each pair of solutions whose top proofs name a common declaration of their own,
-where neither reaches the other. Read each
-listed pair. A shared basic lemma is fine. When the step *is* the sibling's statement, take it from
-the published theorem, prune, and resubmit with `--replaces`. Counting shared declarations instead
-was tried and does not work: a common lemma library puts every pair above 60%.
-
-**Solutions.** Keep the development as small modules that import each other; to submit a full proof, build
-the submission by concatenating with `scripts/merge.py OUT MODULE…` (each module its own section,
-with any scope it leaves open closed; drops a declaration repeated verbatim and refuses one whose
-full name repeats with different text, or a `theorem solution`; Lean parses the modules, so names
-are full names) and finishing with `theorem solution` stated verbatim; **then prune what the proof does not use**, with
-`scripts/prune_solution.py FILE --check`. Concatenation pulls in whole modules, so an assembled
-file carries lemmas its target never touches — one Chou submission was 684 lines of which 205
-were reachable. That is not only untidy: an unused copy of a *published* theorem reads as a
-missing graph edge, and importing it to "fix" that asserts a dependency the proof does not have.
-The script keeps what is reachable from `solution` by Lean's own dependencies (LeanInfo: the
-constants in each proof term, plus every name the elaborator resolved in its source, since an
-`rfl` lemma used by `simp only` leaves no trace in the term), treats every attributed declaration and every
-`instance` as a root — `@[simp]` and typeclass resolution use a declaration without naming it, so
-unused-by-name is not unused — and `--check` re-elaborates the result, which is not optional; re-elaborate the published statement locally and discharge it with
-`solution <binders>` before submitting, which is the type check the server runs. A solution may
-import any platform theorem as `Theorems.Thm_<Namespace>_<name>`, the mission's definitions and
-Mathlib; never another solution or its own target. Importing only Proved theorems gives
-`ACCEPTED` and the target shows Proved; importing an Open theorem gives `SKETCH_ACCEPTED`, a
-reduction: the imported theorems become the target's decomposition children, the target sits in
-the mission's tree and auto-resolves when every leaf is proved (`prove.md`, `missions.md`). A
-reduction is the right submission when the decomposition is what you have and the leaves are
-worth publishing for others to attack; a full proof by concatenation is the right one when you
-have the whole argument and want the milestone Proved now. After Submit, post every
-solution as soon as its own statement is published: a wired solution whose imports are still Open
-is accepted as a reduction and resolves to Proved when they are, so submitting in dependency
-layers and waiting for each layer's verdicts only adds delay (dbenbenn, 2026-09-24). Fetch each imported statement into
-`Theorems/Thm_….lean` locally to compile-check. Submit with `scripts/submit_verify.py TID FILE EXPL.md`; poll
-`GET /verify?submission_id=…` (the documented `GET /submission/{id}` 404s). **The verifier runs with `autoImplicit` off, and `lake env lean` does not**: it ignores the
-lakefile's `leanOptions`, so a `universe u` declared inside a `namespace … end` block that has
-closed passes locally (the stray `u` is auto-bound) and fails on the server — as `unknown universe
-level` or, worse, as SORRY on a declaration above it. Hoist every `universe` line to the top of an
-assembled file; `prune_solution.py --check` now elaborates with `-DautoImplicit=false`. Four of
-the 23 Garrido solutions failed this way. The first verify that
-imports a freshly published bundle can time out at 300 s while the server builds it: resubmit
-unchanged. Explanations are patchable; attach the route in prose and say the file is
-self-contained.
+A solution may import any platform theorem as `Theorems.Thm_<Namespace>_<name>`, the mission's
+definitions and Mathlib; never another solution or its own target. Importing only Proved theorems
+gives `ACCEPTED`; importing an Open one gives `SKETCH_ACCEPTED`, a reduction whose imports become
+the target's decomposition children, and the target resolves to Proved when every leaf is
+(`prove.md`, `missions.md`). A reduction is the right submission when the decomposition is what
+you have and the leaves are worth publishing for others; a full proof when you have the whole
+argument and want the milestone Proved now. Post every solution as soon as its own statement is published;
+waiting for each dependency layer's verdicts only adds delay (dbenbenn, 2026-09-24). Poll verdicts
+with `GET /verify?submission_id=…` (the documented `GET /submission/{id}` 404s). Explanations stay
+patchable.
 
 **Metadata and edits on the live mission.** `PATCH /missions/:id` takes `name`, `description`,
 `mission_type`, `field_ids`, `main_statement`. After a live edit the proposal snapshot lies:
@@ -1148,12 +1050,8 @@ of live work. When a mission teaches something, edit the algorithm, the list or 
 ## The irreversible surface
 
 **`formal_statement`, `theorem_name`, `preamble` and definition code freeze at publish.**
-**A statement's Lean docstring is part of `formal_statement`**, since everything but the
-`import` lines goes into that field — so the prose inside `/-- … -/` freezes too, while every
-other piece of prose on the platform stays patchable. Give a docstring the scrutiny you give
-the statement, not the scrutiny you give a description you can fix later. Cheaper still:
-keep docstrings short and put the discussion in `natural_language_statement`, where a
-correction costs one PATCH instead of a burned name.
+A statement's docstring would be part of `formal_statement` and freeze with it, which is why a
+published statement carries none (the double-check list).
 `theorem_title`, `natural_language_statement`, `source`, `tags` and a solution's `explanation`
 stay patchable forever, definitions included (`contribute.md`'s table omits `theorem_title` and
 is wrong; verified against the API). Two paths reach publish: `POST /submit-problem` and
@@ -1216,365 +1114,66 @@ in a description can be retired into a citation by publishing the claim as its o
 statement; pin its objects by pointwise hypotheses rather than a new definition, and keep
 `source` honest about what the source supplies.
 
-### A solution must not redeclare the target's name with a different signature
+## Verifier failures
 
-A `/verify` submission is compiled **without** the target in scope; the platform then checks
-`solution` against the published statement. So the solution file may not mention the target's
-name at all: `theorem solution : type_of% @Target := @Target_dev` gets `CE` "Unknown constant
-`Target`" (Erdős 3, 2026-10-16), while `theorem solution : type_of% @Target_dev := @Target_dev`
-is accepted. And if your solution file declares that **same full name** with a signature that is
-not identical, the verdict is `WA` with
+Failures that no local build reproduces. The detail and the case behind each is in
+`references/verifier-failures.md`.
 
-    expected token
-    Unknown identifier `<your target's full name>`
-    Unknown constant `_check`
+| Symptom | Cause and remedy |
+|---|---|
+| `WA`, no location: "Unknown identifier `<target>`", "Unknown constant `_check`" | The solution file declares the target's full name with a different signature. Rename the development's theorem; `solution` is the only declaration matching the target. |
+| `CE` "Unknown constant `<target>`" | The solution mentions the target, which is not in scope when it compiles. Write `theorem solution : type_of% @T_dev := @T_dev`. |
+| `WA` "universe level metavariables" | A universe nothing pins: see Expansion 5 (disproofs, and universes only under `max`). |
+| `WA` "does not match the target type", `CoeT` typeclass timeout | A raw `Classical.choose (Classical.choose_spec …)` in a binder type. Name it with `let` after the colon. |
+| "unknown universe level", or `SORRY` on a declaration above the real fault | The verifier runs with `autoImplicit` off and `lake env lean` does not. Hoist every `universe` line to the top of an assembled file. |
+| "FAILED: Compilation timed out after 300s", "Verification timed out after 300s" | The item itself is slow. Retry unchanged first; after about two real timeouts split it into pieces of about 60 s or less at `-j1` locally. |
+| "Module compilation timed out" | A cold worker building imported bundles. Retry unchanged, never split. |
+| `whnf` heartbeat timeout on the server only | A `rfl` proof: rewrite it without the deep unfolding. A definition: `set_option maxHeartbeats 1000000 in`. |
+| "Source too large for token scanner" | The 1 MiB cap. Split into published statements; a disproof cannot import, so golf it. |
+| `dependency_oom` ("Lean exited with code 137") | Heavy computations in bundles a piece imports together; see `references/openai-ports.md`. |
 
-— a parse-style error, **with no location**, that looks nothing like a name collision and
-survives every local check: the merged file builds clean and the server-shape recheck (re-elaborate
-the published `formal_statement`, discharge it with `solution`) passes, because locally nothing
-else declares that name.
+To bisect a locationless `WA`, change one thing at a time against a target where a `WA` costs
+nothing (an already-Proved theorem, or a private trivial probe statement); never guess at syntax.
 
-This bites when a development proves the target under its own name and the solution is assembled
-by concatenating modules. An *identical* signature is harmless — one mission had a solution
-redeclaring its target's exact name and signature and it was ACCEPTED — so the trap only springs
-when the signatures differ, e.g. the module says `{G : Type u}` (a file with `universe u`) while
-the published statement says `{G : Type*}`.
+## The dependency graph
 
-**Fix:** give the development's theorem a different name and let `solution` be the only
-declaration matching the target. Do not "fix" it by editing the signature to match — the name is
-the hazard, and a later edit can reintroduce the mismatch.
+**An edge exists only when a solution carries `import Theorems.Thm_<name>`.** A solution that
+re-proves a published sibling inline creates no edge (a missing edge), and one that imports a
+theorem only dead code used asserts a dependency that does not exist (a false edge). A false edge
+is worse: a missing edge understates the structure, a false one misstates it, and the graph is
+what a reader trusts. Measured across our missions, of 163 copies of published theorems sitting in
+submitted solutions only 37 were reachable from `solution` (Chou: 0 of 57). So classify before
+rewiring: reachable copies get the import, unreachable ones are deleted (`prune_solution.py`,
+then `rewire.py`; see Expansion 11).
 
-**Diagnosing a locationless `WA` generally.** Do not guess at syntax. Bisect with submissions
-against targets where a `WA` costs nothing — an already-`Proved` theorem, or one that already has
-an accepted sketch — changing exactly one thing at a time:
+**Find an inlined copy by its statement, never by its name.** Developments rename what they copy
+(`isSDP_marks` for `isStandardDyadicPartition_marks`), and a name-keyed scan hid 12 of 25 copies on
+CFP §2. `rewire.py` asks Lean, which is why it finds renamed copies; it still cannot see a part or
+a consequence of a published statement (Expansion 11). When a copy is excised, rewrite its call
+sites to the **fully qualified** published name: a bare name can bind to something else in scope,
+and if that happens to typecheck it silently changes what the proof proves. Where the local
+statement genuinely differs, the variant trap's remedy applies: publish the general form as its own
+node, keep the milestone on the source's statement, derive one from the other, relink with a
+`reason`. Establish that a variant *is* one before paying for it; twice the difference was in the
+comparison tool, not the mathematics.
 
-- same file, *different tail* proving some other theorem → isolates content from target;
-- a known-good small solution *plus the suspect import* → isolates the import.
+**Every accepted submission adds its own sketch node**, edges running
+`child -> sketch-<submission_id> -> parent`. Resubmitting a cleaner proof therefore *adds* a
+decomposition beside the old one, and the old edges stay visible until that submission is
+deprecated. Decide deprecation with the human *before* resubmitting a rewired proof, then
+`scripts/deprecate.py --keep NEW_SID OLD_SID… [--go]`. Deprecating a superseded reduction is safe
+when the new one is a superset, and the way to know is the frontier: record
+`GET /theorems/:id/open-leaves` before submitting and compare after deprecating. A reduction is the
+mission's decomposition, and getting it wrong moves the frontier other people work from.
 
-Two such submissions localised the above in minutes after two blind fixes had failed. Rule out
-size first from the record: a 102KB solution had been accepted, so a 70KB one is not too big.
-
-**Two publish timeouts, two remedies.** "FAILED: Compilation timed out after 300s" means the item itself is too slow: split it, with pieces of about 60–70 s or less single-threaded locally (a 102 s Erdős 3 bundle failed three times, and its 69 s and 33 s halves passed). "ERROR: Internal error while publishing: Module compilation timed out" means the server is building imported bundles on a cold worker. It grows more frequent the deeper the item sits in a bundle chain, but every one so far has eventually passed on an unchanged retry (Erdős 3, 2026-10-08), so retry it and never split it.
-
-**A heartbeat timeout the local build never shows: replace the `rfl`, do not raise the limit.** Erdős 3 v2 bundle B122 (2026-10-17) failed on the verifier with "(deterministic) timeout at `whnf`, maximum number of heartbeats (200000)" and again at `set_option maxHeartbeats 400000`, on a one-line `rfl` proof that locally passes under 5,000 heartbeats, with every imported bundle on the platform byte-identical to the local files. Reproving it without the deep unfolding (extensionality on the structure, then the definitions' own `@[simp]` coordinate lemmas, then a small `rfl`) published at once. So for a verifier-only heartbeat timeout, rewrite the proof to avoid the reduction; raising `maxHeartbeats` is not a reliable remedy there.
-
-**A WA "does not match the target type" that no local check reproduces: look for a raw `Classical.choose (Classical.choose_spec …)` in a hypothesis.** Erdős 3 v2 (2026-10-18): two statements got WA ("failed to synthesize CoeT … timeout at `typeclass` (20000)") for every proof, although locally the solution's type and the target's were `Expr`-equal, every published file was byte-identical and every emulation of the check passed. Private probes (`"private": true` statements keeping the hypotheses, conclusion `True`, proof `trivial`) bisected it in four rounds of about 15 minutes each: the trigger was two hypotheses whose binder types repeated `Classical.choose (Classical.choose_spec (exists_… m dim))`. Restating them after the colon, with the term named once by `let A := …` (the form the accepted statements used), passed at once. The proofs needed only an `intro` and positional arguments. So: never put a raw choose-of-an-existence-theorem into a binder type; name it with a `let` after the colon. To bisect a verifier-only WA, use private trivial probes rather than guesses. The verifier elaborates the check separately from the solution file, so options set in the solution never reach its message, and the soundness guard refuses metaprogramming.
-
-**Proof submissions time out the same way.** A solution's verify can return `ERROR` with "Verification
-timed out after 300s". Measure the solution file single-threaded (`lake env lean -j1 FILE`; the default
-parallel wall time hides the cost): Artin's (10.10) solution took 81 s single-threaded (17 s wall) and
-timed out twice, while 18 s and 40 s ones passed. Over about 60 s single-threaded, split it into
-published cuts before the second retry.
-
-**Retry or split according to how easy the split is** (dbenbenn, 2026-10-08). When the carver can cut an item cleanly into parts that are each much faster, split early, after an own-compile timeout or a slow local check, because a split costs little. Dependency timeouts ("Module compilation timed out") do not depend on the item's own size, so they never justify a split: a 14 s Erdős 3 bundle got four in a row while its 42 s sibling passed first try. When one heavy declaration dominates, or the best cut barely changes the time, keep retrying much longer instead. Never loop re-splitting for a marginal gain: a 76 s bundle that the scheduler kept "splitting" to stay under a 75 s cutoff went through unsplit on a retry.
-
-**Carried-over `local notation` lines cost about 1 s each to elaborate.** A carved bundle that keeps every module section's notations can be dominated by them. Erdős 3 B132 had 166 notations for 36 declarations: 161 s at -j1 and 25 own-compile timeouts, though no declaration took more than 5 s. Dropping the unused notations brought it to 73 s, and it published. Prune unused notations when carving.
-
-**A third failure kind is deterministic:** "FAILED: definition does not compile: (deterministic) timeout at `whnf`, maximum number of heartbeats (200000)" can appear on the server for a declaration that compiles locally (Erdős 3 B025, 2026-10-08). Retrying cannot fix it. Put `set_option maxHeartbeats 1000000 in` before that declaration and resubmit.
-
-**The hard size limit is 1 MiB.** The soundness guard refuses a solution over 1,048,576 bytes before compiling it: "Source too large for token scanner" (FAILED, 2026-10-07, a 1.65 MB port of OpenAI's Kaplansky counterexample). Stripping comments saved only 6%. A larger proof has to be split into published intermediate statements, each proved by its own submission. A disproof cannot be split, since it cannot import theorems, so it has to be golfed instead. The Kaplansky disproof went from 1.65 MB to 995 KB by pruning, stripping comments, renaming identifiers to short names, adding `notation` aliases for long Mathlib names, and one global `open scoped Classical`. Tactic `macro`/`syntax` shortcuts are refused by the soundness guard, but `notation` lines pass. 299 KB and 332 KB solutions were accepted.
-
-### Splitting a large ported proof
-
-A port over the 1 MiB cap, or with pieces the 300 s verifier cannot finish, is split by
-`scripts/carve.py` (`graph`, `plan`, `gen`, `order`; its docstring has the config). Never write
-a per-mission carver: five did (Kaplansky, Deligne–Drinfeld, Catalan, Chowla, Erdős 3,
-2026-10-07/08), and each relearned the same bugs, now tests in `tests/test_carve.py`. The tool
-publishes every reachable definition in Definitions bundles and promotes theorems to published
-statements until each piece fits its budget. It carves by Lean's own command ranges, and each
-piece renames OpenAI's copy of its target `<name>_oai`; without the rename the submissions came
-back WA. The lessons:
-- **Budget.** Aim for pieces of about 60 s or less when compiled locally with `-j1`. That leaves
-  margin under the 300 s verifier; the Erdős 3 cost model scales local build times by 1.5, and
-  bundle B005 still timed out twice at 300 s before it was published.
-- **Splitting only helps when it removes shared recomputation.** A definition that every piece
-  re-elaborates costs every piece. Splitting pays when expensive shared material moves into a
-  bundle or a published statement that later pieces import instead of re-proving. Cutting a proof
-  whose pieces all redo the same heavy work only multiplies that work.
-- **Publish concurrently along the DAG.** `carve.py order` prints waves. Everything in a wave can
-  be published at once when the earlier waves are done: independent bundles together, then each
-  statement after its bundles, then each piece after the statements it imports. Erdős 3 first
-  published its bundles as a chain, one at a time, and then re-planned them as a DAG
-  (2026-10-08).
-- **Never edit the port's source after the graph is built.** The carver cuts each module by the
-  command positions recorded when the port was compiled, so changing a proof in the source (even to
-  speed it up) corrupts every later carve of that module: on Erdős 3 a five-line proof fix spliced
-  text into two unpublished bundles (2026-10-16). Apply such fixes as post-carve text replacements
-  to the generated files instead.
-- **No `macro` or `syntax` commands.** The soundness guard refuses them, and the carver refuses to
-  keep one. `notation` is fine.
-- **Fix a carver bug in `p2mlib/carve.py` with a CarveDev test; don't patch it per carve.** The
-  plain carves of 2026-10-23 hit two bugs, both from reading a short name lexically. The field
-  token in `(E.rules ω).fixed_quadratic_memory` was read as a same-named theorem, which gave a
-  false `import Theorems.*` edge. The `_oai` rename also hit other declarations with the target's
-  short name: a namespaced reference to a sibling theorem, and a definition in the target's own
-  statement. Both are fixed: a field is matched only against the declaration's compiled
-  constants, and a token is renamed only when it denotes the target. The per-carve `patches`
-  for these cases are no longer needed. The plain carves of 2026-10-24 found three more:
-  `export Coding (code)` stayed in a bundle without the class Coding ("unknown namespace"; an
-  `export` now goes where its namespace exists, like an `open`); sibling modules' identical
-  anonymous `local instance : Fact …` share one generated name (an instance of a Prop class is a
-  theorem, so Lean accepts the duplicate), and the losers were never re-emitted (they are now);
-  and an instance from a later module, visible through a bundle, changed how an earlier
-  declaration elaborated. All of these were the text reading disagreeing with Lean, and the
-  carver no longer reads meanings from text (next item).
-- **The carver reads what Lean elaborated, not the source text** (2026-10-24). `carve.py graph`
-  runs `lean/LeanInfo.lean --idents` *elaborating* each module (`--module M --no-decls`; cached
-  by content under `~/.cache/p2m/leaninfo`). It costs about the module's own compile CPU time
-  (FormalBoxes: 87 s against 93 s), so a first `graph` is about one more build of the port. For
-  every command it records from the info trees:
-  - `resolved`: what each identifier token resolved to, the name part and each field part
-    (`A.coord_eq` with `A : Space`, `(e).f`, an `open`-resolved name, a `simp only [h]` lemma, a
-    notation's `=> foo`, an `attribute`/`export` target), a local as `""`, a declared or bound
-    name and a structure-instance field marked;
-  - `insts`/`sig_insts`: the non-library instances its elaborated terms use (a `Fact`/`NeZero`
-    instance is a theorem only instance search uses; this is the only place its use shows);
-  - `inst_keys`: what instance search solved (class and argument heads);
-  - `declares_kinds`/`kinds_used`: the notations a command adds and the ones it is written with.
-
-  The carver takes from these: dependency edges (instance uses included; a local notation only
-  for the commands that use it), whether a context line names a gone declaration (fields
-  included), the `_oai`/suffix renames (exactly the token parts that resolved to the renamed
-  constant), and `_root_.` pins (only when the carved file would show the text other candidates
-  than the port's module saw; never a declared name or a case name like `| zero =>`). It puts back
-  in force exactly the local instances a kept declaration used (a stub: its statement), and at
-  the top of each module section it hides again, with `attribute [-instance]` (section-local),
-  the global instances that module never saw and whose type could match its problems: this fixed
-  RationalHitting's witnessCharZero leak, which had needed a post-carve patch. What it cannot
-  hide (an instance declared later in the same module, reached through a bundle) `plan`/`gen`
-  still warn about. The text reading survives only as the fallback for a token with no record (a
-  few per carve, inside some `simp`/`simpa` argument lists); `graph` and `gen` list them. The
-  case-by-case fixes of 2026-10-16..24 were all places where the text reading disagreed with
-  Lean; their tests run against the records now, and one test runs the old rules with the records
-  removed. Rechecked on five plain carves of 2026-10-23/24 (Problem355, PermanentBorder,
-  RationalHitting, Problem340, PosteriorReplicas), regenerated without their `carve_patches.json`:
-  every bundle, statement and piece compiles and the import-edge check finds no false edge, both
-  from the published plans and from fresh plans (PosteriorReplicas' fresh plan no longer has the
-  false edge and the two orphaned statements that were removed by hand). The patches were all
-  for bugs this removed. A post-carve patch is again only for a proof fix.
-- **Heavy computations do not belong in bundles; publish them as statements.** Eilenberg–Ganea
-  (2026-10-25): OpenAI's chain-contraction certificate is about 850 `decide +kernel` lemmas (the
-  module: 900 s, 23 GiB), and a *definition* (`contraction`) rests on their aggregates, so the
-  carver put them all in 17 bundles of about 58 s. Each published alone, but every bundle
-  importing several of them failed with `dependency_oom` ("Failed to compile modules …: Lean
-  exited with code 137"): a cold worker builds the imported bundles in parallel and runs out of
-  memory. Unchanged retries failed the same way. The fix: `forced` the facts the definition needs
-  (statements whose names are ASCII; `pinned` the definitions their statements mention, or the
-  plan has a cycle), so bundles import cheap `sorry` stubs and the computation moves into
-  pieces. When such a fact is proved directly from hundreds of per-index lemmas, the planner
-  promotes each lemma to its own statement (561 here). Add block lemmas first, by a port patch
-  that proves the aggregate from blocks (`interval_cases` over a range, then the per-index
-  lemmas; `omega` picks the block); then it promotes blocks. Size blocks by the measured cost per
-  lemma: 30 lemmas at 2.8 s made an 84 s block. Generator: `p2m-standalone/openai-ports/
-  eilenberg-ganea-carve/gen_block_patches.py`; fold it into `carve_prep.py` the next time a carve
-  needs it.
-- **Uses the elaborated term cannot show** (batch 3, 2026-10-25; `pinned` groups and `synthInstance.maxHeartbeats`
-  patches are no longer needed for these). (1) A `CoeSort`/`CoeFun`/`Coe…` instance that elaborates away
-  (`↑p` is `p.carrier`, `f n` is `f.toFun n`) is a dependency of every declaration naming the function it wraps
-  (`Carver._add_coercion_instances`). (2) Attributes only the declaring file may set (reducibility including
-  `instance_reducible`, `inline`, `specialize`, `export`, `implemented_by`, `extern`, … `RESTRICTED_ATTRIBUTES`) stay in the file
-  that has their target; elsewhere the bundle holding the target already carries them. (3) A local instance that
-  won a subproblem but left no constant comes back when an `inst_keys` problem of the declaration has its
-  class and heads. (4) An instance that only a `variable` binder needs (`NeZero n` for `W.x 0 0`) is a
-  dependency of the declarations in its scope.
-- **`carve_measure.py` checks every import edge, and fails the carve on a false one.** The
-  carver infers dependencies partly from source text, so it can emit an `import Theorems.*` a
-  piece never uses; the file compiles, and the false edge goes into the published graph
-  (PosteriorReplicas 2026-10-23, caught only by hand: drop each import, recompile). After each
-  file compiles, `lean/EdgeUses.lean` reads its .olean (a piece compiles as module
-  `EdgeChk.Chk_<name>` for this) and lists the constants each import supplies to what `solution`
-  reaches (for a bundle or statement, to every declaration). Each import it finds unused is
-  confirmed by one compile without it, because a `dsimp only [rfl_lemma]`, a notation or an `open`
-  leaves no constant behind. Checked: every `import Theorems.*`, and a bundle's imports of this
-  carve's other bundles. The report is `work/false_edges.json`, which lists each false edge (with
-  the bundle to import instead when the statement only brought one in), imports used only by dead
-  code, and **orphaned statements**: no file imports them any more, and they are neither target nor
-  forced, so drop them from the plan, as was done by hand for PosteriorReplicas. Results are cached
-  in `work/edges.json`. `--drop-false-edges` cuts the false import lines and records the cuts in
-  `work/repairs.json`, so they survive `carve.py gen`. `--allow-false-edges` reports without
-  failing; `--no-edge-check` skips the check. Recompiling once per import gives the same answers
-  except for an import that is also reached through a bundle, which it calls false. It is only the
-  fallback, used when the scan fails. On the 17 hand-checked carves of 2026-10-23/24 (106 edges)
-  the check agreed with the hand results: one false edge (PosteriorReplicas, with its orphaned
-  statement) and every other edge used. It added 3–14% to the measure time, about 5 s per file
-  that has an edge to check.
-- **The soundness guard refuses the token `prelude`, even as an identifier** (WLTime 2026-10-23:
-  OpenAI's `def prelude` failed a published bundle). Both port routes rename it to `prelude_`.
-  `carve.py gen`, `split_run.py` and `submit_solution.py` refuse any file the guard would refuse
-  (`p2mlib.leantext.guard_problems` holds the guard's rules; add a newly found rule there).
-- **The cost model is a little pessimistic near the budget; trust the measurement.** On 195
-  measured bundles and pieces of 27 carves (time_scale 1.2, 2026-10-24), measured -j1 time came
-  out at about 0.65 × estimate + 7.6 s (residual sd 6 s). Items estimated at 40–60 s measured at
-  0.74× (median), but the ratio ranged up to 1.43× (a ThorpNine piece: estimated 42 s, measured
-  60.5 s). The carves' own medians ran from 0.56 to 1.34, so the spread is per carve, not a
-  single scale to correct. The model is unchanged. Measure every carve (`carve_measure.py`), then
-  re-plan or `carve.py split` from the times.
-- `carve.py plan` refuses a plan in which a bundle misses a definition that one of its members
-  needs (Erdős 3 B006 `A.space`, B024 `coord`), or in which a bundle or piece rests on `sorry`
-  (B022). Compile every bundle locally before publishing it. A published bundle is frozen
-  (`frozen` in the config), so a later re-plan keeps it as it is.
-- **Extending a published carve** (a new statement after the first bundles are live) is the
-  normal path. Make a second carve with the live bundles under `frozen` (`plan`: the first carve's
-  plan; `bundles`: their names) and the live statements under `external_theorems`, then plan, gen,
-  measure and `split_run.py` as usual, with a fresh run state.
-  - **gen** writes each frozen bundle byte for byte from its published copy: `frozen.lib`, else
-    the workspace's `Definitions/` (`fetch_theorems.py --names`). It refuses when there is no copy.
-    It also re-applies `work/repairs.json` to every file, so a regenerated file is the one
-    measured. With `frozen.repairs` (the first carve's repairs.json) it checks the regenerated
-    text and prints `FROZEN … differs` on drift.
-  - **split_run** starts every run (and the dry run, read-only) by looking up every bundle,
-    statement and piece of the plan on the platform. It adopts each one live under its name with
-    our text (a piece: our exact source as a live proof), without needing its prose. A live name
-    with other text stops the whole run before anything is posted.
-  - Boone–Higman, 2026-10-24: gen dropped a measure-time repair from a frozen bundle, and the
-    agent seeded the run state by hand to keep five live bundles from being re-posted. Both are
-    now in the tools.
-- **Extending a split whose bundle another carver made** (the zero-divisor K(G,1) clause,
-  2026-10-10): `carve.py` with a `frozen` bundle from the old per-mission carver produced pieces
-  that imported none of the new bundles (its dependency edges missed names a `simp only` or `rw`
-  uses). What worked instead: merge the whole port (`build_solution.py`), drop by exact full name
-  every declaration the published bundles define (list them with a Lean `#eval` over
-  `env.constants` filtered by module) and every published statement, import those, rename OpenAI's
-  copy of the target, then `prune_solution.py`. Two traps: a bundle name can capture a bare name
-  the port meant at the root (`GraphPresentation.Group` captured `[Group G]`; write
-  `[_root_.Group G]`), and `prune_solution.py` drops `include` lines after kept `variable` lines
-  and keeps `variable` binders that mention pruned variables (repair script:
-  `p2m-standalone/openai-tfzd-kg1/fixup.py`; fold it into prune_solution next time it bites).
-  When two pieces redo the same generic modules, move those modules whole into definitions
-  bundles: 95 s became bundles of 20 s and 27 s plus pieces of 36 s and 59 s, all accepted.
-
-- **Lessons of the abandoned first Erdős 3 split (2026-10-08..16; archive
-  `p2m-standalone/openai-erdos3-split-v1`, README).** It published 244 bundles and proved 304 of 440
-  pieces, then stalled: its deepest bundles never published (every attempt a cold "Module
-  compilation timed out") because the bundle import chain was 92 levels deep (178 bundles in one
-  closure, ~5,200 s of compile on the critical path). What to do instead:
-  - **Rebuild the port before `carve.py graph`.** DeclGraph reads `.olean`s; proofs repaired in the
-    source but never rebuilt still read as `sorry` with no dependencies, so helpers went missing
-    one layer at a time. `lake build` the port's root first.
-  - **Shallow bundles: `"chunker": "schedule"`.** Bands over modules follow the module DAG (163
-    levels of bundle material); declaration-level list scheduling gives about 16 for the same
-    material. Depth is what a cold verifier pays.
-  - **Bundles hold only what definitions need.** The carver already keeps helper theorems out of
-    bundles except those a definition uses (a definitions bundle may import a published statement,
-    `import Theorems.Thm_…`, per prove.md's Platform Imports: config `bundles_import_statements`,
-    on by default, publishes a forced theorem that definitions need as a statement and has their
-    bundles import it; otherwise the bundle proves it itself); an
-    earlier per-mission carver also put 68% theorems and ~17,000 dead `variable` commands into
-    them. The shared carver drops scopes left without a kept declaration.
-  - **Measure before publishing.** Build every bundle locally (`-j1`), re-pack any over budget, and
-    only then publish; v1's scheduler split bundles while publishing, re-carved published bundles
-    (two published chains then re-declared 169 names), and looped 1,112 times isolating one
-    declaration that alone exceeded the budget.
-  - **Retries: `p2mlib.verdicts`.** Transient failures retry (≤ 30); own timeouts split after 2
-    (v1 retried one piece 740 times); CE/WA stop for a person.
-  - **Local checks: `p2mlib.localcheck`.** Key each result by content (stale cached passes sent
-    broken pieces) and compile the emulated verifier check (solution, published statement,
-    `theorem _check : type_of% @T := @solution`): it reproduces the locationless WA.
-  - The verifier compiles a solution **without its target in scope**; carved pieces must also
-    re-activate local instances (`attribute [local instance] x` when the bundle exports `x`),
-    avoid tokens full Mathlib adds (`Δ_[1]^[n]` → `Δ_[1] ^[n]`), and drop a theorem a published
-    bundle already declares. Config `external_defs`, `statement_suffix`, `patches` (post-carve
-    proof fixes) support a fresh split beside an abandoned one.
-
-### Find an inlined sibling by its statement, never by its name
-
-An edge in the mission graph exists only when a *solution* carries `import Theorems.Thm_<name>`.
-A solution that re-proves a published sibling inline creates no edge, so a mission whose files
-each re-derive their prerequisites renders as disconnected nodes hanging off its definition
-bundles — which is how a human notices, by looking at the graph.
-
-Finding the inlined copies is the whole job, and **a name-keyed scan is the wrong tool**, twice
-over. It misses copies the development renamed: `isSDP_marks` for the published
-`isStandardDyadicPartition_marks`, `exponents_getLast_eq_zero` for `getLast_exponents_eq_zero`.
-And matching `<name>\b` against a *primed* copy silently succeeds, because `\b` sits between a
-letter and `'` — so the extracted signature starts one character early, carries the apostrophe,
-and an identical statement reports as a variant differing by exactly one character. On CFP §2
-that pair of defects hid 12 of 25 copies and mislabelled 6 more as variants needing mathematical
-work they did not need.
-
-**So key the scan on the normalised statement and ignore names entirely**: parse every top-level
-declaration, normalise whitespace from the binders to `:= by`, and look each one up in a map from
-published statement to published name. Then excise the block, import the published theorem, and
-rename the remaining references. A renamed copy costs one extra rewrite of its call sites and
-nothing else.
-
-**Rewrite the call sites to the fully-qualified name, never the bare one.** When the excised
-copy had a different local name, its uses must be renamed — and `Foo.bar`, not `bar`. A short
-name only resolves when the published theorem's namespace is the file's own or is `open`ed, so a
-solution in `namespace MilnorWolf` importing a `GroupFiniteness` theorem breaks; on our Chou
-pass exactly one of eight files was cross-namespace and exactly that one failed to compile. It
-failed with `rcases failed: x✝ : ?m.161 is not an inductive datatype` rather than "unknown
-identifier", because the bare name bound to *something else* in scope. That is the real hazard:
-here the wrong binding errored, but a bare name that happens to typecheck against a different
-theorem of the same short name changes what the proof proves, silently. Qualify, and compile.
-
-Where the local statement genuinely differs, the variant trap's remedy applies unchanged: publish
-the general form as its own node, keep the milestone on the source's own statement, derive one
-from the other, and relink with a `reason`. Establish that a variant *is* one before paying for
-it — twice now the difference has been in my comparison tool rather than in the mathematics.
-
-### Import only what the proof uses — the rest is dead code, not a dependency
-
-A solution assembled by concatenating modules carries lemmas its target never uses. Replacing
-one of those with an import does not add a missing edge, it asserts **a dependency that does not
-exist**, and the file still compiles, so nothing catches it. Measured across our missions: of
-163 copies of published theorems sitting in submitted solutions, only **37** are reachable from
-`solution`. Chou: 0 of 57. CFP §3: 0 of 21. Wolf: 0 of 21.
-
-So classify before rewiring. Build the file's internal call graph and mark what is reachable
-from `solution`: reachable copies get the import, unreachable ones are simply deleted. Counting
-*references* is not enough — a copy referenced only by another dead copy is still dead, and that
-weaker test called 9 of our §2 removals live when they were not. I shipped those 9 as false
-edges before running the stronger one.
-
-A false edge is worse than a missing one: a missing edge understates the structure, a false edge
-misstates it, and the graph is the thing a reader trusts.
-
-**The dependency API exists** — `GET /theorems/:id/graph` (nodes plus edges, from `root_id`)
-and `GET /theorems/:id/decompositions`, both documented in `missions.md` and `prove.md`. Probing
-for `/dependencies` and `/dependents`, getting 404, and concluding there was no such endpoint
-was my error; read the docs for the route name rather than guessing it.
-
-**Deprecating a superseded reduction is safe when the new one is a superset, and the way to
-know is the frontier.** `GET /theorems/:id/open-leaves` returns the open leaves under a theorem:
-record it before submitting, re-read it after deprecating, and compare. On the Chou reduction
-`isVirtuallyNilpotent_or_hasExponentialGrowth_of_elementaryAmenable` the new sketch added one
-*Proved* child to the existing five, so the target kept its single Open child and the frontier
-was the same three Wolf leaves before and after. Do that check rather than reasoning that it
-must be fine: a reduction is the mission's decomposition, and getting it wrong moves the
-frontier other people are working from.
-
-**Every accepted submission adds its own sketch node.** Edges run
-`child -> sketch-<submission_id> -> parent`, so a theorem with three accepted solutions shows
-three sketch nodes, each with its own children, and `has_hidden_deprecated_sketches` reports
-whether any are suppressed. Resubmitting a cleaner proof therefore **adds** a decomposition
-beside the old one rather than replacing it, and an edge from a superseded submission — false
-or merely redundant — stays visible until that submission is deprecated. Decide deprecation
-with the human *before* resubmitting a rewired proof, and tell them this is how the graph
-behaves: the choice looks free until you know it duplicates every node.
-Then deprecate with `scripts/deprecate.py --keep NEW_SID OLD_SID… [--go]`: you name the proof
-that stays, each id is checked against the detail endpoint, and a deprecation that leaves the
-theorem un-Proved is undone. The mission scripts it replaces guessed the keeper as the newest
-list row, which can be a proof deprecated long ago.
-
-**Look a known theorem up by `theorem_name`, not by `q=`.** The keyword search is for
-discovery; asked for a name you already know it is both noisy (`caret` matches "Treshchev") and,
-under load, unreliable — in one batch it returned nothing for five theorems that exist and had
-been submitted against an hour earlier, and the script skipped them as "not found". The exact
-filter `GET /theorems?theorem_name=<Namespace>.<name>` is documented in `mission_solver.md`.
-Retry any lookup whose failure would silently drop work.
-
-`GET /submissions` is unusual in four ways at once: it **ignores `theorem_id`**, it **ignores
-`offset`**, it returns your entire history whatever `limit` says (762 rows for `limit=5`), and
-it **never reports `deprecated_at`** — only `GET /submissions/:id` does. So one call is the
-whole list and the pagination loop you would write by habit never terminates, re-reading the
-same page forever; and a script that filters the list on `deprecated_at` treats
-already-deprecated submissions as live. Confirm deprecation state per row against the detail
-endpoint. It carries no solution code, and its `status` is `ACCEPTED` in capitals.
-
-A verify can come back `ERROR` with `Module compilation timed out after 300s` when the server
-has to build a module the submission imports. That is the transient `prove.md` describes:
-resubmit unchanged.
+**API notes.** The graph is `GET /theorems/:id/graph` and `GET /theorems/:id/decompositions`
+(`missions.md`, `prove.md`); read the docs for a route name rather than probing for one. Look a
+known theorem up with `GET /theorems?theorem_name=<Namespace>.<name>`, never `q=`, which is noisy
+and under load has returned nothing for theorems that exist; retry any lookup whose failure would
+silently drop work. `GET /submissions` ignores `theorem_id` and `offset`, returns your whole history
+whatever `limit` says (so a pagination loop never ends), carries no code, and never reports
+`deprecated_at`: confirm deprecation per row with `GET /submissions/:id`. Its `status` is
+`ACCEPTED` in capitals.
 
 ## Auditing
 
@@ -1629,169 +1228,14 @@ commit as the proof; `sorry` is a loan that must be zero at every commit called 
 definitions before proving anything; build clean before reporting and say what was run. Findings
 are hypotheses: verify each against the source before fixing it.
 
-## Pipeline pitfalls
+## Porting an openai/math result
 
-For the full-project upload pipeline (`references/publishing-pipeline.md`): every source
-position Lean reports is a **UTF-8 byte offset**, so slice as `bytes`, never mix with `str`
-indices, deduplicate overlapping edit ranges and drop edits nested inside a replaced range. The
-job scratch directory is per-session, not per-project: namespace every artifact by project and
-verify counts against the plan. `merge.py`'s two refusals encode a verifier rejection that once
-took six diagnostic submissions.
-
-## Porting an openai/math result to prove2.me
-
-The published OAI goals were generated from openai/math at `adc7f12`. Use the skill's scripts
-for every port. Never copy them into a job directory: twenty carves each kept a private
-`port_modules.py` / `measure.py`, and their fixes drifted apart (2026-10-18). The shared text
-transformations are in `p2mlib.oaiport`, and `tests/test_oaiport.py` pins the bugs they fixed.
-
-1. **Search first.** Before publishing anything, search prove2.me for the goal and for each
-   named result (`/theorems?theorem_name=`, `/definitions?q=`, by title). Someone else's existing
-   statement is imported or proved, never published a second time.
-2. **The single-file route comes first.** Fetch the import closure with `oai_fetch.py`. Then
-   `oai_port.py` merges it, drops every declaration of the statement's published bundles by full
-   name, renames OpenAI's copy of the target `<name>_oai`, and checks the verifier's form locally
-   with `-j1`. `oai_batch.py --dir JOB` does this for many goals; `oai_submit.py --dir JOB` is
-   the submit queue (restart-safe: each goal's state is rebuilt from its log).
-3. **Submit it as it is.** Don't optimize first. Up to about 70–80 s of local CPU passes the
-   300 s verifier; 90 s and slower timed out (five of six such goals timed out twice). So the
-   queue gives a file over ~90 s one attempt and a faster one an unchanged retry. A port that
-   times out twice is carved.
-4. **Carve with the named results forced.** The module route is `oai_port_modules.py` (the
-   modules into `Solutions/FOLDER`, with the compatibility lemmas in namespace `OAI`), then
-   `oai_build_modules.py --elab-log`, then `carve_prep.py config` with `--def` for each published
-   bundle the goal imports and `--forced` for each theorem the paper names. Then run `carve.py
-   graph`, `carve_prep.py ext-defs`, `carve.py plan/gen/order`, `carve_measure.py`, and `carve.py
-   split` (see **Splitting a large ported proof**). The single-file patches go through
-   `carve_prep.py filter-patches` first, with the same compat options as `oai_port_modules.py`.
-   It counts each patch against the text the module port patches, not against OpenAI's source:
-   the port's own rewrites can add a match (`OAI.tensorInductionOn`, below) or
-   remove one (a compat alias). It also drops single-file-only patches, which are marked
-   `"route": "single"` or reorder a universe list for merge.py's `universe` line. The module port
-   inlines tactic macros across modules, as `oai_port.py` does. `oai_build_modules.py` rebuilds
-   a module when anything it imports changed, so after a fix no `--force` is needed. Each forced theorem becomes its own published
-   statement, so others can reuse it. `oai_build_modules.py`, `carve.py` and `carve_measure.py`
-   each allow one live run per carve (`p2mlib/runlock.py`). A second copy exits 3 and names the
-   pid already running it: wait for that run or stop it, and never start another (2026-10-23, a
-   resumed agent had no record of a pipeline it had restarted an hour before).
-5. **A bundle that needs a statement imports it.** With `bundles_import_statements` (the default),
-   a bundle imports a forced theorem that definitions need. That import is allowed only once the
-   theorem is Proved, so `publish_order` puts the bundle after the statement's piece.
-6. **Before publishing:** `carve_prep.py publish-prep`, then `carve_prep.py prose-template DIR`,
-   then write by hand only what it lists as "needs written prose", then `carve_prep.py check-text`.
-   The last checks the explanation rules, that every backticked name exists, and that no stub
-   contains a comment. Credit OpenAI and the result family in every description and explanation.
-   - **Template prose for intermediate items; written prose only for the goal and the forced
-     named results** (dbenbenn, 2026-10-24: a carved intermediate item's prose is rarely read soon
-     and stays patchable, and model-written prose had become the biggest cost of a carve).
-     `prose-template` makes no model call. From the plan, `publish/out/`, `work/decl_graph.jsonl`
-     and `DIR/oai_meta.json` (title, date, family, full commit, paper URL, OpenAI module
-     prefixes; `p2mlib/prosetemplate.py` has the format), it writes three kinds of file:
-     - a statement's prose: the OpenAI credit, the GitHub link to the declaration at the commit,
-       the published Lean in a code block, the split's declarations Lean records the statement
-       using, and which items import it;
-     - each bundle's prose: its declarations by kind, its modules, what it imports and what
-       imports it;
-     - each piece's explanation in prove.md's form.
-
-     It makes no mathematical claim the Lean does not show. It skips the goal and every `forced`
-     node and lists them as needing written prose. Generated files carry `template:` in their
-     front matter (prose) and a sha1 in `.template.json`; a rerun regenerates only unchanged
-     templates and keeps written prose unless `--force`. `bundle-prose` (a hand template) remains
-     for a carve that wants written bundle prose. Fenced code blocks are code to `check-text` and
-     `check_pronouns.py` (a binder `he` is not a pronoun).
-
-The compatibility block lives in namespace `OAI` by default (`--root-compat` restores the old
-form). Two bundles that both declared a root-level `ite_eq_left` would clash. A namespaced
-`alias Finset.prod_le_prod₀ := …` would create `OAI.Finset`, which shadows Mathlib's `Finset`
-under `open Finset`, so each alias is rewritten into the sources instead. Two bundles that were
-already published still export root names: UniversalFInfinity's `OAIQWUFI004` (`ite_eq_left`,
-`ite_eq_right`, `dite_eq_left`, `dite_eq_right`) and ESB's `OAIQWESB000` (`alias
-Finset.prod_le_prod₀`). A port that imports either of them must not declare those names again.
-
-**Mathlib drift that recurs in module-route ports (Sonnet trial, 2026-10-25: Markov, PlanarFPP, SymmetricMahler,
-Problem336).** Fix each at the cause; none needs a macro.
-- *Pi-form vs lambda-form (`to_fun`).* Our `HasDerivAt.mul/neg/sum/pow`, `DifferentiableAt.sum` conclude `c * d`, `-f`,
-  `∑ i, f i` as functions; OpenAI's conclude the lambda. A `convert … using 1` then leaves extra goals (a function
-  equality, an instance diamond like `Complex.addCommGroup = …CStarAlgebra…`). Use the `fun_` variant where it exists
-  (`fun_mul`, `fun_neg`, `fun_sum`, `fun_pow`) and close what is left with `all_goals first | rfl | …`. `ContDiffAt.mul`
-  has no `fun_` form: `convert … using 1 <;> first | rfl | (funext z; simp …)`.
-- *Total `Measure.map`.* d13f23b's `Measure.map f μ` of a non-AEMeasurable `f` is a Dirac mass, so `IsProbabilityMeasure
-  (μ.map f)` is an unconditional instance and `ProbabilityMeasure.map ν f` takes no proof. Ours is 0 there: no instance
-  (a measurable *equivalence* has one in the compat block), `ProbabilityMeasure.map` wants `AEMeasurable f ν`. Patch the
-  site with `Measure.isProbabilityMeasure_map hf.aemeasurable` / `μ.map hf.aemeasurable`. It cannot be shimmed.
-- *`import all`.* OpenAI reaches Mathlib's *private* declarations (`import all …IsGaussianProcess` for
-  `Finset.orderEmbOfFinWithBot`) with `import all`, which a non-`module` file cannot use. Copy the private declarations
-  into the module (root names; the private ones are mangled, so nothing clashes).
-- *`import Mathlib` in Compat leaks instances.* Mathlib's `CStarMatrix` (a type copy of `Matrix` here) breaks
-  `simp only [Matrix.mul_apply]` on matrix products. `oai_port_modules.py --compat-imports narrow` gives Compat only the
-  Mathlib files its lemmas need (`oaiport.COMPAT_NARROW_IMPORTS`); set the carve's `collapse_mathlib` to false so the
-  carved files keep OpenAI's own narrow imports too. A module that then misses a name needs its import added by a patch.
-- *Never edit a running shell driver*: bash reads a script as it runs, and an edit made mid-run executed garbage
-  in a second carve (2026-10-25). There are no job-dir drivers any more: see the next paragraph.
-
-**Run carves with `scripts/carve_pipeline.py`, from a snapshot; never write a job-dir driver** (dbenbenn,
-2026-10-25). Agents kept hand-writing bash drivers (`plain_carve.sh`, `plain_pipeline3.sh`,
-`ext_publish.sh`, ...); one was edited while two carves ran it, and a skill fix pushed mid-carve mixed old
-and new `carve.py` inside one carve. So:
-- `carve_pipeline.py DIR --folder F --root-module M --target T --bundle-prefix P [--def …] [--forced …]
-  [--patches …] [--compat-imports narrow] [--budget N] [--config-set JSON] [--fetch]` is the whole module
-  route of step 4 and 6 above: fetch, filter-patches, port, build, workspace build, config, graph,
-  ext-defs, plan, gen, order, measure (edge check on), publish-prep, prose-template, check-text, and a
-  `split_run` dry run (`--publish` adds `split_run --go`). Each step is idempotent, logged in
-  `DIR/logs/STEP.log`, recorded in `DIR/pipeline_state.json`; the first failure stops the run with the log's
-  tail and the same command resumes. Parameters are stored in `DIR/pipeline.json`. Written prose for the goal
-  and `forced` items is still yours (it is listed, not generated).
-- It re-execs itself from `scripts/skill_snapshot.py`'s read-only copy of the skill at HEAD
-  (`~/.cache/p2m/skill/<sha>/`; `--allow-dirty` snapshots an uncommitted tree) and calls every tool from
-  there, recording the sha; a resume stays on its snapshot (`--upgrade` moves to HEAD). Editing or pushing
-  the live skill cannot reach a running carve.
-- **The cost model is calibrated by the measurement, automatically** (batch 3, 2026-10-25). The first plans
-  of QuarticPowerFree and KirchbergRordam measured 85–128 s per bundle against a 55 s budget (a 128 s bundle
-  timed out three times) and needed `time_scale` 2.2 and 4.5. The `calibrate` step after `measure` takes any
-  unfrozen item measured over 1.6 × budget, sets `time_scale` to scale × (its measured seconds / planned
-  cost), re-plans, re-generates and re-measures (unchanged files are cached), at most twice, and stops with
-  the offenders listed (then `carve.py split` or a manual `time_scale`). Never publish before it passes. It
-  only raises the scale: a small sample cannot calibrate it down, since the per-item error is 0.3–1.4× even
-  at a fitted scale. Outside the pipeline the manual rule is the same: measure everything, and if any item
-  is over ~90 s, multiply `time_scale` by the worst measured/planned ratio and plan again.
-- To change a tool: change the skill (tests first), commit, push; new runs pick it up, running ones do not.
-  A tool fix a running carve needs: `--upgrade --redo STEP`. Any remaining shell script in the skill has
-  its body in `main() { …; }; main "$@"; exit` (`tests/test_shell_scripts.py`).
-- Long single tools outside the pipeline (a one-off `carve.py` call) should likewise run from
-  `python3 "$(scripts/skill_snapshot.py)"/prove2me/scripts/X.py`.
-
-**`TensorProduct.inductionOn` becomes the compat eliminator `OAI.tensorInductionOn`** (2026-10-24).
-OpenAI's Mathlib (d13f23b) has `TensorProduct.inductionOn z tmul add`, with the zero case taken
-from `tmul 0 0`; ours (0df444a) has only `induction_on`, which asks for a `zero` case. The ports
-used to rename it and insert `| zero => simp only [map_zero]` at the `induction` line's
-indentation. That failed on most real goals (`0 ∈ C`, `Commute _ 0`, a `Module.compHom` smul, a
-coerced `0` in a completion) and landed misindented when OpenAI indented the `induction` line
-differently from its alternatives; ComparatorModel and Boone–Higman each carried hand patches for
-it. `lean/compat_4_34.lean` now declares `tensorInductionOn` with OpenAI's signature, and
-`oaiport.core_rewrites` points every use at it, so alternatives, bullets and term-mode uses stay
-as written and no zero case is ever guessed. It is not called `OAI.TensorProduct.inductionOn`:
-an `OAI.TensorProduct` namespace makes `open TensorProduct` inside `namespace OAI` open only that
-namespace (Lean warns "Ambiguous namespace"), which loses Mathlib's `⊗ₜ` lemmas. A carve's old
-`| zero => …` patches now count 0 and must be dropped.
-
-**`Convexity.StdSimplex` is handled by a shim, never by hand** (2026-10-24). OpenAI's Mathlib
-(d13f23b) has `Convexity.StdSimplex` API ours (0df444a) lacks: its topology, compactness,
-barycenters, `homeomorphI`, `range_toFun_comp_weights` and more. `lean/StdSimplexCompat.lean`
-supplies all of it under the d13f23b names (Part 1, copied from Mathlib d13f23b), plus `OAI.SStd`,
-the subtype `stdSimplex` with the same names (Part 2). Both port routes apply it automatically when a
-source mentions `StdSimplex` (`--stdsimplex auto`, `p2mlib.oaiport.stdsimplex_*`). They drop the
-d13f23b-only `Mathlib.Geometry.Convex.ConvexSpace.*` imports, and the module route adds the module
-`StdSimplexCompat`. Our `SimplexCategory.toTop` is the subtype, so code that uses
-`SimplexCategory.toTop.obj` as a `StdSimplex` (Problem340's singular homology) needs
-`--stdsimplex subtype`, which renames `Convexity.StdSimplex` to `OAI.SStd`. That mode needs finite
-index types and has no `ConvexSpace`, so Thomason-style code that mixes both kinds of use still needs
-hand work. The shim is published as `Definitions.Def_OAIStdSimplexCompat`
-(c7014b9a, p2m-standalone/oai-stdsimplex-compat). Once that bundle is in the workspace
-(`Definitions/Def_OAIStdSimplexCompat.lean`, byte-identical to `lean/StdSimplexCompat.lean`, built),
-`oai_port.py` imports it instead of inlining the shim, and `carve_prep.py config` adds it as a
-`--def`, so a carve imports it rather than publishing the shim again. Pass the same `--stdsimplex`
-to `oai_port_modules.py` and `carve_prep.py filter-patches`.
+Ports of openai/math proofs have their own reference, `references/openai-ports.md`: the
+single-file route, carving with `scripts/carve_pipeline.py`, the compatibility shims and the
+Mathlib drift between OpenAI's Mathlib and ours. Read it before any port. Three rules hold even for
+a one-off: search prove2.me for the goal and each named result before publishing anything;
+submit a port as it is before optimizing it; and never copy a skill script into a job directory
+or write a job-dir driver, since every private copy has drifted from the shared fixes.
 
 ## Contributing outside a mission
 
@@ -1827,7 +1271,6 @@ script prints its usage when run with no arguments.
 | `deprecate.py` | Deprecate superseded submissions, naming the one that keeps the theorem proved. |
 | `draft.py` | Upload a mission proposal Draft from a repo, and verify the live Draft against it. |
 | `edge_audit.py` | Audit graph edges against the proofs that produce them: one auditor, judged by Lean. |
-| `edge_overlap.py` | Folded into edge_audit.py (Phase 4.4): its SHARED section is this check, judged by Lean. |
 | `fetch_theorems.py` | Write a mission's published statements into the workspace, so solutions can import them. |
 | `gen_index.py` | Regenerate the scripts index in SKILL.md from the scripts' own docstrings. |
 | `link_mentions.py` | Link the published theorems that a live mission's texts name by their full Lean names. |

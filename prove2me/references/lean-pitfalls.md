@@ -327,3 +327,12 @@ proofs from exact breakpoint computations.
 ## `lt_or_le`
 
 Renamed `lt_or_ge` (with `le_or_lt` → `le_or_gt`) at `0df444a`.
+
+## Analytic stand-ins for probability, when Mathlib has no path space
+
+- A random walk's law is a convolution power. Use `Finsupp` convolution:
+  `ν.sum fun g a => μ.sum fun h b => single (g*h) (a*b)`, because `MonoidAlgebra` is a structure
+  in this Mathlib.
+- A.s. stabilisation becomes ℓ¹-Cauchy laws, with the changes bounded by Green-function terms.
+- Transience comes from a variational inequality, f(o)² ≤ C·E_μ(f), together with
+  E_μ(u_N) ≤ 2u_N(o) for the truncated Green function.

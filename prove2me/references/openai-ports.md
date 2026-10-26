@@ -188,21 +188,12 @@ back WA. The lessons:
   to the generated files instead.
 - **No `macro` or `syntax` commands.** The soundness guard refuses them, and the carver refuses to
   keep one. `notation` is fine.
-- **Fix a carver bug in `p2mlib/carve.py` with a CarveDev test; don't patch it per carve.** The
-  plain carves of 2026-10-23 hit two bugs, both from reading a short name lexically. The field
-  token in `(E.rules ω).fixed_quadratic_memory` was read as a same-named theorem, which gave a
-  false `import Theorems.*` edge. The `_oai` rename also hit other declarations with the target's
-  short name: a namespaced reference to a sibling theorem, and a definition in the target's own
-  statement. Both are fixed: a field is matched only against the declaration's compiled
-  constants, and a token is renamed only when it denotes the target. The per-carve `patches`
-  for these cases are no longer needed. The plain carves of 2026-10-24 found three more:
-  `export Coding (code)` stayed in a bundle without the class Coding ("unknown namespace"; an
-  `export` now goes where its namespace exists, like an `open`); sibling modules' identical
-  anonymous `local instance : Fact …` share one generated name (an instance of a Prop class is a
-  theorem, so Lean accepts the duplicate), and the losers were never re-emitted (they are now);
-  and an instance from a later module, visible through a bundle, changed how an earlier
-  declaration elaborated. All of these were the text reading disagreeing with Lean, and the
-  carver no longer reads meanings from text (next item).
+- **Fix a carver bug in `p2mlib/carve.py` with a CarveDev test; don't patch it per carve.** Every
+  carver bug so far was a text reading of a short name disagreeing with what Lean elaborated
+  (a field token read as a same-named theorem, a `_oai` rename hitting other declarations, an
+  `export` without its namespace, duplicate anonymous instances, a later module's instance
+  changing elaboration). That is why the carver now reads Lean's records instead (next item); a
+  post-carve patch is only for a proof fix.
 - **The carver reads what Lean elaborated, not the source text** (2026-10-24). `carve.py graph`
   runs `lean/LeanInfo.lean --idents` *elaborating* each module (`--module M --no-decls`; cached
   by content under `~/.cache/p2m/leaninfo`). It costs about the module's own compile CPU time
@@ -228,15 +219,7 @@ back WA. The lessons:
   RationalHitting's witnessCharZero leak, which had needed a post-carve patch. What it cannot
   hide (an instance declared later in the same module, reached through a bundle) `plan`/`gen`
   still warn about. The text reading survives only as the fallback for a token with no record (a
-  few per carve, inside some `simp`/`simpa` argument lists); `graph` and `gen` list them. The
-  case-by-case fixes of 2026-10-16..24 were all places where the text reading disagreed with
-  Lean; their tests run against the records now, and one test runs the old rules with the records
-  removed. Rechecked on five plain carves of 2026-10-23/24 (Problem355, PermanentBorder,
-  RationalHitting, Problem340, PosteriorReplicas), regenerated without their `carve_patches.json`:
-  every bundle, statement and piece compiles and the import-edge check finds no false edge, both
-  from the published plans and from fresh plans (PosteriorReplicas' fresh plan no longer has the
-  false edge and the two orphaned statements that were removed by hand). The patches were all
-  for bugs this removed. A post-carve patch is again only for a proof fix.
+  few per carve, inside some `simp`/`simpa` argument lists); `graph` and `gen` list them.
 - **Heavy computations do not belong in bundles; publish them as statements.** Eilenberg–Ganea
   (2026-10-25): OpenAI's chain-contraction certificate is about 850 `decide +kernel` lemmas (the
   module: 900 s, 23 GiB), and a *definition* (`contraction`) rests on their aggregates, so the

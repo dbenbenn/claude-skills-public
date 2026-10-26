@@ -1,6 +1,10 @@
 # The upload pipeline, and what silently breaks it
 
-`upload_full_project.md` describes the intended flow. This file records the traps.
+`upload_full_project.md` describes the intended flow. This file records the traps. The two that
+bite every script: every source position Lean reports is a **UTF-8 byte offset**, so slice as
+`bytes`, never mix with `str` indices, deduplicate overlapping edit ranges and drop edits nested
+inside a replaced range; and the job scratch directory is per-session, not per-project, so
+namespace every artifact by project and verify counts against the plan.
 
 ## Shape of the tree
 
