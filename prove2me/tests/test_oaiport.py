@@ -944,3 +944,8 @@ def test_probability_measure_constructor_instance_falls_back():
     out = O.core_rewrites(src)
     assert out.count("by first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)⟩") == 2
     assert O.core_rewrites(out) == out
+
+
+def test_sigma_iota_comp_desc_renamed():
+    assert O.core_rewrites("exact Sigma.ι_comp_desc _ _; simp [Sigma.ι_comp_desc_assoc]") == \
+        "exact Sigma.ι_desc _ _; simp [Sigma.ι_desc_assoc]"
