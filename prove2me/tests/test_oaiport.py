@@ -917,3 +917,9 @@ def test_compat_has_finset_equivOfEq():
     import os
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean', 'compat_4_34.lean')).read()
     assert 'def _root_.Finset.equivOfEq' in src
+
+
+def test_eLpNorm_le_of_ae_bound_drops_measurability():
+    src = "have hh := eLpNorm_le_of_ae_bound (μ := μ) (p := (1 : ℝ≥0∞))\n  (h.integrable x).aestronglyMeasurable\n  (Eventually.of_forall b)\n"
+    out = O.core_rewrites(src)
+    assert "aestronglyMeasurable" not in out and "(Eventually.of_forall b)" in out and "(μ := μ)" in out

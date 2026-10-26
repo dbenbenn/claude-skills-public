@@ -429,7 +429,9 @@ def core_rewrites(text, compat_ns='OAI'):
     # d13f23b's `eLpNorm_restrict_eq_of_support_subset` and `eLpNorm_congr_norm_ae` take measurability
     # arguments first (one, resp. two); ours take none (HotSpots Sobolev, 2026-10-26)
     text = _drop_positional_arg(text, 'eLpNorm_restrict_eq_of_support_subset')
-    text = _drop_positional_arg(text, 'eLpNorm_le_mul_eLpNorm_of_ae_le_mul')     # GreenOperator, 2026-10-26
+    text = _drop_positional_arg(text, 'eLpNorm_le_mul_eLpNorm_of_ae_le_mul')
+    for _n in ('eLpNorm_le_of_ae_bound', 'eLpNorm_le_of_ae_nnnorm_bound'):    # SKValue, 2026-10-26
+        text = _drop_positional_arg(text, _n)     # GreenOperator, 2026-10-26
     text = _drop_positional_arg(_drop_positional_arg(text, 'eLpNorm_congr_norm_ae'), 'eLpNorm_congr_norm_ae')
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*ring[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
