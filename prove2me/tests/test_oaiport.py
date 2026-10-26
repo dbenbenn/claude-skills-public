@@ -1000,3 +1000,19 @@ def test_elpnorm_exponent_top_drops_measurability_argument():
     out = O.core_rewrites(src)
     assert "rw [one_mul, Lp.norm_toLp, eLpNorm_exponent_top]" in out
     assert "rw [eLpNorm_exponent_top (f := g), eLpNorm_exponent_top]" in out
+
+
+# d13f23b's `Subgroup.isMulCommutative_closure` wants `∀ x ∈ k, ∀ y ∈ k, x ≠ y → x * y = y * x`;
+# ours has no `x ≠ y` binder, so the `rintro _ ⟨u, rfl⟩ _ ⟨v, rfl⟩ _` after `apply` has one `_` too
+# many ("introN failed"; Boone–Higman SteinbergPresentation, PeriodicGroups MonomialPresentation,
+# FiniteType SteinbergWords).
+
+def test_is_mul_commutative_closure_rintro_drops_the_ne_binder():
+    src = ('  apply Subgroup.isMulCommutative_closure\n  rintro _ ⟨u, rfl⟩ _ ⟨v, rfl⟩ _\n  exact h u v\n')
+    assert O.core_rewrites(src) == \
+        '  apply Subgroup.isMulCommutative_closure\n  rintro _ ⟨u, rfl⟩ _ ⟨v, rfl⟩\n  exact h u v\n'
+    src2 = '  apply Subgroup.isMulCommutative_closure\n  rintro _ ⟨u,rfl⟩ _ ⟨v,rfl⟩ _\n'
+    assert O.core_rewrites(src2).splitlines()[1] == '  rintro _ ⟨u,rfl⟩ _ ⟨v,rfl⟩'
+    # other rintro lines are untouched
+    other = '  apply foo\n  rintro _ ⟨u, rfl⟩ _ ⟨v, rfl⟩ _\n'
+    assert O.core_rewrites(other) == other
