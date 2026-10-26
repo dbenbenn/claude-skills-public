@@ -1693,3 +1693,19 @@ def test_a_restricted_attribute_on_an_external_declaration_is_kept_local(g):
     assert out.index('attribute [local') < out.index('-- module')          # at the top: the port's is global
     out = C.Carver(g).carve(keep, have)
     assert not re.search(r'^attribute', out, re.M), out
+
+
+# `deriving instance Fintype for Skeleton` declares an instance (`instFintypeSkeleton`), but the
+# command has no `decl_kind` and no `names`, so it was nobody's node: every bundle holding any of
+# its module's commands got a copy, and a copy in a bundle that lacked the instance it uses
+# (`instFintypeMarker`, another bundle's) failed (PeriodicGroups HeadTour, 2026-10-26).
+
+def test_a_deriving_instance_command_is_a_declaration_command():
+    class Cmd:
+        decl_kind = None
+        short_kind = 'deriving'
+        names = []
+
+    assert C._is_decl_command(Cmd())
+    Cmd.short_kind = 'open'
+    assert not C._is_decl_command(Cmd())
