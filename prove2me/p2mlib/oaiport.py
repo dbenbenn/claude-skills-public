@@ -475,7 +475,8 @@ _CONVERT_BULLET = re.compile(r"(?m)^([ \t]*)(· )(convert\b[^\n]*(?:\n\1[ \t]{3,
 def _convert_close_diamonds(text):
     """`convert h using n` (statement ending in `using n`) leaves, in our Mathlib, an instance-diamond
     goal (`Real.instPreorder.toLE = Real.instLE`) before the goals OpenAI's version leaves; the
-    tactics that follow then hit the wrong goal. Close those first with reducible-instances `rfl`
+    tactics that follow then hit the wrong goal. Close those first with reducible-instances `rfl`, or `Subsingleton.elim` for an
+    `Algebra ℚ A` diamond (`DivisionRing.toRatAlgebra = this`, PPTSquare SplittingSetup 2026-10-26)
     (CompleteCrossing/TriangleRemoval/NodalLength 2026-10-26). Skipped when a bullet, `<;>` or
     `case` follows, or when the convert is already combined with `;`/`<;>`."""
     def sub(rx, src):
@@ -487,10 +488,10 @@ def _convert_close_diamonds(text):
         if not re.search(r"using \d+[ \t]*$", body) or ';' in body.split('using')[-1]:
             return m.group(0)
         rest = src[m.end():].lstrip(' \t\n')
-        if re.match(r"(·|<;>|case\b|next\b|all_goals try with_reducible_and_instances rfl)", rest):
+        if re.match(r"(·|<;>|case\b|next\b|all_goals try (first \| exact Subsingleton\.elim _ _ \| )?with_reducible_and_instances rfl)", rest):
             return m.group(0)
         pad = m.group(1) + ('  ' if bullet else '')
-        return m.group(0) + pad + "all_goals try with_reducible_and_instances rfl\n"
+        return m.group(0) + pad + "all_goals try first | exact Subsingleton.elim _ _ | with_reducible_and_instances rfl\n"
     return sub(_CONVERT_BULLET, sub(_CONVERT, text))
 
 def core_rewrites(text, compat_ns='OAI'):
