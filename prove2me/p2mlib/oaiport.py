@@ -582,6 +582,8 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"(?<![\w.'])((?:ContinuousLinearMap|LinearMap)\.nonneg_iff_isPositive)\.(mpr|mp|1|2)(?![\w'])",
                   r"(\1 _).\2", text)
     text = re.sub(r"(?<![\w.'])\(?nonneg_iff_isPositive\)?\.(mpr|mp|1|2)(?![\w'])", r"(nonneg_iff_isPositive _).\1", text)
+    # d13f23b's `(Continuous)LinearMap.le_def` has f g implicit; ours takes them explicitly (NuclearUltrapower 2026-10-26)
+    text = re.sub(r"(?<![\w.'])((?:ContinuousLinearMap|LinearMap)\.le_def)\.(mpr|mp|1|2)(?![\w'])", r"(\1 _ _).\2", text)
     # d13f23b's `LinearIsometryEquiv.isometry.lipschitzWith`: ours `Isometry.lipschitz` (MultipleMixing Joinings)
     text = re.sub(r"\.isometry\.lipschitzWith(?![\w'])", '.isometry.lipschitz', text)
     text = re.sub(r"\.lt_of_le\.linearOrder(?![\w'])", '.linearOrder', text)   # IsChain.linearOrder wants ≤ here

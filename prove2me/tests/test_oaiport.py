@@ -574,6 +574,21 @@ def test_nonneg_iff_ispositive_gets_explicit_argument():
     assert "nonneg_iff_isPositive T]" in out
 
 
+# d13f23b's `ContinuousLinearMap.le_def` / `LinearMap.le_def` have f g implicit (`.mp hgap` works); ours takes
+# them explicitly (NuclearUltrapower SOSGap, 2026-10-26).
+
+def test_le_def_gets_explicit_arguments():
+    src = ("have hp := (ContinuousLinearMap.le_def.mp hgap).re_inner_nonneg_right y\n"
+           "apply ContinuousLinearMap.le_def.mpr\n"
+           "rw [LinearMap.le_def]\n"
+           "exact ContinuousLinearMap.le_def_foo\n")
+    out = O.core_rewrites(src)
+    assert "(ContinuousLinearMap.le_def _ _).mp hgap" in out
+    assert "apply (ContinuousLinearMap.le_def _ _).mpr" in out
+    assert "rw [LinearMap.le_def]" in out
+    assert "le_def_foo" in out and "le_def _ _)_foo" not in out
+
+
 # d13f23b: `CStarAlgebra.norm_le_norm_of_le_of_nonneg (hab) (ha)`; ours: `norm_le_norm_of_nonneg_of_le (ha) (hab)`
 # (Kirchberg–Rørdam, 2026-10-25). A compat lemma with d13f23b's argument order.
 
