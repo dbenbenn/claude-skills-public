@@ -376,10 +376,12 @@ def _total_map_rewrites(text):
       the proof as an argument here: `(f := f) (by AEM_TAC)`."""
     text = re.sub(r"(?m)^([ \t]*(?:have|let|haveI|letI)\b[^\n:]*:[ \t]*IsProbabilityMeasure\b[^\n]*?)[ \t]*:=[ \t]*"
                   r"(?:inferInstance|by infer_instance)[ \t]*$", lambda m: m.group(1) + ' := by ' + _PM_FALLBACK, text)
-    text = re.sub(r"(?m)^([ \t]*)infer_instance[ \t]*$", lambda m: m.group(1) + _PM_FALLBACK, text)
-    text = re.sub(r"(?m)^([ \t]*)inferInstance(?=[ \t]*(?:[,⟩]|$))", lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK, text)
-    text = re.sub(r"(?<=[⟨,])(\s*)(?:by infer_instance|inferInstance)(?=[ \t]*[,⟩])",
-                  lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK, text)
+    if re.search(r"MeasureTheory|ProbabilityMeasure|Measure\.map", text):   # a lone instance elsewhere is no measure
+        text = re.sub(r"(?m)^([ \t]*)infer_instance[ \t]*$", lambda m: m.group(1) + _PM_FALLBACK, text)
+        text = re.sub(r"(?m)^([ \t]*)inferInstance(?=[ \t]*(?:[,⟩]|$))",
+                      lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK, text)
+        text = re.sub(r"(?<=[⟨,])(\s*)(?:by infer_instance|inferInstance)(?=[ \t]*[,⟩])",
+                      lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK, text)
     text = re.sub(r"(?m)^([ \t]*(?:let|have)\b[^\n]*?:[ \t]*ProbabilityMeasure\b[^\n]*?:=[ \t]*)"
                   r"(\w[\w.']*)\.map[ \t]+(\((?:[^()]|\([^()]*\))*\)|[\w.']+)[ \t]*$",
                   lambda m: m.group(1) + '%s.map (f := %s) (by %s)' % (m.group(2), m.group(3), AEM_TAC)

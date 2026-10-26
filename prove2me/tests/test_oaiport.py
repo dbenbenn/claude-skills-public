@@ -974,7 +974,7 @@ def test_is_local_min_on_renamed_to_localize():
 
 
 def test_unfold_infer_instance_falls_back_to_map_measurability():
-    src = "  unfold gumbelLaw\n  infer_instance\n  unfold a\n  simp\n"
+    src = "open MeasureTheory\n  unfold gumbelLaw\n  infer_instance\n  unfold a\n  simp\n"
     out = O.core_rewrites(src)
     assert "  unfold gumbelLaw\n  first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s)\n" % O.AEM_TAC in out
     assert "unfold a\n  simp" in out
@@ -982,7 +982,7 @@ def test_unfold_infer_instance_falls_back_to_map_measurability():
 
 
 def test_probability_measure_constructor_instance_falls_back():
-    src = "  ⟨(μ.map f),\n    by infer_instance⟩\n  ⟨x.map g, inferInstance⟩\n"
+    src = "open MeasureTheory\n  ⟨(μ.map f),\n    by infer_instance⟩\n  ⟨x.map g, inferInstance⟩\n"
     out = O.core_rewrites(src)
     assert out.count("(by first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s))⟩" % O.AEM_TAC) == 2
     assert O.core_rewrites(out) == out
@@ -1077,7 +1077,8 @@ def test_other_instances_by_inferinstance_are_left_alone():
 
 def test_lone_infer_instance_lines_and_anonymous_constructors_get_the_fallback():
     # Brenier MapDistance/Midpoint/Quantization, PlaneSpectrum SpectralMeasure; MapTransport/Coupling
-    src = ("    infer_instance\n"
+    src = ("open MeasureTheory\n"
+           "    infer_instance\n"
            "  refine ⟨inferInstance, ?_, ?_⟩\n"
            "  refine ⟨q, hqY, inferInstance, ?_,\n"
            "    inferInstance,\n"
@@ -1087,6 +1088,13 @@ def test_lone_infer_instance_lines_and_anonymous_constructors_get_the_fallback()
     assert out.count("(by %s)" % FALLBACK) == 4
     assert "inferInstance" not in out
     assert O.core_rewrites(out) == out
+
+
+def test_inferinstance_in_a_file_without_measure_theory_is_left_alone():
+    # NuclearUltrapower FullGroupAlgebra: `⟨x, ℂ, inferInstance, 1, rfl⟩` is a CStarAlgebra witness; the fallback
+    # chain made its type a metavariable and timed out at whnf (2026-10-26)
+    src = "  exact ⟨‖evaluate 1 x‖, ℂ, inferInstance, 1, rfl⟩\n    infer_instance\n"
+    assert O.core_rewrites(src) == src
 
 
 def test_map_smul_drops_a_proof_that_is_a_chain_and_keeps_the_first_argument():
