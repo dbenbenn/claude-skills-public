@@ -256,12 +256,15 @@ def cmd_ext_defs(argv):
 
 # ---------------------------------------------------------------- patches
 
-def filter_patches(patches, texts):
+def filter_patches(patches, texts, detail=None):
     """(kept, [(count, patch)] dropped): a patch is kept when its `old` occurs exactly `count`
     times over the texts (a list, or {name: text}), after the kept patches before it are applied
     (a later patch may amend an earlier one's output). A single-file-only patch
     (oaiport.single_file_only: `"route": "single"`, or a universe-list reordering for merge.py's
-    `universe` line) is dropped as ('single-file only', patch)."""
+    `universe` line) is dropped as ('single-file only', patch). `detail`, a list, gets
+    (patch, {module: occurrences}) for each patch dropped for its count (modules numbered 0.. for a
+    plain list), counted at the same point as the drop."""
+    names = list(texts) if isinstance(texts, dict) else list(range(len(texts)))
     texts = list(texts.values()) if isinstance(texts, dict) else list(texts)
     keep, drop = [], []
     for p in patches:
@@ -274,16 +277,19 @@ def filter_patches(patches, texts):
             texts = [t.replace(p['old'], p['new']) for t in texts]
         else:
             drop.append((n, p))
+            if detail is not None:
+                detail.append((p, {k: t.count(p['old']) for k, t in zip(names, texts) if t.count(p['old'])}))
     return keep, drop
 
 
-def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='', stdsimplex='auto'):
+def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='', stdsimplex='auto', detail=None):
     """filter_patches against the text oai_port_modules.py patches: the modules after its import,
     header, core and compat rewrites (oaiport.module_texts), never OpenAI's raw source
     (ComparatorModel 2026-10-24: the `| zero` case core_rewrites then added counted 0 there and was
     dropped; CubeShuffle: a patch the compat aliases made redundant was kept)."""
     return filter_patches(patches, O.module_texts(sources, 'Solutions.FilterPatches', compat_text,
-                                                  compat_ns, header, stdsimplex))
+                                                  compat_ns, header, stdsimplex),
+                          detail)
 
 
 def cmd_filter_patches(argv):
@@ -295,15 +301,27 @@ def cmd_filter_patches(argv):
     compat = open(opt(argv, '--compat', COMPAT), encoding='utf-8').read()
     ns = None if '--root-compat' in argv else opt(argv, '--compat-ns', 'OAI')
     header = open(opt(argv, '--header'), encoding='utf-8').read() if '--header' in argv else ''
+    detail = []
     try:
         keep, drop = port_filter_patches(json.load(open(src)), srcs, compat, ns, header,
-                                         opt(argv, '--stdsimplex', 'auto'))
+                                         opt(argv, '--stdsimplex', 'auto'), detail)
     except O.PortError as e:
         sys.exit(str(e))
     for n, p in drop:
         print('dropped (%s): %r' % (n if isinstance(n, str) else '%d occurrences' % n, p['old'][:70]))
-    json.dump(keep, open(out, 'w'), ensure_ascii=False, indent=1)
     print('kept', len(keep), 'of', len(keep) + len(drop))
+    # a patch dropped for its count is a patch the port would silently lack (six batches ran an
+    # unpatched port that way): fail unless the patch says it may drop ("allow_drop": true).
+    # Single-file-only drops are deliberate and stay quiet.
+    bad = [(p, per) for p, per in detail if not p.get('allow_drop')]
+    if bad:
+        for p, per in bad:
+            print('PATCH DROPPED: %r\n  expected count %s, found %s\n  occurrences per module: %s' % (
+                p['old'][:200], p.get('count', 1), sum(per.values()),
+                ', '.join('%s: %d' % kv for kv in sorted(per.items())) or 'none in any module'), file=sys.stderr)
+        sys.exit('%d patch(es) dropped for their count; fix the patch (old/count) or mark it "allow_drop": true. '
+                 'Nothing written.' % len(bad))
+    json.dump(keep, open(out, 'w'), ensure_ascii=False, indent=1)
 
 
 # ---------------------------------------------------------------- publishing

@@ -247,7 +247,7 @@ def test_filter_patches_drops_single_file_only_patches():
 
 def test_filter_patches_command_line(tmp_path):
     p = tmp_path / 'p.json'
-    p.write_text(json.dumps([{'old': 'Finset.prod_le_prod₀ = Finset.prod_le_prod₀', 'new': 'x'},
+    p.write_text(json.dumps([{'old': 'Finset.prod_le_prod₀ = Finset.prod_le_prod₀', 'new': 'x', 'allow_drop': True},
                              {'old': 'theorem b_thm', 'new': 'theorem b_thm'}]))
     c = tmp_path / 'compat.lean'
     c.write_text(COMPAT)
@@ -257,6 +257,30 @@ def test_filter_patches_command_line(tmp_path):
     # with the root-level compat block the alias is not rewritten, so the first patch applies
     CP.main(['filter-patches', str(p), LEAN, str(out), 'OAI.Fam', '--compat', str(c), '--root-compat'])
     assert len(json.load(open(str(out)))) == 2
+
+
+def test_filter_patches_command_fails_on_a_dropped_patch_unless_it_may_drop(tmp_path, capsys):
+    # six batches missed the one-line `dropped (N occurrences)` and ran an unpatched port
+    c = tmp_path / 'compat.lean'
+    c.write_text(COMPAT)
+    out = tmp_path / 'out.json'
+    p = tmp_path / 'p.json'
+    bad = {'old': 'theorem b_thm', 'new': 'theorem b_thm\'', 'count': 3}
+    p.write_text(json.dumps([{'old': 'theorem b_thm', 'new': 'theorem b_thm'}, bad]))
+    with pytest.raises(SystemExit) as e:
+        CP.main(['filter-patches', str(p), LEAN, str(out), 'OAI.Fam', '--compat', str(c)])
+    assert 'dropped' in str(e.value) and not out.exists()
+    err = capsys.readouterr().err
+    assert 'expected count 3' in err and 'found 1' in err and 'B' in err and 'theorem b_thm' in err
+    # a patch matching nowhere is reported as such
+    p.write_text(json.dumps([{'old': 'no such text', 'new': 'x'}]))
+    with pytest.raises(SystemExit):
+        CP.main(['filter-patches', str(p), LEAN, str(out), 'OAI.Fam', '--compat', str(c)])
+    assert 'none in any module' in capsys.readouterr().err
+    # allowed to drop, or deliberately single-file-only: kept going
+    p.write_text(json.dumps([dict(bad, allow_drop=True), {'old': 'Sys.{uA, uB}', 'new': 'x', 'route': 'single'}]))
+    CP.main(['filter-patches', str(p), LEAN, str(out), 'OAI.Fam', '--compat', str(c)])
+    assert json.load(open(str(out))) == []
 
 
 MACRO_DEF = ('import Mathlib\n\nnamespace OAI.Fam\n\n/-- Closes word goals.  Each leaf is\nproved. -/\n'
