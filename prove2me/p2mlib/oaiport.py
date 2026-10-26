@@ -440,6 +440,9 @@ def core_rewrites(text, compat_ns='OAI'):
     # `IsProbabilityMeasure (….map f)` needs the measurability (SKValue/IsingPerceptron 2026-10-26)
     text = re.sub(r"(?m)^([ \t]*)unfold ([\w.']+)\n\1infer_instance[ \t]*$",
                   r"\1unfold \2\n\1first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)", text)
+    # the same inside a `⟨map, by infer_instance⟩` / `⟨map, inferInstance⟩` ProbabilityMeasure constructor
+    text = re.sub(r",(\s*)(?:by infer_instance|inferInstance)⟩",
+                  r",\1by first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)⟩", text)
     # d13f23b's lambda-form `logDeriv_fun_mul` / `logDeriv_fun_prod` are our `logDeriv_mul` / `logDeriv_prod`
     # (NodalLength, 2026-10-26)
     text = re.sub(r"(?<![\w'])logDeriv_fun_(mul|prod)(?![\w'])", r"logDeriv_\1", text)

@@ -937,3 +937,10 @@ def test_unfold_infer_instance_falls_back_to_map_measurability():
     assert "  unfold gumbelLaw\n  first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)\n" in out
     assert "unfold a\n  simp" in out
     assert O.core_rewrites(out) == out
+
+
+def test_probability_measure_constructor_instance_falls_back():
+    src = "  ⟨(μ.map f),\n    by infer_instance⟩\n  ⟨x.map g, inferInstance⟩\n"
+    out = O.core_rewrites(src)
+    assert out.count("by first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)⟩") == 2
+    assert O.core_rewrites(out) == out
