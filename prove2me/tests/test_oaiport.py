@@ -1189,3 +1189,15 @@ def test_clm_lipschitzWith_field_becomes_lipschitz():
     assert "toContinuousLinearMap.lipschitz)" in out
     assert "apply lipschitzWith_of_nnnorm_deriv_le" in out
     assert "hf.lipschitzWith_foo" in out
+
+
+# d13f23b's Egorov `tendstoUniformlyOn_of_ae_tendsto'` takes an extended-real ε (`0 < ENNReal.ofReal e`);
+# ours takes the real ε>0 (CAT0Fillings LargePieces, oaiq-029).
+
+def test_egorov_real_epsilon():
+    src = ("  obtain ⟨e,he,hμe,hue⟩ := tendstoUniformlyOn_of_ae_tendsto'\n"
+           "    (fun n => (hu n).stronglyMeasurable) stronglyMeasurable_const hc\n"
+           "      (ENNReal.ofReal_pos.mpr (half_pos hε))\n")
+    out = O.core_rewrites(src)
+    assert "hc\n      (half_pos hε)\n" in out
+    assert "ofReal_pos" not in out

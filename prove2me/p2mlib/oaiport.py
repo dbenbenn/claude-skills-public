@@ -517,6 +517,10 @@ def core_rewrites(text, compat_ns='OAI'):
     # (SLE IntegralLimits, oaiq-027); `.mp` and the primed form have no shim
     text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?unifIntegrable_iff\.mpr(?![\w'])",
                   pre + 'unifIntegrable_of_enn', text)
+    # d13f23b's Egorov `tendstoUniformlyOn_of_ae_tendsto'` takes an extended-real ε proof
+    # `ENNReal.ofReal_pos.mpr h`; ours takes the real `h : 0 < ε` (CAT0Fillings, oaiq-029)
+    text = re.sub(r"(tendstoUniformlyOn_of_ae_tendsto'[^\n]*(?:\n[^\n]*){0,3}?)\(ENNReal\.ofReal_pos\.mpr "
+                  r"(\((?:[^()]|\([^()]*\))*\)|[\w.']+)\)", r"\1\2", text)
     # d13f23b's `Finsupp.mapDomain_apply_of_injective hf x a` is our `Finsupp.mapDomain_apply`
     # (same statement; Markov superreflexivity 2026-10-25)
     text = re.sub(r"(?<![\w'])(Finsupp\.)?mapDomain_apply_of_injective(?![\w'])",
