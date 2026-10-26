@@ -710,8 +710,7 @@ def stdsimplex_single(text, mode='auto', use_bundle=False, drop=((), ())):
 
 
 LINT = ('set_option linter.all false\nset_option linter.unusedVariables false\n'
-        'set_option linter.unusedTactic false\nset_option linter.unreachableTactic false\n'
-        'set_option backward.isDefEq.respectTransparency false\n')
+        'set_option linter.unusedTactic false\nset_option linter.unreachableTactic false\n')
 
 
 def module_sources(lean_root, prefixes):
