@@ -226,6 +226,23 @@ def test_tensor_induction_shapes_compile_against_the_workspace_mathlib(tmp_path)
     assert 'Ambiguous namespace' not in out, out
 
 
+def test_the_compat_block_declares_a_simp_lemma_for_numerals_below_infty():
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^@\[simp\]\ntheorem ofNat_le_infty\b', block, re.M)
+
+
+@pytest.mark.lean
+def test_simp_closes_a_numeral_le_infty_with_the_compat_block(tmp_path):
+    from p2mlib import carve as C
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    f = tmp_path / 'OfNatInfty.lean'
+    f.write_text('import Mathlib\nopen scoped ContDiff\n\n' + block + '\n'
+                 'example : (2 : WithTop ℕ∞) ≤ ∞ := by simp\n'
+                 'example : (3 : WithTop ℕ∞) ≤ ∞ := by simp\n', encoding='utf-8')
+    out = C.compile_file(str(f), None, str(tmp_path / 'olean'))
+    assert 'error' not in out, out
+
+
 # ---------------------------------------------------------------- the submit queue's logs
 
 def test_the_queue_rebuilds_each_goal_from_its_log():

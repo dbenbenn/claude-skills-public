@@ -105,6 +105,11 @@ theorem condDistrib_ae_eq_of_measure_eq_compProd
     (hκ : μ.map (fun x => (X x, Y x)) = (μ.map X).compProd κ) :
     ProbabilityTheory.condDistrib Y X μ =ᵐ[μ.map X] κ :=
   ProbabilityTheory.condDistrib_ae_eq_of_measure_eq_compProd X hY hκ
+/-- `simp` closes `2 ≤ ∞` in `WithTop ℕ∞` (the smoothness order) in Mathlib d13f23b; ours has the
+lemma only for `1` and casts (AffineBernstein, `isSymmSndFDerivAt (by simp)`, 2026-10-26). -/
+@[simp]
+theorem ofNat_le_infty (n : ℕ) [n.AtLeastTwo] : (no_index (OfNat.ofNat n) : WithTop ℕ∞) ≤ ((⊤ : ℕ∞) : WithTop ℕ∞) :=
+  ENat.LEInfty.out
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod
