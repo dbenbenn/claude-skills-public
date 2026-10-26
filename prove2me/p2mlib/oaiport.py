@@ -406,6 +406,8 @@ def core_rewrites(text, compat_ns='OAI'):
     text = _drop_positional_arg(_drop_positional_arg(text, 'eLpNorm_congr_norm_ae'), 'eLpNorm_congr_norm_ae')
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*ring[ \t]*$", r"\1 <;> first | rfl | ring", text)
     # d13f23b renames (UnitDistances, StandardMap 2026-10-25)
+    text = re.sub(r"(?<![\w.'])birkhoffSum_succ_apply'(?![\w'])", "birkhoffSum_succ'", text)
+    text = re.sub(r"(?<![\w.'])birkhoffSum_add_right_apply(?![\w'])", "birkhoffSum_add", text)
     text = re.sub(r"(?<![\w.'])finsum_le_finsum(?![\w'])", "finsum_le_finsum'", text)
     text = re.sub(r"(?<![\w'])Filter\.eventuallyEqSet_iff(?![\w'])", 'Filter.eventuallyEq_set', text)
     text = re.sub(r"posLog_le_posLog \(neg_one_lt_zero\.le\.trans ", 'posLog_le_posLog (id ', text)

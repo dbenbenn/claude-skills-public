@@ -838,3 +838,13 @@ def test_lt_m_token_is_spaced():
     # the Matroid notation itself, written with spaces, stays
     assert O.core_rewrites('N <m M') == 'N <m M'
     assert O.core_rewrites('a <mem b') == 'a <mem b'
+
+
+# d13f23b's `birkhoffSum_succ_apply'` / `birkhoffSum_add_right_apply` are our `birkhoffSum_succ'` / `birkhoffSum_add`
+# (StandardMap Lyapunov, 2026-10-26).
+
+def test_birkhoff_sum_renames():
+    out = O.core_rewrites("rw [birkhoffSum_succ_apply', hb]\nsimpa using birkhoffSum_add_right_apply T g m n x\nrw [birkhoffSum_succ_apply]\n")
+    assert "rw [birkhoffSum_succ', hb]" in out
+    assert "birkhoffSum_add T g m n x" in out
+    assert "birkhoffSum_succ_apply]" in out
