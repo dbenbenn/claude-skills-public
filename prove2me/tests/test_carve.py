@@ -1671,3 +1671,14 @@ def test_an_instance_only_a_variable_binder_needs_is_a_dependency_of_the_declara
 @pytest.mark.lean
 def test_variable_binders_needing_an_instance_compile(g, tmp_path):
     _compile_in_publish_order(g, _coer_plan(g, ['CD.Co.var_user'], bundle_budget=0.0001), tmp_path)
+
+
+def test_a_restricted_attribute_on_an_external_declaration_is_kept_local(g):
+    # Coboundary (2026-10-26): `attribute [reducible] Face`, with Face in a published bundle
+    # (external_defs), was dropped, so every proof that saw through Face failed in the carved file.
+    # No bundle of the carve carries it and Lean lets only Face's file set it globally.
+    keep, have = {'CD.Co.rdef_pos'}, g.have_names({'CD.Co.rdef_pos', 'CD.Co.rdef'})
+    out = C.Carver(g).carve(keep, have, external={'CD.Co.rdef'})
+    assert re.search(r'^attribute \[local instance_reducible\] rdef$', out, re.M), out
+    out = C.Carver(g).carve(keep, have)
+    assert not re.search(r'^attribute', out, re.M), out

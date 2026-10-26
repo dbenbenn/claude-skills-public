@@ -2211,8 +2211,9 @@ class Carver:
     def __init__(self, g):
         self.g = g
 
-    def carve(self, keep, have, deprivatize=False, sorry=(), rename=None):
+    def carve(self, keep, have, deprivatize=False, sorry=(), rename=None, external=()):
         g = self.g
+        self.external = set(external)
         keep = set(keep)
         self.keep = keep
         have = set(have) | g.have_names(keep)
@@ -2322,6 +2323,11 @@ class Carver:
         if hits and idn is not None:
             g.note_fallback(g.infos[m], c, idn)
         return bool(hits) and all(pubname(h) not in have for h in hits)
+
+    def _external_ref(self, idn, c, m):
+        """Does the identifier resolve to a declaration of an external (published) bundle?"""
+        r = self.g.reading(self.g.infos[m], c, idn)
+        return r is not None and any(pubname(n) in self.external for n in r.consts)
 
     def _drops(self, m, kept, have):
         g, info = self.g, self.g.infos[m]
@@ -2478,7 +2484,21 @@ class Carver:
                     names = lambda L: ' '.join(t[i['start']:i['end']].decode('utf-8') for i in L)
                     rest = [e for e in ents if not restricted_attribute('attribute [%s] x' % e)]
                     res = [e for e in ents if e not in rest]
+                    # a declaration of someone else's published bundle (external_defs) is carried by
+                    # no bundle of this carve, and Lean lets only its own file set the attribute
+                    # globally: keep it here, `local` (reducibility needs allowUnsafeReducibility)
+                    # (Coboundary: `attribute [reducible] Face`, Face in Def_CoboundaryExpanders)
+                    theirs = [i for i in refs if i not in gone and i not in mine and
+                              self._external_ref(i, c, m)]
                     out = []
+                    if theirs:
+                        for e in res:
+                            kw = e.split()[0]
+                            if kw in ('reducible', 'irreducible', 'semireducible'):
+                                out.append('set_option allowUnsafeReducibility true in\n'
+                                           'attribute [local %s] %s' % (e, names(theirs)))
+                            elif kw == 'instance_reducible':
+                                out.append('attribute [local %s] %s' % (e, names(theirs)))
                     if rest and refs and len(gone) < len(refs):
                         out.append('attribute [%s] %s' % (', '.join(rest), names([i for i in refs if i not in gone])))
                     if mine:
@@ -3082,7 +3102,8 @@ def gen_bundle(g, plan, name, collapse_mathlib=True):
         avail |= _bundle_have(g, plan, plan['stubs'][st]['bundles'])
     ren = collision_renames(g)
     ren.update(_stmt_renames(g, plan, sts))
-    body = Carver(g).carve(keep, g.have_names(keep | avail), deprivatize=True, rename=ren)
+    body = Carver(g).carve(keep, g.have_names(keep | avail), deprivatize=True, rename=ren,
+                         external=plan.get('external_defs') or ())
     hdr = header(g, {g.nodes[k].module for k in keep}, b['imports'],
                  [statement_name(plan, st) for st in sts], collapse_mathlib,
                  extra=_ext_imports(g, plan, keep))
@@ -3095,7 +3116,8 @@ def gen_stub(g, plan, node, collapse_mathlib=True):
     avail |= _ext_have(g, plan, _ext_imports(g, plan, [node], statement_only=True), bs)
     ren = collision_renames(g)
     ren.update(_stmt_renames(g, plan, [node]))
-    body = Carver(g).carve({node}, g.have_names({node} | avail), sorry={node}, rename=ren)
+    body = Carver(g).carve({node}, g.have_names({node} | avail), sorry={node}, rename=ren,
+                         external=plan.get('external_defs') or ())
     # no comments: a statement's formal_statement freezes at publish and api.call refuses one
     # carrying a comment (the `-- module` markers, OpenAI's comments in kept context lines)
     body = re.sub(r'\n\s*\n(\s*\n)+', '\n\n', '\n'.join(l.rstrip() for l in strip(body).split('\n')))
@@ -3128,7 +3150,8 @@ def gen_piece(g, plan, node, collapse_mathlib=True):
     ren = collision_renames(g)
     ren.update(_stmt_renames(g, plan, p['imports']))
     ren[node] = statement_name(plan, node).rsplit('.', 1)[-1] + '_oai'
-    body = Carver(g).carve(keep, g.have_names(keep | avail), rename=ren)
+    body = Carver(g).carve(keep, g.have_names(keep | avail), rename=ren,
+                         external=plan.get('external_defs') or ())
     hdr = header(g, {g.nodes[k].module for k in keep}, p['bundles'],
                  [statement_name(plan, i) for i in p['imports']], collapse_mathlib,
                  extra=_ext_imports(g, plan, keep))
