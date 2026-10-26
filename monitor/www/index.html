@@ -14,7 +14,7 @@ main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
 h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14px}
 .card{background:var(--surface-1);border-radius:10px;padding:14px 16px;margin:0 0 14px}
 .alarm{background:var(--alarm);color:#fff;padding:10px 14px;border-radius:8px;margin:0 0 14px}
-.alarm b{display:block;margin-bottom:2px}.alarm ul{margin:0;padding-left:18px}
+.alarm b{display:block;margin-bottom:2px}.alarm ul{margin:0;padding-left:18px}.alarm li{overflow-wrap:anywhere}
 .ph{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--grid);cursor:pointer}
 .ph:first-child{border-top:0}.ph.sel .n{text-decoration:underline;text-underline-offset:3px}
 .ph .n{font-weight:600}.ph .v{color:var(--text-secondary);font-variant-numeric:tabular-nums;text-align:right}
@@ -27,6 +27,8 @@ h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14
 .run span{overflow-wrap:anywhere}
 @media (max-width:560px){.run{grid-template-columns:minmax(7em,1fr) auto auto auto;gap:3px 10px;font-size:13px}.run .sh{display:none}.run .c{grid-column:1/5}}
 .salerts{color:var(--alarm);font-weight:600;margin:6px 0;padding-left:18px}
+.cleared{margin:4px 0 0;padding-left:18px;color:var(--text-secondary);font-size:13px}.cleared li{overflow-wrap:anywhere;margin:2px 0}
+.cleared .when{color:var(--text-muted);font-variant-numeric:tabular-nums}
 h2{font-size:17px;margin:0 0 2px} h3{font-size:14px;margin:0 0 2px} .chart-sub{color:var(--text-secondary);font-size:13px;margin:0 0 6px}
 .meta{color:var(--text-muted);font-size:13px;margin:0 0 6px}.meta a{color:var(--series-1)}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px 20px}
@@ -67,6 +69,9 @@ code{font-size:13px}
 <div class="chart"><h3>Stall pressure</h3><p class="chart-sub" id="s-psi"></p><div id="c-psi"></div></div>
 </div>
 <h3 style="margin-top:16px">Lean processes</h3><div id="lean"></div>
+<div id="cleared-box" hidden><h3 style="margin-top:16px" id="t-cleared">Cleared alerts (last 24 h)</h3>
+<p class="chart-sub">Trouble that was in the red banner and has stopped: the condition is gone, the racing jobs are no longer both running, or an OOM kill is over an hour old. Repeats are one row with their worst reading.</p>
+<ul class="cleared" id="cleared"></ul></div>
 </section>
 <section class="card" aria-labelledby="t-quota">
 <h2 id="t-quota">Subscription quota</h2>
@@ -92,6 +97,8 @@ const TZ = 'Europe/Berlin', tzName = t => new Intl.DateTimeFormat('en-GB',{timeZ
 const fmtT = t => new Date(t*1000).toLocaleTimeString('de-DE',{timeZone:TZ,hour:'2-digit',minute:'2-digit'});
 const fmtDay = t => new Date(t*1000).toLocaleDateString('en-CA',{timeZone:TZ});
 const fmtAt = t => (fmtDay(t)===fmtDay(Date.now()/1000) ? '' : fmtDay(t)+' ') + fmtT(t) + ' ' + tzName(t);
+const fmtSpan = (a, b) => b - a < 60 ? fmtAt(a) : fmtDay(a)!==fmtDay(b) ? fmtAt(a) + ' – ' + fmtAt(b)
+  : (fmtDay(a)===fmtDay(Date.now()/1000) ? '' : fmtDay(a)+' ') + fmtT(a) + '–' + fmtT(b) + ' ' + tzName(b);
 const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ago = s => s<90 ? `${s} s ago` : s<5400 ? `${Math.round(s/60)} min ago` : `${(s/3600).toFixed(1)} h ago`;
 const fmtWd = t => new Date(t*1000).toLocaleDateString('en-GB',{timeZone:TZ,weekday:'short'});
@@ -227,6 +234,9 @@ async function load(){
   const pr = document.getElementById('problems'), P = s.problems || [];
   pr.hidden = !P.length; pr.textContent = P.length ? 'Section files the page could not read: ' + P.join('; ') : '';
   al.innerHTML = s.alerts.length ? `<b>${esc(s.host||'machine')} needs attention</b><ul>${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>` : '';
+  const C = s.cleared || [];
+  document.getElementById('cleared-box').hidden = !C.length;
+  document.getElementById('cleared').innerHTML = C.map(e => `<li><span class="when">${esc(fmtSpan(e.first, e.last))}</span> · ${e.what==='machine'?'':esc(e.what)+': '}${esc(e.text)}${e.what!=='machine' && e.n>1 ? ` · ${e.n} checks` : ''}</li>`).join('');
   drawSystem(s.system);
   drawSections(s.sections||[]);
   if (typeof drawQuota === 'function') drawQuota();

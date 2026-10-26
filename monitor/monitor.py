@@ -176,24 +176,67 @@ def lean_view(procs, prev, now):
     return sorted(out, key=lambda r: -r['own_gib'])
 
 
-def health_flags(path, now, window=86400):
-    """Lean health flags (lean-health.timer) from the last day, as 'date FLAG: ...' lines."""
+HEALTH_EVERY = 600         # lean-health.timer's interval
+NUM = re.compile(r'(?<!pid )\b\d+(?:\.\d+)?\b')     # a flag's measurements; pids name it
+RACE = re.compile(r"race: '([^']*)' started by pid (\d+) .* while pid (\d+) is already on it")
+
+
+def severity(text):
+    """Orders reports of one flag, worst last: by their numbers; for 'only N GiB free', fewer is worse."""
+    nums = tuple(float(x) for x in NUM.findall(text))
+    return tuple(-x for x in nums) if text.startswith('only ') else nums
+
+
+def add_report(eps, t, text, gap):
+    """Counts a report of `text` at time t into the episode of the same flag (its numbers aside)
+    last seen at most `gap` s before, or opens a new one. An episode keeps the latest text and the worst."""
+    key = NUM.sub('#', text)
+    e = next((e for e in reversed(eps) if e['key'] == key and t - e['last'] <= gap), None)
+    if e is None:
+        eps.append({'key': key, 'text': text, 'worst': text, 'first': t, 'last': t, 'n': 1})
+        return
+    e.update(text=text, last=t, n=e['n'] + 1)
+    if severity(text) > severity(e['worst']):
+        e['worst'] = text
+
+
+def pid_running(pid, needle):
+    """pid is alive and still the job it was (its command line mentions needle)."""
+    try:
+        return needle in open('/proc/%s/cmdline' % pid, 'rb').read().decode(errors='replace')
+    except OSError:
+        return False
+
+
+def health_flags(path, now, alive=pid_running, home=os.path.expanduser('~'), window=86400):
+    """Lean health flags (lean-health.timer, and lean-cap's race reports) from the last day, as episodes
+    {text, worst, first, last, n, active}. Active: a race while both jobs still run; an OOM kill for
+    an hour; any other flag while the latest check (every 10 min) still reports it."""
     try:
         text = open(path, errors='replace').read()
     except OSError:
         return []
-    out, stamp, recent = [], '', False
+    eps, t = [], None
     for l in text.splitlines():
         m = re.match(r'^=== (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)', l)
         if m:
-            stamp = m.group(1)
             try:
-                recent = now - datetime.datetime.strptime(stamp, '%Y-%m-%d %H:%M:%S').timestamp() <= window
+                t = datetime.datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S').timestamp()
             except ValueError:
-                recent = False
-        elif recent and l.startswith('FLAG:'):
-            out.append(stamp + ' ' + l)
-    return out
+                t = None
+        elif t is not None and now - t <= window and l.startswith('FLAG:'):
+            add_report(eps, t, l[len('FLAG:'):].strip().replace(home + '/', '~/'), gap=2.5 * HEALTH_EVERY)
+    for e in eps:
+        race = RACE.search(e['text'])
+        if race:
+            target = race.group(1)
+            needle = re.split(r'[|/.]', target[:-5] if target.endswith('.lean') else target)[-1]
+            e['active'] = alive(race.group(2), needle) and alive(race.group(3), needle)
+        elif 'OOM' in e['text']:
+            e['active'] = now - e['last'] <= 3600
+        else:
+            e['active'] = now - e['last'] <= 1.5 * HEALTH_EVERY
+    return eps
 
 
 # ---- the sections ----------------------------------------------------------------------------
@@ -259,16 +302,29 @@ def track(hist, sections, now):
                     p['eta'] = int(now + (p['total'] - p['done']) / rate)
 
 
-def build_status(now, sections, problems, system, flags, lean):
-    """alerts: machine trouble only (the page's top banner). A section's own alerts and staleness
-    show in that section; unreadable section files are listed apart as problems."""
+def build_status(now, sections, problems, system, flags, lean, trouble=None):
+    """alerts: machine trouble going on now (the page's top banner and its red icon). Trouble from the
+    last day that has stopped is listed as cleared: Lean health episodes that are no longer active
+    (flags, from health_flags) and stall/low-memory episodes, which `trouble` keeps across samples
+    (updated in place). A section's own alerts and staleness show in that section; unreadable section
+    files are listed apart as problems."""
+    trouble = [] if trouble is None else trouble
     psi = system['psi'][-1][1:] if system.get('psi') else None
     free = system.get('free_gib')
     if free is not None:
         free += system.get('swap_free_gib', 0)   # with swap, low free RAM alone is normal under load
-    alerts = pressure_alerts(psi, free) + ['Lean health: ' + f for f in flags]
-    return {'updated': now, 'host': socket.gethostname(), 'alerts': alerts, 'problems': problems,
-            'system': dict(system, lean=lean, health_flags=flags), 'sections': sections}
+    now_alerts = pressure_alerts(psi, free)
+    for a in now_alerts:
+        add_report(trouble, now, a, gap=600)
+    trouble[:] = [e for e in trouble if now - e['last'] <= 86400]
+    since = lambda t: time.strftime('%H:%M', time.localtime(t))
+    alerts = now_alerts + ['Lean health: %s (since %s)' % (e['text'], since(e['first'])) for e in flags if e['active']]
+    cleared = [dict(what='machine', **e) for e in trouble if e['last'] < now] + \
+              [dict(what='Lean health', **e) for e in flags if not e['active']]
+    cleared = [{k: e[k] for k in ('what', 'first', 'last', 'n')} | {'text': e['worst']}
+               for e in sorted(cleared, key=lambda e: -e['last'])]
+    return {'updated': now, 'host': socket.gethostname(), 'alerts': alerts, 'cleared': cleared, 'problems': problems,
+            'system': dict(system, lean=lean), 'sections': sections}
 
 
 # ---- the loop and the server -----------------------------------------------------------------
@@ -327,7 +383,9 @@ def step(home, now=None):
     system = {'machine': res['machine'], 'psi': res.get('psi', []), 'labels': res['labels'],
               'free_gib': round(mi['MemAvailable'] / G, 1), 'cores_total': os.cpu_count(),
               'swap_free_gib': round(mi.get('SwapFree', 0) / G, 1), 'swap_total_gib': round(mi.get('SwapTotal', 0) / G, 1)}
-    status = build_status(now, secs, problems, system, health_flags(HEALTH_FLAGS, now), lean_view(procs, prev, now))
+    res['trouble'] = res.get('trouble', [])
+    status = build_status(now, secs, problems, system, health_flags(HEALTH_FLAGS, now), lean_view(procs, prev, now),
+                          trouble=res['trouble'])
     status['quota'] = {'series': quota['series'], 'columns': ['t', 'five_hour %', 'five_hour resets', 'seven_day %', 'seven_day resets']}
     save_json(os.path.join(st, 'resources.json'), res)
     save_json(os.path.join(st, 'history.json'), hist)

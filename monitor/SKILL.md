@@ -78,9 +78,17 @@ producer unit, and let the section expire.
 some, memory full, io some, io full]` (avg10, %); `system.free_gib`, `swap_free_gib`, `swap_total_gib`; `system.lean`; and `sections` with history, rates
 and ETAs. The top banner is for machine trouble only (dbenbenn 2026-10-18): memory full > 5%, I/O full >
 20%, CPU some > 50%, less than 4 GiB of memory and swap available together (low free RAM alone is
-normal on a box where Lean may fill RAM and spill to swap), and Lean health flags from `lean-health.timer` (last
-24 h). Project alerts and STALE badges stay in their sections; unreadable section files are listed
-under the sections (`problems` in status.json).
+normal on a box where Lean may fill RAM and spill to swap), and Lean health flags from `lean-health.timer`
+and lean-cap's race reports. **The banner and the red favicon show only trouble going on now**
+(dbenbenn 2026-10-26): a pressure alert in the current sample; a Lean health flag that the latest check
+still reports (checks run every 10 min, so it counts as current for 15); a race while both jobs still run
+(`/proc/<pid>/cmdline` still names the module); an OOM kill for its first hour. Everything else from the
+last 24 h is `cleared` in status.json (`{what, text, first, last, n}`, newest first), listed in grey under
+"Cleared alerts" below the Lean processes. Repeats of one flag (the same text apart from its numbers;
+pids kept) less than 25 min apart (10 min for pressure alerts) count as one episode, shown with its worst
+reading. Pressure episodes persist across samples in `state/resources.json` (`trouble`). Project alerts
+and STALE badges stay in their sections; unreadable section files are listed under the sections
+(`problems` in status.json).
 
 ## Headless agents, quota and logs (no tokens)
 

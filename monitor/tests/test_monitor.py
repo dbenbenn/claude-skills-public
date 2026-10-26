@@ -75,13 +75,57 @@ def test_track_forgets_sections_and_phases_that_left():
     assert 'gone' not in hist and 'old' not in hist['s'] and 'new' in hist['s']
 
 
-def test_health_flags_last_day(tmp_path):
-    f = tmp_path / 'flags'
-    f.write_text('=== 2026-10-16 10:00:00\nFLAG: old\n=== 2026-10-18 06:00:00\nFLAG: two Lean jobs race\n')
+def at(hhmm, day=26):
     import datetime
-    now = datetime.datetime(2026, 10, 18, 7, 0).timestamp()
-    assert M.health_flags(str(f), now) == ['2026-10-18 06:00:00 FLAG: two Lean jobs race']
-    assert M.health_flags(str(tmp_path / 'missing'), now) == []
+    h, m = map(int, hhmm.split(':'))
+    return datetime.datetime(2026, 10, day, h, m).timestamp()
+
+
+def flags_file(tmp_path, *blocks):
+    f = tmp_path / 'flags'
+    f.write_text(''.join('=== 2026-10-%02d %s:00\n%s\n' % (day, hhmm, '\n'.join('FLAG: ' + l for l in lines))
+                         for day, hhmm, lines in blocks))
+    return str(f)
+
+
+NUC = 'pid %d (/home/u/ws/Solutions/OAIQ019_Nuc/SOS.lean) at %d MiB'
+
+
+def test_health_flags_merge_repeats_keep_the_peak_and_drop_the_old_day(tmp_path):
+    f = flags_file(tmp_path, (25, '06:00', ['two Lean jobs race']),
+                   (26, '16:47', [NUC % (11, 14284)]), (26, '16:57', [NUC % (11, 11759)]),
+                   (26, '18:37', [NUC % (22, 14866)]))
+    eps = M.health_flags(f, at('20:00'), home='/home/u')
+    assert [(e['first'], e['last'], e['n']) for e in eps] == [(at('16:47'), at('16:57'), 2), (at('18:37'), at('18:37'), 1)]
+    assert eps[0]['worst'] == 'pid 11 (~/ws/Solutions/OAIQ019_Nuc/SOS.lean) at 14284 MiB'
+    assert eps[0]['text'] == 'pid 11 (~/ws/Solutions/OAIQ019_Nuc/SOS.lean) at 11759 MiB'
+    assert not any(e['active'] for e in eps)
+    assert M.health_flags(str(tmp_path / 'missing'), at('20:00')) == []
+
+
+def test_health_flag_is_active_until_a_later_check_leaves_it_out(tmp_path):
+    f = flags_file(tmp_path, (26, '21:27', ['Lean holds 19.3 of its 24.0 GiB of swap', 'Lean holds 24.0 of its 24.0 GiB of swap']))
+    assert [e['active'] for e in M.health_flags(f, at('21:37'))] == [True]      # one episode, still the latest check
+    assert [e['active'] for e in M.health_flags(f, at('21:47'))] == [False]     # the 21:37 check had no flag
+    assert M.health_flags(f, at('21:47'))[0]['worst'] == 'Lean holds 24.0 of its 24.0 GiB of swap'
+
+
+def test_race_is_active_while_both_jobs_run(tmp_path):
+    f = flags_file(tmp_path, (26, '11:24', ["race: '/home/u/ws|Solutions.OAIQ12_ED.Edit_Defs' started by pid 7 (python3 x) while pid 5 is already on it"]))
+    running = {}
+    def alive(pid, needle):
+        assert needle == 'Edit_Defs'
+        return pid in running
+    running.update({'5': 1, '7': 1})
+    assert M.health_flags(f, at('23:00'), alive=alive)[0]['active']
+    del running['5']
+    assert not M.health_flags(f, at('11:25'), alive=alive)[0]['active']
+
+
+def test_oom_kill_is_active_for_an_hour(tmp_path):
+    f = flags_file(tmp_path, (26, '10:00', ['1 Lean job(s) OOM-killed inside lean.slice since last check']))
+    assert M.health_flags(f, at('10:59'))[0]['active']
+    assert not M.health_flags(f, at('11:01'))[0]['active']
 
 
 def test_machine_row_splits_memory_and_cpu_by_group():
@@ -103,13 +147,31 @@ def test_banner_is_for_the_machine_only(tmp_path):
     h = str(tmp_path)
     S.publish('job', title='Job', alerts=['NEEDS A PERSON: B1'], home=h, now=100)
     secs, problems = M.load_sections(os.path.join(h, 'sections'), now=110)
+    flags = [dict(text='x', worst='x', first=at('21:27'), last=at('21:27'), n=1, active=True),
+             dict(text='y', worst='y!', first=at('16:47'), last=at('17:27'), n=5, active=False)]
     st = M.build_status(now=110, sections=secs, problems=problems + ['broken.json: bad'],
                         system={'machine': [], 'psi': [[110, 0, 0, 9, 0, 0]], 'free_gib': 20},
-                        flags=['FLAG: x'], lean=[])
-    assert st['alerts'] == ['memory stalls 9% (full)', 'Lean health: FLAG: x']
+                        flags=flags, lean=[])
+    assert st['alerts'] == ['memory stalls 9% (full)', 'Lean health: x (since 21:27)']
+    assert st['cleared'] == [{'what': 'Lean health', 'text': 'y!', 'first': at('16:47'), 'last': at('17:27'), 'n': 5}]
     assert st['sections'][0]['alerts'] == ['NEEDS A PERSON: B1']
     assert st['problems'] == ['broken.json: bad']
     json.dumps(st)
+
+
+def test_machine_trouble_moves_to_cleared_when_it_stops_and_back_when_it_returns():
+    trouble = []
+    def status(now, mem_full):
+        return M.build_status(now=now, sections=[], problems=[], flags=[], lean=[], trouble=trouble,
+                              system={'machine': [], 'psi': [[now, 0, 0, mem_full, 0, 0]], 'free_gib': 20})
+    assert status(100, 12)['alerts'] == ['memory stalls 12% (full)']
+    assert status(130, 9)['alerts'] == ['memory stalls 9% (full)']
+    st = status(160, 0)
+    assert st['alerts'] == [] and st['cleared'] == [
+        {'what': 'machine', 'text': 'memory stalls 12% (full)', 'first': 100, 'last': 130, 'n': 2}]
+    assert status(700, 7)['cleared'] == []                     # back within 10 min: the same episode
+    assert status(730, 0)['cleared'][0]['first'] == 100
+    assert status(100 + 86400 + 731, 0)['cleared'] == []      # forgotten after a day
 
 
 def test_free_memory_alert_counts_swap():
