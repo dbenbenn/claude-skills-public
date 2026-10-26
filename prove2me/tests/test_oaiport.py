@@ -789,3 +789,15 @@ def test_finsum_eventuallyeq_set_posLog_renames():
     assert "apply finsum_le_finsum' (hf) (hg)" in out and "finsum_le_finsum'' " not in out
     assert "Filter.eventuallyEq_set" in out and "eventuallyEqSet_iff" not in out
     assert "posLog_le_posLog (id (v.nonneg x))" in out
+
+
+def test_initialize_token_is_refused_and_renamed_even_as_a_field():
+    # VariableWL (2026-10-26): OpenAI's `theorem Machine.initialize` and `M.initialize` were rejected by
+    # the soundness guard ("`initialize` - arbitrary code execution at module initialization") in
+    # every piece, after every local check had passed
+    from p2mlib import leantext as L
+    text = 'theorem Machine.initialize (M : Nat) : M = M := rfl\nexample := by rw [M.initialize, M.initial_x]\n'
+    assert [(n, t) for n, t, _ in L.guard_problems(text)] == [(1, 'initialize'), (2, 'initialize')]
+    out = O.guard_renames(text)
+    assert 'Machine.initialize_ ' in out and 'M.initialize_,' in out and 'M.initial_x' in out
+    assert not L.guard_problems(out)

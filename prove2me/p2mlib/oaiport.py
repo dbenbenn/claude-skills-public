@@ -280,7 +280,7 @@ def apply_rewrites(text, rewrites):
 
 # identifiers prove2.me's soundness guard refuses (leantext.GUARD_TOKENS), and what the ports call
 # them instead (WLTime 2026-10-23: OpenAI's `def prelude`, renamed by hand to preludeCode)
-GUARD_RENAMES = {'prelude': 'prelude_'}
+GUARD_RENAMES = {'prelude': 'prelude_', 'initialize': 'initialize_'}
 
 
 def guard_renames(text):

@@ -252,7 +252,8 @@ def code_only(text):
 # automatic Init prelude import, enabling kernel-primitive shadowing"). `notation` is allowed.
 GUARD_COMMAND = re.compile(r'[ \t]*(?:@\[[^\]\n]*\][ \t]*)?(?:(?:local|scoped)\s+)?'
                            r'(macro|macro_rules|syntax|elab|elab_rules|declare_syntax_cat|initialize)\b')
-GUARD_TOKENS = {'prelude': 'disables the automatic Init prelude import (refused even as an identifier)'}
+GUARD_TOKENS = {'prelude': 'disables the automatic Init prelude import (refused even as an identifier)',
+                'initialize': 'arbitrary code execution at module initialization (refused even as an identifier or a field)'}
 _TOKEN = r"(?<![\w'!?₀-ₜ])%s(?![\w'!?₀-ₜ])"
 
 
