@@ -1237,3 +1237,15 @@ def test_nonunital_star_ring_hom_of_class_uses_the_compat_shim():
     assert O.core_rewrites("NonUnitalStarRingHom.ofClass f", None) == "nonUnitalStarRingHomOfClass f"
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean', 'compat_4_34.lean')).read()
     assert 'def nonUnitalStarRingHomOfClass' in src
+
+
+# d13f23b's `Isometry.antilipschitzWith` is `Isometry.antilipschitz` in our Mathlib
+# (HyperbolicGroups GeometricSpaceTransport, oaiq-034).
+
+def test_core_rewrites_isometry_antilipschitzWith_is_antilipschitz():
+    src = "  (u X).symm.isometry.antilipschitzWith.properSpace h\n  hf.antilipschitzWith\n  Isometry.antilipschitzWith hf\n"
+    out = O.core_rewrites(src)
+    assert '.isometry.antilipschitz.properSpace' in out
+    assert 'Isometry.antilipschitz hf' in out
+    assert 'hf.antilipschitzWith' in out  # not an isometry: left alone
+    assert O.core_rewrites(out) == out

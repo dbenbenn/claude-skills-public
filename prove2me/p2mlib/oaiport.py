@@ -527,6 +527,8 @@ def core_rewrites(text, compat_ns='OAI'):
     # d13f23b's `NonUnitalStarRingHom.ofClass f` is the compat block's `nonUnitalStarRingHomOfClass`
     # (Kadison commutator, oaiq-039; Kaplansky quotient, oaiq-015)
     text = re.sub(r"(?<![\w.'])NonUnitalStarRingHom\.ofClass(?![\w'])", pre + 'nonUnitalStarRingHomOfClass', text)
+    # d13f23b's `Isometry.antilipschitzWith` is `Isometry.antilipschitz` here (HyperbolicGroups, oaiq-034)
+    text = re.sub(r"(\.isometry\.|(?<![\w.'])Isometry\.)antilipschitzWith(?![\w'])", r"\1antilipschitz", text)
     # d13f23b's `Finsupp.mapDomain_apply_of_injective hf x a` is our `Finsupp.mapDomain_apply`
     # (same statement; Markov superreflexivity 2026-10-25)
     text = re.sub(r"(?<![\w'])(Finsupp\.)?mapDomain_apply_of_injective(?![\w'])",
