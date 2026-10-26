@@ -1209,3 +1209,10 @@ def test_egorov_real_epsilon():
 def test_posSemidef_dotProduct_mulVec_zero_iff_explicit_x():
     out = O.core_rewrites("    have hz := hP.dotProduct_mulVec_zero_iff.1 heq.symm\n")
     assert "(hP.dotProduct_mulVec_zero_iff _).1 heq.symm" in out
+
+
+def test_clm_isTopologicalAddGroup_becomes_inferInstance():
+    # d13f23b's named instance `ContinuousLinearMap.isTopologicalAddGroup` (GeneralMahler, 2026-10-26)
+    out = O.core_rewrites("    let : IsTopologicalAddGroup (E →L[ℝ] F) :=\n      ContinuousLinearMap.isTopologicalAddGroup\n")
+    assert "      inferInstance\n" in out
+    assert "isTopologicalAddGroup" not in out.replace("IsTopologicalAddGroup", "")
