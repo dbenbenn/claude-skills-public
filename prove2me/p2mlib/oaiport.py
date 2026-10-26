@@ -481,7 +481,7 @@ def core_rewrites(text, compat_ns='OAI'):
     text = _drop_positional_arg(text, 'compProd_map_condDistrib')
     # d13f23b's `CStarAlgebra.norm_mem_spectrum_of_nonneg a ha` has `a` explicit; ours implicit
     # (Kirchberg-Rordam 2026-10-25)
-    text = re.sub(r"(?<![\w.'])(CStarAlgebra\.norm_mem_spectrum_of_nonneg)[ \t]+[A-Za-z_][\w']*[ \t]+(?=[A-Za-z_(])",
+    text = re.sub(r"(?<![\w.'])(CStarAlgebra\.norm_(?:or_neg_norm_)?mem_spectrum(?:_of_nonneg)?)[ \t]+[A-Za-z_][\w']*[ \t]+(?=[A-Za-z_(])",
                   r"\1 ", text)
     # d13f23b renamed the ordered-monoid `Finset.prod_le_prod'` (one hypothesis) to
     # `Finset.prod_le_prod`, and our nonnegative `prod_le_prod` to `prod_le_prod₀` (the compat

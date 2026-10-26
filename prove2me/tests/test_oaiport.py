@@ -606,6 +606,15 @@ def test_norm_mem_spectrum_of_nonneg_drops_explicit_element():
     assert out.count("norm_mem_spectrum_of_nonneg hb") == 2
 
 
+# d13f23b: `CStarAlgebra.norm_or_neg_norm_mem_spectrum a ha`; ours has `a` implicit (FactorGeneration, 2026-10-26).
+
+def test_norm_or_neg_norm_mem_spectrum_drops_explicit_element():
+    src = ("rcases CStarAlgebra.norm_or_neg_norm_mem_spectrum a ha with h | h\n"
+           "exact CStarAlgebra.norm_or_neg_norm_mem_spectrum ha\n")
+    out = O.core_rewrites(src)
+    assert out.count("norm_or_neg_norm_mem_spectrum ha") == 2
+
+
 # d13f23b has `YoungDiagram.card_transpose`; ours does not (BinarySweep DiagonalDimension, 2026-10-25).
 
 def test_compat_has_youngdiagram_card_transpose():
