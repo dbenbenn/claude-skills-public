@@ -801,3 +801,12 @@ def test_initialize_token_is_refused_and_renamed_even_as_a_field():
     out = O.guard_renames(text)
     assert 'Machine.initialize_ ' in out and 'M.initialize_,' in out and 'M.initial_x' in out
     assert not L.guard_problems(out)
+
+
+# d13f23b's `RKHS.posSemidef_tfae` has four items (index 3 = Hermitian and nonneg on `X →₀ V`);
+# ours has three, with that form at index 2 (HotSpots Reciprocal, 2026-10-26).
+
+def test_rkhs_posSemidef_tfae_index():
+    out = O.core_rewrites("apply (RKHS.posSemidef_tfae.out 1 3).mpr\nexact (RKHS.posSemidef_tfae.out 0 1).mp h\n")
+    assert "apply (RKHS.posSemidef_tfae.out 2 0).mp" in out
+    assert "RKHS.posSemidef_tfae.out 0 1" in out
