@@ -818,7 +818,7 @@ def test_rkhs_posSemidef_tfae_index():
 def test_elpnorm_measurability_args_dropped():
     src = ("rw [eLpNorm_restrict_eq_of_support_subset hf.continuous.aestronglyMeasurable hs']\n"
            "apply eLpNorm_congr_norm_ae\n  (hf.continuous_fderiv (by simp)).aestronglyMeasurable\n"
-           "  ((foo.comp bar).aestronglyMeasurable)\n  hh\n")
+           "  (((a b).symm.continuous.comp\n    (hf.continuous_fderiv (by simp))).aestronglyMeasurable)\n  hh\n")
     out = O.core_rewrites(src)
     assert "eLpNorm_restrict_eq_of_support_subset hs'" in out
     assert "eLpNorm_congr_norm_ae\n  hh" in out.replace("  hh", "  hh") or "eLpNorm_congr_norm_ae hh" in out

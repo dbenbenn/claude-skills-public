@@ -344,7 +344,7 @@ def _drop_positional_arg(text, name):
                     out.append(text[i:r])
                     i = k = r
                     continue
-                i = r
+                i = r + len(re.compile(r"(?:\.[\w']+)*").match(text, r).group(0))   # `(h x).foo` is one argument
                 break
             m3 = re.compile(r"[\w.']+").match(text, q)
             if m3 and not text[q:].startswith('<|') and m3.group(0) not in ('at', 'with', 'using', 'from', 'only'):
@@ -398,10 +398,8 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"\(RKHS\.posSemidef_tfae\.out 1 3\)\.mpr", "(RKHS.posSemidef_tfae.out 2 0).mp", text)
     # d13f23b's `eLpNorm_restrict_eq_of_support_subset` and `eLpNorm_congr_norm_ae` take measurability
     # arguments first (one, resp. two); ours take none (HotSpots Sobolev, 2026-10-26)
-    _m = r"(?:\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|[\w']+)(?:\.[\w']+)*"
-    text = re.sub(r"(?<![\w.'])(eLpNorm_restrict_eq_of_support_subset)\s+" + _m + r"(?=\s|\))", r"\1", text)
-    text = re.sub(r"(?<![\w.'])(eLpNorm_congr_norm_ae)\s+" + _m + r"\s+" + _m + r"(?=\s|\))", r"\1", text)
-    # `convert h using n; ring` leaves instance-diamond / lambda-form goals first in ours: close all by rfl or ring
+    text = _drop_positional_arg(text, 'eLpNorm_restrict_eq_of_support_subset')
+    text = _drop_positional_arg(_drop_positional_arg(text, 'eLpNorm_congr_norm_ae'), 'eLpNorm_congr_norm_ae')
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*ring[ \t]*$", r"\1 <;> first | rfl | ring", text)
     # d13f23b renames (UnitDistances, StandardMap 2026-10-25)
     text = re.sub(r"(?<![\w.'])finsum_le_finsum(?![\w'])", "finsum_le_finsum'", text)
