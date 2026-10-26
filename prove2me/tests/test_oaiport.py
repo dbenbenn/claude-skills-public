@@ -963,3 +963,13 @@ def test_elpnorm_lt_top_iff_drops_measurability_argument():
     assert "rw [eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top\n    (by norm_num) (by norm_num)]" in out
     assert "rw [eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top h0 h1, foo]" in out
     assert "rw [eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top h0 h1]" in out
+
+
+# d13f23b's `eLpNorm_exponent_top hf` takes a measurability argument; ours takes none (Elasticity Parameters, 2026-10-26)
+
+def test_elpnorm_exponent_top_drops_measurability_argument():
+    src = ("rw [one_mul, Lp.norm_toLp, eLpNorm_exponent_top g.memLp_top.aestronglyMeasurable]\n"
+           "rw [eLpNorm_exponent_top (f := g) hg, eLpNorm_exponent_top]\n")
+    out = O.core_rewrites(src)
+    assert "rw [one_mul, Lp.norm_toLp, eLpNorm_exponent_top]" in out
+    assert "rw [eLpNorm_exponent_top (f := g), eLpNorm_exponent_top]" in out

@@ -423,6 +423,9 @@ def core_rewrites(text, compat_ns='OAI'):
     # d13f23b's `eLpNorm_one_eq_lintegral_enorm hf` has a measurability argument; ours has none
     # (MemoryPrecision, 2026-10-25)
     text = _drop_positional_arg(text, 'eLpNorm_one_eq_lintegral_enorm')
+    # d13f23b's `eLpNorm_exponent_top hf` takes a measurability argument; ours takes none
+    # (Elasticity Parameters, 2026-10-26)
+    text = _drop_positional_arg(text, 'eLpNorm_exponent_top')
     # d13f23b's `(Add)Subgroup.isClosed_of_discreteTopology (U := L)` is ours `isClosed_of_discrete (H := L)`
     # (SingleLatticeCovering 2026-10-25)
     text = re.sub(r"(?<=\.)isClosed_of_discreteTopology(?![\w'])( \(U :=)?",
