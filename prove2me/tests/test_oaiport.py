@@ -827,3 +827,14 @@ def test_elpnorm_measurability_args_dropped():
 def test_elpnorm_le_mul_measurability_arg_dropped():
     out = O.core_rewrites("apply eLpNorm_le_mul_eLpNorm_of_ae_le_mul\n  (measurable_green_left x).aestronglyMeasurable\nfilter_upwards [h] with y hy\n")
     assert "eLpNorm_le_mul_eLpNorm_of_ae_le_mul\nfilter_upwards" in out or "eLpNorm_le_mul_eLpNorm_of_ae_le_mul\n  \nfilter" in out
+
+
+# Mathlib's `Matroid` file declares the global token `<m` (strict minor). `1<m` (a variable named m)
+# lexes as `1 <m` and fails; OpenAI's Mathlib has no such token (CompleteCrossing 2026-10-26).
+def test_lt_m_token_is_spaced():
+    assert O.core_rewrites('by_cases hm : 1<m\n') == 'by_cases hm : 1 < m\n'
+    assert O.core_rewrites('(s w\').card<m := by') == "(s w').card < m := by"
+    assert O.core_rewrites('i<m ∧ j≤m') == 'i < m ∧ j ≤ m'
+    # the Matroid notation itself, written with spaces, stays
+    assert O.core_rewrites('N <m M') == 'N <m M'
+    assert O.core_rewrites('a <mem b') == 'a <mem b'
