@@ -822,3 +822,8 @@ def test_elpnorm_measurability_args_dropped():
     out = O.core_rewrites(src)
     assert "eLpNorm_restrict_eq_of_support_subset hs'" in out
     assert "eLpNorm_congr_norm_ae\n  hh" in out.replace("  hh", "  hh") or "eLpNorm_congr_norm_ae hh" in out
+
+
+def test_elpnorm_le_mul_measurability_arg_dropped():
+    out = O.core_rewrites("apply eLpNorm_le_mul_eLpNorm_of_ae_le_mul\n  (measurable_green_left x).aestronglyMeasurable\nfilter_upwards [h] with y hy\n")
+    assert "eLpNorm_le_mul_eLpNorm_of_ae_le_mul\nfilter_upwards" in out or "eLpNorm_le_mul_eLpNorm_of_ae_le_mul\n  \nfilter" in out
