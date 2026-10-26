@@ -949,3 +949,17 @@ def test_probability_measure_constructor_instance_falls_back():
 def test_sigma_iota_comp_desc_renamed():
     assert O.core_rewrites("exact Sigma.ι_comp_desc _ _; simp [Sigma.ι_comp_desc_assoc]") == \
         "exact Sigma.ι_desc _ _; simp [Sigma.ι_desc_assoc]"
+
+
+# d13f23b's `eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top hp0 hptop hf` has a third, measurability argument;
+# ours has two (Elasticity Regularity, 2026-10-26)
+
+def test_elpnorm_lt_top_iff_drops_measurability_argument():
+    src = ("rw [eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top\n"
+           "    (by norm_num) (by norm_num) growth.1.continuous.aestronglyMeasurable]\n"
+           "rw [eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top h0 h1 hf.aestronglyMeasurable, foo]\n"
+           "rw [eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top h0 h1]\n")
+    out = O.core_rewrites(src)
+    assert "rw [eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top\n    (by norm_num) (by norm_num)]" in out
+    assert "rw [eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top h0 h1, foo]" in out
+    assert "rw [eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top h0 h1]" in out

@@ -416,6 +416,10 @@ def core_rewrites(text, compat_ns='OAI'):
     _a = r"(?:\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|[\w.']+)"
     text = re.sub(r"(?<![\w.'])(eLpNorm_eq_lintegral_rpow_enorm_toReal\s+" + _a + r"\s+" + _a + r")\s+"
                   r"[\w.']*\.aestronglyMeasurable(?![\w'])", r"\1", text)
+    # d13f23b's `eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top hp0 hptop hf` has a third, measurability
+    # argument; ours has two (Elasticity Regularity, 2026-10-26)
+    text = re.sub(r"(?<![\w.'])(eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top\s+" + _a + r"\s+" + _a + r")\s+"
+                  r"[\w.']*\.aestronglyMeasurable(?![\w'])", r"\1", text)
     # d13f23b's `eLpNorm_one_eq_lintegral_enorm hf` has a measurability argument; ours has none
     # (MemoryPrecision, 2026-10-25)
     text = _drop_positional_arg(text, 'eLpNorm_one_eq_lintegral_enorm')
