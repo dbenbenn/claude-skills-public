@@ -855,3 +855,12 @@ def test_measure_map_smul_drops_named_aemeasurable_lemma_application():
     out = O.core_rewrites("rw [potentialMeasure,Measure.map_smul _ (chart_aemeasurable e d),map_chartMeasure e d hd]\n")
     assert "rw [potentialMeasure,Measure.map_smul,map_chartMeasure e d hd]" in out
     assert O.core_rewrites('(hs : 2≤s) (p.val<s-1) a≤c') == '(hs : 2 ≤ s) (p.val < s-1) a ≤ c'
+
+
+# unqualified `(nonneg_iff_isPositive).mpr` under `open ContinuousLinearMap` (MultipleMixing HilbertCodes, 2026-10-26)
+
+def test_nonneg_iff_ispositive_unqualified_gets_explicit_argument():
+    out = O.core_rewrites("exact foo ((nonneg_iff_isPositive).mpr h) (nonneg_iff_isPositive.mp k) (nonneg_iff_isPositive T)\n")
+    assert "((nonneg_iff_isPositive _).mpr h)" in out
+    assert "(nonneg_iff_isPositive _).mp k" in out
+    assert "(nonneg_iff_isPositive T)" in out

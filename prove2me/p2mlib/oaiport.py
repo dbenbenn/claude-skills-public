@@ -422,6 +422,7 @@ def core_rewrites(text, compat_ns='OAI'):
     # explicitly (Kirchberg-Rordam 2026-10-25)
     text = re.sub(r"(?<![\w.'])((?:ContinuousLinearMap|LinearMap)\.nonneg_iff_isPositive)\.(mpr|mp|1|2)(?![\w'])",
                   r"(\1 _).\2", text)
+    text = re.sub(r"(?<![\w.'])\(?nonneg_iff_isPositive\)?\.(mpr|mp|1|2)(?![\w'])", r"(nonneg_iff_isPositive _).\1", text)
     # d13f23b's `CStarAlgebra.norm_mem_spectrum_of_nonneg a ha` has `a` explicit; ours implicit
     # (Kirchberg-Rordam 2026-10-25)
     text = re.sub(r"(?<![\w.'])(CStarAlgebra\.norm_mem_spectrum_of_nonneg)[ \t]+[A-Za-z_][\w']*[ \t]+(?=[A-Za-z_(])",
