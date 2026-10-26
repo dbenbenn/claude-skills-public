@@ -911,3 +911,9 @@ def test_logderiv_fun_forms_renamed():
 def test_ischain_lt_of_le_linearOrder():
     out = O.core_rewrites("let : LinearOrder (s : Set P) := hchain.lt_of_le.linearOrder\n")
     assert "hchain.linearOrder\n" in out
+
+
+def test_compat_has_finset_equivOfEq():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean', 'compat_4_34.lean')).read()
+    assert 'def _root_.Finset.equivOfEq' in src
