@@ -879,3 +879,11 @@ def test_comp_prod_map_cond_distrib_drops_first_arg_and_compat_lemma():
     import os
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean', 'compat_4_34.lean')).read()
     assert 'theorem condDistrib_ae_eq_of_measure_eq_compProd' in src
+
+
+def test_isometry_lipschitzWith_and_aemeasurable_of_eval():
+    import os
+    out = O.core_rewrites("exact U.isometry.lipschitzWith\nexact AEMeasurable.of_eval fun n => h n\n")
+    assert "U.isometry.lipschitz\n" in out
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean', 'compat_4_34.lean')).read()
+    assert 'theorem _root_.AEMeasurable.of_eval' in src

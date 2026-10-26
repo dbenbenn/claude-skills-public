@@ -16,6 +16,10 @@ theorem dite_eq_right {α : Sort _} {p : Prop} {_ : Decidable p} {a : p → α} 
 theorem Measurable.of_eval {δ ι : Type*} {π : ι → Type*} [MeasurableSpace δ]
     [∀ i, MeasurableSpace (π i)] {f : δ → ∀ i, π i}
     (h : ∀ i, Measurable fun a => f a i) : Measurable f := measurable_pi_lambda f h
+/-- Mathlib's newer name for `aemeasurable_pi_lambda` (with `f` implicit). -/
+theorem _root_.AEMeasurable.of_eval {δ ι : Type*} {π : ι → Type*} [MeasurableSpace δ]
+    [∀ i, MeasurableSpace (π i)] {μ : MeasureTheory.Measure δ} {f : δ → ∀ i, π i}
+    (h : ∀ i, AEMeasurable (fun a => f a i) μ) : AEMeasurable f μ := aemeasurable_pi_lambda f h
 /-- Mathlib's newer `TensorProduct.inductionOn` (no `zero` case: it is the `tmul` case at
 `0 ⊗ₜ 0`); ours has only `TensorProduct.induction_on`, which asks for one. Not named
 `TensorProduct.inductionOn`: inside `namespace OAI` that would make `open TensorProduct` open
