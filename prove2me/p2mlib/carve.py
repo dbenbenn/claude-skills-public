@@ -879,6 +879,11 @@ class Graph:
                 ts.update(x.get('t', ()))
                 vs.update(x.get('v', ()))
             w = vs - ts - set(nd.names)
+            if not w:
+                # the wrapped function is a projection of the type's own structure
+                # (`⟨fun f => f.val⟩` on `abbrev Test := {f // …}`): the instance is then used by every
+                # declaration that mentions the type (Elasticity, oaiq-006)
+                w = {t for t in ts - set(nd.names) if t in self.owner}
             if w:
                 wraps[k] = w
         if not wraps:
@@ -893,6 +898,8 @@ class Graph:
                 tc.update(x.get('t', ()))
                 vc.update(x.get('v', ()))
             for ik, w in wraps.items():
+                if w & set(nd.names):      # the declaration of the wrapped type needs no instance on it
+                    continue
                 if w & (tc | vc):
                     c.insts = list(c.insts) + [n for n in self.nodes[ik].names if n not in c.insts]
                     if w & tc:

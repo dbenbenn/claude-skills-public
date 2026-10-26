@@ -1595,6 +1595,16 @@ def test_a_coercion_instance_that_elaborates_away_is_a_dependency(g):
     assert 'CD.Co.instCoeSortPackType' not in g.nodes['CD.Co.Fn.double'].deps
 
 
+def test_a_coercion_instance_on_an_abbreviated_subtype_is_a_dependency(g):
+    # Elasticity (oaiq-006): `instance : CoeFun Test _ := ⟨fun f => f.val⟩` on `abbrev Test := {f // …}`;
+    # its value names `Test` only (Subtype.val is a projection), so the wrapped-function rule saw nothing
+    inst = [k for k in g.nodes if 'instCoeFun' in k and 'Tst' in k]
+    assert len(inst) == 1, inst
+    assert inst[0] in g.nodes['CD.Co.Tst.ev'].deps
+    assert inst[0] not in g.nodes['CD.Co.rdef'].deps
+    assert inst[0] not in g.nodes['CD.Co.Tst'].deps
+
+
 def test_the_bundle_of_a_coerced_declaration_carries_the_coercion_instance(g):
     p = _coer_plan(g, ['CD.Co.fn_double_apply'])
     holders = {n for b in p['bundles'] for n in b['nodes']}

@@ -30,6 +30,17 @@ def Fn.double : Fn := ⟨fun n => n + n⟩
 
 theorem fn_double_apply (n : Nat) : Fn.double n = n + n := rfl
 
+/-- Elasticity (oaiq-006): a `CoeFun` instance whose value is only `Subtype.val`, on an abbreviation of a
+subtype; the application `f 1` elaborates to `↑f 1`, and neither the instance's value nor its type
+names any constant but the abbreviation. -/
+abbrev Tst := {f : Nat → Nat // f 0 = 0}
+
+instance : CoeFun Tst (fun _ => Nat → Nat) := ⟨fun f => f.val⟩
+
+def Tst.ev (f : Tst) : Nat := f 1
+
+def Tst.zero : Tst := ⟨fun _ => 0, rfl⟩
+
 def rdef (n : Nat) : Nat := n + 1
 
 attribute [instance_reducible] rdef
