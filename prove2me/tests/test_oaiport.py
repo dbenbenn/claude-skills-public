@@ -864,3 +864,18 @@ def test_nonneg_iff_ispositive_unqualified_gets_explicit_argument():
     assert "((nonneg_iff_isPositive _).mpr h)" in out
     assert "(nonneg_iff_isPositive _).mp k" in out
     assert "(nonneg_iff_isPositive T)" in out
+
+
+# d13f23b's `compProd_map_condDistrib hX hY` has our `compProd_map_condDistrib hY`; and
+# `condDistrib_ae_eq_of_measure_eq_compProd` (ae-measurable) is a compat lemma (MultipleMixing Arrays, 2026-10-26).
+
+def test_comp_prod_map_cond_distrib_drops_first_arg_and_compat_lemma():
+    out = O.core_rewrites("exact (compProd_map_condDistrib hE.aemeasurable hO.aemeasurable).symm\n"
+                          "  (compProd_map_condDistrib (μ := μ i) (X := f i)\n    (Y := id) (hf i).aemeasurable measurable_id.aemeasurable).symm\n"
+                          "(compProd_map_condDistrib (by fun_prop) measurable_id.aemeasurable).symm\n")
+    assert "(compProd_map_condDistrib hO.aemeasurable).symm" in out
+    assert "(Y := id) measurable_id.aemeasurable).symm" in out
+    assert "(compProd_map_condDistrib measurable_id.aemeasurable).symm" in out
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean', 'compat_4_34.lean')).read()
+    assert 'theorem _root_.ProbabilityTheory.condDistrib_ae_eq_of_measure_eq_compProd' in src

@@ -85,6 +85,27 @@ instance isProbabilityMeasure_map_measurableEquiv {α β : Type*} [MeasurableSpa
     [MeasurableSpace β] {μ : MeasureTheory.Measure α} [MeasureTheory.IsProbabilityMeasure μ]
     (e : α ≃ᵐ β) : MeasureTheory.IsProbabilityMeasure (μ.map e) :=
   MeasureTheory.Measure.isProbabilityMeasure_map e.measurable.aemeasurable
+/-- Mathlib d13f23b's `condDistrib_ae_eq_of_measure_eq_compProd` (almost-everywhere measurable `X`, `Y`);
+ours has only the `_of_measurable` form (MultipleMixing Arrays, 2026-10-26). -/
+theorem _root_.ProbabilityTheory.condDistrib_ae_eq_of_measure_eq_compProd
+    {Ω β 𝓨 : Type*} {mΩ : MeasurableSpace Ω} {mβ : MeasurableSpace β} {m𝓨 : MeasurableSpace 𝓨}
+    [StandardBorelSpace 𝓨] [Nonempty 𝓨] {μ : MeasureTheory.Measure Ω}
+    [MeasureTheory.IsFiniteMeasure μ] {X : Ω → β} {Y : Ω → 𝓨}
+    (hX : AEMeasurable X μ) (hY : AEMeasurable Y μ)
+    {κ : ProbabilityTheory.Kernel β 𝓨} [ProbabilityTheory.IsFiniteKernel κ]
+    (hκ : μ.map (fun x => (X x, Y x)) = μ.map X ⊗ₘ κ) :
+    ProbabilityTheory.condDistrib Y X μ =ᵐ[μ.map X] κ := by
+  have hXY : (fun x => (hX.mk X x, hY.mk Y x)) =ᵐ[μ] fun x => (X x, Y x) := by
+    filter_upwards [hX.ae_eq_mk, hY.ae_eq_mk] with x h1 h2 using by simp [h1, h2]
+  have h1 : μ.map (fun x => (hX.mk X x, hY.mk Y x)) = μ.map (fun x => (X x, Y x)) :=
+    MeasureTheory.Measure.map_congr hXY
+  have h2 : μ.map (hX.mk X) = μ.map X := MeasureTheory.Measure.map_congr hX.ae_eq_mk.symm
+  have h3 := ProbabilityTheory.condDistrib_ae_eq_of_measure_eq_compProd_of_measurable (μ := μ) (κ := κ)
+    hX.measurable_mk hY.measurable_mk (by rw [h1, h2]; exact hκ)
+  have h4 : ProbabilityTheory.condDistrib Y X μ =
+      ProbabilityTheory.condDistrib (hY.mk Y) (hX.mk X) μ := by
+    simp only [ProbabilityTheory.condDistrib, h1]
+  rw [h4, ← h2]; exact h3
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod
