@@ -395,3 +395,8 @@ def test_stdsimplex_shim_compiles_and_covers_openai_names(tmp_path):
     out = r.stdout + r.stderr
     assert r.returncode == 0 and 'error' not in out, out[-3000:]
     assert 'sorry' not in out
+
+
+def test_text_check_skips_auto_named_instances():
+    md = 'Uses `Ns.Specht.instFintypeTabloid` and `Ns.instDecidableEqSwitchIndex`.\n'
+    assert CP.missing_names(md, 'noncomputable instance : Fintype (Tabloid m) := x', lambda n: False) == []

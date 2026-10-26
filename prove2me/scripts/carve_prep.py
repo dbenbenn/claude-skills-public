@@ -414,6 +414,8 @@ def missing_names(md_text, local, in_library, skip=()):
             if len(nm) < 3 or nm in SKIP or nm in skip or nm in bad:
                 continue
             last = nm.split('.')[-1]
+            if re.match(r'inst[A-Z]', last):     # an anonymous instance's generated name is never in the source text
+                continue
             hit = any(re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(x), local) for x in {nm, last}) \
                 or in_library(last)
             if not hit:
