@@ -1179,3 +1179,13 @@ def test_unif_integrable_iff_mpr_uses_the_compat_lemma():
 def test_the_compat_block_declares_unif_integrable_of_enn():
     block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
     assert re.search(r'^theorem unifIntegrable_of_enn\b', block, re.M)
+
+
+def test_clm_lipschitzWith_field_becomes_lipschitz():
+    # d13f23b's `ContinuousLinearMap.lipschitzWith` (GeneralMahler, 2026-10-26): ours is `.lipschitz`
+    out = O.core_rewrites("exact (l.lipschitzWith.comp hK).add (q.root.toContinuousLinearMap.lipschitzWith)\n"
+                          "apply lipschitzWith_of_nnnorm_deriv_le\nexact hf.lipschitzWith_foo\n")
+    assert "l.lipschitz.comp hK" in out
+    assert "toContinuousLinearMap.lipschitz)" in out
+    assert "apply lipschitzWith_of_nnnorm_deriv_le" in out
+    assert "hf.lipschitzWith_foo" in out

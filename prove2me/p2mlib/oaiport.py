@@ -592,6 +592,8 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"(?<![\w.'])((?:ContinuousLinearMap|LinearMap)\.le_def)\.(mpr|mp|1|2)(?![\w'])", r"(\1 _ _).\2", text)
     # d13f23b's `LinearIsometryEquiv.isometry.lipschitzWith`: ours `Isometry.lipschitz` (MultipleMixing Joinings)
     text = re.sub(r"\.isometry\.lipschitzWith(?![\w'])", '.isometry.lipschitz', text)
+    # ... and likewise any `ContinuousLinearMap/Equiv.lipschitzWith` field (GeneralMahler, 2026-10-26)
+    text = re.sub(r"(?<=[\w)\]'])\.lipschitzWith(?![\w'])", '.lipschitz', text)
     text = re.sub(r"\.lt_of_le\.linearOrder(?![\w'])", '.linearOrder', text)   # IsChain.linearOrder wants ≤ here
     # d13f23b's `compProd_map_condDistrib hX hY` is our `compProd_map_condDistrib hY` (MultipleMixing, 2026-10-26)
     text = _drop_positional_arg(text, 'compProd_map_condDistrib')
