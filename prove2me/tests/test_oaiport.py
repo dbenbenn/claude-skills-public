@@ -1211,6 +1211,14 @@ def test_posSemidef_dotProduct_mulVec_zero_iff_explicit_x():
     assert "(hP.dotProduct_mulVec_zero_iff _).1 heq.symm" in out
 
 
+def test_posSemidef_dotProduct_mulVec_zero_iff_parenthesised_receiver():
+    # DimensionTen FamilyGeometry (oaiq-033): `(hA i).…` and `(hAB i).1.…`
+    out = O.core_rewrites("exact (hA i).dotProduct_mulVec_zero_iff.mp hi\nhave hz := (hAB i).1.dotProduct_mulVec_zero_iff.mp h\n")
+    assert "exact ((hA i).dotProduct_mulVec_zero_iff _).mp hi" in out
+    assert "have hz := ((hAB i).1.dotProduct_mulVec_zero_iff _).mp h" in out
+    assert O.core_rewrites(out) == out
+
+
 def test_clm_isTopologicalAddGroup_becomes_inferInstance():
     # d13f23b's named instance `ContinuousLinearMap.isTopologicalAddGroup` (GeneralMahler, 2026-10-26)
     out = O.core_rewrites("    let : IsTopologicalAddGroup (E →L[ℝ] F) :=\n      ContinuousLinearMap.isTopologicalAddGroup\n")

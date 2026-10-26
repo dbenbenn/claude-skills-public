@@ -518,7 +518,7 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?unifIntegrable_iff\.mpr(?![\w'])",
                   pre + 'unifIntegrable_of_enn', text)
     # d13f23b's `PosSemidef.dotProduct_mulVec_zero_iff` has `x` implicit; ours explicit (CAT0Fillings, oaiq-029)
-    text = re.sub(r"(?<![\w.'])([\w']+)\.dotProduct_mulVec_zero_iff\.(mpr|mp|1|2)(?![\w'])",
+    text = re.sub(r"(?<![\w.'])(\([^()\n]*\)(?:\.[12])?|[\w']+)\.dotProduct_mulVec_zero_iff\.(mpr|mp|1|2)(?![\w'])",
                   r"(\1.dotProduct_mulVec_zero_iff _).\2", text)
     # d13f23b's Egorov `tendstoUniformlyOn_of_ae_tendsto'` takes an extended-real ε proof
     # `ENNReal.ofReal_pos.mpr h`; ours takes the real `h : 0 < ε` (CAT0Fillings, oaiq-029)
