@@ -524,6 +524,9 @@ def core_rewrites(text, compat_ns='OAI'):
     # `ENNReal.ofReal_pos.mpr h`; ours takes the real `h : 0 < ε` (CAT0Fillings, oaiq-029)
     text = re.sub(r"(tendstoUniformlyOn_of_ae_tendsto'[^\n]*(?:\n[^\n]*){0,3}?)\(ENNReal\.ofReal_pos\.mpr "
                   r"(\((?:[^()]|\([^()]*\))*\)|[\w.']+)\)", r"\1\2", text)
+    # d13f23b's `NonUnitalStarRingHom.ofClass f` is the compat block's `nonUnitalStarRingHomOfClass`
+    # (Kadison commutator, oaiq-039; Kaplansky quotient, oaiq-015)
+    text = re.sub(r"(?<![\w.'])NonUnitalStarRingHom\.ofClass(?![\w'])", pre + 'nonUnitalStarRingHomOfClass', text)
     # d13f23b's `Finsupp.mapDomain_apply_of_injective hf x a` is our `Finsupp.mapDomain_apply`
     # (same statement; Markov superreflexivity 2026-10-25)
     text = re.sub(r"(?<![\w'])(Finsupp\.)?mapDomain_apply_of_injective(?![\w'])",

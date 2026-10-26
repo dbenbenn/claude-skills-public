@@ -127,6 +127,12 @@ lemma only for `1` and casts (AffineBernstein, `isSymmSndFDerivAt (by simp)`, 20
 @[simp]
 theorem ofNat_le_infty (n : ℕ) [n.AtLeastTwo] : (no_index (OfNat.ofNat n) : WithTop ℕ∞) ≤ ((⊤ : ℕ∞) : WithTop ℕ∞) :=
   ENat.LEInfty.out
+/-- d13f23b's `NonUnitalStarRingHom.ofClass`: the bundled hom of a hom class (Kadison commutator
+FreeSymmetry10, oaiq-039). -/
+def nonUnitalStarRingHomOfClass {F R S : Type*} [NonUnitalNonAssocSemiring R] [NonUnitalNonAssocSemiring S]
+    [Star R] [Star S] [FunLike F R S] [NonUnitalRingHomClass F R S] [StarHomClass F R S] (f : F) :
+    R →⋆ₙ+* S :=
+  { (f : R →ₙ+* S) with map_star' := map_star f }
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod

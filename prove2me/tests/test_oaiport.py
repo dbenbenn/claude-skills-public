@@ -1224,3 +1224,16 @@ def test_clm_isTopologicalAddGroup_becomes_inferInstance():
     out = O.core_rewrites("    let : IsTopologicalAddGroup (E →L[ℝ] F) :=\n      ContinuousLinearMap.isTopologicalAddGroup\n")
     assert "      inferInstance\n" in out
     assert "isTopologicalAddGroup" not in out.replace("IsTopologicalAddGroup", "")
+
+
+# d13f23b has `NonUnitalStarRingHom.ofClass f`; ours has no such name, and the coercion
+# `(f : _ →⋆ₙ+* _)` needs its types written. The compat block's `nonUnitalStarRingHomOfClass`
+# takes the class instance (Kadison commutator, FreeSymmetry10, oaiq-039; Kaplansky quotient, oaiq-015).
+
+def test_nonunital_star_ring_hom_of_class_uses_the_compat_shim():
+    import os
+    out = O.core_rewrites("((NonUnitalStarRingHom.ofClass f).map_le_map_of_map_star hab)\n")
+    assert "((OAI.nonUnitalStarRingHomOfClass f).map_le_map_of_map_star hab)" in out
+    assert O.core_rewrites("NonUnitalStarRingHom.ofClass f", None) == "nonUnitalStarRingHomOfClass f"
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean', 'compat_4_34.lean')).read()
+    assert 'def nonUnitalStarRingHomOfClass' in src
