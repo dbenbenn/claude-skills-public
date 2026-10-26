@@ -961,7 +961,7 @@ def test_is_local_min_on_renamed_to_localize():
 def test_unfold_infer_instance_falls_back_to_map_measurability():
     src = "  unfold gumbelLaw\n  infer_instance\n  unfold a\n  simp\n"
     out = O.core_rewrites(src)
-    assert "  unfold gumbelLaw\n  first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)\n" in out
+    assert "  unfold gumbelLaw\n  first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s)\n" % O.AEM_TAC in out
     assert "unfold a\n  simp" in out
     assert O.core_rewrites(out) == out
 
@@ -969,7 +969,7 @@ def test_unfold_infer_instance_falls_back_to_map_measurability():
 def test_probability_measure_constructor_instance_falls_back():
     src = "  ⟨(μ.map f),\n    by infer_instance⟩\n  ⟨x.map g, inferInstance⟩\n"
     out = O.core_rewrites(src)
-    assert out.count("by first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)⟩") == 2
+    assert out.count("(by first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s))⟩" % O.AEM_TAC) == 2
     assert O.core_rewrites(out) == out
 
 
@@ -1016,3 +1016,108 @@ def test_is_mul_commutative_closure_rintro_drops_the_ne_binder():
     # other rintro lines are untouched
     other = '  apply foo\n  rintro _ ⟨u, rfl⟩ _ ⟨v, rfl⟩ _\n'
     assert O.core_rewrites(other) == other
+
+
+
+# ---------------------------------------------------------------- total Measure.map, the rest of the shapes
+# d13f23b's `Measure.map` is total, so `IsProbabilityMeasure (μ.map f)` is an instance for every f; ours
+# needs AEMeasurable. Synthetic snippets shaped like the sites oaiq-005 (Brenier, SmoothObstruction,
+# CompactFactors) fixed by hand: 2026-10-26.
+
+FALLBACK = "first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s)" % O.AEM_TAC
+
+
+def test_aem_chain_tries_the_context_after_fun_prop():
+    # the chain names, in order, what fun_prop cannot do: a hypothesis (also under a binder), a
+    # Continuous / MeasurePreserving / QuasiMeasurePreserving hypothesis, measurability
+    t = O.AEM_TAC
+    assert t.startswith('first | fun_prop')
+    for need in ('assumption', 'Measurable.aemeasurable', 'solve_by_elim', 'Continuous.aemeasurable',
+                 'MeasurePreserving.aemeasurable', 'QuasiMeasurePreserving.aemeasurable', 'measurability'):
+        assert need in t, need
+    assert t.index('fun_prop') < t.index('assumption') < t.index('measurability')
+
+
+def test_have_let_haveI_of_isprobabilitymeasure_by_inferinstance_get_the_fallback():
+    # Brenier AffineOptimality, ConditionalLimits, Functions, GridCells ...
+    src = ("  let : IsProbabilityMeasure (Measure.map T ρ) := inferInstance\n"
+           "  have : IsProbabilityMeasure (Measure.map T ρ) := inferInstance\n"
+           "  haveI : IsProbabilityMeasure (μ.map p) := by infer_instance\n"
+           "    have : IsProbabilityMeasure ν := inferInstance\n"
+           "  letI hν : IsProbabilityMeasure ν := inferInstance\n")
+    out = O.core_rewrites(src)
+    assert "  let : IsProbabilityMeasure (Measure.map T ρ) := by %s\n" % FALLBACK in out
+    assert "  have : IsProbabilityMeasure (Measure.map T ρ) := by %s\n" % FALLBACK in out
+    assert "  haveI : IsProbabilityMeasure (μ.map p) := by %s\n" % FALLBACK in out
+    assert "    have : IsProbabilityMeasure ν := by %s\n" % FALLBACK in out
+    assert "  letI hν : IsProbabilityMeasure ν := by %s\n" % FALLBACK in out
+    assert 'inferInstance' not in out.replace('infer_instance', '')
+    assert O.core_rewrites(out) == out                                      # idempotent
+
+
+def test_other_instances_by_inferinstance_are_left_alone():
+    src = "  have : Fintype X := inferInstance\n  let i : Nonempty X := by infer_instance\n"
+    assert O.core_rewrites(src) == src
+
+
+def test_lone_infer_instance_lines_and_anonymous_constructors_get_the_fallback():
+    # Brenier MapDistance/Midpoint/Quantization, PlaneSpectrum SpectralMeasure; MapTransport/Coupling
+    src = ("    infer_instance\n"
+           "  refine ⟨inferInstance, ?_, ?_⟩\n"
+           "  refine ⟨q, hqY, inferInstance, ?_,\n"
+           "    inferInstance,\n"
+           "    inferInstance, ?_, ?_, ?_⟩\n")
+    out = O.core_rewrites(src)
+    assert "    %s\n" % FALLBACK in out
+    assert out.count("(by %s)" % FALLBACK) == 4
+    assert "inferInstance" not in out
+    assert O.core_rewrites(out) == out
+
+
+def test_map_smul_drops_a_proof_that_is_a_chain_and_keeps_the_first_argument():
+    # Brenier Cube/Midpoint/PrefixSampling; DensityBounds/SymbolCores (`C hr.aemeasurable`, `a hS.measurable.aemeasurable`)
+    src = ("    Measure.map_smul _ (PiLp.volume_preserving_ofLp (Fin d)).measurable.aemeasurable,\n"
+           "  rw [Measure.map_smul _ (tripleSplit h).continuous.measurable.aemeasurable]\n"
+           "    rw [←hcoords,Measure.map_smul C hr.aemeasurable,hrecover] at h\n"
+           "  rwa [Measure.map_smul a hS.measurable.aemeasurable,hS.map_eq] at hh\n"
+           "  rw [Measure.map_smul ((μ : Measure G) (e.coset z))⁻¹\n"
+           "    (f := fun point : ℂ => point + -v) (continuous_id.add_const (-v)).aemeasurable,\n"
+           "      foo]\n")
+    out = O.core_rewrites(src)
+    assert "    Measure.map_smul,\n" in out
+    assert "  rw [Measure.map_smul]\n" in out
+    assert "rw [←hcoords,Measure.map_smul C,hrecover] at h" in out
+    assert "rwa [Measure.map_smul a,hS.map_eq] at hh" in out
+    assert "rw [Measure.map_smul ((μ : Measure G) (e.coset z))⁻¹\n    (f := fun point : ℂ => point + -v),\n      foo]" in out
+    assert 'aemeasurable' not in out
+
+
+def test_map_smul_exact_with_a_chain_proof_keeps_three_explicit_arguments():
+    out = O.core_rewrites("    exact Measure.map_smul ((μ : Measure G) (e.coset z))⁻¹\n"
+                          "      (e.measurable_coordinate.comp (measurable_id.div_const z)).aemeasurable\n")
+    assert "exact Measure.map_smul ((μ : Measure G) (e.coset z))⁻¹ _ _\n" in out
+
+
+def test_map_smul_with_no_proof_argument_is_untouched():
+    src = "  rw [Measure.map_smul c μ f, Measure.map_smul c]\n  simp [Measure.map_smul]\n"
+    assert O.core_rewrites(src) == src
+
+
+def test_probabilitymeasure_map_gets_its_measurability_proof():
+    # Brenier/SmoothObstruction: `let v (n : ℕ) : ProbabilityMeasure X := μ.map (b n)`; explicit form
+    src = ("  let v (n : ℕ) : ProbabilityMeasure X := μ.map (b n)\n"
+           "  let w : ProbabilityMeasure Y := ProbabilityMeasure.map μ f\n")
+    out = O.core_rewrites(src)
+    assert "  let v (n : ℕ) : ProbabilityMeasure X := μ.map (f := (b n)) (by %s)\n" % O.AEM_TAC in out
+    assert "  let w : ProbabilityMeasure Y := ProbabilityMeasure.map μ (f := f) (by %s)\n" % O.AEM_TAC in out
+    assert O.core_rewrites(out) == out
+    # with a proof already given, or a Measure (not ProbabilityMeasure) map, nothing changes
+    same = ("  let a : ProbabilityMeasure Y := μ.map hf.aemeasurable\n  let b : Measure Y := μ.map f\n"
+            "  let c : ProbabilityMeasure Y := ProbabilityMeasure.map μ hf.aemeasurable\n")
+    assert O.core_rewrites(same) == same
+
+
+def test_fst_map_prodmk_drops_its_first_measurability_argument():
+    # CompactFactors AlgebraModels: d13f23b `Measure.fst_map_prodMk hq measurable_id`, ours takes only the second
+    out = O.core_rewrites("  simpa only [Measure.fst_map_prodMk hq measurable_id, Measure.fst_compProd] using he\n")
+    assert "Measure.fst_map_prodMk measurable_id," in out

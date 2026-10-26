@@ -353,6 +353,119 @@ def _drop_positional_arg(text, name):
 
 
 
+# The tactic that proves `AEMeasurable f μ` at a site the port rewrites for our non-total `Measure.map`.
+# fun_prop first (it uses hypotheses too, but not a named lemma, a `∀ i, Measurable (c i)` hypothesis, a
+# Continuous / MeasurePreserving hypothesis used as AEMeasurable), then the context, then measurability.
+# oaiq-005 fixed about 50 such sites by hand; macros are rejected by the verifier, so the text is inlined.
+AEM_TAC = ("first | fun_prop | assumption | (apply Measurable.aemeasurable; solve_by_elim) "
+           "| (apply Continuous.aemeasurable; solve_by_elim) "
+           "| (apply MeasureTheory.MeasurePreserving.aemeasurable; solve_by_elim) "
+           "| (apply MeasureTheory.Measure.QuasiMeasurePreserving.aemeasurable; solve_by_elim) "
+           "| (apply Measurable.aemeasurable; measurability) | measurability")
+_PM_FALLBACK = "first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s)" % AEM_TAC
+
+
+def _total_map_rewrites(text):
+    """d13f23b's `Measure.map` is total, so `IsProbabilityMeasure (μ.map f)` is an instance for every `f`;
+    ours needs `Measure.isProbabilityMeasure_map hf.aemeasurable`. Every place the source leans on the
+    instance gets a fallback chain (`_PM_FALLBACK`): `first | infer_instance | exact
+    Measure.isProbabilityMeasure_map (by AEM_TAC)`, so an instance that exists still wins:
+    * `have/let/haveI/letI … : IsProbabilityMeasure T := inferInstance` (or `by infer_instance`);
+    * a line that is just `infer_instance`, and `inferInstance` as an element of an anonymous constructor;
+    * `ProbabilityMeasure.map ν f` (explicit) and `… : ProbabilityMeasure X := ν.map f`, which take
+      the proof as an argument here: `(f := f) (by AEM_TAC)`."""
+    text = re.sub(r"(?m)^([ \t]*(?:have|let|haveI|letI)\b[^\n:]*:[ \t]*IsProbabilityMeasure\b[^\n]*?)[ \t]*:=[ \t]*"
+                  r"(?:inferInstance|by infer_instance)[ \t]*$", lambda m: m.group(1) + ' := by ' + _PM_FALLBACK, text)
+    text = re.sub(r"(?m)^([ \t]*)infer_instance[ \t]*$", lambda m: m.group(1) + _PM_FALLBACK, text)
+    text = re.sub(r"(?m)^([ \t]*)inferInstance(?=[ \t]*(?:[,⟩]|$))", lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK, text)
+    text = re.sub(r"(?<=[⟨,])(\s*)(?:by infer_instance|inferInstance)(?=[ \t]*[,⟩])",
+                  lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK, text)
+    text = re.sub(r"(?m)^([ \t]*(?:let|have)\b[^\n]*?:[ \t]*ProbabilityMeasure\b[^\n]*?:=[ \t]*)"
+                  r"(\w[\w.']*)\.map[ \t]+(\((?:[^()]|\([^()]*\))*\)|[\w.']+)[ \t]*$",
+                  lambda m: m.group(1) + '%s.map (f := %s) (by %s)' % (m.group(2), m.group(3), AEM_TAC)
+                  if 'aemeasurable' not in m.group(3) else m.group(0), text)
+    text = re.sub(r"(?<![\w.'])((?:MeasureTheory\.)?ProbabilityMeasure\.map[ \t]+[\w.']+)[ \t]+"
+                  r"(\((?:[^()]|\([^()]*\))*\)|[\w.']+)(?=[ \t]*$)",
+                  lambda m: m.group(0) if 'aemeasurable' in m.group(2) else
+                  '%s (f := %s) (by %s)' % (m.group(1), m.group(2), AEM_TAC), text, flags=re.M)
+    return text
+
+
+def _arg_end(text, k):
+    """End of the Lean argument starting at k (after whitespace): a balanced `( … )` group or a word,
+    followed by any `.field` chain and `⁻¹`; k itself if there is none."""
+    if k >= len(text):
+        return k
+    if text[k] in '([':
+        close = {'(': ')', '[': ']'}[text[k]]
+        depth, r = 0, k
+        while r < len(text):
+            depth += (text[r] == text[k]) - (text[r] == close)
+            r += 1
+            if depth == 0:
+                break
+    else:
+        m = re.compile(r"[\w.']+").match(text, k)
+        if not m or text[k:].startswith('<|'):
+            return k
+        r = m.end()
+    m = re.compile(r"(?:\.[\w']+)*⁻?¹?").match(text, r)
+    return m.end() if m else r
+
+
+def _drop_map_smul_proof(text):
+    """d13f23b's `Measure.map_smul c hf` takes an AEMeasurable proof; ours is `map_smul c μ f` with none
+    (SingleLatticeCovering 2026-10-25; Brenier/SmoothObstruction oaiq-005). The proof is the argument after
+    the first (and after named arguments): `hf.aemeasurable`, `(…).measurable.aemeasurable`, `(by fun_prop)`.
+    Dropped, leaving a bare `Measure.map_smul c` for `rw`/`simp`; after `exact` the two other explicit
+    arguments become `_ _` (a bare name there is "typeclass instance problem is stuck", MemoryPrecision)."""
+    pat = re.compile(r"(?<![\w.'])((?:MeasureTheory\.)?Measure\.map_smul)(?![\w'])")
+    out, i = [], 0
+    ws = re.compile(r"\s+")
+    while True:
+        m = pat.search(text, i)
+        if not m:
+            return ''.join(out) + text[i:]
+        out.append(text[i:m.end()])
+        k = m.end()
+        w = ws.match(text, k)
+        a1 = _arg_end(text, w.end() if w else k)           # the scalar
+        if not w or a1 == w.end():
+            i = k
+            continue
+        is_exact = bool(re.search(r"\bexact[ \t]+$", text[max(0, m.start() - 12):m.start()]))
+        scalar = text[k:a1]
+        k = a1
+        named = ''
+        while True:                                          # named arguments stay
+            w = ws.match(text, k)
+            q = w.end() if w else k
+            if re.match(r"\(\w+ :=", text[q:]):
+                e = _arg_end(text, q)
+                named += text[k:e]
+                k = e
+            else:
+                break
+        w = ws.match(text, k)
+        q = w.end() if w else k
+        e = _arg_end(text, q)
+        arg = text[q:e]
+        proof = e > q and (arg == '(by fun_prop)' or arg.endswith('.aemeasurable')
+                           or (arg.startswith('(') and 'aemeasurable' in arg))
+        if not proof:
+            out.append(scalar + named)
+            i = k
+            continue
+        if is_exact:
+            out.append(scalar + named + ' _ _')
+        elif scalar.strip() != '_':
+            out.append(scalar + named)
+        else:
+            out.append(named)
+        i = e
+
+
+
 _CONVERT = re.compile(r"(?m)^([ \t]*)(convert\b[^\n]*(?:\n\1[ \t]+[^\n]*)*)\n")
 _CONVERT_BULLET = re.compile(r"(?m)^([ \t]*)(· )(convert\b[^\n]*(?:\n\1[ \t]{3,}[^\n]*)*)\n")
 
@@ -404,11 +517,8 @@ def core_rewrites(text, compat_ns='OAI'):
                   lambda m: (m.group(1) or '') + 'mapDomain_apply', text)
     # d13f23b's `Measure.map_smul c hf` takes an AEMeasurable proof; ours is `map_smul c μ f` with none
     # (SingleLatticeCovering 2026-10-25)
-    text = re.sub(r"(\bexact[ \t]+(?:MeasureTheory\.)?Measure\.map_smul) _ "
-                  r"(?:\(by fun_prop\)|(?:[\w.]+|\((?:[^()]|\([^()]*\))*\))\.aemeasurable)(?![\w.'])", r"\1 _ _ _", text)
-    text = re.sub(r"(?<![\w.'])((?:MeasureTheory\.)?Measure\.map_smul) _ "
-                  r"(?:\(by fun_prop\)|(?:[\w.]+|\((?:[^()]|\([^()]*\))*\))\.aemeasurable"
-                  r"|\([\w.]*aemeasurable[\w.]*(?: [\w.]+)*\))(?![\w.'])", r"\1", text)
+    text = _drop_map_smul_proof(text)
+    text = _drop_positional_arg(text, 'Measure.fst_map_prodMk')   # CompactFactors, oaiq-005
     # d13f23b's `Filter.eventuallyEmptyOrUniv_iff'` is our `Filter.eventuallyConst_set'` (FiniteFactor, 2026-10-25)
     text = re.sub(r"(?<![\w'])eventuallyEmptyOrUniv_iff'", "eventuallyConst_set'", text)
     # d13f23b's `eLpNorm_eq_lintegral_rpow_enorm_toReal hp0 hptop hf` has a third, measurability argument;
@@ -443,13 +553,7 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
-    # Our `Measure.map` is total (0 for a non-AEMeasurable map): `unfold law; infer_instance` for an
-    # `IsProbabilityMeasure (….map f)` needs the measurability (SKValue/IsingPerceptron 2026-10-26)
-    text = re.sub(r"(?m)^([ \t]*)unfold ([\w.']+)\n\1infer_instance[ \t]*$",
-                  r"\1unfold \2\n\1first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)", text)
-    # the same inside a `⟨map, by infer_instance⟩` / `⟨map, inferInstance⟩` ProbabilityMeasure constructor
-    text = re.sub(r",(\s*)(?:by infer_instance|inferInstance)⟩",
-                  r",\1by first | infer_instance | exact Measure.isProbabilityMeasure_map (by fun_prop)⟩", text)
+    text = _total_map_rewrites(text)
     # d13f23b's lambda-form `logDeriv_fun_mul` / `logDeriv_fun_prod` are our `logDeriv_mul` / `logDeriv_prod`
     # (NodalLength, 2026-10-26)
     text = re.sub(r"(?<![\w'])logDeriv_fun_(mul|prod)(?![\w'])", r"logDeriv_\1", text)
