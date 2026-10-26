@@ -439,6 +439,8 @@ def core_rewrites(text, compat_ns='OAI'):
     # d13f23b's lambda-form `logDeriv_fun_mul` / `logDeriv_fun_prod` are our `logDeriv_mul` / `logDeriv_prod`
     # (NodalLength, 2026-10-26)
     text = re.sub(r"(?<![\w'])logDeriv_fun_(mul|prod)(?![\w'])", r"logDeriv_\1", text)
+    # d13f23b's `IsMinOn.isLocalMinOn` / `IsMaxOn.isLocalMaxOn` are our `.localize` (SKValue, 2026-10-26)
+    text = re.sub(r"\.isLocal(?:Min|Max)On(?![\w'])", ".localize", text)
     # d13f23b renames (UnitDistances, StandardMap 2026-10-25)
     text = re.sub(r"(?<![\w.'])birkhoffSum_succ_apply'(?![\w'])", "birkhoffSum_succ'", text)
     text = re.sub(r"(?<![\w.'])birkhoffSum_add_right_apply(?![\w'])", "birkhoffSum_add", text)

@@ -923,3 +923,9 @@ def test_eLpNorm_le_of_ae_bound_drops_measurability():
     src = "have hh := eLpNorm_le_of_ae_bound (μ := μ) (p := (1 : ℝ≥0∞))\n  (h.integrable x).aestronglyMeasurable\n  (Eventually.of_forall b)\n"
     out = O.core_rewrites(src)
     assert "aestronglyMeasurable" not in out and "(Eventually.of_forall b)" in out and "(μ := μ)" in out
+
+
+def test_is_local_min_on_renamed_to_localize():
+    assert O.core_rewrites("hm.isLocalMinOn.hasFDerivWithinAt_nonneg x; hM.isLocalMaxOn") == \
+        "hm.localize.hasFDerivWithinAt_nonneg x; hM.localize"
+    assert O.core_rewrites("IsLocalMinOn f s a") == "IsLocalMinOn f s a"
