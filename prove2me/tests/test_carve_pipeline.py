@@ -27,10 +27,23 @@ STUB = textwrap.dedent('''
         sys.exit(1)
     if NAME == 'carve_prep' and sys.argv[1] == 'config':
         json.dump({'targets': [], 'external': ['E']}, open(os.path.join(sys.argv[2], 'config.json'), 'w'))
+    if NAME == 'fetch_theorems':
+        ws = os.environ['P2M_WORKSPACE']
+        for n in sys.argv[2:]:
+            if n.startswith('--'):
+                continue
+            if '.' in n:
+                p = os.path.join(ws, 'Theorems', 'Thm_' + n.replace('.', '_') + '.lean')
+                open(p, 'w').write('import Mathlib\\nimport Definitions.Def_A\\n\\ntheorem ' + n + ' : True := by sorry\\n')
+                os.makedirs(os.path.join(ws, 'Definitions'), exist_ok=True)
+                open(os.path.join(ws, 'Definitions', 'Def_A.lean'), 'w').write('def A := 1\\n')
+            else:
+                os.makedirs(os.path.join(ws, 'Definitions'), exist_ok=True)
+                open(os.path.join(ws, 'Definitions', 'Def_' + n + '.lean'), 'w').write('def X := 1\\n')
     if NAME == 'carve_prep' and sys.argv[1] == 'prose-template':
         print('needs written prose: goal (goal)')
 ''')
-TOOLS = ['oai_fetch', 'oai_port_modules', 'oai_build_modules', 'carve_prep', 'carve', 'carve_measure', 'split_run']
+TOOLS = ['fetch_theorems', 'oai_fetch', 'oai_port_modules', 'oai_build_modules', 'carve_prep', 'carve', 'carve_measure', 'split_run']
 
 
 def git(repo, *a):
@@ -61,9 +74,11 @@ def env(tmp_path, monkeypatch):
     (ws / 'Solutions' / 'F' / 'Pre_Main.lean').write_text('')
     (ws / 'Theorems').mkdir()
     (ws / 'Theorems' / 'Thm_OAI_X_main.lean').write_text('import Mathlib\nimport Definitions.Def_A\n\ntheorem OAI.X.main : True := by sorry\n')
+    (ws / 'Definitions').mkdir()
+    (ws / 'Definitions' / 'Def_A.lean').write_text('def A := 1\n')
     d = tmp_path / 'carve'
     (d / 'src' / 'lean' / 'OAI' / 'Pre').mkdir(parents=True)
-    (d / 'oai_meta.json').write_text('{"title": "T", "date": "d", "family": "1"}')
+    (d / 'oai_meta.json').write_text('{"title": "T", "date": "d", "family": "1", "prefixes": ["OAI.Pre"]}')
     bin = tmp_path / 'bin'
     bin.mkdir()
     lake = bin / 'lake'
@@ -360,3 +375,114 @@ def test_a_measure_that_fits_calibrates_nothing(env, monkeypatch):
     assert r.returncode == 0, r.stdout + r.stderr
     assert [t[0] for t in tools_called(env)].count('carve_measure') == 1
     assert 'kept' in (env.dir / 'logs' / 'calibrate.log').read_text()
+
+
+# ---------------------------------------------------------------- inputs: statements and Def_ bundles
+
+def test_missing_statement_and_bundles_are_fetched_before_wsbuild(env):
+    (env.ws / 'Theorems' / 'Thm_OAI_X_main.lean').unlink()
+    r = run(env, *ARGS)
+    assert r.returncode == 0, r.stdout + r.stderr
+    fetch = [c for c in calls(env) if c.get('tool') == 'fetch_theorems']
+    assert len(fetch) == 1 and fetch[0]['argv'] == ['--names', 'OAI.X.main', '--no-build']
+    lines = [l for l in env.log.read_text().splitlines()]
+    i_fetch = next(i for i, l in enumerate(lines) if '"fetch_theorems"' in l)
+    i_build = next(i for i, l in enumerate(lines) if l.startswith('lake build'))
+    assert i_fetch < i_build
+
+
+def test_missing_def_bundle_alone_is_fetched_too(env):
+    (env.ws / 'Definitions' / 'Def_A.lean').unlink()
+    assert run(env, *ARGS).returncode == 0
+    assert [c['argv'] for c in calls(env) if c.get('tool') == 'fetch_theorems'] == [['--names', 'OAI.X.main', '--no-build']]
+
+
+def test_present_inputs_are_not_fetched(env):
+    assert run(env, *ARGS).returncode == 0
+    assert not [c for c in calls(env) if c.get('tool') == 'fetch_theorems']
+
+
+def test_explicit_def_missing_from_workspace_is_fetched_by_name(env):
+    assert run(env, *ARGS, '--def', 'Definitions.Def_Z').returncode == 0
+    f = [c['argv'] for c in calls(env) if c.get('tool') == 'fetch_theorems']
+    assert f == [['--names', 'Z', '--no-build']]
+
+
+# ---------------------------------------------------------------- oai_meta.json is checked at config
+
+def test_missing_meta_fails_at_config(env):
+    (env.dir / 'oai_meta.json').unlink()
+    r = run(env, *ARGS)
+    assert r.returncode == 1 and "step 'config' failed" in r.stderr and 'oai_meta.json' in r.stderr
+    assert ('carve_prep', 'config') not in tools_called(env)
+
+
+def test_meta_without_prefixes_or_with_foreign_prefixes_fails_at_config(env):
+    for meta in ('{"title": "T", "date": "d", "family": "1"}',
+                 '{"title": "T", "date": "d", "family": "1", "prefixes": ["OAI.Other"]}'):
+        (env.dir / 'oai_meta.json').write_text(meta)
+        env.log.write_text('')
+        r = run(env, *ARGS, '--stop-after', 'config')
+        assert r.returncode == 1 and "step 'config' failed" in r.stderr and 'prefixes' in r.stderr, meta
+        assert ('carve_prep', 'config') not in tools_called(env)
+        (env.dir / 'pipeline_state.json').unlink()
+
+
+# ---------------------------------------------------------------- stale steps: changed output reaches its consumers
+
+def _patches_setup(env, text='[]'):
+    (env.tmp / 'patches.json').write_text(text)
+    return ['--patches', str(env.tmp / 'patches.json')]
+
+
+def test_redo_filter_patches_with_changed_output_reruns_port_and_what_follows(env):
+    # six batches: edited the patches, ran `--redo filter_patches`, and the port stayed unpatched
+    extra = _patches_setup(env)
+    assert run(env, *ARGS, *extra).returncode == 0
+    n = len(tools_called(env))
+    # the stub filter-patches writes nothing; make the redo change port_patches.json
+    pp = env.dir / 'port_patches.json'
+    pp.write_text('[{"old": "a", "new": "b"}]')
+    env.log.write_text('')
+    r = run(env, '--redo', 'filter_patches')
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert seq[0] == ('carve_prep', 'filter-patches') and ('oai_port_modules', next(c['argv'][0] for c in calls(env) if c['tool'] == 'oai_port_modules')) in seq
+    assert ('carve_prep', 'config') in seq and ('carve', 'plan') in seq        # everything after was re-run
+    assert 'stale' in r.stdout
+
+
+def test_redo_with_unchanged_output_leaves_later_steps_alone(env):
+    extra = _patches_setup(env)
+    assert run(env, *ARGS, *extra).returncode == 0
+    env.log.write_text('')
+    assert run(env, '--redo', 'filter_patches').returncode == 0
+    assert tools_called(env) == [('carve_prep', 'filter-patches')]
+
+
+def test_editing_the_patches_file_alone_marks_filter_patches_stale(env):
+    extra = _patches_setup(env)
+    assert run(env, *ARGS, *extra).returncode == 0
+    (env.tmp / 'patches.json').write_text('[{"old": "a", "new": "b"}]')
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert tools_called(env)[0] == ('carve_prep', 'filter-patches') and ('carve', 'plan') in tools_called(env)
+
+
+def test_state_from_before_hashes_existed_is_not_called_stale(env):
+    assert run(env, *ARGS).returncode == 0
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    for rec in st['steps'].values():
+        rec.pop('in', None)
+    json.dump(st, open(env.dir / 'pipeline_state.json', 'w'))
+    (env.dir / 'port_patches.json').write_text('[1]')
+    env.log.write_text('')
+    assert run(env).returncode == 0 and tools_called(env) == []
+
+
+def test_from_still_forgets_the_step_and_everything_after(env):
+    assert run(env, *ARGS).returncode == 0
+    env.log.write_text('')
+    assert run(env, '--from', 'graph', '--stop-after', 'plan').returncode == 0
+    assert tools_called(env) == [('carve', 'graph'), ('carve_prep', 'ext-defs'), ('carve', 'plan')]

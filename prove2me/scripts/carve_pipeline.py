@@ -21,12 +21,20 @@ DIR is the carve directory. The first run needs the parameters, which are stored
   --measure-flag=FLAG   (repeat) passed to carve_measure.py, e.g. --measure-flag=--drop-false-edges
   --tags T              publish-prep tags (default openai-math)
 
-Steps (STEPS in p2mlib.carvepipeline): fetch, filter_patches, port, build, wsbuild, config, graph,
+Steps (STEPS in p2mlib.carvepipeline): fetch, inputs (the targets' published statements and their Def_
+bundles are fetched into the workspace when missing), filter_patches, port, build, wsbuild, config, graph,
 extdefs, plan, gen, order, measure, calibrate, publish_prep, prose, check_text, dryrun (split_run.py without
 --go: lookups only), and with --publish the real `split_run.py --go`. Each step is idempotent and
 resumable: its result is recorded in DIR/pipeline_state.json, its output in DIR/logs/STEP.log, and the
 first failure stops the run with the log's tail (re-run the same command to resume). --redo STEP
 re-runs one step; --from STEP forgets it and everything after; --stop-after STEP stops there.
+
+Stale steps: each step records content hashes of what it reads from another step (patches file and
+sources -> filter_patches; port_patches.json and sources -> port; the ported modules -> build, config).
+A resume that finds one changed prints `== stale: STEP ...` and re-runs that step and all later ones, so
+editing the patches and running `--redo filter_patches` (or just resuming) re-ports; a --redo whose output
+is unchanged leaves the later steps alone. Step `config` fails at once if DIR/oai_meta.json is missing or
+its `prefixes` do not match the sources and the root module.
 
 `calibrate` reads what `measure` found: an item (not frozen) measured over 1.6 x the budget raises
 config `time_scale` to scale x (its measured seconds / its planned cost), forgets plan..measure and

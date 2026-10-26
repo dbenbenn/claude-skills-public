@@ -5,6 +5,7 @@ tracked implementation, every step idempotent and logged, state in DIR/pipeline_
 sub-tool called from one skill snapshot (p2mlib.snapshot) so editing or pushing the live skill
 cannot reach a running carve."""
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -14,7 +15,7 @@ import time
 
 from . import runlock, snapshot, workspace as wslib
 
-STEPS = ['fetch', 'filter_patches', 'port', 'build', 'wsbuild', 'config', 'graph', 'extdefs', 'plan', 'gen',
+STEPS = ['fetch', 'inputs', 'filter_patches', 'port', 'build', 'wsbuild', 'config', 'graph', 'extdefs', 'plan', 'gen',
          'order', 'measure', 'calibrate', 'publish_prep', 'prose', 'check_text', 'dryrun', 'publish']
 DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
@@ -95,6 +96,68 @@ def derive_defs(ws, targets):
     return defs
 
 
+def missing_inputs(ws, targets, defs):
+    """The names to fetch so every target statement and Def_ bundle the carve imports is in the workspace:
+    a target whose Theorems/ file is absent, or whose preamble imports a Definitions.Def_X not on disk,
+    and every listed bundle not on disk."""
+    need = []
+    for t in targets:
+        _, rel = wslib.statement_module(t)
+        p = os.path.join(ws, rel)
+        if not os.path.exists(p):
+            need.append(t)
+            continue
+        for line in open(p, encoding='utf-8'):
+            m = re.match(r'import\s+Definitions\.(\S+)', line)
+            if m and not os.path.exists(os.path.join(ws, 'Definitions', m.group(1) + '.lean')):
+                need.append(t)
+                break
+    for d in defs:
+        m = re.match(r'Definitions\.Def_(\S+)$', d)
+        if m and not os.path.exists(os.path.join(ws, 'Definitions', 'Def_' + m.group(1) + '.lean')):
+            need.append(m.group(1))
+    return list(dict.fromkeys(need))
+
+
+def check_meta(path, lean_src, root_module):
+    """Why oai_meta.json cannot serve the prose links, or None. publish_prep/prose build every link from
+    its `prefixes`; a missing file or prefixes that are not the port's module prefixes gave broken links
+    only after the whole carve had run (oaiq-007, oaiq-016)."""
+    if not os.path.exists(path):
+        return 'no %s: write {"title", "date", "family", "commit", "paper", "prefixes"} (see p2mlib/prosetemplate.py)' % path
+    try:
+        m = json.load(open(path))
+    except ValueError as e:
+        return '%s is not valid JSON: %s' % (path, e)
+    pre = m.get('prefixes')
+    if not pre or not isinstance(pre, list):
+        return '%s has no "prefixes" (the OpenAI module prefixes, e.g. ["OAI.Geometry.Foo"])' % path
+    for p in pre:
+        if not os.path.isdir(os.path.join(lean_src, *p.split('.'))):
+            return '%s: prefix %r is not a directory of the fetched sources (%s)' % (path, p, lean_src)
+    if not any(root_module == p or root_module.startswith(p + '.') for p in pre):
+        return '%s: no prefix of %s is a prefix of the root module %s' % (path, pre, root_module)
+    return None
+
+
+def hash_paths(paths, exts=('',)):
+    """sha1 over the content of files and directory trees (names relative to each root, sorted), or None
+    when none of the paths exists: the identity of what a step reads or writes."""
+    h, seen = hashlib.sha1(), False
+    for root in paths:
+        files = []
+        if os.path.isdir(root):
+            for dp, dn, fn in os.walk(root):
+                dn[:] = sorted(x for x in dn if x != '__pycache__' and not x.startswith('.'))
+                files += [os.path.join(dp, f) for f in sorted(fn) if f.endswith(tuple(exts))]
+        elif os.path.exists(root):
+            files = [root]
+        for f in files:
+            seen = True
+            h.update(os.path.relpath(f, root).encode() + b'\0' + open(f, 'rb').read() + b'\0')
+    return h.hexdigest() if seen else None
+
+
 def openai_prefixes(lean_src):
     oai = os.path.join(lean_src, 'OAI')
     return ['OAI.' + d for d in sorted(os.listdir(oai)) if os.path.isdir(os.path.join(oai, d))]
@@ -121,6 +184,38 @@ class Pipeline:
         tmp = self.state_path + '.tmp'
         json.dump(self.state, open(tmp, 'w'), indent=1)
         os.replace(tmp, self.state_path)
+
+    def folder_dir(self):
+        return os.path.join(self.ws, 'Solutions', self.p['folder'])
+
+    def step_inputs_hash(self, s):
+        """{name: hash} of what step `s` reads that another step (or the user) produces, taken now. Recorded
+        when the step finishes; a later run that finds a recorded hash different has a stale step, and
+        it and everything after it run again. `--redo filter_patches` after editing the patches changed
+        port_patches.json and left the port unpatched (six batches, 2026-10); `--from` and `--redo` stay
+        as they were. config.json is not tracked: calibrate rewrites it on purpose."""
+        pp = os.path.expanduser(self.p['patches']) if self.p.get('patches') else None
+        port_out = hash_paths([self.folder_dir()], ('.lean',))
+        return {
+            'filter_patches': {'patches file': hash_paths([pp] if pp else []),
+                               'sources': hash_paths([self.lean_src], ('.lean',))},
+            'port': {'filter_patches': hash_paths([self.port_patches()]),
+                     'sources': hash_paths([self.lean_src], ('.lean',))},
+            'build': {'port': port_out},
+            'config': {'port': port_out},
+        }.get(s, {})
+
+    def stale_step(self):
+        """The first finished step whose recorded input hashes differ from the current ones: (step, what)."""
+        for s in STEPS:
+            rec = self.state['steps'].get(s)
+            if not rec or rec['status'] not in ('done', 'skipped') or not rec.get('in'):
+                continue
+            now = self.step_inputs_hash(s)
+            for k, old in rec['in'].items():
+                if k in now and now[k] != old:
+                    return s, k
+        return None
 
     def invalidate(self, frm):
         i = STEPS.index(frm)
@@ -186,6 +281,16 @@ class Pipeline:
             a += ['--commit', self.p['commit']]
         self.run_cmds('fetch', [self.tool('oai_fetch', *a)])
 
+    def step_inputs(self):
+        names = missing_inputs(self.ws, self.p['targets'], self.p.get('defs') or [])
+        if not names:
+            return 'skipped'
+        self.run_cmds('inputs', [self.tool('fetch_theorems', '--names', *names, '--no-build')])
+        again = missing_inputs(self.ws, self.p['targets'], self.p.get('defs') or [])
+        if again:
+            raise StepFailed("step 'inputs': still not in the workspace after fetch_theorems: %s "
+                             "(published yet? see logs/inputs.log)" % ', '.join(again))
+
     def step_filter_patches(self):
         if not self.p.get('patches'):
             return 'skipped'
@@ -207,6 +312,9 @@ class Pipeline:
         self.run_cmds('wsbuild', [['lake', 'build', *mods]], cwd=self.ws)
 
     def step_config(self):
+        bad = check_meta(self.meta, self.lean_src, self.p['root_module'])
+        if bad:
+            raise StepFailed("step 'config' failed: " + bad)
         a = ['config', self.d, self.p['folder'], self.root(), self.p['targets'][0]]
         for d in self.defs():
             a += ['--def', d]
@@ -317,6 +425,13 @@ class Pipeline:
 
     def _run_once(self, stop_after, only_redo):
         for s in STEPS:
+            while True:
+                st = self.stale_step()
+                if not st or STEPS.index(st[0]) > STEPS.index(s):
+                    break
+                print('== stale: %s (its input "%s" changed); re-running it and every later step' % st, flush=True)
+                self.invalidate(st[0])
+                self.save()
             rec = self.state['steps'].get(s)
             if rec and rec['status'] in ('done', 'skipped') and s not in only_redo:
                 if s == stop_after:
@@ -326,6 +441,9 @@ class Pipeline:
                 break                                              # publishing is opt-in, never recorded
             print('== %s %s' % (s, _now()), flush=True)
             rec = self.state['steps'][s] = {'status': 'running', 'started': _now()}
+            hashes = self.step_inputs_hash(s)
+            if hashes:
+                rec['in'] = hashes
             self.save()
             try:
                 res = getattr(self, 'step_' + s)()
