@@ -122,6 +122,13 @@ def apply_cuts(text, cuts):
     group (text starting with a bracket) where it stands as a group of a `variable` command."""
     applied, stale = [], []
     for c in cuts:
+        if '\0' in c:                    # `old\\0new`: the command `old` is replaced by `new`
+            old, new = c.split('\0', 1)
+            pat = re.compile(r'(^|\n)' + re.escape(old) + r'\n')
+            if pat.search(text):
+                text = pat.sub(lambda m: m.group(1) + new + '\n', text, count=1)
+                applied.append(c)
+            continue
         pat = re.compile(r'(^|\n)' + re.escape(c) + r'\n(\n?)')
         if pat.search(text):
             text = pat.sub(lambda m: m.group(1), text, count=1)

@@ -123,6 +123,21 @@ def test_drop_records_the_cut_so_it_survives_gen(tmp_path):
     assert M.drop_cuts({'false': ['Theorems.Thm_U'], 'restore': {'Theorems.Thm_U': ['Definitions.Def_S']}}) is None
 
 
+def test_a_false_bundle_import_is_replaced_by_the_bundles_it_brought_in():
+    # a bundle importing a bundle it only needs for that bundle's own imports (oaiq-037 K032 -> K018):
+    # the cut carries the replacement, applies once and survives a re-apply after gen
+    import carve_measure as M
+    from p2mlib import repair as RP
+    text = 'import Mathlib\nimport Definitions.Def_A\nimport Definitions.Def_B\n\ndef x := 1\n'
+    cuts = M.drop_cuts({'false': ['Definitions.Def_B'],
+                        'restore': {'Definitions.Def_B': ['Definitions.Def_C', 'Definitions.Def_D']}})
+    assert cuts and len(cuts) == 1
+    new, applied, stale = RP.apply_cuts(text, cuts)
+    assert new == ('import Mathlib\nimport Definitions.Def_A\nimport Definitions.Def_C\n'
+                   'import Definitions.Def_D\n\ndef x := 1\n') and applied == cuts and not stale
+    assert M.reapply(new, cuts) == (new, [])
+
+
 def test_recorded_cuts_already_applied_by_gen_are_not_stale():
     # carve.py gen re-applies work/repairs.json now (Boone-Higman, 2026-10-24), so measure finds
     # most recorded cuts already made: silent; a cut whose text is still there but no longer

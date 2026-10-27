@@ -331,11 +331,21 @@ class Measure:
 
 
 def drop_cuts(res):
-    """The repair cuts that remove a file's false imports, or None when one of them must be
-    replaced by a bundle import (left to a person: a cut cannot add a line)."""
-    if not res.get('false') or any(res.get('restore', {}).get(m) for m in res['false']):
+    """The repair cuts that remove a file's false imports. A false bundle import that brought in
+    bundles the file needs is replaced by them (a cut `import old\\0import new...`, p2mlib.repair);
+    a statement import that needs a bundle in its place is left to a person (None)."""
+    if not res.get('false'):
         return None
-    return ['import ' + m for m in res['false']]
+    cuts = []
+    for m in res['false']:
+        back = res.get('restore', {}).get(m)
+        if not back:
+            cuts.append('import ' + m)
+        elif m.startswith('Definitions.') and all(r.startswith('Definitions.') for r in back):
+            cuts.append('import ' + m + '\0' + '\n'.join('import ' + r for r in back))
+        else:
+            return None
+    return cuts
 
 
 def edge_report(plan, edges):
