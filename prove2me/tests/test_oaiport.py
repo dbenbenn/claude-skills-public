@@ -1593,3 +1593,16 @@ def test_elpnorm_norm_drops_its_measurability_argument():
            "        simp only [nLp, Lp.norm_toLp, eLpNorm_norm f hf.aestronglyMeasurable]\n")
     assert O.core_rewrites(src) == ("    rw [Lp.norm_toLp,eLpNorm_norm (v i),Lp.norm_def]\n"
                                     "        simp only [nLp, Lp.norm_toLp, eLpNorm_norm f]\n")
+
+
+def test_elpnorm_le_nnreal_smul_ae_le_mul_drops_its_measurability_argument():
+    # d13f23b's `eLpNorm_le_nnreal_smul_eLpNorm_of_ae_le_mul hf h p` takes `hf`; ours is `… h p` (oaiq-059)
+    src = ("    eLpNorm_le_nnreal_smul_eLpNorm_of_ae_le_mul\n"
+           "      (hv.continuous_fderiv (by simp)).aestronglyMeasurable\n"
+           "      (Eventually.of_forall fun point => by\n"
+           "        exact_mod_cast foo point) 2\n"
+           "  have := eLpNorm_le_nnreal_smul_eLpNorm_of_ae_le_mul' h p\n")
+    assert O.core_rewrites(src) == ("    eLpNorm_le_nnreal_smul_eLpNorm_of_ae_le_mul\n"
+                                    "      (Eventually.of_forall fun point => by\n"
+                                    "        exact_mod_cast foo point) 2\n"
+                                    "  have := eLpNorm_le_nnreal_smul_eLpNorm_of_ae_le_mul' h p\n")

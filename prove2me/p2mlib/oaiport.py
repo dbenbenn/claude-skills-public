@@ -739,7 +739,8 @@ def core_rewrites(text, compat_ns='OAI'):
     # and `Lp.eLpNorm_le_of_ae_tendsto bound hf hg h` a third (`hg`); ours have none (MemoryPrecision 2026-10-25,
     # oaiq-038, oaiq-048)
     for _n, _k in (("eLpNorm_eq_lintegral_rpow_enorm_toReal", 3), ("eLpNorm_eq_eLpNorm'", 3),
-                   ("eLpNorm_nnreal_eq_eLpNorm'", 2), ("eLpNorm_mono_real", 1), ("eLpNorm_norm", 2)):
+                   ("eLpNorm_nnreal_eq_eLpNorm'", 2), ("eLpNorm_mono_real", 1), ("eLpNorm_norm", 2),
+                   ("eLpNorm_le_nnreal_smul_eLpNorm_of_ae_le_mul", 1)):
         text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?" + re.escape(_n) + r"(?![\w'])", _k)
     text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?Lp\.eLpNorm_le_of_ae_tendsto(?![\w'])", 3)
     # ours added a measurability argument to `eLpNorm_sum_le` (hfs, first), `eLpNorm_le_eLpNorm_of_exponent_le`
