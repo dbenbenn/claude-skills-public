@@ -1790,8 +1790,12 @@ def test_a_fully_generic_local_instance_answers_any_problem_of_its_class():
     other = types.SimpleNamespace(inst_keys=['Fintype Option'])
     assert C._could_answer(inst, asked)
     assert C._could_answer(inst, other)       # a generic Decidable* instance counts for any recorded problem (next test)
+    # a generic instance of another class answers problems of its own class only (the Decidable*
+    # widening above is for decidability alone); aae14f3 asserted this against `other`, a Fintype
+    # problem, which a generic Fintype instance does answer (102b62a)
     generic_fintype = types.SimpleNamespace(declares=[('inst', 'Fintype', [])])
-    assert not C._could_answer(generic_fintype, other)
+    assert C._could_answer(generic_fintype, other)
+    assert not C._could_answer(generic_fintype, asked)
 
 
 def test_a_local_decidable_instance_is_kept_for_a_command_that_asks_about_its_type():
