@@ -1789,7 +1789,9 @@ def test_a_fully_generic_local_instance_answers_any_problem_of_its_class():
     asked = types.SimpleNamespace(inst_keys=['DecidableEq Option'])
     other = types.SimpleNamespace(inst_keys=['Fintype Option'])
     assert C._could_answer(inst, asked)
-    assert not C._could_answer(inst, other)
+    assert C._could_answer(inst, other)       # a generic Decidable* instance counts for any recorded problem (next test)
+    generic_fintype = types.SimpleNamespace(declares=[('inst', 'Fintype', [])])
+    assert not C._could_answer(generic_fintype, other)
 
 
 def test_a_local_decidable_instance_is_kept_for_a_command_that_asks_about_its_type():
@@ -1805,6 +1807,19 @@ def test_a_local_decidable_instance_is_kept_for_a_command_that_asks_about_its_ty
     assert not C._could_answer(inst, other)
     nonDecidable = types.SimpleNamespace(declares=[('inst', 'Fintype', ['Edge'])])
     assert not C._could_answer(nonDecidable, types.SimpleNamespace(inst_keys=['DecidableEq Sample', 'Foo Edge']))
+
+
+def test_a_generic_decidability_instance_is_kept_for_any_proof_that_asked_something():
+    # DilutedSpin (oaiq-041): `physicalOverlapLimsup_antitone` applies `DepthAverage.average_domain_bound`,
+    # whose `[DecidableEq S.Vertex]` unification assigns; nothing records a `DecidableEq` problem (it asks
+    # `Fintype`-family and arithmetic problems only). A fully generic `Decidable*` local instance was in
+    # force for the whole section, so a proof (never a statement) keeps it whenever it asked anything.
+    import types
+    inst = types.SimpleNamespace(declares=[('inst', 'DecidableEq', [])])
+    assert C._could_answer(inst, types.SimpleNamespace(inst_keys=['Add Nat', 'Fintype Vertex']))
+    assert not C._could_answer(inst, types.SimpleNamespace(inst_keys=[]))
+    generic_fintype = types.SimpleNamespace(declares=[('inst', 'Fintype', [])])
+    assert not C._could_answer(generic_fintype, types.SimpleNamespace(inst_keys=['Add Nat']))
 
 
 def test_reactivated_instance_uses_its_collision_rename():

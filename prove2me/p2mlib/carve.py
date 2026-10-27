@@ -2063,6 +2063,8 @@ def _could_answer(inst_cmd, c):
         # `DecidableEq (Edge S)`, whose command asks only `Fintype Edge`)
         if d[1].startswith('Decidable') and heads and any(heads <= set(p[1:]) for p in asked):
             return True
+        if d[1].startswith('Decidable') and not heads and asked:
+            return True       # generic `(β : Type) : DecidableEq β`: in force for every problem of its section
     return False
 
 
