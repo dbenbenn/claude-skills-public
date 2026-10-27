@@ -586,7 +586,11 @@ def test_a_piece_under_the_cap_never_forces_a_replan():
     # statements freeze at publish, so they keep the strict limit.
     r = CP.calibration(_plan({'B0': 55}, {'P': 46}), {'bundle:B0': _t(20), 'piece:P': _t(106)}, 8, 55)
     assert r['over'] == [] and r['new_scale'] == 8
-    r = CP.calibration(_plan({'B0': 55}, {'P': 46}), {'bundle:B0': _t(20), 'piece:P': _t(250)}, 8, 55)
+    r = CP.calibration(_plan({'B0': 55}, {'P': 46}), {'bundle:B0': _t(250), 'piece:P': _t(250)}, 8, 55)
+    assert [x[0] for x in r['over']] == ['bundle:B0', 'piece:P']
+    # oaiq-031: a 192 s piece timed out three times at the verifier's 300 s; pieces are excused only
+    # up to 150 s (dbenbenn's rule: submit as is at ~145 s)
+    r = CP.calibration(_plan({'B0': 55}, {'P': 10}), {'bundle:B0': _t(20), 'piece:P': _t(192)}, 8, 55)
     assert [x[0] for x in r['over']] == ['piece:P']
     r = CP.calibration(_plan({'B0': 55}), {'bundle:B0': _t(106)}, 8, 55)
     assert [x[0] for x in r['over']] == ['bundle:B0']
@@ -617,3 +621,32 @@ def test_prose_template_gets_the_sources_for_its_module_links(env):
     prose = [c for c in calls(env) if c.get('tool') == 'carve_prep' and c['argv'][0] == 'prose-template']
     a = prose[0]['argv']
     assert a[a.index('--lean-root') + 1] == str(env.dir / 'src' / 'lean')
+
+
+
+def test_a_slow_piece_alone_stops_calibrate_with_the_forcing_hint(env, monkeypatch):
+    # oaiq-031: a piece of 20 private `decide +kernel` lemmas measured 192 s (planned 10 s); re-planning
+    # does not shrink a piece (KMedian's stayed at 106 s through two), so calibrate stops at once and
+    # says what worked: force the lemmas by their graph node names (20 pieces of ~11 s)
+    work = env.dir / 'carve_work'
+    work.mkdir(parents=True, exist_ok=True)
+    (work / 'plan.json').write_text(json.dumps(_plan({'B0': 55}, {'OAI.X.certificate_valid': 10})))
+    (work / 'times.json').write_text(json.dumps({'bundle:B0': _t(20), 'piece:OAI.X.certificate_valid': _t(192)}))
+    r = run(env, *ARGS, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}))
+    assert r.returncode == 1
+    assert 'piece:OAI.X.certificate_valid' in r.stderr and 'forced' in r.stderr and 'decide +kernel' in r.stderr
+    assert json.load(open(env.dir / 'pipeline_state.json')).get('replans', 0) == 0
+    assert [t[0] for t in tools_called(env)].count('carve_measure') == 1
+
+
+def test_meta_prefixes_must_be_the_ports(tmp_path):
+    # oaiq-031: prefixes ["OAI.Algebra.AuslanderReiten"] (the result's folder) while the port strips
+    # OAI.Algebra: 181 prose files linked lean/OAI/Algebra/AuslanderReiten/AuslanderReiten/... (404)
+    lean = tmp_path / 'lean'
+    (lean / 'OAI' / 'Algebra' / 'AuslanderReiten').mkdir(parents=True)
+    meta = tmp_path / 'oai_meta.json'
+    meta.write_text(json.dumps({'prefixes': ['OAI.Algebra.AuslanderReiten']}))
+    why = CP.check_meta(str(meta), str(lean), 'OAI.Algebra.AuslanderReiten.All')
+    assert why and 'OAI.Algebra' in why and 'port' in why
+    meta.write_text(json.dumps({'prefixes': ['OAI.Algebra']}))
+    assert CP.check_meta(str(meta), str(lean), 'OAI.Algebra.AuslanderReiten.All') is None

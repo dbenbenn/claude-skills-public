@@ -31,7 +31,9 @@ class StepFailed(Exception):
     pass
 
 
-ACCEPT_CAP = 200        # a piece, or an accept_over item, is excused only below this many seconds
+ACCEPT_CAP = 200        # an accept_over item is excused only below this many seconds
+PIECE_CAP = 150         # a piece (resubmittable) is excused below this: dbenbenn's "submit at ~145 s";
+                        # oaiq-031's 192 s piece timed out three times at the verifier's 300 s
 
 
 def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR, accepted=()):
@@ -59,11 +61,13 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
         measured += 1
         if slowest is None or t['secs'] > slowest[1]:
             slowest = (key, t['secs'])
-        if (key in accepted or key.startswith('piece:')) and t['secs'] <= ACCEPT_CAP:
+        if key.startswith('piece:') and t['secs'] <= PIECE_CAP:
             # a piece is a proof: resubmittable, so submit as is and split only after two real
             # timeouts (oaiq-035/037: a 106 s piece cost two ~1 h re-plans); bundles and statements
-            # freeze at publish. pipeline.json accept_over excuses any other item the same way
+            # freeze at publish
             continue
+        if key in accepted and t['secs'] <= ACCEPT_CAP:
+            continue                                   # pipeline.json accept_over
         if t['secs'] > limit and name not in frozen:
             over.append((key, t['secs'], cost))
     ratio = max((secs / max(cost, 1.0) for _, secs, cost in over), default=1.0)
@@ -145,6 +149,13 @@ def check_meta(path, lean_src, root_module):
             return '%s: prefix %r is not a directory of the fetched sources (%s)' % (path, p, lean_src)
     if not any(root_module == p or root_module.startswith(p + '.') for p in pre):
         return '%s: no prefix of %s is a prefix of the root module %s' % (path, pre, root_module)
+    # the port strips its own prefixes, OAI.<top directory>, from module names; any other value makes
+    # every link repeat a directory (oaiq-031: OAI.Algebra.AuslanderReiten, 181 broken links)
+    port = openai_prefixes(lean_src)
+    wrong = [p for p in pre if p not in port]
+    if wrong:
+        return ('%s: prefixes %s are not the port\'s module prefixes (%s, what oai_port_modules strips); '
+                'use those' % (path, wrong, [p for p in port if any(w.startswith(p + '.') for w in wrong)] or port))
     return None
 
 
@@ -423,6 +434,16 @@ class Pipeline:
             open(log, 'a').write('\n'.join(lines + ['fits the model; time_scale %g kept' % cfg.get('time_scale', 1.5)]) + '\n')
             return None
         n = self.state.get('replans', 0)
+        if all(k.startswith('piece:') for k, _, _ in res['over']):
+            # re-planning raises time_scale, which re-splits bundles but never shrank an over-limit piece
+            # (KMedian 106 s through two re-plans, oaiq-031 192 s): stop now and say what works
+            open(log, 'a').write('\n'.join(lines) + '\n')
+            raise StepFailed(
+                "step 'calibrate': only pieces are over the limit, and re-planning does not shrink a piece:\n%s\n"
+                "Force the heavy lemmas the piece keeps into statements of their own: list them in pipeline.json "
+                "`forced` (a private one by its graph node name, `_private.<module>.0.<name>`), then --from config. "
+                "Kernel computation (`decide +kernel`, `native_decide`) is the usual cause: the cost model cannot "
+                "see it (oaiq-031: one 192 s piece became 20 pieces of ~11 s). Log %s" % ('\n'.join(lines[1:]), log))
         if n >= MAX_REPLANS:
             open(log, 'a').write('\n'.join(lines) + '\n')
             raise StepFailed("step 'calibrate': %d re-plans did not fit the budget; items over the limit:\n%s\n"

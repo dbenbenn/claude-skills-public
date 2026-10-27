@@ -166,7 +166,10 @@ and new `carve.py` inside one carve. So:
 - Parameters live in `DIR/pipeline.json`: a different CLI value is refused, so edit the file. A changed
   `config_set.patches` needs `--redo config` and `--redo gen` (config alone leaves the generated files
   unpatched). Editing the patches file and resuming re-ports (stale-step detection). `--def` takes
-  `Definitions.Def_X` (a bare `Def_X` is read so); `--measure-flag` takes the `=` form. Each step is idempotent, logged in
+  `Definitions.Def_X` (a bare `Def_X` is read so); `--measure-flag` takes the `=` form. `oai_meta.json`
+  `prefixes` are the port's own prefixes, `OAI.<top directory>` (what `oai_port_modules` strips, e.g.
+  `OAI.Algebra`), never the result's folder: step `config` refuses another value (oaiq-031: 181 links
+  repeated a directory). Each step is idempotent, logged in
   `DIR/logs/STEP.log`, recorded in `DIR/pipeline_state.json`; the first failure stops the run with the log's
   tail and the same command resumes. Parameters are stored in `DIR/pipeline.json`. Written prose for the goal
   and `forced` items is still yours (it is listed, not generated).
@@ -181,10 +184,17 @@ and new `carve.py` inside one carve. So:
   cost), re-plans, re-generates and re-measures (unchanged files are cached), at most twice, and stops with
   the offenders listed (then `carve.py split` or a manual `time_scale`). Never publish before it passes. It
   only raises the scale: a small sample cannot calibrate it down, since the per-item error is 0.3–1.4× even
-  at a fitted scale. A piece measured under 200 s never counts (57119d3): it is a proof, resubmittable,
-  so submit it as is and split only after two real verifier timeouts; bundles and statements freeze at
-  publish and keep the strict limit (oaiq-035/037: a 106 s piece cost two hour-long re-plans).
-  `accept_over` in pipeline.json excuses another item under the same 200 s cap. Outside the pipeline the
+  at a fitted scale. A piece measured under 150 s never counts: it is a proof, resubmittable, so submit
+  it as is and split only after two real verifier timeouts; bundles and statements freeze at publish and
+  keep the strict limit (oaiq-035/037: a 106 s piece cost two hour-long re-plans; oaiq-031: a 192 s piece
+  timed out three times at the verifier's 300 s, so the cap is 150, not 200). When only pieces are over,
+  calibrate stops at once: re-planning re-splits bundles but has never shrunk a piece. Then force the heavy
+  lemmas the piece keeps into statements of their own (`forced` in pipeline.json; a private one by its graph
+  node name, `_private.<module>.0.<name>`, published without the prefix) and resume `--from config`.
+  Kernel computation (`decide +kernel`, `native_decide`) is the usual cause, since the cost model cannot
+  see it: oaiq-031's piece of 20 private `decide +kernel` lemmas became 20 pieces of ~11 s, with the plan's
+  bundles unchanged, so live bundles kept their text. `accept_over` in pipeline.json excuses another item
+  (`bundle:NAME`) under a 200 s cap. Outside the pipeline the
   manual rule is the same: measure everything, and if any bundle or statement is over ~90 s, multiply
   `time_scale` by the worst measured/planned ratio and plan again.
 - To change a tool: change the skill (tests first), commit, push; new runs pick it up, running ones do not.
