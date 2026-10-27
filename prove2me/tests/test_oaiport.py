@@ -541,6 +541,14 @@ def test_measure_map_smul_exact_keeps_explicit_arguments():
     assert "exact Measure.map_smul _ _ _\n" in out
 
 
+# unifIntegrable_iff' is the definition here (WeakHessian, oaiq-052).
+
+def test_unif_integrable_iff_prime_dropped():
+    out = O.core_rewrites("  have hi : UnifIntegrable g 2 m := by\n    rw [unifIntegrable_iff']\n    intro e he\n"
+                          "  have h2 : UnifIntegrable g 2 m := by\n    apply unifIntegrable_iff'.mpr\n    intro e he\n")
+    assert "unifIntegrable_iff'" not in out and out.count("intro e he") == 2
+
+
 # A term-mode use after `:=` (same line or next) takes the two other explicit arguments as `_ _` too
 # (WeakHessian SpeedApprox/RnDerivSmul, oaiq-052).
 
