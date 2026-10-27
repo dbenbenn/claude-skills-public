@@ -1778,3 +1778,14 @@ def test_a_local_borel_space_instance_answers_an_opens_measurable_space_problem(
     other = types.SimpleNamespace(inst_keys=['Nonempty ContinuousMap Real'])
     assert C._could_answer(inst, asked)
     assert not C._could_answer(inst, other)
+
+
+def test_reactivated_instance_uses_its_collision_rename():
+    # Lech/Dutta (oaiq-032): ten modules declare `private local instance concreteRing`; the bundle
+    # deprivatizes them as concreteRing_p0.., and a piece's `attribute [local instance]` named the
+    # old public name, which no bundle has
+    ik = '_private.M.0.OAI.Lech.ReesRoot.concreteRing'
+    assert C.instance_ref(ik, {}, {ik: 'concreteRing_p3'}) == 'OAI.Lech.ReesRoot.concreteRing_p3'
+    assert C.instance_ref(ik, {}, {}) == 'OAI.Lech.ReesRoot.concreteRing'
+    assert C.instance_ref(ik, {ik: 'B.inst'}, {ik: 'concreteRing_p3'}) == 'B.inst'
+    assert C.instance_ref('top', {}, {'top': 'top_p0'}) == 'top_p0'

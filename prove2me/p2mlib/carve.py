@@ -1061,6 +1061,17 @@ class Graph:
         return out | {self.scoped[k] + '.«notation»' for k in keys if k in self.scoped}
 
 
+def instance_ref(ik, inst_names, rename):
+    """The name a file uses for the local instance node ik: the name Lean gave it in a bundle that
+    kept it anonymous, else its public name under any collision rename."""
+    if ik in inst_names:
+        return inst_names[ik]
+    pn = pubname(ik)
+    if ik in rename:
+        return pn.rsplit('.', 1)[0] + '.' + rename[ik] if '.' in pn else rename[ik]
+    return pn
+
+
 def collision_renames(g):
     """Private declarations whose public names collide (two modules' `private theorem helper`, in
     one carved file or deprivatized): {env name: new short name}, the same in every file."""
@@ -2666,7 +2677,7 @@ class Carver:
                 continue
             done.add((vi, chain))
             if ik and pubname(ik) in have:
-                out.append('attribute [local instance] %s\n' % inst_names.get(ik, pubname(ik)))
+                out.append('attribute [local instance] %s\n' % instance_ref(ik, inst_names, self.rename))
                 continue
             # not imported: its command again under a name unique to this file, anonymous or
             # named (Erdős 3 v2: `local instance forecastModulusNeZero (Pr) (A) : NeZero …`, which
