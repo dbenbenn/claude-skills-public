@@ -256,6 +256,25 @@ def cmd_ext_defs(argv):
 
 # ---------------------------------------------------------------- patches
 
+_IDENT = re.compile(r"[\w'!?\u2080-\u209c]")    # a character that continues a Lean identifier
+
+
+def cut_identifier(old, texts):
+    """An occurrence of `old` that starts or ends inside a longer identifier, as a short snippet, or
+    None. oaiq-040: `... hpos` also matched the start of `hpositive`, and the port wrote `hpos 3itive`."""
+    head, tail = bool(_IDENT.match(old[:1])), bool(_IDENT.match(old[-1:]))
+    if not (head or tail):
+        return None
+    for t in texts:
+        i = t.find(old)
+        while i >= 0:
+            j = i + len(old)
+            if (tail and _IDENT.match(t[j:j + 1])) or (head and i and _IDENT.match(t[i - 1])):
+                return t[max(i - 10, 0):j + 12].replace('\n', ' ')
+            i = t.find(old, i + 1)
+    return None
+
+
 def filter_patches(patches, texts, detail=None):
     """(kept, [(count, patch)] dropped): a patch is kept when its `old` occurs exactly `count`
     times over the texts (a list, or {name: text}), after the kept patches before it are applied
@@ -263,13 +282,19 @@ def filter_patches(patches, texts, detail=None):
     (oaiport.single_file_only: `"route": "single"`, or a universe-list reordering for merge.py's
     `universe` line) is dropped as ('single-file only', patch). `detail`, a list, gets
     (patch, {module: occurrences}) for each patch dropped for its count (modules numbered 0.. for a
-    plain list), counted at the same point as the drop."""
+    plain list), counted at the same point as the drop. A patch whose `old` starts or ends inside a
+    longer identifier somewhere is dropped as ('cuts an identifier: SNIPPET', patch): end it at a
+    delimiter."""
     names = list(texts) if isinstance(texts, dict) else list(range(len(texts)))
     texts = list(texts.values()) if isinstance(texts, dict) else list(texts)
     keep, drop = [], []
     for p in patches:
         if O.single_file_only(p):
             drop.append(('single-file only', p))
+            continue
+        cut = cut_identifier(p['old'], texts)
+        if cut is not None:
+            drop.append(('cuts an identifier: ...%s...' % cut, p))
             continue
         n = sum(t.count(p['old']) for t in texts)
         if n == p.get('count', 1):
@@ -313,7 +338,12 @@ def cmd_filter_patches(argv):
     # a patch dropped for its count is a patch the port would silently lack (six batches ran an
     # unpatched port that way): fail unless the patch says it may drop ("allow_drop": true).
     # Single-file-only drops are deliberate and stay quiet.
+    cuts = [(n, p) for n, p in drop if isinstance(n, str) and n.startswith('cuts an identifier') and not p.get('allow_drop')]
+    for n, p in cuts:
+        print('PATCH CUTS AN IDENTIFIER: %r\n  %s; end `old` at a delimiter' % (p['old'][:200], n), file=sys.stderr)
     bad = [(p, per) for p, per in detail if not p.get('allow_drop')]
+    if cuts and not bad:
+        sys.exit('%d patch(es) would rewrite part of a longer identifier. Nothing written.' % len(cuts))
     if bad:
         for p, per in bad:
             print('PATCH DROPPED: %r\n  expected count %s, found %s\n  occurrences per module: %s' % (

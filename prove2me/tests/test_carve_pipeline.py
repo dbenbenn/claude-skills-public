@@ -590,3 +590,21 @@ def test_a_piece_under_the_cap_never_forces_a_replan():
     assert [x[0] for x in r['over']] == ['piece:P']
     r = CP.calibration(_plan({'B0': 55}), {'bundle:B0': _t(106)}, 8, 55)
     assert [x[0] for x in r['over']] == ['bundle:B0']
+
+
+def test_upgrade_works_when_run_from_the_old_snapshot(env, monkeypatch):
+    # oaiq-034: `--upgrade` invoked through the carve's old snapshot (the path an agent had recorded)
+    # silently kept the old sha, and the port re-ran with the old rewrite in 2 s
+    monkeypatch.setenv('STUB_FAIL', 'carve plan')
+    run(env, *ARGS)
+    old = json.load(open(env.dir / 'pipeline_state.json'))['snapshot']['path']
+    write_tools(env.repo, 'v2')
+    git(env.repo, 'add', '-A')
+    git(env.repo, 'commit', '-qm', 'v2')
+    monkeypatch.delenv('STUB_FAIL')
+    env.log.write_text('')
+    r = subprocess.run([sys.executable, os.path.join(old, 'prove2me', 'scripts', 'carve_pipeline.py'), str(env.dir),
+                        '--upgrade', '--redo', 'dryrun'], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert {c['version'] for c in calls(env)} == {'v2'}
+    assert json.load(open(env.dir / 'pipeline_state.json'))['snapshot']['sha'] == git(env.repo, 'rev-parse', 'HEAD')

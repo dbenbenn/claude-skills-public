@@ -186,6 +186,10 @@ def choose_snapshot(a, state):
     """The snapshot this run uses: the one it is inside, else the recorded one (a resume), else HEAD."""
     here = snapshot.snapshot_root_of(os.path.abspath(__file__))
     rec = (state or {}).get('snapshot')
+    if here and a.upgrade:
+        # from any snapshot, the old one included (oaiq-034: run through the carve's recorded old
+        # snapshot, --upgrade kept it), upgrade means HEAD's; main re-executes into it if it differs
+        return snapshot.snapshot(allow_dirty=a.allow_dirty)
     if here:
         if rec and rec['sha'] != os.path.basename(here) and not a.upgrade:
             sys.exit('this carve ran from snapshot %s; running from %s. Use --upgrade to move it.' % (rec['sha'], os.path.basename(here)))

@@ -122,6 +122,22 @@ def test_filter_patches_keeps_exact_counts():
     assert keep == chain and drop == []
 
 
+def test_filter_patches_refuses_a_patch_that_cuts_an_identifier():
+    # oaiq-040: `... T 3 hpos` also matched the start of `hpositive`; with the count raised to fit, the
+    # port wrote `hpos 3itive`, a parse error found after a 13 min rebuild
+    p = {'old': 'pow_nonneg T 3 hpos', 'new': 'pow_nonneg T 3 hpos.le', 'count': 2}
+    keep, drop = CP.filter_patches([p], ['pow_nonneg T 3 hpos)\n', 'pow_nonneg T 3 hpositive\n'])
+    assert keep == [] and len(drop) == 1 and drop[0][0].startswith('cuts an identifier')
+    assert 'hpositive' in drop[0][0]
+    # a match at an identifier's start is caught too; delimiters on both sides are fine
+    keep, drop = CP.filter_patches([{'old': 'pos_of', 'new': 'q'}], ['lt_pos_of x\n'])
+    assert keep == [] and drop[0][0].startswith('cuts an identifier')
+    keep, drop = CP.filter_patches([{'old': 'hpos)', 'new': 'hpos.le)'}], ['f (hpos)\n'])
+    assert drop == []
+    keep, drop = CP.filter_patches([{'old': '(hpos', 'new': '(hpos.le'}], ['f (hpos)\n'])
+    assert drop == []
+
+
 def test_text_check_names_and_stub_comments():
     md = '---\nsource: `a/b`\n---\nUses `Foo.bar_baz` and `qux_lemma h` and `Mathlib_thing`.\n'
     lib = {'Mathlib_thing'}

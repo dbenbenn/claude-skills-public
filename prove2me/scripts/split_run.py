@@ -24,6 +24,9 @@ def load(path):
 
 
 def main(argv=None):
+    # line-buffered even when redirected to a file: a long --go run prints its progress as it goes
+    # (oaiq-045 saw nothing until it exited)
+    sys.stdout.reconfigure(line_buffering=True)
     argv = list(sys.argv[1:] if argv is None else argv)
     go = '--go' in argv
     resets, hours, rest = [], None, []
