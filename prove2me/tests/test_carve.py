@@ -1791,11 +1791,12 @@ def test_reactivated_instance_uses_its_collision_rename():
     assert C.instance_ref('top', {}, {'top': 'top_p0'}) == 'top_p0'
 
 
-def test_collided_instance_is_never_assumed_imported_by_public_name():
+def test_collided_instance_is_imported_only_under_its_renamed_name():
     # Lech/Dutta (oaiq-032): projectiveModule is private in ten modules, so one copy's bundle made
     # the public name `have` for all ten and a bundle imported a `projectiveModule_p7` nobody had
     ik = '_private.M.0.OAI.Lech.ReesRoot.projectiveModule'
-    have = {'OAI.Lech.ReesRoot.projectiveModule'}
-    assert C.instance_imported(ik, have, {}) is True
-    assert C.instance_imported(ik, have, {ik: 'projectiveModule_p7'}) is False
+    ren = {ik: 'projectiveModule_p7'}
+    assert C.instance_imported(ik, {'OAI.Lech.ReesRoot.projectiveModule'}, {}) is True
+    assert C.instance_imported(ik, {'OAI.Lech.ReesRoot.projectiveModule'}, ren) is False
+    assert C.instance_imported(ik, {'OAI.Lech.ReesRoot.projectiveModule_p7'}, ren) is True
     assert C.instance_imported(ik, set(), {}) is False

@@ -1054,9 +1054,17 @@ class Graph:
                     changed = True
         return added
 
+    def collision_renames(self):
+        if getattr(self, '_collision_renames', None) is None:
+            self._collision_renames = collision_renames(self)
+        return self._collision_renames
+
     def have_names(self, keys):
         """The public names a set of nodes declares (what a file keeping or importing them has)."""
         out = {pubname(n) for k in keys for n in self.nodes[k].names}
+        # a collided private declaration is deprivatized under its rename (`helper_p3`)
+        ren = self.collision_renames()
+        out |= {instance_ref(n, {}, ren) for k in keys for n in self.nodes[k].names if n in ren}
         # a scoped notation's scope exists where the notation does (`open scoped X` needs it)
         return out | {self.scoped[k] + '.«notation»' for k in keys if k in self.scoped}
 
@@ -1075,8 +1083,10 @@ def instance_ref(ik, inst_names, rename):
 def instance_imported(ik, have, rename):
     """Does an imported file carry the local instance node ik as a plain constant? Not when its
     public name is shared by collided copies (rename): `have` holds public names, so another
-    copy's bundle would stand in for this one."""
-    return pubname(ik) in have and ik not in rename
+    copy's bundle would stand in for this one; its renamed name is in `have` only with its own."""
+    if ik in rename:
+        return instance_ref(ik, {}, rename) in have
+    return pubname(ik) in have
 
 
 def collision_renames(g):
