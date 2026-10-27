@@ -1,7 +1,11 @@
-"""Apply the 'restore' lists of work/false_edges.json: each false bundle import is replaced by the
-imports it stood in for. carve_measure's --drop-false-edges only cuts imports that need no
-replacement; this does the swap in the generated files (run it on out/lib and stage/Definitions,
-never after a `carve.py gen`, which regenerates them), then measure again."""
+"""Apply the 'restore' lists of work/false_edges.json: each false import is replaced by the imports
+it stood in for, by editing the generated files (run it on out/lib and stage/Definitions, never
+after a `carve.py gen`, which regenerates them), then measure again.
+
+Prefer `carve_measure.py --measure-flag=--drop-false-edges` (9d7c60a2): it does the bundle-for-bundle
+swap itself, as a recorded repair cut that survives `gen`. This tool remains for what that flag
+leaves to a person: a false STATEMENT import whose restore list names bundles (check that the
+file needs only the bundle, then swap)."""
 import json
 import os
 import sys
