@@ -31,7 +31,10 @@ class StepFailed(Exception):
     pass
 
 
-def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR):
+ACCEPT_CAP = 200        # an accepted (atomic, unsplittable) item is excused only below this many seconds
+
+
+def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR, accepted=()):
     """Does the cost model's `scale` (time_scale) fit this carve's measured times?
     Returns {'over': [(item, secs, cost)], 'ratio', 'new_scale', 'limit', 'measured', 'slowest'}.
 
@@ -56,6 +59,8 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
         measured += 1
         if slowest is None or t['secs'] > slowest[1]:
             slowest = (key, t['secs'])
+        if key in accepted and t['secs'] <= ACCEPT_CAP:
+            continue                                   # pipeline.json accept_over: submit as is
         if t['secs'] > limit and name not in frozen:
             over.append((key, t['secs'], cost))
     ratio = max((secs / max(cost, 1.0) for _, secs, cost in over), default=1.0)
@@ -361,7 +366,8 @@ class Pipeline:
             return 'skipped'                                       # nothing was measured
         plan, times = json.load(open(plan_path)), json.load(open(times_path))
         fz = (cfg.get('frozen') or {}).get('bundles') or ()
-        res = calibration(plan, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz)
+        res = calibration(plan, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
+                          accepted=self.p.get('accept_over') or ())
         log = os.path.join(self.d, 'logs', 'calibrate.log')
         os.makedirs(os.path.dirname(log), exist_ok=True)
         lines = ['%s: measured %d items against budget %g (limit %.0f s), slowest %s' % (

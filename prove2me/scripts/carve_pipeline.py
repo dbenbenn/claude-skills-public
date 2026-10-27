@@ -39,7 +39,8 @@ its `prefixes` do not match the sources and the root module.
 `calibrate` reads what `measure` found: an item (not frozen) measured over 1.6 x the budget raises
 config `time_scale` to scale x (its measured seconds / its planned cost), forgets plan..measure and
 runs them again (cached files are not re-measured), at most twice; then it stops and lists the
-offenders. Nothing is published before it. See p2mlib.carvepipeline.calibration.
+offenders. An atomic item re-planning cannot split (one theorem, measured under 200 s) is excused by
+listing `piece:NAME` in pipeline.json `accept_over`. Nothing is published before it. See p2mlib.carvepipeline.calibration.
 
 The driver re-executes itself from a read-only snapshot of the skill (p2mlib.snapshot) and calls
 every sub-tool from that snapshot, so editing or pushing the live skill never affects a running

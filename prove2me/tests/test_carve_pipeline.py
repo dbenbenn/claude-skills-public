@@ -486,3 +486,13 @@ def test_from_still_forgets_the_step_and_everything_after(env):
     env.log.write_text('')
     assert run(env, '--from', 'graph', '--stop-after', 'plan').returncode == 0
     assert tools_called(env) == [('carve', 'graph'), ('carve_prep', 'ext-defs'), ('carve', 'plan')]
+
+
+def test_calibration_excuses_accepted_items_under_the_hard_cap():
+    # an atomic piece (one theorem) that re-planning cannot split: ~100 s is submitted as is
+    plan = _plan({'B0': 55}, {'P': 46})
+    times = {'bundle:B0': _t(10), 'piece:P': _t(101)}
+    assert CP.calibration(plan, times, 8.0, 55)['over']
+    assert CP.calibration(plan, times, 8.0, 55, accepted=['piece:P'])['over'] == []
+    # the hard cap still applies to an accepted item
+    assert CP.calibration(plan, {'piece:P': _t(250)}, 8.0, 55, accepted=['piece:P'])['over']
