@@ -1115,10 +1115,21 @@ def test_other_instances_by_inferinstance_are_left_alone():
 
 
 def test_lone_infer_instance_lines_and_anonymous_constructors_get_the_fallback():
-    # Brenier MapDistance/Midpoint/Quantization, PlaneSpectrum SpectralMeasure; MapTransport/Coupling
+    # Brenier MapDistance/Midpoint/Quantization, PlaneSpectrum SpectralMeasure; MapTransport/Coupling.
+    # A constructor element fires where its context (the declaration's statement, the enclosing
+    # `have … :` lines, the constructor's own line) mentions a probability measure or a map.
     src = ("open MeasureTheory\n"
            "    infer_instance\n"
-           "  refine ⟨inferInstance, ?_, ?_⟩\n"
+           "theorem wasserstein2_map_le_mapL2Dist [IsProbabilityMeasure ρ]\n"
+           "    (hT : Measurable T) (hS : Measurable S) :\n"
+           "    wasserstein2 (Measure.map T ρ) (Measure.map S ρ) ≤ mapL2Dist ρ T S := by\n"
+           "  have hπ : IsCoupling (Measure.map T ρ) (Measure.map S ρ)\n"
+           "      (Measure.map (fun x => (T x, S x)) ρ) := by\n"
+           "    refine ⟨inferInstance, ?_, ?_⟩\n"
+           "theorem exists_finite_target_approximation {d : ℕ} {μ : Measure (E d)} :\n"
+           "    ∃ q : SimpleFunc (E d) (E d),\n"
+           "      IsProbabilityMeasure (Measure.map q μ) ∧ True := by\n"
+           "  obtain ⟨q, hqY, hqerr⟩ := exists_compact_quantizer hY hne hε\n"
            "  refine ⟨q, hqY, inferInstance, ?_,\n"
            "    inferInstance,\n"
            "    inferInstance, ?_, ?_, ?_⟩\n")
@@ -1127,6 +1138,26 @@ def test_lone_infer_instance_lines_and_anonymous_constructors_get_the_fallback()
     assert out.count("(by %s)" % FALLBACK) == 4
     assert "inferInstance" not in out
     assert O.core_rewrites(out) == out
+
+
+def test_constructor_inferinstance_in_a_non_measure_statement_is_left_alone():
+    # CoordinateSweeps (oaiq-056, SignedTensor Domination): the slots are `Fintype I` / `Nonempty I`; the
+    # fallback chain timed out at whnf. The file is a measure-theory file, the statement is not.
+    src = ("open MeasureTheory\n"
+           "theorem finite_density_domination (s p l : ℕ) (hp : 0 < p) :\n"
+           "    ∃ (I : Type) (_ : Fintype I) (_ : Nonempty I) (r : I → EvenDensity p),\n"
+           "      (((Fintype.card I : ℂ)⁻¹ • ∑ i, densityPower l (r i).val)).PosSemidef := by\n"
+           "  by_cases hl : (2*p)*(2*p)<l\n"
+           "  · exact ⟨DensityProfile p l,inferInstance,densityProfile_nonempty hp,\n"
+           "      profilePoint s p l hp hl,finite_profile_domination s p l hp hps hls hl ρ⟩\n"
+           "  · refine ⟨PUnit,inferInstance,inferInstance,fun _ => uniformDensity p hp,?_⟩\n"
+           "    simp\n"
+           "theorem other : ∃ μ : Measure X, IsProbabilityMeasure μ ∧ True := by\n"
+           "  refine ⟨μ,inferInstance,?_⟩\n")
+    out = O.core_rewrites(src)
+    assert "⟨DensityProfile p l,inferInstance,densityProfile_nonempty hp," in out
+    assert "refine ⟨PUnit,inferInstance,inferInstance,fun _" in out
+    assert "refine ⟨μ,(by %s),?_⟩" % FALLBACK in out           # the next declaration's slot is a measure's
 
 
 def test_inferinstance_in_a_file_without_measure_theory_is_left_alone():

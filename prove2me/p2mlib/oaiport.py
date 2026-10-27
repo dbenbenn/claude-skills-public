@@ -366,13 +366,45 @@ AEM_TAC = ("first | fun_prop | assumption | (apply Measurable.aemeasurable; solv
 _PM_FALLBACK = "first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s)" % AEM_TAC
 
 
+_PM_CONTEXT = re.compile(r"ProbabilityMeasure|\.map\b")
+
+
+def _instance_context(text, pos):
+    """What says which instance the term at `pos` must be, as far as the text shows: the line up to `pos`,
+    each line above with less indentation than every line between (the enclosing `have … :`, `refine ⟨`,
+    bullets), each with its continuation up to its `:=`, and the statement of the declaration (the first
+    unindented line above, up to its `:=`)."""
+    lines = text[:pos].split('\n')
+    out = [lines[-1]]
+    ind = lambda l: len(l) - len(l.lstrip(' \t'))
+    low = ind(lines[-1])
+    for j in range(len(lines) - 2, -1, -1):
+        l = lines[j]
+        if not l.strip() or l.lstrip().startswith(('--', '/-')):
+            continue
+        if ind(l) < low:
+            low = ind(l)
+            k = j
+            seg = [l]
+            while ':=' not in seg[-1] and k + 1 < len(lines) - 1 and ind(lines[k + 1]) > low:
+                k += 1
+                seg.append(lines[k])
+            out.append('\n'.join(seg).split(':=')[0])
+            if low == 0:
+                break
+    return '\n'.join(out)
+
+
 def _total_map_rewrites(text):
     """d13f23b's `Measure.map` is total, so `IsProbabilityMeasure (μ.map f)` is an instance for every `f`;
     ours needs `Measure.isProbabilityMeasure_map hf.aemeasurable`. Every place the source leans on the
     instance gets a fallback chain (`_PM_FALLBACK`): `first | infer_instance | exact
     Measure.isProbabilityMeasure_map (by AEM_TAC)`, so an instance that exists still wins:
     * `have/let/haveI/letI … : IsProbabilityMeasure T := inferInstance` (or `by infer_instance`);
-    * a line that is just `infer_instance`, and `inferInstance` as an element of an anonymous constructor;
+    * a line that is just `infer_instance`, and `inferInstance` as an element of an anonymous constructor
+      whose context (_instance_context) mentions a probability measure or a map (CoordinateSweeps oaiq-056:
+      in `⟨DensityProfile p l, inferInstance, …⟩` the slots were Fintype/Nonempty, and the chain timed out
+      at whnf);
     * `ProbabilityMeasure.map ν f` (explicit) and `… : ProbabilityMeasure X := ν.map f`, which take
       the proof as an argument here: `(f := f) (by AEM_TAC)`."""
     text = re.sub(r"(?m)^([ \t]*(?:have|let|haveI|letI)\b[^\n:]*:[ \t]*IsProbabilityMeasure\b[^\n]*?)[ \t]*:=[ \t]*"
@@ -380,9 +412,11 @@ def _total_map_rewrites(text):
     if re.search(r"MeasureTheory|ProbabilityMeasure|Measure\.map", text):   # a lone instance elsewhere is no measure
         text = re.sub(r"(?m)^([ \t]*)infer_instance[ \t]*$", lambda m: m.group(1) + _PM_FALLBACK, text)
         text = re.sub(r"(?m)^([ \t]*)inferInstance(?=[ \t]*(?:[,⟩]|$))",
-                      lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK, text)
+                      lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK
+                      if _PM_CONTEXT.search(_instance_context(m.string, m.end(1))) else m.group(0), text)
         text = re.sub(r"(?<=[⟨,])(\s*)(?:by infer_instance|inferInstance)(?=[ \t]*[,⟩])",
-                      lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK, text)
+                      lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK
+                      if _PM_CONTEXT.search(_instance_context(m.string, m.end(1))) else m.group(0), text)
     text = re.sub(r"(?m)^([ \t]*(?:let|have)\b[^\n]*?:[ \t]*ProbabilityMeasure\b[^\n]*?:=[ \t]*)"
                   r"(\w[\w.']*)\.map[ \t]+(\((?:[^()]|\([^()]*\))*\)|[\w.']+)[ \t]*$",
                   lambda m: m.group(1) + '%s.map (f := %s) (by %s)' % (m.group(2), m.group(3), AEM_TAC)
