@@ -17,8 +17,10 @@ usage: oai_build_modules.py FOLDER ROOT [--force] [--log BUILD.log] [--elab-log 
               replayed modules have no time, so keep the earlier logs too (carve_prep.py config
               reads every build_elab*.log, later ones winning) or pass --force
 
-One Lean process at a time (the box cap is shared). A failed module's outputs are removed and the
-script exits 1 with its first errors.
+One Lean process at a time (the box cap is shared). A failed module's outputs are removed and its
+first errors printed; the build goes on with every module that does not import a failed one (those
+are listed as skipped), so one run reports every failing module, and the script then exits 1
+(oaiq-038/048: stopping at the first failure cost a 5-13 min rebuild per drift fix).
 
 Each module compiles through the compiled LeanInfo (p2mlib.leaninfo.build_module, 2026-10-27): the
 same elaboration writes the .olean/.ilean and caches the reading `carve.py graph` needs, which
@@ -89,6 +91,7 @@ def build(ws, folder, root, force=False, log=None):
     order = module_order(d, pre, root)
     lines, total = [], 0.0
     rebuilt = set()
+    failed, skipped = [], set()       # keep going past a failure (oaiq-038/048): report them all
 
     def olean_of(m):
         return os.path.join(out_root, *(pre + '.' + m).split('.')) + '.olean'
@@ -98,11 +101,20 @@ def build(ws, folder, root, force=False, log=None):
         lines.append(s)
         if log:
             open(log, 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
+    def fail(i, mod, cpu, errs):
+        say('✖ [%d/%d] FAILED %s (%.1fs)' % (i + 1, len(order), mod, cpu))
+        print('\n'.join(errs[:10]), flush=True)
+        failed.append(mod)
     for i, m in enumerate(order):
         mod = pre + '.' + m
         out = os.path.join(out_root, *mod.split('.'))
         os.makedirs(os.path.dirname(out), exist_ok=True)
         src = os.path.join(d, *m.split('.')) + '.lean'
+        bad = [x for x in module_imports(d, pre, m) if x in skipped or pre + '.' + x in failed]
+        if bad:
+            skipped.add(m)
+            say('- [%d/%d] Skipped %s (imports %s, which did not build)' % (i + 1, len(order), mod, pre + '.' + bad[0]))
+            continue
         if not force and not stale(m, src, out + '.olean', module_imports(d, pre, m), rebuilt, olean_of):
             say('✔ [%d/%d] Replayed %s' % (i + 1, len(order), mod))
             continue
@@ -111,9 +123,8 @@ def build(ws, folder, root, force=False, log=None):
             ok, cpu, errs = res
             total += cpu
             if not ok:
-                say('✖ [%d/%d] FAILED %s (%.1fs)' % (i + 1, len(order), mod, cpu))
-                print('\n'.join(errs[:10]))
-                return False, lines
+                fail(i, mod, cpu, errs)
+                continue
             rebuilt.add(m)
             say('✔ [%d/%d] Built %s (%.1fs)' % (i + 1, len(order), mod, cpu))
             continue
@@ -127,15 +138,18 @@ def build(ws, folder, root, force=False, log=None):
         o = r.stdout + r.stderr
         errs = [l for l in o.split('\n') if ': error' in l]
         if r.returncode or errs:
-            say('✖ [%d/%d] FAILED %s (%.1fs)' % (i + 1, len(order), mod, cpu))
-            print('\n'.join((errs or [o[-2000:]])[:10]))
+            fail(i, mod, cpu, errs or [o[-2000:]])
             for f in (out + '.olean', out + '.ilean'):
                 if os.path.exists(f):
                     os.remove(f)
-            return False, lines
+            continue
         rebuilt.add(m)
         say('✔ [%d/%d] Built %s (%.1fs)' % (i + 1, len(order), mod, cpu))
     print('total CPU %.1f s over %d modules' % (total, len(order)))
+    if failed:
+        print('%d modules failed: %s; %d skipped because they import one' % (
+            len(failed), ', '.join(failed), len(skipped)), flush=True)
+        return False, lines
     return True, lines
 
 

@@ -49,7 +49,8 @@ def test_build_failure_prints_lean_style_errors(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(leaninfo, 'build_module', lambda path, *a, **k: (False, 1.0, ['%s:2:0: error: boom' % path]))
     ok, lines = B.build(ws, 'F', 'Main')
     out = capsys.readouterr().out
-    assert not ok and lines[-1].startswith('✖ [1/2] FAILED Solutions.F.A') and 'A.lean:2:0: error: boom' in out
+    assert not ok and lines[0].startswith('✖ [1/2] FAILED Solutions.F.A') and 'A.lean:2:0: error: boom' in out
+    assert lines[-1].startswith('- [2/2] Skipped Solutions.F.Main')
 
 
 def test_build_falls_back_to_lean_without_the_compiled_tool(monkeypatch, tmp_path):
@@ -68,3 +69,35 @@ def test_build_falls_back_to_lean_without_the_compiled_tool(monkeypatch, tmp_pat
     monkeypatch.setattr(B.subprocess, 'run', run)
     ok, _ = B.build(ws, 'F', 'Main')
     assert ok and seen[0][:3] == ['lake', 'env', 'lean'] and '-DautoImplicit=false' in seen[0]
+
+
+def test_build_keeps_going_past_a_failed_module(monkeypatch, tmp_path, capsys):
+    # oaiq-038/048: the build stopped at the first failing module, so each Mathlib-drift fix cost a
+    # 5-13 min rebuild just to reach the next failure (24 cycles for LogConcave). Modules that do not
+    # import a failed one still build, and every failure is reported in one run.
+    from p2mlib import leaninfo
+    ws = tmp_path / 'ws'
+    d = ws / 'Solutions' / 'F'
+    d.mkdir(parents=True)
+    (d / 'A.lean').write_text('x\n')                                   # fails
+    (d / 'B.lean').write_text('import Solutions.F.A\n')                # skipped: imports A
+    (d / 'C.lean').write_text('y\n')                                   # fails too
+    (d / 'D.lean').write_text('z\n')                                   # builds
+    (d / 'Main.lean').write_text('import Solutions.F.B\nimport Solutions.F.C\nimport Solutions.F.D\n')
+    built = []
+
+    def fake(path, module, olean, ilean, ws=None, **k):
+        m = module.rsplit('.', 1)[-1]
+        if m in ('A', 'C'):
+            return False, 1.0, ['%s:1:0: error: drift in %s' % (path, m)]
+        built.append(m)
+        open(olean, 'w').close()
+        return True, 1.0, []
+    monkeypatch.setattr(leaninfo, 'build_module', fake)
+    ok, lines = B.build(str(ws), 'F', 'Main')
+    out = capsys.readouterr().out
+    assert not ok and built == ['D']
+    assert 'drift in A' in out and 'drift in C' in out
+    assert any('Skipped Solutions.F.B' in l and 'Solutions.F.A' in l for l in lines)
+    assert any('Skipped Solutions.F.Main' in l for l in lines)
+    assert '2 modules failed' in out
