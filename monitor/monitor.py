@@ -7,6 +7,7 @@ state/resources.json and state/history.json (48 h of samples), state/status.json
 shows; handy for reading from a shell). No Claude involvement: it runs as the systemd user unit
 monitor.service."""
 import datetime
+import glob
 import json
 import os
 import re
@@ -80,20 +81,105 @@ def classify(args, groups):
     return None
 
 
-def proc_table(groups):
-    """Every process that belongs to a group, with its own memory (Pss_Anon: shared pages split, file
-    cache excluded), memory-mapped files (Pss_File), CPU ticks, age and working directory."""
-    boot = time.time() - float(open('/proc/uptime').read().split()[0])
+# The charts' categories (dbenbenn 2026-10-27: one group per section gave ~100 "Headless agent"
+# entries): where a process lives, not which section claims it. The rest is the remainder.
+CATS = ('lean', 'queue', 'claude')
+CAT_LABELS = {'lean': 'Lean', 'queue': 'Queue workers', 'claude': 'Claude sessions', 'rest': 'Rest of the machine'}
+QUEUE_UNIT = re.compile(r'/(headless-[^/\s]*|oai-queue|carve-[^/\s]*)\.service\s*$', re.M)
+
+
+def _argv0(args):
+    a = args.split()
+    return a[0] if a else ''
+
+
+def category(args, cgroup, ancestors):
+    """'lean' (Lean, lake, anything in lean.slice), 'queue' (in the queue supervisor's, a headless
+    agent's or a detached carve driver's unit), 'claude' (under an interactive `claude`), or None.
+    ancestors: the command lines of the process's parents, nearest first."""
+    if re.match(r'(\S*/)?(lean|lake|lake\.orig)$', _argv0(args)) or '/lean.slice/' in cgroup:
+        return 'lean'
+    if QUEUE_UNIT.search(cgroup):
+        return 'queue'
+    # the CLI is `claude`, or the versioned binary it runs (~/.local/share/claude/versions/2.1.310)
+    if any(re.match(r'(\S*/)?claude$|\S*/claude/versions/[\w.-]+$', _argv0(x)) for x in [args] + list(ancestors)):
+        return 'claude'
+    return None
+
+
+def fold_row(row):
+    """A history row from before the categories, its per-section groups folded into them."""
+    for k in ('mem', 'cpu'):
+        d = row.get(k)
+        if d is None:
+            continue
+        out = {c: 0.0 for c in CATS}
+        for g, v in d.items():
+            if g in CATS or g == 'rest':
+                out[g] = out.get(g, 0.0) + v
+            else:
+                c = 'queue' if g.startswith(('headless-', 'oaiq', 'oai-queue', 'carve')) else 'claude'
+                out[c] += v
+        row[k] = {g: round(v, 2) for g, v in out.items()}
+    return row
+
+
+def inboxes(path, now):
+    """[{label, dir, count, items, oldest_s}] for each directory listed in PATH (a JSON list of
+    {label, dir, ignore}): what is waiting for someone, so the page can say so."""
+    try:
+        conf = json.load(open(path))
+    except (OSError, ValueError):
+        return []
     out = []
+    for c in conf:
+        d = os.path.expanduser(c['dir'])
+        e = {'label': c.get('label', d), 'dir': d, 'count': 0, 'items': [], 'oldest_s': None}
+        if not os.path.isdir(d):
+            e['missing'] = True
+            out.append(e)
+            continue
+        names = sorted(f for f in os.listdir(d) if not f.startswith('.') and f not in c.get('ignore', ())
+                       and os.path.isfile(os.path.join(d, f)))
+        if names:
+            e.update(count=len(names), items=names[:10],
+                     oldest_s=int(now - min(os.path.getmtime(os.path.join(d, f)) for f in names)))
+        out.append(e)
+    return out
+
+
+def proc_table(groups):
+    """Every process in a chart category or a section, with its own memory (Pss_Anon: shared pages
+    split, file cache excluded), memory-mapped files (Pss_File), CPU ticks, age and working directory."""
+    boot = time.time() - float(open('/proc/uptime').read().split()[0])
+    info = {}
     for d in os.listdir('/proc'):
         if not d.isdigit():
             continue
         try:
             args = open('/proc/%s/cmdline' % d, 'rb').read().replace(b'\0', b' ').decode(errors='replace').strip()
+            ppid = open('/proc/%s/stat' % d).read().rsplit(')', 1)[1].split()[1]
+            cg = open('/proc/%s/cgroup' % d).read()
+        except (OSError, ValueError, IndexError):
+            continue
+        info[d] = (args, ppid, cg)
+
+    def ancestors(d):
+        out, seen = [], set()
+        while d in info and d not in seen and len(out) < 64:
+            seen.add(d)
+            d = info[d][1]
+            if d in info:
+                out.append(info[d][0])
+        return out
+    out = []
+    for d, (args, _, cg) in info.items():
+        try:
             g = classify(args, groups)
-            if not g:
+            cat = category(args, cg, ancestors(d))
+            if not g and not cat:
                 continue
-            p = {'pid': d, 'args': args, 'group': g, 'anon': 0, 'file': 0}
+            p = {'pid': d, 'args': args, 'group': g, 'cat': cat, 'anon': 0, 'file': 0}
             for l in open('/proc/%s/smaps_rollup' % d):
                 if l.startswith('Pss_Anon:'):
                     p['anon'] = int(l.split()[1]) * 1024
@@ -125,15 +211,38 @@ def read_stat():
     return [sum(cpu[:8]), cpu[3] + cpu[4]]
 
 
-def machine_row(now, procs, meminfo, stat, prev, ncpu=None, clk=CLK):
-    """{'t', 'total', 'mem': {group: GiB, 'rest': GiB}, 'cpu': {group: cores, 'rest': cores} or None}.
-    Memory in use = MemTotal - MemAvailable; the rest is what no group accounts for."""
+USER_CG = '/sys/fs/cgroup/user.slice/user-%d.slice/user@%d.service' % (os.getuid(), os.getuid())
+
+
+def cgroup_usage(base=USER_CG):
+    """{'lean': {cgroup: usage_usec}, 'queue': {...}}: CPU time of the Lean slots' slice and of the queue's
+    units, exited processes included (per-process ticks miss every Lean compile that lives only
+    seconds: lean.slice used 3.66 cores while they showed 1.01, 2026-10-27)."""
+    out = {'lean': {}, 'queue': {}}
+    paths = [('lean', os.path.join(base, 'lean.slice'))] + \
+        [('queue', p) for p in glob.glob(os.path.join(base, 'app.slice', '*.service'))
+         if QUEUE_UNIT.search('/' + os.path.basename(p))]
+    for cat, p in paths:
+        try:
+            for l in open(os.path.join(p, 'cpu.stat')):
+                if l.startswith('usage_usec'):
+                    out[cat][p] = int(l.split()[1])
+        except (OSError, ValueError, IndexError):
+            continue
+    return out
+
+
+def machine_row(now, procs, meminfo, stat, prev, ncpu=None, clk=CLK, cg=None):
+    """{'t', 'total', 'mem': {category: GiB, 'rest': GiB}, 'cpu': {category: cores, 'rest': cores} or None}.
+    Memory in use = MemTotal - MemAvailable; the rest is what no category accounts for. CPU of a
+    category with cgroup usage (`cg`, from cgroup_usage) comes from it: a unit seen for the first time
+    counts from 0, one gone since the last sample drops out; the others' from their processes' ticks."""
     ncpu = ncpu or os.cpu_count()
     used = meminfo['MemTotal'] - meminfo['MemAvailable']
-    procs = [p for p in procs if p['group']]
-    mem = {'lean': 0}
+    procs = [p for p in procs if p.get('cat')]
+    mem = {c: 0 for c in CATS}
     for p in procs:
-        mem[p['group']] = mem.get(p['group'], 0) + p['anon']
+        mem[p['cat']] += p['anon']
     row = {'t': now, 'total': round(meminfo['MemTotal'] / G, 1),
            'mem': dict({g: round(v / G, 2) for g, v in mem.items()}, rest=round(max(0, used - sum(mem.values())) / G, 2)),
            'cpu': None}
@@ -141,11 +250,15 @@ def machine_row(now, procs, meminfo, stat, prev, ncpu=None, clk=CLK):
         dt = now - prev['t']
         cpu = {g: 0.0 for g in mem}
         for p in procs:
-            cpu[p['group']] += max(0, p['ticks'] - prev['ticks'].get(p['pid'], p['ticks'])) / clk / dt
+            cpu[p['cat']] += max(0, p['ticks'] - prev['ticks'].get(p['pid'], p['ticks'])) / clk / dt
+        if cg and prev.get('cg'):
+            for cat, units in cg.items():
+                old = prev['cg'].get(cat, {})
+                cpu[cat] = sum(max(0, v - old.get(u, 0)) for u, v in units.items()) / 1e6 / dt
         dtot, didle = stat[0] - prev['stat'][0], stat[1] - prev['stat'][1]
         busy = (dtot - didle) / dtot * ncpu if dtot > 0 else 0.0
         row['cpu'] = dict({g: round(v, 2) for g, v in cpu.items()}, rest=round(max(0.0, busy - sum(cpu.values())), 2))
-    return row, {'t': now, 'ticks': {p['pid']: p['ticks'] for p in procs}, 'stat': stat}
+    return row, {'t': now, 'ticks': {p['pid']: p['ticks'] for p in procs}, 'stat': stat, 'cg': cg}
 
 
 def cores_of(p, prev, now):
@@ -168,7 +281,7 @@ def proc_view(p, prev, now, label):
 def lean_view(procs, prev, now):
     out = []
     for p in procs:
-        if p['group'] != 'lean':
+        if p.get('cat') != 'lean':
             continue
         a = p['args'].split()
         what = os.path.basename(a[0]) + (' ' + ' '.join(os.path.basename(x) for x in a[1:3]) if len(a) > 1 else '')
@@ -360,16 +473,13 @@ def step(home, now=None):
     procs = proc_table(groups)
     mi = read_meminfo()
     prev = res.get('prev')
-    row, res['prev'] = machine_row(now, procs, mi, read_stat(), prev)
+    row, res['prev'] = machine_row(now, procs, mi, read_stat(), prev, cg=cgroup_usage())
     row['load1'] = float(open('/proc/loadavg').read().split()[0])
-    res['machine'] = [r for r in res.get('machine', []) if r['t'] >= now - KEEP] + [row]
+    res['machine'] = [fold_row(r) for r in res.get('machine', []) if r['t'] >= now - KEEP] + [row]
     psi = read_psi()
     if psi:
         res['psi'] = [r for r in res.get('psi', []) if r[0] >= now - KEEP] + [[now] + psi]
-    labels = res.get('labels', {})
-    labels.update({s['id']: s['title'] for s in secs})
-    seen = {g for r in res['machine'] for g in r['mem']}
-    res['labels'] = {g: l for g, l in labels.items() if g in seen}
+    res['labels'] = dict(CAT_LABELS)
     track(hist, secs, now)
     costs = load_json(os.path.join(st, 'agent_costs.json'), {})
     AG.record_costs(costs, AG.AGENTS_DIR, now)
@@ -386,6 +496,7 @@ def step(home, now=None):
     res['trouble'] = res.get('trouble', [])
     status = build_status(now, secs, problems, system, health_flags(HEALTH_FLAGS, now), lean_view(procs, prev, now),
                           trouble=res['trouble'])
+    status['inboxes'] = inboxes(os.path.join(home, 'inboxes.json'), now)
     status['quota'] = {'series': quota['series'], 'columns': ['t', 'five_hour %', 'five_hour resets', 'seven_day %', 'seven_day resets']}
     save_json(os.path.join(st, 'resources.json'), res)
     save_json(os.path.join(st, 'history.json'), hist)

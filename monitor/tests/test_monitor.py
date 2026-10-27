@@ -128,18 +128,64 @@ def test_oom_kill_is_active_for_an_hour(tmp_path):
     assert not M.health_flags(f, at('11:01'))[0]['active']
 
 
-def test_machine_row_splits_memory_and_cpu_by_group():
+def test_machine_row_splits_memory_and_cpu_by_category():
     G = 2 ** 30
     meminfo = {'MemTotal': 64 * G, 'MemAvailable': 40 * G}
-    procs = [{'pid': '1', 'group': 'lean', 'anon': 4 * G, 'ticks': 100},
-             {'pid': '2', 'group': 'job', 'anon': 2 * G, 'ticks': 50},
-             {'pid': '3', 'group': None, 'anon': 1 * G, 'ticks': 10}]
+    procs = [{'pid': '1', 'cat': 'lean', 'anon': 4 * G, 'ticks': 100},
+             {'pid': '2', 'cat': 'queue', 'anon': 2 * G, 'ticks': 50},
+             {'pid': '3', 'cat': None, 'anon': 1 * G, 'ticks': 10}]
     row, prev = M.machine_row(1000, procs, meminfo, [1000, 500], None, ncpu=8)
-    assert row['mem'] == {'lean': 4.0, 'job': 2.0, 'rest': 18.0} and row['cpu'] is None
+    assert row['mem'] == {'lean': 4.0, 'queue': 2.0, 'claude': 0.0, 'rest': 18.0} and row['cpu'] is None
     procs[0]['ticks'] = 100 + 100 * 30          # one core for 30 s, at 100 ticks per second
     row, _ = M.machine_row(1030, procs, meminfo, [1000 + 800, 500 + 400], prev, ncpu=8, clk=100)
-    assert row['cpu']['lean'] == 1.0 and row['cpu']['job'] == 0.0
+    assert row['cpu']['lean'] == 1.0 and row['cpu']['queue'] == 0.0
     assert row['cpu']['rest'] == 3.0             # 4 of 8 cores busy in all, minus Lean's 1
+
+
+# 2026-10-27: the charts had one group per section, ~100 "Headless agent: oaiq-0NN" entries; now a few
+# categories by where a process lives (dbenbenn): Lean, queue workers, Claude sessions, the rest.
+UNIT = '0::/user.slice/user-1000.slice/user@1000.service/app.slice/%s\n'
+
+
+def test_category_by_command_unit_and_ancestry():
+    claude = '/home/u/.local/bin/claude --resume abc'
+    assert M.category('lean -j1 Foo.lean', UNIT % 'headless-oaiq-031.service', []) == 'lean'
+    assert M.category('/x/lake.orig env lean -R . F.lean', UNIT % 'lean.slice/run-p1-i2.scope', []) == 'lean'
+    for unit in ('headless-oaiq-031.service', 'oai-queue.service', 'carve-f3faf27c0d.service'):
+        assert M.category('python3 agent.py', UNIT % unit, []) == 'queue', unit
+    # a headless agent's own claude process is queue work, not a Claude session
+    assert M.category(claude, UNIT % 'headless-oaiq-031.service', []) == 'queue'
+    assert M.category('rg foo', '0::/user.slice/user-1000.slice/session-2.scope\n', ['bash', claude, 'konsole']) == 'claude'
+    assert M.category(claude, '0::/user.slice/user-1000.slice/session-2.scope\n', ['konsole']) == 'claude'
+    v = '/home/u/.local/share/claude/versions/2.1.310 --print'
+    assert M.category('node x.js', '0::/user.slice/user-1000.slice/session-2.scope\n', [v, 'bash']) == 'claude'
+    assert M.category('plasmashell', '0::/user.slice/user-1000.slice/session-2.scope\n', ['systemd']) is None
+    assert M.category('python3 monitor.py', '0::/system.slice/monitor.service\n', ['systemd']) is None
+
+
+def test_old_rows_fold_into_the_categories():
+    row = {'t': 1, 'mem': {'lean': 1.0, 'headless-oaiq-031': 0.5, 'oai-queue': 0.25, 'wifi-watch': 0.5, 'rest': 2.0},
+           'cpu': {'lean': 1.0, 'headless-oaiq-031': 0.5, 'rest': 1.0}}
+    M.fold_row(row)
+    assert row['mem'] == {'lean': 1.0, 'queue': 0.75, 'claude': 0.5, 'rest': 2.0}
+    assert row['cpu'] == {'lean': 1.0, 'queue': 0.5, 'claude': 0.0, 'rest': 1.0}
+
+
+def test_inboxes_count_waiting_items(tmp_path):
+    d = tmp_path / 'inbox'
+    d.mkdir()
+    (d / 'README.md').write_text('how to file')
+    (d / 'a.md').write_text('x')
+    (d / 'b.md').write_text('y')
+    os.utime(d / 'a.md', (900, 900))
+    cfg = tmp_path / 'inboxes.json'
+    cfg.write_text(json.dumps([{'label': 'Lessons inbox', 'dir': str(d), 'ignore': ['README.md']},
+                               {'label': 'Gone', 'dir': str(tmp_path / 'absent')}]))
+    out = M.inboxes(str(cfg), 1000)
+    assert out[0] == {'label': 'Lessons inbox', 'dir': str(d), 'count': 2, 'items': ['a.md', 'b.md'],
+                      'oldest_s': 100}
+    assert out[1]['count'] == 0 and out[1].get('missing')
+    assert M.inboxes(str(tmp_path / 'none.json'), 1000) == []
 
 
 def test_banner_is_for_the_machine_only(tmp_path):
@@ -182,3 +228,33 @@ def test_free_memory_alert_counts_swap():
     assert alerts(free_gib=1.0, swap_free_gib=20.0) == []
     assert alerts(free_gib=1.0, swap_free_gib=2.0) == ['only 3.0 GiB of memory and swap free']
     assert alerts(free_gib=2.5) == ['only 2.5 GiB of memory and swap free']   # no swap
+
+
+def test_cpu_of_lean_and_queue_comes_from_their_cgroups():
+    # 2026-10-27: per-process ticks see only processes alive at both samples; most Lean compiles
+    # live seconds, so lean.slice used 3.66 cores while the chart showed 1.01 and "rest" the other
+    # 2.6. A cgroup's usage_usec counts its exited processes too.
+    G = 2 ** 30
+    meminfo = {'MemTotal': 64 * G, 'MemAvailable': 40 * G}
+    procs = [{'pid': '1', 'cat': 'lean', 'anon': 4 * G, 'ticks': 100},
+             {'pid': '2', 'cat': 'claude', 'anon': 1 * G, 'ticks': 0}]
+    cg0 = {'lean': {'/lean.slice': 1_000_000}, 'queue': {'/a.service': 0, '/gone.service': 5_000_000}}
+    row, prev = M.machine_row(1000, procs, meminfo, [1000, 500], None, ncpu=8, cg=cg0)
+    procs[1]['ticks'] = 100 * 30                 # the session: one core by its own ticks
+    cg1 = {'lean': {'/lean.slice': 1_000_000 + 90_000_000},           # 3 cores over 30 s
+           'queue': {'/a.service': 15_000_000, '/new.service': 15_000_000}}   # a unit that started meanwhile
+    row, _ = M.machine_row(1030, procs, meminfo, [1000 + 2400, 500 + 900], prev, ncpu=8, clk=100, cg=cg1)
+    assert row['cpu']['lean'] == 3.0             # not the 0 its one long-lived process's ticks show
+    assert row['cpu']['queue'] == 1.0            # a.service's 0.5 + the new unit's 0.5; a gone unit drops out
+    assert row['cpu']['claude'] == 1.0
+    assert row['cpu']['rest'] == 0.0             # 5 of 8 cores busy, all accounted for
+
+
+def test_cgroup_usage_reads_lean_slice_and_queue_units(tmp_path):
+    base = tmp_path / 'user@1000.service'
+    for d, us in (('lean.slice', 7), ('app.slice/headless-oaiq-1.service', 3), ('app.slice/oai-queue.service', 2),
+                  ('app.slice/carve-abc.service', 1), ('app.slice/konsole.service', 99)):
+        (base / d).mkdir(parents=True)
+        (base / d / 'cpu.stat').write_text('usage_usec %d\nuser_usec 0\n' % us)
+    u = M.cgroup_usage(str(base))
+    assert sum(u['lean'].values()) == 7 and sum(u['queue'].values()) == 6

@@ -6,7 +6,7 @@ description: The machine's monitoring page at http://<hostname>:8765/ (http://ni
 # The monitoring page
 
 http://nixos:8765/ (the machine's hostname, port 8765) is dbenbenn's one place to see what the machine is doing. On top: the whole
-machine's memory and CPU (split into Lean, each section's own processes, and the rest), load, kernel
+machine's memory and CPU (split into four categories, below), load, kernel
 stall pressure, every Lean/lake process with its working directory, and a red banner for machine trouble.
 Below: **one section per piece of work**, written by whoever runs that work.
 
@@ -57,7 +57,7 @@ section.publish('erdos3-v2', title='Erdős 3 v2: publishing to prove2.me', state
 | `state` | `running`, `waiting`, `paused`, `done` or `failed` |
 | `phases` | `[{name, done, total, state?, note?}]`, one progress bar each; pick one to chart by clicking it |
 | `alerts` | strings that need a person, shown in red in the section. Only real stops belong here, never routine retries. The top banner is reserved for machine trouble, so it never shows these |
-| `processes` | `[{label, match}]`: a Python regex searched in each process's command line. Matching processes count as this section in the memory and CPU charts and are listed under it. Lean and lake always count as Lean |
+| `processes` | `[{label, match}]`: a Python regex searched in each process's command line. Matching processes are listed under the section (the charts use the categories below, not sections) |
 | `owner`, `note`, `links` | who runs it (e.g. the Claude session id, the systemd unit); one line of context; `[{label, url}]` |
 | `heartbeat_secs` | how often you update (default 300). A running or waiting section with no update for 3 heartbeats gets a STALE badge, so set it honestly: a Claude session that updates once per turn wants 900 or more |
 | `expires_secs` | how long a done or failed section stays (default 86400) |
@@ -135,3 +135,19 @@ To look at the page headless on NixOS use `google-chrome --headless=new --no-san
 dbenbenn for a `playwright-driver.browsers` package. Tests: `python3 -m pytest -q ~/.claude/skills/monitor/tests`.
 After changing `monitor.py` the service must restart: `sudo systemctl restart monitor`, which dbenbenn
 runs (ask). Commit and push this skill (claude-skills-public) in the same turn.
+
+## Chart categories and inboxes (2026-10-27)
+
+The memory and CPU charts have four fixed categories (`monitor.CATS`; one per section gave about 100
+"Headless agent" entries): **Lean** (lean, lake, anything in `lean.slice`), **queue workers** (in the
+`oai-queue`, `headless-*` or `carve-*` user units), **Claude sessions** (processes under an interactive
+`claude`, or its versioned binary `~/.local/share/claude/versions/X`), and grey **rest of the machine**
+(the remainder of what is in use). Memory is per process (Pss_Anon). CPU of Lean and the queue comes from
+their cgroups' `cpu.stat` (`cgroup_usage`), which counts processes that already exited: per-process
+ticks see only processes alive at two samples, so short Lean compiles were missed (3.66 cores in
+`lean.slice` charted as 1.01, the rest as "rest"). History rows from before are folded into the
+categories (`fold_row`).
+
+**Inboxes.** `MONITOR_HOME/inboxes.json` lists directories whose files wait for someone:
+`[{"label", "dir", "ignore": ["README.md"]}]`. The page shows each one's count, oldest age and file names
+under the title (amber when anything waits). The prove2me lessons inbox is the first.

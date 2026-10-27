@@ -14,6 +14,8 @@ main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
 h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14px}
 .card{background:var(--surface-1);border-radius:10px;padding:14px 16px;margin:0 0 14px}
 .alarm{background:var(--alarm);color:#fff;padding:10px 14px;border-radius:8px;margin:0 0 14px}
+.inbox{border:1px solid var(--grid);border-left:4px solid var(--good);background:var(--surface-1);padding:8px 14px;border-radius:8px;margin:0 0 14px;font-size:14px}
+.inbox.waiting{border-left-color:var(--warn)}.inbox b{font-weight:600}.inbox .items{color:var(--text-secondary);font-size:13px;overflow-wrap:anywhere}
 .alarm b{display:block;margin-bottom:2px}.alarm ul{margin:0;padding-left:18px}.alarm li{overflow-wrap:anywhere}
 .ph{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--grid);cursor:pointer}
 .ph:first-child{border-top:0}.ph.sel .n{text-decoration:underline;text-underline-offset:3px}
@@ -53,10 +55,11 @@ code{font-size:13px}
 <h1 id="h1">monitor</h1>
 <p class="sub" id="upd">Loading…</p>
 <div class="alarm" id="alarm" role="alert" hidden></div>
+<div class="inbox" id="inbox" hidden></div>
 <nav class="nav" aria-label="Views"><a href="#t-sys">System resources</a><a href="#t-quota">Subscription quota</a><a href="#t-agents">Headless agents</a><a href="#sections">Work in progress</a></nav>
 <section class="card" aria-labelledby="t-sys">
 <h2 id="t-sys">System resources</h2>
-<p class="chart-sub">The whole machine, split by what uses it; sampled every 30 s · times in Berlin time (CET/CEST). Memory: each group's own process memory (file cache excluded); the rest is everything else in use.</p>
+<p class="chart-sub">The whole machine, split by what uses it; sampled every 30 s · times in Berlin time (CET/CEST). Memory: each category's own process memory (file cache excluded): Lean (Lean, lake, the Lean slots), queue workers (the queue supervisor, headless agents and detached carve drivers), Claude sessions (interactive ones and their tools); the rest is everything else in use.</p>
 <div class="toolbar">
   <div class="seg" role="group" aria-label="Time range" id="ranges"></div>
   <button id="zoomed" hidden>Zoomed in · back to range</button>
@@ -106,7 +109,6 @@ const xTicks = (u, splits) => { const span = u.scales.x.max - u.scales.x.min;
   return splits.map(v => span > 18*3600 ? fmtWd(v) + ' ' + fmtT(v) : fmtT(v)); };
 const lastIdx = u => u.data[0].length - 1;
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const PALETTE = ['--series-2','--series-3','--series-4','--series-5'];
 const RANGES = [['30 min',1800],['1 h',3600],['3 h',10800],['12 h',43200],['48 h',172800]];
 const store = {get(k,d){ try { return localStorage.getItem(k) ?? d; } catch(e) { return d; } }, set(k,v){ try { localStorage.setItem(k,v); } catch(e) {} }};
 let range = +store.get('monitor.range', 3600);
@@ -183,10 +185,11 @@ function upsert(id, built){
 
 function drawSystem(sy){
   const M = sy.machine || [], lastRow = M.length ? M[M.length-1] : null;
-  const seen = []; for (const r of M) for (const g in r.mem) if (g!=='lean' && g!=='rest' && !seen.includes(g)) seen.push(g);
-  const groups = ['lean', ...seen, 'rest'];
-  const labelOf = g => g==='lean' ? 'Lean' : g==='rest' ? 'Rest of the machine' : (sy.labels[g] || g);
-  const colorOf = g => g==='lean' ? '--series-1' : g==='rest' ? '--rest' : PALETTE[seen.indexOf(g) % PALETTE.length];
+  // fixed categories (monitor.CATS): where a process lives, not which section claims it
+  const CAT_COLOR = {lean: '--series-1', queue: '--series-2', claude: '--series-4', rest: '--rest'};
+  const groups = ['lean', 'queue', 'claude', 'rest'];
+  const labelOf = g => sy.labels[g] || g;
+  const colorOf = g => CAT_COLOR[g] || '--rest';
   const key = groups.join('|') + '|' + Object.keys(sy.labels).map(k => sy.labels[k]).join('|') + '|' + document.documentElement.clientWidth + '|' + matchMedia('(prefers-color-scheme: dark)').matches;
   if (key !== chartKey) { for (const u of Object.values(charts)) u.destroy(); charts = {}; chartKey = key; }
   const x = M.map(r => r.t), memTotal = lastRow ? lastRow.total : 64, cores = sy.cores_total || 32;
@@ -234,6 +237,13 @@ async function load(){
   const pr = document.getElementById('problems'), P = s.problems || [];
   pr.hidden = !P.length; pr.textContent = P.length ? 'Section files the page could not read: ' + P.join('; ') : '';
   al.innerHTML = s.alerts.length ? `<b>${esc(s.host||'machine')} needs attention</b><ul>${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>` : '';
+  const IB = s.inboxes || [], ib = document.getElementById('inbox');
+  ib.hidden = !IB.length;
+  ib.className = 'inbox' + (IB.some(e => e.count) ? ' waiting' : '');
+  const age = n => n == null ? '' : n < 3600 ? Math.round(n/60) + ' min' : n < 172800 ? Math.round(n/3600) + ' h' : Math.round(n/86400) + ' days';
+  ib.innerHTML = IB.map(e => e.missing ? `<div><b>${esc(e.label)}</b>: directory missing (${esc(e.dir)})</div>`
+    : e.count ? `<div><b>${esc(e.label)}: ${e.count} waiting</b> · oldest ${esc(age(e.oldest_s))}<div class="items">${e.items.map(esc).join(' · ')}${e.count > e.items.length ? ' …' : ''}</div></div>`
+    : `<div><b>${esc(e.label)}</b>: empty</div>`).join('');
   const C = s.cleared || [];
   document.getElementById('cleared-box').hidden = !C.length;
   document.getElementById('cleared').innerHTML = C.map(e => `<li><span class="when">${esc(fmtSpan(e.first, e.last))}</span> · ${e.what==='machine'?'':esc(e.what)+': '}${esc(e.text)}${e.what!=='machine' && e.n>1 ? ` · ${e.n} checks` : ''}</li>`).join('');
