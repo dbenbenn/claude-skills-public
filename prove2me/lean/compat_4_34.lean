@@ -24,6 +24,12 @@ theorem _root_.AEMeasurable.of_eval {δ ι : Type*} [Countable ι] {π : ι → 
 (Coboundary CongruenceFrames, 2026-10-26). -/
 def _root_.Finset.equivOfEq {α : Type*} {s t : Finset α} (h : s = t) : s ≃ t :=
   Equiv.subtypeEquivRight (fun _ => by rw [h])
+/-- Mathlib d13f23b's `Finsupp.mapDomain_fintype`: on a finite index type `mapDomain f v` is the
+sum of the point masses at the images (Thomason Polyhedra, oaiq-043). -/
+theorem _root_.Finsupp.mapDomain_fintype {α β M : Type*} [Fintype α] [AddCommMonoid M]
+    (f : α → β) (v : α →₀ M) : Finsupp.mapDomain f v = ∑ i, Finsupp.single (f i) (v i) := by
+  rw [Finsupp.mapDomain, Finsupp.sum_fintype _ _ (by simp)]
+
 /-- Mathlib's newer `TensorProduct.inductionOn` (no `zero` case: it is the `tmul` case at
 `0 ⊗ₜ 0`); ours has only `TensorProduct.induction_on`, which asks for one. Not named
 `TensorProduct.inductionOn`: inside `namespace OAI` that would make `open TensorProduct` open

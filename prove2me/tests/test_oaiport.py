@@ -1296,3 +1296,11 @@ def test_mv_power_series_pderiv_gets_the_ring_argument():
     assert out.count('MvPowerSeries.pderiv _ ') == 3
     assert 'MvPowerSeries.pderiv_X' in out
     assert O.core_rewrites(out) == out
+
+
+def test_compat_has_finsupp_mapdomain_fintype():
+    # d13f23b's `Finsupp.mapDomain_fintype` (Thomason Polyhedra, oaiq-043): `mapDomain f v` as a sum
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert '_root_.Finsupp.mapDomain_fintype' in src and '∑ i, Finsupp.single (f i) (v i)' in src
