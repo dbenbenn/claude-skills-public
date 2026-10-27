@@ -1072,6 +1072,13 @@ def instance_ref(ik, inst_names, rename):
     return pn
 
 
+def instance_imported(ik, have, rename):
+    """Does an imported file carry the local instance node ik as a plain constant? Not when its
+    public name is shared by collided copies (rename): `have` holds public names, so another
+    copy's bundle would stand in for this one."""
+    return pubname(ik) in have and ik not in rename
+
+
 def collision_renames(g):
     """Private declarations whose public names collide (two modules' `private theorem helper`, in
     one carved file or deprivatized): {env name: new short name}, the same in every file."""
@@ -2676,7 +2683,7 @@ class Carver:
             if not is_inst or (ik and pubname(ik) in self.keep_names):
                 continue
             done.add((vi, chain))
-            if ik and pubname(ik) in have:
+            if ik and instance_imported(ik, have, self.rename):
                 out.append('attribute [local instance] %s\n' % instance_ref(ik, inst_names, self.rename))
                 continue
             # not imported: its command again under a name unique to this file, anonymous or
