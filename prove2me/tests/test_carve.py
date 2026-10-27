@@ -2006,3 +2006,40 @@ def test_a_reactivated_local_instance_keeps_its_priority(g):
     assert 'attribute [local instance] CD.LC.towerHi\n' in sec, sec
     assert C._instance_priority(b'local instance (priority := high) x : A := a') == 'high'
     assert C._instance_priority(b'local instance x : A := a') is None
+
+
+def _lc_graph_tower_unseen():
+    """The fixture graph with tower_use's record naming only actHi (Auslander–Reiten: the
+    IsScalarTower partner of a Module local instance is a Prop instance no elaborated term names)."""
+    g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    user = g.nodes['CD.LC.tower_use']
+    c = g.infos[user.module].commands[user.cmd]
+    c.insts = c.sig_insts = ['CD.LC.actHi']
+    c.inst_keys = [k for k in c.inst_keys or () if not k.startswith('CD.LC.Tower')]
+    c.used_keys = c.sig_used_keys = [k for k in c.used_keys or () if not k.startswith('CD.LC.Tower')]
+    for n in user.names:
+        for f in ('t', 'v'):
+            g.consts[n][f] = [x for x in g.consts[n][f] if x != 'CD.LC.towerHi']
+    return g
+
+
+def test_a_used_local_instance_brings_its_prop_partner_on_the_same_carrier():
+    # oaiq-031: `local instance … : Module k (…).carrier` and `local instance … : IsScalarTower k A
+    # (…).carrier`; only the Module one shows as used, and the carved file lacked the tower
+    # ("failed to synthesize SMulCommClass k R …"). Here actHi (Act (Wc n)) and towerHi
+    # (Tower Nat (Wc n)): different classes, argument heads sharing the carrier Wc.
+    g = _lc_graph_tower_unseen()
+    keep = LC_DEFS | {'CD.LC.tower_use'}
+    sec = _section(C.Carver(g).carve(keep, g.have_names(keep)), 'CarveDev.LocalCtx')
+    a = re.search(r'^local instance \(priority := 3000\) actHi_r\w+', sec, re.M)
+    t = re.search(r'^local instance towerHi_r\w+', sec, re.M)
+    assert a and t and a.start() < t.start() < sec.index('theorem tower_use'), sec
+    # imported from a bundle: both activated, the partner too (a kept constant there)
+    have = g.have_names(keep | {'CD.LC.actHi', 'CD.LC.towerHi', 'CD.LC.actLo'})
+    sec = _section(C.Carver(g).carve(keep, have), 'CarveDev.LocalCtx')
+    assert re.search(r'^attribute \[local instance(?: \d+)?\] CD\.LC\.towerHi$', sec, re.M), sec
+    # the partner not in a bundle: emitted again, never activated as a constant no file declares
+    have = g.have_names(keep | {'CD.LC.actHi', 'CD.LC.actLo'})
+    sec = _section(C.Carver(g).carve(keep, have), 'CarveDev.LocalCtx')
+    assert 'attribute [local instance 3000] CD.LC.actHi\n' in sec, sec
+    assert 'CD.LC.towerHi' not in sec and re.search(r'^local instance towerHi_r\w+', sec, re.M), sec

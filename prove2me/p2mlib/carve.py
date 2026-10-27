@@ -2777,25 +2777,37 @@ class Carver:
         return ''.join(out)
 
     def _sibling_used(self, info, vc, c, used):
-        """Did command c use another local instance of its module, in scope at c, on the same type
-        as local instance vc (the same class argument heads, LeanInfo `declares`)? Then vc comes
-        back too: both were in force in the port, and a use of vc can leave no record (Thomason
-        oaiq-043: `local instance : Fintype (OrdinalVertices n)` beside the kept `LinearOrder` one on
-        that synonym; partialLastVertex needed it, though neither its constants, `insts` nor
-        `inst_keys` show a Fintype problem)."""
-        heads = {tuple(x[2]) for x in vc.declares or () if x[1] and x[2]}
+        """Did command c use another local instance of its module, in scope at c, of another class
+        on the same carrier as local instance vc (a type among the argument heads of both, LeanInfo
+        `declares`)? Then vc comes back too: both were in force in the port, and a use of vc can
+        leave no record (Thomason oaiq-043: `local instance : Fintype (OrdinalVertices n)` beside the
+        kept `LinearOrder` one on that synonym; partialLastVertex needed it, though neither its
+        constants, `insts` nor `inst_keys` show a Fintype problem; Auslander–Reiten oaiq-031: the
+        Prop partner `IsScalarTower k A M` of a used `Module k M`, whose heads list A and the
+        instances too, never named by a term, "failed to synthesize SMulCommClass k R …")."""
         classes = {x[1] for x in vc.declares or () if x[1]}
-        if not heads:
+        mine = self._carriers(info, [h for x in vc.declares or () if x[1] for h in x[2]])
+        if not mine:
             return False
         for c2 in info.commands[:c.index]:
             if c2.index == vc.index or not _in_scope(info, c2.index, c) or \
                     not _local_instance(info, c2)[0]:
                 continue
             # not one of vc's own class: emitted before c, vc would take priority over the one c used
-            if any(x[1] and x[1] not in classes and tuple(x[2]) in heads and x[0] in used
+            if any(x[1] and x[1] not in classes and x[0] in used and mine & self._carriers(info, x[2])
                    for x in c2.declares or ()):
                 return True
         return False
+
+    def _carriers(self, info, heads):
+        """The heads of an instance's conclusion that are types, not instances (`TensorProduct.instSMul`,
+        `SMulZeroClass.toSMul`, an instance of the project)."""
+        cache = self.__dict__.setdefault('_inst_names_cache', {})
+        insts = cache.get(id(info))
+        if insts is None:
+            insts = cache[id(info)] = {x[0] for c in info.commands for x in c.declares or () if x[1]}
+        return {h for h in heads if h not in insts and not (self.g.consts.get(h) or {}).get('i') and
+                not re.match(r"(?:inst|to[A-Z])", h.rsplit('.', 1)[-1])}
 
     def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=(), pins=None):
         """The `variable` command without its gone binder groups: False (unchanged), None (none
