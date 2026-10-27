@@ -1804,7 +1804,10 @@ def test_a_local_decidable_instance_is_kept_for_a_command_that_asks_about_its_ty
     asked = types.SimpleNamespace(inst_keys=['Fintype Edge', 'Fintype Sample'])
     other = types.SimpleNamespace(inst_keys=['Fintype Sample'])
     assert C._could_answer(inst, asked)
-    assert not C._could_answer(inst, other)
+    # heads are not required to match (SharpRamsey, oaiq-045: `DecidableEq (Block w)` over an abbrev the
+    # record shows unfolded, `Fintype Prod …`): a decidability instance was in force in its section
+    assert C._could_answer(inst, other)
+    assert not C._could_answer(inst, types.SimpleNamespace(inst_keys=[]))
     nonDecidable = types.SimpleNamespace(declares=[('inst', 'Fintype', ['Edge'])])
     assert not C._could_answer(nonDecidable, types.SimpleNamespace(inst_keys=['DecidableEq Sample', 'Foo Edge']))
 

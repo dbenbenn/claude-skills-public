@@ -2063,8 +2063,12 @@ def _could_answer(inst_cmd, c):
         # `DecidableEq (Edge S)`, whose command asks only `Fintype Edge`)
         if d[1].startswith('Decidable') and heads and any(heads <= set(p[1:]) for p in asked):
             return True
-        if d[1].startswith('Decidable') and not heads and asked:
-            return True       # generic `(β : Type) : DecidableEq β`: in force for every problem of its section
+        if d[1].startswith('Decidable') and asked:
+            # generic `(β : Type) : DecidableEq β`: in force for every problem of its section. With head
+            # constants too: the record may show the type unfolded (`DecidableEq (Block w)` with
+            # `abbrev Block := Fin w × Bool` against a `Fintype Prod …` problem, SharpRamsey oaiq-045),
+            # and a decidability instance was in force in its section anyway, so keeping it is safe
+            return True
     return False
 
 
