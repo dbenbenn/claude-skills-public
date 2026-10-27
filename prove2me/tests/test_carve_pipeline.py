@@ -608,3 +608,12 @@ def test_upgrade_works_when_run_from_the_old_snapshot(env, monkeypatch):
     assert r.returncode == 0, r.stderr
     assert {c['version'] for c in calls(env)} == {'v2'}
     assert json.load(open(env.dir / 'pipeline_state.json'))['snapshot']['sha'] == git(env.repo, 'rev-parse', 'HEAD')
+
+
+def test_prose_template_gets_the_sources_for_its_module_links(env):
+    # oaiq-035: with oai_meta.json lacking lean_root, the guessed module paths doubled a directory
+    # (KMedian/KMedian/Analysis/..., 225 broken links); the pipeline knows the sources, so it says
+    run(env, *ARGS, '--stop-after', 'prose')
+    prose = [c for c in calls(env) if c.get('tool') == 'carve_prep' and c['argv'][0] == 'prose-template']
+    a = prose[0]['argv']
+    assert a[a.index('--lean-root') + 1] == str(env.dir / 'src' / 'lean')

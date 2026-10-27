@@ -32,7 +32,12 @@ transformations are in `p2mlib.oaiport`, and `tests/test_oaiport.py` pins the bu
    `carve_prep.py filter-patches` first, with the same compat options as `oai_port_modules.py`.
    It counts each patch against the text the module port patches, not against OpenAI's source:
    the port's own rewrites can add a match (`OAI.tensorInductionOn`, below) or
-   remove one (a compat alias). It also drops single-file-only patches, which are marked
+   remove one (a compat alias): quote the ported text (an `inferInstance` at a `Measure.map` site
+   is a long `first | infer_instance | …` line there) and count with `rg -c` in `Solutions/FOLDER`.
+   A patch whose count differs fails the step, listing its occurrences per module (`"allow_drop":
+   true` lets one go); so does a patch whose `old` starts or ends inside a longer identifier
+   (oaiq-040: `hpos` matched `hpositive`), so end `old` at a delimiter. It also drops
+   single-file-only patches, which are marked
    `"route": "single"` or reorder a universe list for merge.py's `universe` line. The module port
    inlines tactic macros across modules, as `oai_port.py` does. `oai_build_modules.py` rebuilds
    a module when anything it imports changed, so after a fix no `--force` is needed. Each forced theorem becomes its own published
@@ -87,8 +92,48 @@ Problem336).** Fix each at the cause; none needs a macro.
   has no `fun_` form: `convert … using 1 <;> first | rfl | (funext z; simp …)`.
 - *Total `Measure.map`.* d13f23b's `Measure.map f μ` of a non-AEMeasurable `f` is a Dirac mass, so `IsProbabilityMeasure
   (μ.map f)` is an unconditional instance and `ProbabilityMeasure.map ν f` takes no proof. Ours is 0 there: no instance
-  (a measurable *equivalence* has one in the compat block), `ProbabilityMeasure.map` wants `AEMeasurable f ν`. Patch the
-  site with `Measure.isProbabilityMeasure_map hf.aemeasurable` / `μ.map hf.aemeasurable`. It cannot be shimmed.
+  (a measurable *equivalence* has one in the compat block), `ProbabilityMeasure.map` wants `AEMeasurable f ν`. The port
+  rewrites the textual sites (`oaiport.core_rewrites`, 8bac231): `have … : IsProbabilityMeasure _ := inferInstance`,
+  a bare `infer_instance`, `inferInstance` inside `⟨…⟩`, `ProbabilityMeasure.map ν f` and `… := ν.map f`, the
+  `Measure.map_smul` and `fst_map_prodMk` proof arguments; the measurability goal goes to `AEM_TAC`
+  (`fun_prop | assumption | … | measurability`). By hand: `μ.map T` of an untyped `ProbabilityMeasure`, an instance
+  used implicitly by a lemma statement (add `haveI … := Measure.isProbabilityMeasure_map …`), and a map whose
+  measurability is a named lemma (`measurable_liftPair d`): name it directly, since the tactic chain can time out
+  at `isDefEq` (oaiq-041, oaiq-044).
+- *The `eLpNorm` family, `tendsto_integral_of_L1'`, renames, `mgf_gaussianReal`* (oaiq-036/038/048; rewritten by
+  0cd4396). A trailing measurability argument was removed from `eLpNorm_eq_eLpNorm'`,
+  `eLpNorm_eq_lintegral_rpow_enorm_toReal`, `eLpNorm_nnreal_eq_eLpNorm'`, `eLpNorm_mono_real` and
+  `Lp.eLpNorm_le_of_ae_tendsto` (its `hg`), and the port drops it by position; `eLpNorm_sum_le`,
+  `eLpNorm_le_eLpNorm_of_exponent_le` and Bochner `tendsto_integral_of_L1'` gained one, which the port inserts as
+  a named argument proved by `AESM_TAC`; `eventuallyEqSet_univ` is `eventuallyEq_univ`; d13f23b's
+  `eLpNorm_indicator_const` is our `eLpNorm_indicator_const₀`; `mgf_gaussianReal ⟨hm, heq⟩` is
+  `mgf_gaussianReal heq`. By hand: an `apply` followed by one bullet per goal (delete the dropped goal's bullet),
+  a `rw [foo a b]` that left the removed argument as a side goal, an `AESM_TAC` site where nothing fixes the
+  function yet (`simpa … using eLpNorm_sum_le (…)` with no `(f := …)`).
+- *Smaller drift seen once or twice, patched per site:* `MemLp g p μ` is a pair (a bare `lt_top` proof needs
+  `⟨hg.aestronglyMeasurable, _⟩`), `MemLp.mul` swapped its factors; `norm_num [table defs]` leaves `vecCons`
+  lookups or `Int.toNat 205` unevaluated where `simp [same]` evaluates them (oaiq-033/038); `rw
+  [AddMonoidAlgebra.coeff_zero]` on an `MvPolynomial.coeff` goal is `MvPolynomial.coeff_zero` (and `coeff_add`);
+  `tauto` no longer unfolds an applied set-builder membership; a multi-line `convert … using 1; first | rfl |
+  ring` closes only the first goal (use `<;>`) (oaiq-045); `omit [BorelSpace E]` on a lemma that uses stdGaussian
+  (oaiq-048).
+- *"not type-correct under the `implicit` transparency level"* in `rw`/`simp`/`dsimp` (category theory,
+  homological algebra; oaiq-032). Fix per failing module, never as a port default (making
+  `backward.isDefEq.respectTransparency false` a header default broke modules that had built: synthInstance and
+  whnf timeouts, a `simp` that now closes the goal). In order: the option as a port patch anchored inside the
+  module before `namespace OAI` (a `set_option` inside a namespace ends with it); else `erw` at the failing step;
+  when the option makes `simp` close a goal, `all_goals` or `simp only` for the next tactic.
+  `set_option synthInstance.maxHeartbeats 200000` fixed "failed to synthesize … deterministic timeout" in 12
+  modules with one patch.
+- *`SimplexCategory.toTopHomeo` / `TopCat.toSSetObjEquiv` with `--stdsimplex auto`* (oaiq-043): ours lands in the
+  subtype `stdSimplex`, d13f23b's in the structure; structure mode renames `toTopHomeo` to `toTopHomeoD…` from the
+  module `StdSimplexTopCompat` (a040fa7). `--stdsimplex subtype` is no way out for code that also uses the
+  structure's fields. Many hand patches are easier to keep as a diff of the repaired modules against a copy of the
+  unpatched port turned into `patches.json` (oaiq-043/mkpatches.py: one line of context per hunk, never a line
+  the port itself rewrites).
+- *A `have` that states a hand-written `match`* (`have h : … (match vs with …) …; simp_rw [h]`) breaks when the
+  function whose body has the same `match` comes from a bundle: Lean shares a matcher only within one module
+  (oaiq-018). Patch the generated piece (config `patches`) with a defeq congruence instead of the rewrite.
 - *`import all`.* OpenAI reaches Mathlib's *private* declarations (`import all …IsGaussianProcess` for
   `Finset.orderEmbOfFinWithBot`) with `import all`, which a non-`module` file cannot use. Copy the private declarations
   into the module (root names; the private ones are mangled, so nothing clashes).
@@ -105,9 +150,23 @@ Problem336).** Fix each at the cause; none needs a macro.
 and new `carve.py` inside one carve. So:
 - `carve_pipeline.py DIR --folder F --root-module M --target T --bundle-prefix P [--def …] [--forced …]
   [--patches …] [--compat-imports narrow] [--budget N] [--config-set JSON] [--fetch]` is the whole module
-  route of step 4 and 6 above: fetch, filter-patches, port, build, workspace build, config, graph,
-  ext-defs, plan, gen, order, measure (edge check on), publish-prep, prose-template, check-text, and a
-  `split_run` dry run (`--publish` adds `split_run --go`). Each step is idempotent, logged in
+  route of step 4 and 6 above: fetch, inputs (the targets' published statements and `Def_` bundles,
+  fetched into the workspace when missing), filter-patches, port, build, workspace build, config, graph,
+  ext-defs, plan, gen, order, measure (edge check on), calibrate, publish-prep, prose-template, check-text,
+  and a `split_run` dry run (`--publish` adds `split_run --go`). `--fetch` copies the root's import closure
+  from the local openai/math clone (`~/claude/openai-math`; raw GitHub only for what it lacks, with backoff on
+  429); never pass a whole openai/math tree as `--lean-src` (port and filter-patches refuse more than 50 modules
+  outside the closure; eleven workers lost hours to that and to 429s, 2026-10-26/27). The build keeps going past
+  a failing module and reports every failure in one run.
+- **Run it detached and wait on it** (2026-10-27): `carve_pipeline.py DIR … --detach` starts the run as a
+  systemd user unit (log `DIR/logs/driver.log`); `carve_pipeline.py DIR --wait 100` returns its status, or
+  exits 4 still running: re-arm that. A Bash background command dies at 2 h, and that killed drivers mid-build
+  and mid-graph on every port over ~300 modules (oaiq-033..049); a killed wait costs nothing. Since a932a18 the
+  build leaves `graph` its LeanInfo reading, so `graph` takes seconds after a build.
+- Parameters live in `DIR/pipeline.json`: a different CLI value is refused, so edit the file. A changed
+  `config_set.patches` needs `--redo config` and `--redo gen` (config alone leaves the generated files
+  unpatched). Editing the patches file and resuming re-ports (stale-step detection). `--def` takes
+  `Definitions.Def_X` (a bare `Def_X` is read so); `--measure-flag` takes the `=` form. Each step is idempotent, logged in
   `DIR/logs/STEP.log`, recorded in `DIR/pipeline_state.json`; the first failure stops the run with the log's
   tail and the same command resumes. Parameters are stored in `DIR/pipeline.json`. Written prose for the goal
   and `forced` items is still yours (it is listed, not generated).
@@ -122,10 +181,15 @@ and new `carve.py` inside one carve. So:
   cost), re-plans, re-generates and re-measures (unchanged files are cached), at most twice, and stops with
   the offenders listed (then `carve.py split` or a manual `time_scale`). Never publish before it passes. It
   only raises the scale: a small sample cannot calibrate it down, since the per-item error is 0.3–1.4× even
-  at a fitted scale. Outside the pipeline the manual rule is the same: measure everything, and if any item
-  is over ~90 s, multiply `time_scale` by the worst measured/planned ratio and plan again.
+  at a fitted scale. A piece measured under 200 s never counts (57119d3): it is a proof, resubmittable,
+  so submit it as is and split only after two real verifier timeouts; bundles and statements freeze at
+  publish and keep the strict limit (oaiq-035/037: a 106 s piece cost two hour-long re-plans).
+  `accept_over` in pipeline.json excuses another item under the same 200 s cap. Outside the pipeline the
+  manual rule is the same: measure everything, and if any bundle or statement is over ~90 s, multiply
+  `time_scale` by the worst measured/planned ratio and plan again.
 - To change a tool: change the skill (tests first), commit, push; new runs pick it up, running ones do not.
-  A tool fix a running carve needs: `--upgrade --redo STEP`. Any remaining shell script in the skill has
+  A tool fix a running carve needs: `--upgrade --redo STEP` (from any snapshot, the carve's old one
+  included, since 1dbb8c1). Any remaining shell script in the skill has
   its body in `main() { …; }; main "$@"; exit` (`tests/test_shell_scripts.py`).
 - Long single tools outside the pipeline (a one-off `carve.py` call) should likewise run from
   `python3 "$(scripts/skill_snapshot.py)"/prove2me/scripts/X.py`.

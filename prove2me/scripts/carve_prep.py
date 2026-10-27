@@ -38,7 +38,7 @@ usage:
   carve_prep.py bundle-prose PUBLISH_DIR TEMPLATE.md
       prose/<NAME>.md for every bundle: TEMPLATE with {NAME}, {MODULES} (the bundle's `-- module`
       markers), {IMPORTS} (its bundle imports) and {EXTRA} (extra_<NAME>.md beside the template).
-  carve_prep.py prose-template DIR [--meta oai_meta.json] [--force]
+  carve_prep.py prose-template DIR [--meta oai_meta.json] [--lean-root SRC/lean] [--force]
       after publish-prep, with no model call (p2mlib.prosetemplate): DIR/publish/prose/<slug>.md for
       every intermediate statement and prose/<NAME>.md for every bundle, explanations/<slug>.md
       for every piece proving an intermediate statement, from the plan, out/, work/decl_graph.jsonl
@@ -535,10 +535,16 @@ def cmd_check_text(argv):
 
 def cmd_prose_template(argv):
     from p2mlib import prosetemplate as T
-    pos = positional(argv, ('--meta',))
+    pos = positional(argv, ('--meta', '--lean-root'))
     if len(pos) != 1:
         sys.exit(__doc__)
     meta = json.load(open(opt(argv, '--meta'), encoding='utf-8')) if '--meta' in argv else None
+    if '--lean-root' in argv:
+        # the fetched sources map each module to its path; without them the paths are guessed from
+        # flattened names, which doubled a directory (oaiq-035). oai_meta.json's own lean_root wins
+        meta = meta if meta is not None else T.load_meta(pos[0])
+        if not meta.get('lean_root') and os.path.isdir(opt(argv, '--lean-root')):
+            meta['lean_root'] = opt(argv, '--lean-root')
     rep = T.write_templates(pos[0], meta, force='--force' in argv)
     for r in rep['written']:
         print('wrote', r)

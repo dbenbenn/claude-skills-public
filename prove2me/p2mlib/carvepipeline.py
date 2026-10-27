@@ -447,7 +447,9 @@ class Pipeline:
                                                  self.p.get('tags') or 'openai-math')])
 
     def step_prose(self):
-        self.run_cmds('prose', [self.tool('carve_prep', 'prose-template', self.d, '--meta', self.meta)])
+        # the sources map each module to its openai/math path (oaiq-035: guessed paths doubled a directory)
+        self.run_cmds('prose', [self.tool('carve_prep', 'prose-template', self.d, '--meta', self.meta,
+                                          '--lean-root', self.lean_src)])
         log = os.path.join(self.d, 'logs', 'prose.log')
         need = [l for l in open(log).read().splitlines() if 'needs written prose' in l]
         if need:
