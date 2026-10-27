@@ -305,6 +305,13 @@ def test_check_text_skips_fenced_lean(tmp_path):
     assert CP.missing_names(md, '', lambda n: False) == []
 
 
+def test_check_text_accepts_openai_name_when_only_its_suffixed_statement_is_published():
+    md = 'The declaration `OAI.Foo.bar_lemma` of OpenAI.\n'
+    local = 'lemma bar_lemma_q44 (x : Nat) : x = x := rfl'
+    assert CP.missing_names(md, local, lambda n: False) == ['OAI.Foo.bar_lemma']
+    assert CP.missing_names(md, local, lambda n: False, suffix='_q44') == []
+
+
 def test_reruns_regenerate_templates_but_keep_written_prose(tmp_path):
     d, _ = make_carve(tmp_path)
     run(d)

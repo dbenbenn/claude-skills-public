@@ -419,7 +419,7 @@ def stub_comments(texts):
     return sorted(n for n, t in texts.items() if re.search(r'/-|--', t))
 
 
-def missing_names(md_text, local, in_library, skip=()):
+def missing_names(md_text, local, in_library, skip=(), suffix=''):
     """The Lean-looking names in backticks found neither in `local` text nor by `in_library`."""
     md_text = re.sub(r'^---\n.*?\n---\n', '', md_text, flags=re.S)      # front matter: source URLs
     md_text = re.sub(r'^```.*?^```[ \t]*$', '', md_text, flags=re.M | re.S)   # fenced Lean: verbatim code
@@ -435,6 +435,7 @@ def missing_names(md_text, local, in_library, skip=()):
             if re.match(r'inst[A-Z]', last):     # an anonymous instance's generated name is never in the source text
                 continue
             hit = any(re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(x), local) for x in {nm, last}) \
+                or (suffix and re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(last + suffix), local)) \
                 or in_library(last)
             if not hit:
                 bad.append(nm)
@@ -471,6 +472,11 @@ def cmd_check_text(argv):
     skip = {re.sub(r'^(Def|Thm|Sol)_', '', os.path.basename(f)[:-5]) for f in gen + extra}
     skip |= set(opts(argv, '--allow'))
     roots, rg, seen = library_roots(ws), rg_exe(), {}
+    suffix = ''
+    try:        # a suffixed split (statement_suffix) publishes OpenAI's name with it appended
+        suffix = json.load(open(os.path.join(P, '..', 'config.json'))).get('statement_suffix') or ''
+    except (OSError, ValueError):
+        pass
 
     def in_library(name):
         if name not in seen:
@@ -484,7 +490,7 @@ def cmd_check_text(argv):
             for pr in E.problems(t):
                 bad += 1
                 print('EXPLANATION %s: %s' % (os.path.basename(f), pr))
-        for nm in missing_names(t, local, in_library, skip):
+        for nm in missing_names(t, local, in_library, skip, suffix):
             bad += 1
             print('NOT FOUND %s: %s' % (os.path.basename(f), nm))
     stubs = {os.path.basename(f): open(f, encoding='utf-8').read() for f in glob.glob(P + '/out/lib/Thm_*.lean')}
