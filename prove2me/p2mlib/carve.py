@@ -210,6 +210,7 @@ def record_fixture(src_root, prefix, roots, olean_dir, out_dir, ws=None):
         out = ['decl_graph.jsonl']
         for m in mods:
             data = leaninfo.raw(module_path(src_root, m), ws=ws, idents=True, module=m, no_decls=True)
+            data.pop('build_ms', None)        # a timing: never the same twice, so never recorded
             data['file'] = os.path.relpath(module_path(src_root, m), src_root)
             rel = os.path.relpath(module_path(src_root, m), src_root)[:-5] + '.info.json'
             os.makedirs(os.path.dirname(os.path.join(out_dir, rel)), exist_ok=True)
@@ -909,9 +910,14 @@ class Graph:
                             [n for n in self.nodes[ik].names if n not in (c.sig_insts or ())]
 
     def is_local_instance(self, k):
-        """Is node k a `local instance` (visible only in the rest of its own section)?"""
+        """Is node k a `local instance` (visible only in the rest of its own section)? Read from its
+        command's text alone: DeclGraph's instance flag (Meta.isInstance on the compiled
+        environment) is False for every local instance, whose attribute ends with its section, so
+        requiring it made this always False (2026-10-27)."""
         nd = self.nodes[k]
-        return nd.instance and _local_instance(self.infos[nd.module], self.infos[nd.module].commands[nd.cmd])[0]
+        if nd.cmd is None:
+            return False
+        return _local_instance(self.infos[nd.module], self.infos[nd.module].commands[nd.cmd])[0]
 
     def inst_problems(self, k):
         """[(class, {argument heads})]: what instance search solved in node k's elaboration

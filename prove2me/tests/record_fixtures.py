@@ -22,6 +22,7 @@ def record(name):
     for parse_only, suffix in ((False, ''), (True, '.parse')):
         path = os.path.join(FIX, name + '.lean')
         data = leaninfo.raw(path, parse_only=parse_only)
+        data.pop('build_ms', None)            # a timing, never the same twice
         data['file'] = name + '.lean'
         with open(os.path.join(FIX, name + suffix + '.json'), 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=1, sort_keys=True)

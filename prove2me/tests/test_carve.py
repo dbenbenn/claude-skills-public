@@ -1939,3 +1939,24 @@ def test_a_kept_local_instance_brings_its_same_type_siblings():
     # a declaration that uses no instance on Verts does not bring it
     keep = {'CD.IC.R', 'CD.IC.Zeroish', 'CD.IC.Verts', 'CD.IC.instZeroishVerts'}
     assert 'Inhabited' not in C.Carver(g).carve(keep, g.have_names(keep))
+
+
+
+def test_local_instances_are_recognised_and_never_owned_across_modules(g):
+    # DeclGraph's `i` comes from Meta.isInstance on the compiled environment, where a `local instance`
+    # is no longer one, so is_local_instance (which also required it) was False for every local
+    # instance and the cross-module guard in inst_owners never fired (found in the oaiq-032 fix).
+    for k in (IC_A + 'zeroR', IC_A + 'oneR', IC_B + 'zeroR', 'CD.IC.instInhabitedVerts'):
+        assert g.is_local_instance(k), k
+    for k in ('CD.Co.instCoeFunTstForallNat', 'CD.IC.R', 'CD.IC.one_a'):
+        assert not g.is_local_instance(k), k
+    # InstColB imports InstColA, but InstColA's local zeroR is out of force there: a command of
+    # InstColB that used `zeroR` used its own (the carver re-emits that command instead)
+    idx = len(g.infos['CarveDev.InstColB'].commands)
+    assert IC_A + 'zeroR' not in g.inst_owners([IC_A + 'zeroR'], 'CD.IC.one_b', 'CarveDev.InstColB', idx)
+    # a global instance of an imported module still counts
+    co = g.nodes['CD.Co.instCoeFunTstForallNat'].module
+    users = [m for m in g.infos if m != co and g.sees(m, co)]
+    if users:
+        assert 'CD.Co.instCoeFunTstForallNat' in g.inst_owners(
+            ['CD.Co.instCoeFunTstForallNat'], 'x', users[0], len(g.infos[users[0]].commands))
