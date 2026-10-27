@@ -1285,3 +1285,14 @@ def test_module_route_adds_the_tophomeo_module_where_used():
     assert 'sorry' not in top
     files = O.module_files({'OAI.G.A': ('A', SIMPLEX_SRC)}, 'Solutions.G', (), '')
     assert 'StdSimplexTopCompat.lean' not in files
+
+
+# d13f23b's `MvPowerSeries.pderiv i` takes the index only; ours is `MvPowerSeries.pderiv R i` with the
+# ring explicit (SharpRamsey RichLines, oaiq-045). Lemma names (`pderiv_X`, `pderiv_coe`) are untouched.
+def test_mv_power_series_pderiv_gets_the_ring_argument():
+    src = ('(MvPowerSeries.pderiv i (MvPowerSeries.pderiv j h)) simp [MvPowerSeries.pderiv_X] '
+           'MvPowerSeries.pderiv a\n  (f)')
+    out = O.core_rewrites(src)
+    assert out.count('MvPowerSeries.pderiv _ ') == 3
+    assert 'MvPowerSeries.pderiv_X' in out
+    assert O.core_rewrites(out) == out
