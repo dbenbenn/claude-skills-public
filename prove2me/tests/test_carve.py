@@ -1924,3 +1924,18 @@ def test_a_local_instance_its_imported_bundle_text_lacks_is_emitted_again_not_ac
     C.generate(g, P, str(tmp_path), what=('bundles',), names={'IC1'})
     assert 'attribute [local instance] CD.IC.zeroR_p1' not in open(tmp_path / 'lib' / 'Def_IC1.lean').read()
 
+
+def test_a_kept_local_instance_brings_its_same_type_siblings():
+    # Thomason (oaiq-043, 2026-10-27): `local instance : Fintype (OrdinalVertices n)` beside the
+    # kept `LinearOrder` one on the same synonym; partialLastVertex needed it ("failed to synthesize
+    # Fintype ↑(OrdinalVertices n)") though no record of the port shows a use. Here verts_zero uses
+    # the Zeroish instance on Verts; the Inhabited sibling comes back with it.
+    g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    keep = {'CD.IC.R', 'CD.IC.Zeroish', 'CD.IC.Verts', 'CD.IC.instZeroishVerts', 'CD.IC.verts_zero'}
+    txt = C.Carver(g).carve(keep, g.have_names(keep))
+    sec = _section(txt, 'CarveDev.InstColA')
+    s = re.search(r'^local instance instInhabitedVerts_r\w+ \(n : Nat\) : Inhabited \(Verts n\)', sec, re.M)
+    assert s and s.start() < sec.index('theorem verts_zero'), sec
+    # a declaration that uses no instance on Verts does not bring it
+    keep = {'CD.IC.R', 'CD.IC.Zeroish', 'CD.IC.Verts', 'CD.IC.instZeroishVerts'}
+    assert 'Inhabited' not in C.Carver(g).carve(keep, g.have_names(keep))

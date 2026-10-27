@@ -2685,7 +2685,8 @@ class Carver:
           command again, under a name unique to this file, after the earlier local instances its
           own elaboration used (the same rules, recursively: Lech oaiq-032, a re-emitted
           `baseAlgebra_r…` came before the `concreteRing` its statement needs).
-        `chain`: the scope the emitted text lands in (c's, or the kept
+        A local instance on the same type (argument heads) as one c used comes back with it
+        (`_sibling_used`). `chain`: the scope the emitted text lands in (c's, or the kept
         command's when re-emitting what a re-emitted instance needs)."""
         g = self.g
         if chain is None:
@@ -2697,12 +2698,15 @@ class Carver:
                 continue
             vc = info.commands[vi]
             is_inst, anon_at = _local_instance(info, vc)
+            sibling = False
             if is_inst and used is not None:
                 ik0 = g.cmd_node.get((m, vi))
                 names = {x[0] for x in vc.declares or ()} or set(g.nodes[ik0].names if ik0 else ())
                 keys = {'key:' + ' '.join([x[1]] + list(x[2])) for x in vc.declares or () if x[1]}
                 if not (names | keys) & used and not (not sorried and _could_answer(vc, c)):
-                    continue
+                    if not self._sibling_used(info, vc, c, used):
+                        continue
+                    sibling = True
             # ik None: a local instance that is nobody's node. An instance of a Prop class is a
             # theorem, and Lean lets sibling modules declare the same one under one generated name
             # (Problem340 2026-10-24: `local instance : Fact ((0 : ℝ) < 100)` in 28 modules, 13
@@ -2727,7 +2731,7 @@ class Carver:
             opens = g.scope_opens(info, vc, m)
             refs = [i for i in vc.idents or [] if i['role'] == 'ref']
             if any(self._gone(i['name'], vc, m, have, opens, idn=i) for i in refs):
-                if used is not None:
+                if used is not None and not sibling:
                     # used, but it names what this file lacks: the plan should have kept it
                     g.lost_instances.append((m, vc.start.line, c.start.line))
                 continue
@@ -2740,6 +2744,27 @@ class Carver:
             edit = (anon_at, anon_at, ' ' + name) if anon_at is not None else (decl['start'], decl['end'], name)
             out.append(_cmd_text(info, vc, [edit]).strip() + '\n')
         return ''.join(out)
+
+    def _sibling_used(self, info, vc, c, used):
+        """Did command c use another local instance of its module, in scope at c, on the same type
+        as local instance vc (the same class argument heads, LeanInfo `declares`)? Then vc comes
+        back too: both were in force in the port, and a use of vc can leave no record (Thomason
+        oaiq-043: `local instance : Fintype (OrdinalVertices n)` beside the kept `LinearOrder` one on
+        that synonym; partialLastVertex needed it, though neither its constants, `insts` nor
+        `inst_keys` show a Fintype problem)."""
+        heads = {tuple(x[2]) for x in vc.declares or () if x[1] and x[2]}
+        classes = {x[1] for x in vc.declares or () if x[1]}
+        if not heads:
+            return False
+        for c2 in info.commands[:c.index]:
+            if c2.index == vc.index or not _in_scope(info, c2.index, c) or \
+                    not _local_instance(info, c2)[0]:
+                continue
+            # not one of vc's own class: emitted before c, vc would take priority over the one c used
+            if any(x[1] and x[1] not in classes and tuple(x[2]) in heads and x[0] in used
+                   for x in c2.declares or ()):
+                return True
+        return False
 
     def _variable(self, info, c, m, have, opens, dropped_vars, protected, dead_tokens=(), pins=None):
         """The `variable` command without its gone binder groups: False (unchanged), None (none
