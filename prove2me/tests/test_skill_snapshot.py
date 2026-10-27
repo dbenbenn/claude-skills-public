@@ -127,3 +127,18 @@ def test_inside_detects_a_path_in_the_cache(repo, cache):
     p = snapshot.snapshot(str(repo), cache=str(cache))
     assert snapshot.snapshot_root_of(os.path.join(p, 'prove2me', 'scripts', 'tool.py'), cache=str(cache)) == p
     assert snapshot.snapshot_root_of(str(repo / 'prove2me' / 'scripts' / 'tool.py'), cache=str(cache)) is None
+
+
+def test_default_repo_inside_a_snapshot_is_the_live_skills_repo(tmp_path, monkeypatch):
+    # oaiq-059: --upgrade --detach re-ran inside a snapshot, whose parent is no git repo ("not a git repository")
+    import importlib.util
+    cache = tmp_path / 'cache'
+    fake = cache / 'abc123' / 'prove2me' / 'p2mlib'
+    fake.mkdir(parents=True)
+    src = open(os.path.join(os.path.dirname(__file__), '..', 'p2mlib', 'snapshot.py')).read()
+    (fake / 'snapshot.py').write_text(src)
+    monkeypatch.setenv('P2M_SNAPSHOT_CACHE', str(cache))
+    spec = importlib.util.spec_from_file_location('snap_copy', fake / 'snapshot.py')
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert m.default_repo() == os.path.expanduser('~/.claude/skills')

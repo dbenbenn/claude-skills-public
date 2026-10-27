@@ -22,7 +22,10 @@ class DirtyTree(Exception):
 
 def default_repo():
     """The skills repository this library lives in (…/skills/prove2me/p2mlib/snapshot.py)."""
-    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if os.path.dirname(here) == cache_dir():       # inside a snapshot: the repo is the live one (oaiq-059)
+        return os.path.expanduser('~/.claude/skills')
+    return here
 
 
 def cache_dir(cache=None):
