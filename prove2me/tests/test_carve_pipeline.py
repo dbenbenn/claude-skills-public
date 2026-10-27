@@ -496,3 +496,82 @@ def test_calibration_excuses_accepted_items_under_the_hard_cap():
     assert CP.calibration(plan, times, 8.0, 55, accepted=['piece:P'])['over'] == []
     # the hard cap still applies to an accepted item
     assert CP.calibration(plan, {'piece:P': _t(250)}, 8.0, 55, accepted=['piece:P'])['over']
+
+
+# ---- lean_src must be the root's import closure (2026-10-27) -------------------------------------
+# oaiq-033/034/038/040/046/048: after a GitHub 429, workers passed the whole OpenAI tree (1.4 GB,
+# 121,736 modules) as --lean-src; filter_patches and port then took every OAI.* module as input
+# (25-50 min, then ~340 "not ported" lines, or a port of everything).
+
+def _tree(root, outside):
+    lean = root / 'lean'
+    (lean / 'OAI' / 'Pre').mkdir(parents=True)
+    (lean / 'OAI' / 'Pre' / 'Main.lean').write_text('import Mathlib\nimport OAI.Pre.A\n')
+    (lean / 'OAI' / 'Pre' / 'A.lean').write_text('import Mathlib\n')
+    (lean / 'OAI' / 'Other').mkdir(parents=True)
+    for i in range(outside):
+        (lean / 'OAI' / 'Other' / ('M%d.lean' % i)).write_text('import Mathlib\n')
+    return lean
+
+
+def test_closure_check_counts_modules_outside_the_closure(tmp_path):
+    sys.path.insert(0, ROOT)
+    from p2mlib import carvepipeline as CP
+    lean = _tree(tmp_path, 3)
+    assert CP.outside_closure(str(lean), 'OAI.Pre.Main') == (3, 2)
+    assert CP.outside_closure(str(_tree(tmp_path / 'b', 0)), 'OAI.Pre.Main') == (0, 2)
+
+
+def test_a_whole_tree_as_lean_src_is_refused_before_port(env):
+    lean = _tree(env.tmp / 'whole', 60)
+    r = run(env, *ARGS, '--lean-src', str(lean), '--stop-after', 'port')
+    assert r.returncode != 0 and 'import closure' in (r.stdout + r.stderr)
+    assert ('oai_port_modules', str(lean)) not in tools_called(env)
+
+
+def test_a_closure_only_lean_src_passes(env):
+    lean = _tree(env.tmp / 'closure', 0)
+    r = run(env, *ARGS, '--lean-src', str(lean), '--stop-after', 'port')
+    assert r.returncode == 0, r.stderr
+    assert ('oai_port_modules', str(lean)) in tools_called(env)
+
+
+def test_a_bare_def_name_means_the_definitions_module(env):
+    # oaiq-042: `--def Def_CriticalStripMass` reached `lake build Def_CriticalStripMass` ("unknown
+    # target") after an hour of fetch, port and build
+    run(env, *ARGS, '--def', 'Def_A', '--stop-after', 'inputs')
+    assert json.load(open(env.dir / 'pipeline.json'))['defs'] == ['Definitions.Def_A']
+
+
+# ---- --detach / --wait (2026-10-27) ------------------------------------------------------------
+# oaiq-033/034/036/038/041/042/046/049: the driver ran inside a Bash background command, which the
+# harness kills at 2 h, mid-build or mid-graph. Detached, the driver is its own systemd user unit;
+# what an agent arms is a --wait, and a killed wait costs nothing.
+
+def _cp():
+    sys.path.insert(0, SCRIPTS)
+    import carve_pipeline
+    return carve_pipeline
+
+
+def test_detach_command_runs_the_same_arguments_as_a_user_unit(tmp_path):
+    cp = _cp()
+    env = {'PATH': '/x/lean-cap:/usr/bin', 'HOME': '/h', 'P2M_WORKSPACE': '/ws', 'LEAN_PRIORITY': '7', 'SECRET': 's'}
+    unit, cmd = cp.detach_command(str(tmp_path / 'carve'), ['--from', 'graph', '--detach'], '/s/carve_pipeline.py', env)
+    assert unit.startswith('carve-') and cmd[:3] == ['systemd-run', '--user', '--unit=' + unit]
+    assert '--collect' in cmd and '-p' in cmd and 'WorkingDirectory=%s' % (tmp_path / 'carve') in cmd
+    for kv in ('PATH=/x/lean-cap:/usr/bin', 'HOME=/h', 'P2M_WORKSPACE=/ws', 'LEAN_PRIORITY=7'):
+        assert '--setenv=' + kv in cmd
+    assert not any('SECRET' in c for c in cmd)
+    inner = cmd[-1]
+    assert '/s/carve_pipeline.py' in inner and '--from graph' in inner and '--detach' not in inner
+    assert '== driver exit' in inner and 'driver.log' in inner
+    assert cp.detach_command(str(tmp_path / 'carve'), [], 'x', env)[0] == unit   # one unit name per carve
+
+
+def test_wait_reads_the_last_detached_run():
+    cp = _cp()
+    assert cp.wait_result('') is None
+    assert cp.wait_result('== detached 1\n== driver exit 1\n== detached 2\nrunning graph\n') is None
+    assert cp.wait_result('== detached 1\n== driver exit 1\n== detached 2\npipeline ok\n== driver exit 0\n') == 0
+    assert cp.wait_result('== detached 1\nstep failed\n== driver exit 1\n') == 1

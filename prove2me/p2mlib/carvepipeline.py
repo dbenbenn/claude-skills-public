@@ -163,6 +163,36 @@ def hash_paths(paths, exts=('',)):
     return h.hexdigest() if seen else None
 
 
+OUTSIDE_CLOSURE_LIMIT = 50
+
+
+def outside_closure(lean_src, root_module):
+    """(OpenAI modules under lean_src outside root_module's import closure, modules in the closure).
+    The port and filter-patches steps take every module under lean_src as input, so lean_src must be
+    the closure (what oai_fetch writes), never a whole checkout of openai/math (oaiq-033..048)."""
+    seen, todo = set(), [root_module]
+    while todo:
+        m = todo.pop()
+        if m in seen:
+            continue
+        f = os.path.join(lean_src, *m.split('.')) + '.lean'
+        if not os.path.exists(f):
+            continue
+        seen.add(m)
+        todo += [i for i in re.findall(r'^import\s+(\S+)', open(f, encoding='utf-8').read(), re.M)
+                 if i.split('.')[0] in ('OAI', 'ComparatorChallenges')]
+    out = 0
+    for d, _, fs in os.walk(os.path.join(lean_src, 'OAI')):
+        for f in fs:
+            if f.endswith('.lean'):
+                m = os.path.relpath(os.path.join(d, f), lean_src)[:-5].replace(os.sep, '.')
+                if m not in seen:
+                    out += 1
+                    if out > 10 * OUTSIDE_CLOSURE_LIMIT:
+                        return out, len(seen)
+    return out, len(seen)
+
+
 def openai_prefixes(lean_src):
     oai = os.path.join(lean_src, 'OAI')
     return ['OAI.' + d for d in sorted(os.listdir(oai)) if os.path.isdir(os.path.join(oai, d))]
@@ -296,13 +326,25 @@ class Pipeline:
             raise StepFailed("step 'inputs': still not in the workspace after fetch_theorems: %s "
                              "(published yet? see logs/inputs.log)" % ', '.join(again))
 
+    def check_closure(self, step):
+        out, inside = outside_closure(self.lean_src, self.p['root_module'])
+        if out > OUTSIDE_CLOSURE_LIMIT:
+            raise StepFailed("step '%s': %s holds %s OpenAI modules outside the import closure of %s (%d "
+                             "modules); the port would take them all as input. Use --fetch without "
+                             "--lean-src (oai_fetch copies just the closure from the local openai/math "
+                             "clone), or point lean_src in pipeline.json at a closure-only copy"
+                             % (step, self.lean_src, '%d' % out if out <= 10 * OUTSIDE_CLOSURE_LIMIT
+                                else 'more than %d' % (10 * OUTSIDE_CLOSURE_LIMIT), self.p['root_module'], inside))
+
     def step_filter_patches(self):
         if not self.p.get('patches'):
             return 'skipped'
+        self.check_closure('filter_patches')
         self.run_cmds('filter_patches', [self.tool('carve_prep', 'filter-patches', os.path.expanduser(self.p['patches']),
                                                    self.lean_src, self.port_patches(), *self.prefixes(), *self.compat_args())])
 
     def step_port(self):
+        self.check_closure('port')
         a = [self.lean_src, self.p['folder'], *self.prefixes()]
         if self.p.get('patches'):
             a += ['--patches', self.port_patches()]
