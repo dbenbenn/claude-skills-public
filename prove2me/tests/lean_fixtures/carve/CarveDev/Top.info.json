@@ -1,4 +1,5 @@
 {
+ "build_ms": 190,
  "commands": [
   {
    "attrs": [],
@@ -11,17 +12,17 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 164,
+    "byte": 189,
     "col": 10,
-    "line": 9
+    "line": 10
    },
    "heads": [],
    "idents": [
     {
-     "end": 164,
+     "end": 189,
      "name": "u",
      "role": "univ",
-     "start": 163
+     "start": 188
     }
    ],
    "ids": [],
@@ -36,9 +37,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 154,
+    "byte": 179,
     "col": 0,
-    "line": 9
+    "line": 10
    },
    "used_keys": []
   },
@@ -55,17 +56,17 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 178,
+    "byte": 203,
     "col": 12,
-    "line": 11
+    "line": 12
    },
    "heads": [],
    "idents": [
     {
-     "end": 178,
+     "end": 203,
      "name": "CD",
      "role": "scope",
-     "start": 176
+     "start": 201
     }
    ],
    "ids": [],
@@ -80,9 +81,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 166,
+    "byte": 191,
     "col": 0,
-    "line": 11
+    "line": 12
    },
    "used_keys": []
   },
@@ -110,96 +111,96 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 267,
+    "byte": 292,
     "col": 85,
-    "line": 13
+    "line": 14
    },
    "heads": [],
    "idents": [
     {
-     "end": 196,
+     "end": 221,
      "name": "top_pick",
      "role": "decl",
-     "start": 188
+     "start": 213
     },
     {
-     "end": 200,
+     "end": 225,
      "name": "α",
      "role": "binder",
-     "start": 198
-    },
-    {
-     "end": 209,
-     "name": "u",
-     "role": "ref",
-     "start": 208
-    },
-    {
-     "end": 213,
-     "name": "a",
-     "role": "binder",
-     "start": 212
-    },
-    {
-     "end": 218,
-     "name": "α",
-     "role": "ref",
-     "start": 216
-    },
-    {
-     "end": 226,
-     "name": "pick",
-     "role": "ref",
-     "start": 222
-    },
-    {
-     "end": 228,
-     "name": "[anonymous]",
-     "role": "ref",
-     "start": 228
-    },
-    {
-     "end": 232,
-     "name": "pick",
-     "role": "ref",
-     "start": 228
+     "start": 223
     },
     {
      "end": 234,
-     "name": "a",
+     "name": "u",
      "role": "ref",
      "start": 233
     },
     {
-     "end": 239,
+     "end": 238,
      "name": "a",
+     "role": "binder",
+     "start": 237
+    },
+    {
+     "end": 243,
+     "name": "α",
      "role": "ref",
-     "start": 238
+     "start": 241
+    },
+    {
+     "end": 251,
+     "name": "pick",
+     "role": "ref",
+     "start": 247
+    },
+    {
+     "end": 253,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 253
     },
     {
      "end": 257,
-     "name": "pick_eq",
+     "name": "pick",
      "role": "ref",
-     "start": 250
+     "start": 253
     },
     {
-     "end": 266,
+     "end": 259,
+     "name": "a",
+     "role": "ref",
+     "start": 258
+    },
+    {
+     "end": 264,
+     "name": "a",
+     "role": "ref",
+     "start": 263
+    },
+    {
+     "end": 282,
      "name": "pick_eq",
      "role": "ref",
-     "start": 259
+     "start": 275
+    },
+    {
+     "end": 291,
+     "name": "pick_eq",
+     "role": "ref",
+     "start": 284
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 196,
+      "byte": 221,
       "col": 16,
-      "line": 13
+      "line": 14
      },
      "start": {
-      "byte": 188,
+      "byte": 213,
       "col": 8,
-      "line": 13
+      "line": 14
      }
     }
    ],
@@ -214,77 +215,77 @@
    "opens": [],
    "resolved": [
     [
-     188,
-     196,
+     213,
+     221,
      "CD.top_pick",
      "b"
     ],
     [
-     188,
-     196,
-     "",
-     "b"
-    ],
-    [
-     198,
-     200,
-     "",
-     "b"
-    ],
-    [
-     212,
      213,
+     221,
      "",
      "b"
     ],
     [
-     216,
-     218,
-     ""
+     223,
+     225,
+     "",
+     "b"
     ],
     [
-     222,
-     226,
-     "CD.pick"
-    ],
-    [
-     228,
-     232,
-     "CD.pick"
-    ],
-    [
-     233,
-     234,
-     ""
-    ],
-    [
+     237,
      238,
-     239,
+     "",
+     "b"
+    ],
+    [
+     241,
+     243,
      ""
     ],
     [
-     250,
+     247,
+     251,
+     "CD.pick"
+    ],
+    [
+     253,
      257,
+     "CD.pick"
+    ],
+    [
+     258,
+     259,
+     ""
+    ],
+    [
+     263,
+     264,
+     ""
+    ],
+    [
+     275,
+     282,
      "CD.pick_eq"
     ],
     [
-     259,
-     266,
+     284,
+     291,
      "CD.pick_eq"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 180,
+    "byte": 205,
     "col": 0,
-    "line": 13
+    "line": 14
    },
    "used_keys": [],
    "value_start": {
-    "byte": 240,
+    "byte": 265,
     "col": 58,
-    "line": 13
+    "line": 14
    }
   },
   {
@@ -304,17 +305,17 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 277,
+    "byte": 302,
     "col": 8,
-    "line": 15
+    "line": 16
    },
    "heads": [],
    "idents": [
     {
-     "end": 277,
+     "end": 302,
      "name": "Aux",
      "role": "open",
-     "start": 274
+     "start": 299
     }
    ],
    "ids": [],
@@ -329,9 +330,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 269,
+    "byte": 294,
     "col": 0,
-    "line": 15
+    "line": 16
    },
    "used_keys": []
   },
@@ -361,36 +362,36 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 316,
+    "byte": 341,
     "col": 37,
-    "line": 17
+    "line": 18
    },
    "heads": [],
    "idents": [
     {
-     "end": 301,
+     "end": 326,
      "name": "helper",
      "role": "decl",
-     "start": 295
+     "start": 320
     },
     {
-     "end": 316,
+     "end": 341,
      "name": "rfl",
      "role": "ref",
-     "start": 313
+     "start": 338
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 301,
+      "byte": 326,
       "col": 22,
-      "line": 17
+      "line": 18
      },
      "start": {
-      "byte": 295,
+      "byte": 320,
       "col": 16,
-      "line": 17
+      "line": 18
      }
     }
    ],
@@ -411,40 +412,40 @@
     }
    ],
    "private": {
-    "end": 286,
-    "start": 279
+    "end": 311,
+    "start": 304
    },
    "resolved": [
     [
-     295,
-     301,
+     320,
+     326,
      "",
      "b"
     ],
     [
-     295,
-     301,
+     320,
+     326,
      "_private.CarveDev.Top.0.CD.helper",
      "b"
     ],
     [
-     313,
-     316,
+     338,
+     341,
      "rfl"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 279,
+    "byte": 304,
     "col": 0,
-    "line": 17
+    "line": 18
    },
    "used_keys": [],
    "value_start": {
-    "byte": 310,
+    "byte": 335,
     "col": 31,
-    "line": 17
+    "line": 18
    }
   },
   {
@@ -473,162 +474,162 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 541,
+    "byte": 566,
     "col": 53,
-    "line": 23
+    "line": 24
    },
    "heads": [],
    "idents": [
     {
-     "end": 330,
+     "end": 355,
      "name": "main",
      "role": "decl",
-     "start": 326
+     "start": 351
     },
     {
-     "end": 333,
+     "end": 358,
      "name": "A",
      "role": "binder",
-     "start": 332
+     "start": 357
     },
     {
-     "end": 341,
+     "end": 366,
      "name": "Space",
      "role": "ref",
-     "start": 336
-    },
-    {
-     "end": 345,
-     "name": "n",
-     "role": "binder",
-     "start": 344
-    },
-    {
-     "end": 351,
-     "name": "Nat",
-     "role": "ref",
-     "start": 348
-    },
-    {
-     "end": 361,
-     "name": "A.size",
-     "role": "ref",
-     "start": 355
+     "start": 361
     },
     {
      "end": 370,
-     "name": "double",
-     "role": "ref",
-     "start": 364
+     "name": "n",
+     "role": "binder",
+     "start": 369
     },
     {
-     "end": 372,
+     "end": 376,
+     "name": "Nat",
+     "role": "ref",
+     "start": 373
+    },
+    {
+     "end": 386,
+     "name": "A.size",
+     "role": "ref",
+     "start": 380
+    },
+    {
+     "end": 395,
+     "name": "double",
+     "role": "ref",
+     "start": 389
+    },
+    {
+     "end": 397,
      "name": "[anonymous]",
      "role": "ref",
-     "start": 372
+     "start": 397
     },
     {
-     "end": 373,
+     "end": 398,
      "name": "n",
      "role": "ref",
-     "start": 372
+     "start": 397
     },
     {
-     "end": 387,
+     "end": 412,
      "name": "double",
      "role": "ref",
-     "start": 381
+     "start": 406
     },
     {
-     "end": 389,
+     "end": 414,
      "name": "n",
      "role": "ref",
-     "start": 388
+     "start": 413
     },
     {
-     "end": 407,
+     "end": 432,
      "name": "List.headOr",
      "role": "ref",
-     "start": 396
+     "start": 421
     },
     {
-     "end": 424,
+     "end": 449,
      "name": "[anonymous]",
      "role": "ref",
-     "start": 424
+     "start": 449
     },
     {
-     "end": 433,
+     "end": 458,
      "name": "helper",
      "role": "ref",
-     "start": 427
+     "start": 452
     },
     {
-     "end": 441,
+     "end": 466,
      "name": "[anonymous]",
      "role": "ref",
-     "start": 441
+     "start": 466
     },
     {
-     "end": 447,
+     "end": 472,
      "name": "quad",
-     "role": "ref",
-     "start": 443
-    },
-    {
-     "end": 460,
-     "name": "rfl",
-     "role": "ref",
-     "start": 457
-    },
-    {
-     "end": 468,
-     "name": "[anonymous]",
      "role": "ref",
      "start": 468
     },
     {
      "end": 485,
+     "name": "rfl",
+     "role": "ref",
+     "start": 482
+    },
+    {
+     "end": 493,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 493
+    },
+    {
+     "end": 510,
      "name": "size_via_coord",
      "role": "ref",
-     "start": 471
+     "start": 496
     },
     {
-     "end": 487,
+     "end": 512,
      "name": "A",
      "role": "ref",
-     "start": 486
+     "start": 511
     },
     {
-     "end": 503,
+     "end": 528,
      "name": "size_zero",
      "role": "ref",
-     "start": 494
+     "start": 519
     },
     {
-     "end": 516,
+     "end": 541,
      "name": "double_succ",
      "role": "ref",
-     "start": 505
+     "start": 530
     },
     {
-     "end": 533,
+     "end": 558,
      "name": "List.headOr_nil",
      "role": "ref",
-     "start": 518
+     "start": 543
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 330,
+      "byte": 355,
       "col": 12,
-      "line": 19
+      "line": 20
      },
      "start": {
-      "byte": 326,
+      "byte": 351,
       "col": 8,
-      "line": 19
+      "line": 20
      }
     }
    ],
@@ -653,132 +654,132 @@
    ],
    "resolved": [
     [
-     326,
-     330,
+     351,
+     355,
      "CD.main",
      "b"
     ],
     [
-     326,
-     330,
-     "",
-     "b"
-    ],
-    [
-     332,
-     333,
-     "",
-     "b"
-    ],
-    [
-     336,
-     341,
-     "CD.Space"
-    ],
-    [
-     344,
-     345,
-     "",
-     "b"
-    ],
-    [
-     348,
      351,
-     "Nat"
-    ],
-    [
      355,
-     356,
-     ""
-    ],
-    [
-     355,
-     361,
-     "CD.Space.size"
+     "",
+     "b"
     ],
     [
      357,
+     358,
+     "",
+     "b"
+    ],
+    [
      361,
+     366,
+     "CD.Space"
+    ],
+    [
+     369,
+     370,
+     "",
+     "b"
+    ],
+    [
+     373,
+     376,
+     "Nat"
+    ],
+    [
+     380,
+     381,
+     ""
+    ],
+    [
+     380,
+     386,
      "CD.Space.size"
     ],
     [
-     364,
-     370,
-     "CD.double"
+     382,
+     386,
+     "CD.Space.size"
     ],
     [
-     372,
-     373,
-     ""
-    ],
-    [
-     381,
-     387,
-     "CD.double"
-    ],
-    [
-     388,
      389,
+     395,
+     "CD.double"
+    ],
+    [
+     397,
+     398,
      ""
     ],
     [
-     396,
-     407,
+     406,
+     412,
+     "CD.double"
+    ],
+    [
+     413,
+     414,
+     ""
+    ],
+    [
+     421,
+     432,
      "CD.List.headOr"
     ],
     [
-     427,
-     433,
+     452,
+     458,
      "_private.CarveDev.Top.0.CD.helper"
     ],
     [
-     443,
-     447,
+     468,
+     472,
      "CD.quad"
     ],
     [
-     457,
-     460,
+     482,
+     485,
      "rfl"
     ],
     [
-     471,
-     485,
+     496,
+     510,
      "CD.size_via_coord"
     ],
     [
-     486,
-     487,
+     511,
+     512,
      ""
     ],
     [
-     494,
-     503,
+     519,
+     528,
      "CD.size_zero"
     ],
     [
-     505,
-     516,
+     530,
+     541,
      "CD.double_succ"
     ],
     [
-     518,
-     533,
+     543,
+     558,
      "CD.List.headOr_nil"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 318,
+    "byte": 343,
     "col": 0,
-    "line": 19
+    "line": 20
    },
    "used_keys": [],
    "value_start": {
-    "byte": 411,
+    "byte": 436,
     "col": 93,
-    "line": 19
+    "line": 20
    }
   },
   {
@@ -807,54 +808,54 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 604,
+    "byte": 629,
     "col": 39,
-    "line": 26
+    "line": 27
    },
    "heads": [
     {
-     "end": 565,
+     "end": 590,
      "kind": "Lean.Parser.Command.open",
-     "start": 543
+     "start": 568
     }
    ],
    "idents": [
     {
-     "end": 561,
+     "end": 586,
      "name": "_root_.CD.Aux",
      "role": "open",
-     "start": 548
-    },
-    {
-     "end": 580,
-     "name": "top_aux",
-     "role": "decl",
      "start": 573
     },
     {
-     "end": 590,
-     "name": "auxOnly",
-     "role": "ref",
-     "start": 583
+     "end": 605,
+     "name": "top_aux",
+     "role": "decl",
+     "start": 598
     },
     {
-     "end": 604,
+     "end": 615,
+     "name": "auxOnly",
+     "role": "ref",
+     "start": 608
+    },
+    {
+     "end": 629,
      "name": "aux_eq",
      "role": "ref",
-     "start": 598
+     "start": 623
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 580,
+      "byte": 605,
       "col": 15,
-      "line": 26
+      "line": 27
      },
      "start": {
-      "byte": 573,
+      "byte": 598,
       "col": 8,
-      "line": 26
+      "line": 27
      }
     }
    ],
@@ -877,40 +878,40 @@
    ],
    "resolved": [
     [
-     573,
-     580,
+     598,
+     605,
      "CD.top_aux",
      "b"
     ],
     [
-     573,
-     580,
+     598,
+     605,
      "",
      "b"
     ],
     [
-     583,
-     590,
+     608,
+     615,
      "CD.Aux.auxOnly"
     ],
     [
-     598,
-     604,
+     623,
+     629,
      "CD.Aux.aux_eq"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 543,
+    "byte": 568,
     "col": 0,
-    "line": 25
+    "line": 26
    },
    "used_keys": [],
    "value_start": {
-    "byte": 595,
+    "byte": 620,
     "col": 30,
-    "line": 26
+    "line": 27
    }
   },
   {
@@ -939,42 +940,42 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 649,
+    "byte": 674,
     "col": 43,
-    "line": 28
+    "line": 29
    },
    "heads": [],
    "idents": [
     {
-     "end": 624,
+     "end": 649,
      "name": "uses_sorry",
      "role": "decl",
-     "start": 614
+     "start": 639
     },
     {
-     "end": 638,
+     "end": 663,
      "name": "usesSorried",
      "role": "ref",
-     "start": 627
+     "start": 652
     },
     {
-     "end": 649,
+     "end": 674,
      "name": "rfl",
      "role": "ref",
-     "start": 646
+     "start": 671
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 624,
+      "byte": 649,
       "col": 18,
-      "line": 28
+      "line": 29
      },
      "start": {
-      "byte": 614,
+      "byte": 639,
       "col": 8,
-      "line": 28
+      "line": 29
      }
     }
    ],
@@ -996,40 +997,40 @@
    ],
    "resolved": [
     [
-     614,
-     624,
+     639,
+     649,
      "CD.uses_sorry",
      "b"
     ],
     [
-     614,
-     624,
+     639,
+     649,
      "",
      "b"
     ],
     [
-     627,
-     638,
+     652,
+     663,
      "CD.usesSorried"
     ],
     [
-     646,
-     649,
+     671,
+     674,
      "rfl"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 606,
+    "byte": 631,
     "col": 0,
-    "line": 28
+    "line": 29
    },
    "used_keys": [],
    "value_start": {
-    "byte": 643,
+    "byte": 668,
     "col": 37,
-    "line": 28
+    "line": 29
    }
   },
   {
@@ -1058,72 +1059,72 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 712,
+    "byte": 737,
     "col": 61,
-    "line": 30
+    "line": 31
    },
    "heads": [],
    "idents": [
     {
-     "end": 669,
+     "end": 694,
      "name": "uses_sized",
      "role": "decl",
-     "start": 659
+     "start": 684
     },
     {
-     "end": 672,
+     "end": 697,
      "name": "B",
      "role": "binder",
-     "start": 671
+     "start": 696
     },
     {
-     "end": 680,
+     "end": 705,
      "name": "Space",
      "role": "ref",
-     "start": 675
+     "start": 700
     },
     {
-     "end": 685,
+     "end": 710,
      "name": "[anonymous]",
      "role": "ref",
-     "start": 685
+     "start": 710
     },
     {
-     "end": 694,
+     "end": 719,
      "name": "sizedZero",
      "role": "ref",
-     "start": 685
+     "start": 710
     },
     {
-     "end": 696,
+     "end": 721,
      "name": "B",
      "role": "ref",
-     "start": 695
+     "start": 720
     },
     {
-     "end": 701,
+     "end": 726,
      "name": "val",
      "role": "ref",
-     "start": 698
+     "start": 723
     },
     {
-     "end": 712,
+     "end": 737,
      "name": "rfl",
      "role": "ref",
-     "start": 709
+     "start": 734
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 669,
+      "byte": 694,
       "col": 18,
-      "line": 30
+      "line": 31
      },
      "start": {
-      "byte": 659,
+      "byte": 684,
       "col": 8,
-      "line": 30
+      "line": 31
      }
     }
    ],
@@ -1145,61 +1146,61 @@
    ],
    "resolved": [
     [
-     659,
-     669,
+     684,
+     694,
      "CD.uses_sized",
      "b"
     ],
     [
-     659,
-     669,
+     684,
+     694,
      "",
      "b"
     ],
     [
-     671,
-     672,
+     696,
+     697,
      "",
      "b"
     ],
     [
-     675,
-     680,
+     700,
+     705,
      "CD.Space"
     ],
     [
-     685,
-     694,
+     710,
+     719,
      "CD.sizedZero"
     ],
     [
-     695,
-     696,
+     720,
+     721,
      ""
     ],
     [
-     698,
-     701,
+     723,
+     726,
      "Subtype.val"
     ],
     [
-     709,
-     712,
+     734,
+     737,
      "rfl"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 651,
+    "byte": 676,
     "col": 0,
-    "line": 30
+    "line": 31
    },
    "used_keys": [],
    "value_start": {
-    "byte": 706,
+    "byte": 731,
     "col": 55,
-    "line": 30
+    "line": 31
    }
   },
   {
@@ -1228,42 +1229,42 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 758,
+    "byte": 783,
     "col": 44,
-    "line": 32
+    "line": 33
    },
    "heads": [],
    "idents": [
     {
-     "end": 733,
+     "end": 758,
      "name": "uses_scoped",
      "role": "decl",
-     "start": 722
+     "start": 747
     },
     {
-     "end": 745,
+     "end": 770,
      "name": "viaScoped",
      "role": "ref",
-     "start": 736
+     "start": 761
     },
     {
-     "end": 758,
+     "end": 783,
      "name": "rfl",
      "role": "ref",
-     "start": 755
+     "start": 780
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 733,
+      "byte": 758,
       "col": 19,
-      "line": 32
+      "line": 33
      },
      "start": {
-      "byte": 722,
+      "byte": 747,
       "col": 8,
-      "line": 32
+      "line": 33
      }
     }
    ],
@@ -1285,40 +1286,40 @@
    ],
    "resolved": [
     [
-     722,
-     733,
+     747,
+     758,
      "CD.uses_scoped",
      "b"
     ],
     [
-     722,
-     733,
+     747,
+     758,
      "",
      "b"
     ],
     [
-     736,
-     745,
+     761,
+     770,
      "CD.viaScoped"
     ],
     [
-     755,
-     758,
+     780,
+     783,
      "rfl"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 714,
+    "byte": 739,
     "col": 0,
-    "line": 32
+    "line": 33
    },
    "used_keys": [],
    "value_start": {
-    "byte": 752,
+    "byte": 777,
     "col": 38,
-    "line": 32
+    "line": 33
    }
   },
   {
@@ -1349,36 +1350,36 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 800,
+    "byte": 825,
     "col": 40,
-    "line": 34
+    "line": 35
    },
    "heads": [],
    "idents": [
     {
-     "end": 781,
+     "end": 806,
      "name": "simpA",
      "role": "decl",
-     "start": 776
+     "start": 801
     },
     {
-     "end": 800,
+     "end": 825,
      "name": "rfl",
      "role": "ref",
-     "start": 797
+     "start": 822
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 781,
+      "byte": 806,
       "col": 21,
-      "line": 34
+      "line": 35
      },
      "start": {
-      "byte": 776,
+      "byte": 801,
       "col": 16,
-      "line": 34
+      "line": 35
      }
     }
    ],
@@ -1403,35 +1404,35 @@
    ],
    "resolved": [
     [
-     776,
-     781,
+     801,
+     806,
      "",
      "b"
     ],
     [
-     776,
-     781,
+     801,
+     806,
      "CD.simpA",
      "b"
     ],
     [
-     797,
-     800,
+     822,
+     825,
      "rfl"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 760,
+    "byte": 785,
     "col": 0,
-    "line": 34
+    "line": 35
    },
    "used_keys": [],
    "value_start": {
-    "byte": 794,
+    "byte": 819,
     "col": 34,
-    "line": 34
+    "line": 35
    }
   },
   {
@@ -1453,23 +1454,23 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 825,
+    "byte": 850,
     "col": 23,
-    "line": 36
+    "line": 37
    },
    "heads": [],
    "idents": [
     {
-     "end": 818,
+     "end": 843,
      "name": "simp",
      "role": "ref",
-     "start": 814
+     "start": 839
     },
     {
-     "end": 825,
+     "end": 850,
      "name": "simpA",
      "role": "ref",
-     "start": 820
+     "start": 845
     }
    ],
    "ids": [],
@@ -1487,17 +1488,17 @@
    ],
    "resolved": [
     [
-     820,
-     825,
+     845,
+     850,
      "CD.simpA"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 802,
+    "byte": 827,
     "col": 0,
-    "line": 36
+    "line": 37
    },
    "used_keys": []
   },
@@ -1520,17 +1521,17 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 833,
+    "byte": 858,
     "col": 6,
-    "line": 38
+    "line": 39
    },
    "heads": [],
    "idents": [
     {
-     "end": 833,
+     "end": 858,
      "name": "CD",
      "role": "scope",
-     "start": 831
+     "start": 856
     }
    ],
    "ids": [],
@@ -1550,9 +1551,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 827,
+    "byte": 852,
     "col": 0,
-    "line": 38
+    "line": 39
    },
    "used_keys": []
   },
@@ -1569,17 +1570,17 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 851,
+    "byte": 876,
     "col": 16,
-    "line": 40
+    "line": 41
    },
    "heads": [],
    "idents": [
     {
-     "end": 851,
+     "end": 876,
      "name": "CD.Aux",
      "role": "scope",
-     "start": 845
+     "start": 870
     }
    ],
    "ids": [],
@@ -1594,9 +1595,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 835,
+    "byte": 860,
     "col": 0,
-    "line": 40
+    "line": 41
    },
    "used_keys": []
   },
@@ -1624,36 +1625,36 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 878,
+    "byte": 903,
     "col": 25,
-    "line": 42
+    "line": 43
    },
    "heads": [],
    "idents": [
     {
-     "end": 867,
+     "end": 892,
      "name": "laterConst",
      "role": "decl",
-     "start": 857
+     "start": 882
     },
     {
-     "end": 873,
+     "end": 898,
      "name": "Nat",
      "role": "ref",
-     "start": 870
+     "start": 895
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 867,
+      "byte": 892,
       "col": 14,
-      "line": 42
+      "line": 43
      },
      "start": {
-      "byte": 857,
+      "byte": 882,
       "col": 4,
-      "line": 42
+      "line": 43
      }
     }
    ],
@@ -1670,35 +1671,35 @@
    "opens": [],
    "resolved": [
     [
-     857,
-     867,
+     882,
+     892,
      "",
      "b"
     ],
     [
-     857,
-     867,
+     882,
+     892,
      "CD.Aux.laterConst",
      "b"
     ],
     [
-     870,
-     873,
+     895,
+     898,
      "Nat"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 853,
+    "byte": 878,
     "col": 0,
-    "line": 42
+    "line": 43
    },
    "used_keys": [],
    "value_start": {
-    "byte": 874,
+    "byte": 899,
     "col": 21,
-    "line": 42
+    "line": 43
    }
   },
   {
@@ -1718,17 +1719,17 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 890,
+    "byte": 915,
     "col": 10,
-    "line": 44
+    "line": 45
    },
    "heads": [],
    "idents": [
     {
-     "end": 890,
+     "end": 915,
      "name": "CD.Aux",
      "role": "scope",
-     "start": 884
+     "start": 909
     }
    ],
    "ids": [],
@@ -1743,9 +1744,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 880,
+    "byte": 905,
     "col": 0,
-    "line": 44
+    "line": 45
    },
    "used_keys": []
   },
@@ -1762,9 +1763,9 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 891,
+    "byte": 916,
     "col": 0,
-    "line": 45
+    "line": 46
    },
    "heads": [],
    "idents": [],
@@ -1780,9 +1781,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 891,
+    "byte": 916,
     "col": 0,
-    "line": 45
+    "line": 46
    },
    "used_keys": []
   }

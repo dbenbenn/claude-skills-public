@@ -5,6 +5,7 @@ import CarveDev.InstA
 import CarveDev.InstB
 import CarveDev.InstLate
 import CarveDev.Coer
+import CarveDev.InstColB
 
 universe u
 

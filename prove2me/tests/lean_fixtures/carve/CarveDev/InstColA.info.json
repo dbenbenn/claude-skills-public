@@ -1,0 +1,1640 @@
+{
+ "build_ms": 177,
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 842,
+    "col": 87,
+    "line": 10
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 859,
+    "col": 15,
+    "line": 12
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 859,
+     "name": "CD.IC",
+     "role": "scope",
+     "start": 854
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 844,
+    "col": 0,
+    "line": 12
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.IC.R",
+     "",
+     []
+    ],
+    [
+     "CD.IC.R.x",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 898,
+    "col": 9,
+    "line": 15
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 872,
+     "name": "R",
+     "role": "decl",
+     "start": 871
+    },
+    {
+     "end": 875,
+     "name": "n",
+     "role": "binder",
+     "start": 874
+    },
+    {
+     "end": 881,
+     "name": "Nat",
+     "role": "ref",
+     "start": 878
+    },
+    {
+     "end": 892,
+     "name": "x",
+     "role": "ref",
+     "start": 891
+    },
+    {
+     "end": 898,
+     "name": "Nat",
+     "role": "ref",
+     "start": 895
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 872,
+      "col": 11,
+      "line": 14
+     },
+     "start": {
+      "byte": 871,
+      "col": 10,
+      "line": 14
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IC.R"
+   ],
+   "namespace": "CD.IC",
+   "opens": [],
+   "resolved": [
+    [
+     871,
+     872,
+     "CD.IC.R",
+     "b"
+    ],
+    [
+     871,
+     872,
+     "",
+     "b"
+    ],
+    [
+     874,
+     875,
+     "",
+     "b"
+    ],
+    [
+     878,
+     881,
+     "Nat"
+    ],
+    [
+     891,
+     892,
+     "CD.IC.R.x",
+     "b"
+    ],
+    [
+     895,
+     898,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 861,
+    "col": 0,
+    "line": 14
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.IC.Zeroish.z",
+     "",
+     []
+    ],
+    [
+     "CD.IC.Zeroish",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 940,
+    "col": 7,
+    "line": 18
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 913,
+     "name": "Zeroish",
+     "role": "decl",
+     "start": 906
+    },
+    {
+     "end": 917,
+     "name": "α",
+     "role": "binder",
+     "start": 915
+    },
+    {
+     "end": 935,
+     "name": "z",
+     "role": "ref",
+     "start": 934
+    },
+    {
+     "end": 940,
+     "name": "α",
+     "role": "ref",
+     "start": 938
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 913,
+      "col": 13,
+      "line": 17
+     },
+     "start": {
+      "byte": 906,
+      "col": 6,
+      "line": 17
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IC.Zeroish"
+   ],
+   "namespace": "CD.IC",
+   "opens": [],
+   "resolved": [
+    [
+     906,
+     913,
+     "",
+     "b"
+    ],
+    [
+     906,
+     913,
+     "CD.IC.Zeroish",
+     "b"
+    ],
+    [
+     915,
+     917,
+     "",
+     "b"
+    ],
+    [
+     934,
+     935,
+     "CD.IC.Zeroish.z",
+     "b"
+    ],
+    [
+     938,
+     940,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 900,
+    "col": 0,
+    "line": 17
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.IC.Oneish",
+     "",
+     []
+    ],
+    [
+     "CD.IC.Oneish.o",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 994,
+    "col": 7,
+    "line": 21
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 954,
+     "name": "Oneish",
+     "role": "decl",
+     "start": 948
+    },
+    {
+     "end": 958,
+     "name": "α",
+     "role": "binder",
+     "start": 956
+    },
+    {
+     "end": 975,
+     "name": "Zeroish",
+     "role": "ref",
+     "start": 968
+    },
+    {
+     "end": 978,
+     "name": "α",
+     "role": "ref",
+     "start": 976
+    },
+    {
+     "end": 989,
+     "name": "o",
+     "role": "ref",
+     "start": 988
+    },
+    {
+     "end": 994,
+     "name": "α",
+     "role": "ref",
+     "start": 992
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 954,
+      "col": 12,
+      "line": 20
+     },
+     "start": {
+      "byte": 948,
+      "col": 6,
+      "line": 20
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IC.Oneish"
+   ],
+   "namespace": "CD.IC",
+   "opens": [],
+   "resolved": [
+    [
+     948,
+     954,
+     "CD.IC.Oneish",
+     "b"
+    ],
+    [
+     948,
+     954,
+     "",
+     "b"
+    ],
+    [
+     956,
+     958,
+     "",
+     "b"
+    ],
+    [
+     968,
+     975,
+     "CD.IC.Zeroish"
+    ],
+    [
+     976,
+     978,
+     ""
+    ],
+    [
+     988,
+     989,
+     "CD.IC.Oneish.o",
+     "b"
+    ],
+    [
+     992,
+     994,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 942,
+    "col": 0,
+    "line": 20
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "_private.CarveDev.InstColA.0.CD.IC.zeroR",
+     "CD.IC.Zeroish",
+     [
+      "CD.IC.R"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1067,
+    "col": 63,
+    "line": 23
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1024,
+     "name": "zeroR",
+     "role": "decl",
+     "start": 1019
+    },
+    {
+     "end": 1027,
+     "name": "n",
+     "role": "binder",
+     "start": 1026
+    },
+    {
+     "end": 1033,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1030
+    },
+    {
+     "end": 1044,
+     "name": "Zeroish",
+     "role": "ref",
+     "start": 1037
+    },
+    {
+     "end": 1046,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1046
+    },
+    {
+     "end": 1047,
+     "name": "R",
+     "role": "ref",
+     "start": 1046
+    },
+    {
+     "end": 1049,
+     "name": "n",
+     "role": "ref",
+     "start": 1048
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1024,
+      "col": 28,
+      "line": 23
+     },
+     "start": {
+      "byte": 1019,
+      "col": 23,
+      "line": 23
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [
+    "_private.CarveDev.InstColA.0.CD.IC.zeroR"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IC.zeroR"
+   ],
+   "namespace": "CD.IC",
+   "opens": [],
+   "private": {
+    "end": 1003,
+    "start": 996
+   },
+   "resolved": [
+    [
+     1019,
+     1024,
+     "_private.CarveDev.InstColA.0.CD.IC.zeroR",
+     "b"
+    ],
+    [
+     1019,
+     1024,
+     "",
+     "b"
+    ],
+    [
+     1026,
+     1027,
+     "",
+     "b"
+    ],
+    [
+     1030,
+     1033,
+     "Nat"
+    ],
+    [
+     1037,
+     1044,
+     "CD.IC.Zeroish"
+    ],
+    [
+     1046,
+     1047,
+     "CD.IC.R"
+    ],
+    [
+     1048,
+     1049,
+     ""
+    ]
+   ],
+   "sig_insts": [
+    "_private.CarveDev.InstColA.0.CD.IC.zeroR"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 996,
+    "col": 0,
+    "line": 23
+   },
+   "used_keys": [
+    "CD.IC.Zeroish"
+   ],
+   "value_start": {
+    "byte": 1051,
+    "col": 55,
+    "line": 23
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "_private.CarveDev.InstColA.0.CD.IC.oneR",
+     "CD.IC.Oneish",
+     [
+      "CD.IC.R",
+      "_private.CarveDev.InstColA.0.CD.IC.zeroR"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1137,
+    "col": 61,
+    "line": 24
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1095,
+     "name": "oneR",
+     "role": "decl",
+     "start": 1091
+    },
+    {
+     "end": 1098,
+     "name": "n",
+     "role": "binder",
+     "start": 1097
+    },
+    {
+     "end": 1104,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1101
+    },
+    {
+     "end": 1114,
+     "name": "Oneish",
+     "role": "ref",
+     "start": 1108
+    },
+    {
+     "end": 1116,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1116
+    },
+    {
+     "end": 1117,
+     "name": "R",
+     "role": "ref",
+     "start": 1116
+    },
+    {
+     "end": 1119,
+     "name": "n",
+     "role": "ref",
+     "start": 1118
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1095,
+      "col": 27,
+      "line": 24
+     },
+     "start": {
+      "byte": 1091,
+      "col": 23,
+      "line": 24
+     }
+    }
+   ],
+   "inst_keys": [
+    "CD.IC.Zeroish CD.IC.R",
+    "OfNat Nat"
+   ],
+   "insts": [
+    "_private.CarveDev.InstColA.0.CD.IC.oneR",
+    "_private.CarveDev.InstColA.0.CD.IC.zeroR"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IC.oneR"
+   ],
+   "namespace": "CD.IC",
+   "opens": [],
+   "private": {
+    "end": 1075,
+    "start": 1068
+   },
+   "resolved": [
+    [
+     1091,
+     1095,
+     "_private.CarveDev.InstColA.0.CD.IC.oneR",
+     "b"
+    ],
+    [
+     1091,
+     1095,
+     "",
+     "b"
+    ],
+    [
+     1097,
+     1098,
+     "",
+     "b"
+    ],
+    [
+     1101,
+     1104,
+     "Nat"
+    ],
+    [
+     1108,
+     1114,
+     "CD.IC.Oneish"
+    ],
+    [
+     1116,
+     1117,
+     "CD.IC.R"
+    ],
+    [
+     1118,
+     1119,
+     ""
+    ]
+   ],
+   "sig_insts": [
+    "_private.CarveDev.InstColA.0.CD.IC.oneR",
+    "_private.CarveDev.InstColA.0.CD.IC.zeroR"
+   ],
+   "sig_used_keys": [
+    "CD.IC.Zeroish CD.IC.R"
+   ],
+   "start": {
+    "byte": 1068,
+    "col": 0,
+    "line": 24
+   },
+   "used_keys": [
+    "CD.IC.Oneish",
+    "CD.IC.Zeroish CD.IC.R"
+   ],
+   "value_start": {
+    "byte": 1121,
+    "col": 53,
+    "line": 24
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.IC.one_a",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1194,
+    "col": 55,
+    "line": 26
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1152,
+     "name": "one_a",
+     "role": "decl",
+     "start": 1147
+    },
+    {
+     "end": 1155,
+     "name": "n",
+     "role": "binder",
+     "start": 1154
+    },
+    {
+     "end": 1161,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1158
+    },
+    {
+     "end": 1166,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1166
+    },
+    {
+     "end": 1174,
+     "name": "Oneish.o",
+     "role": "ref",
+     "start": 1166
+    },
+    {
+     "end": 1178,
+     "name": "R",
+     "role": "ref",
+     "start": 1177
+    },
+    {
+     "end": 1180,
+     "name": "n",
+     "role": "ref",
+     "start": 1179
+    },
+    {
+     "end": 1183,
+     "name": "x",
+     "role": "ref",
+     "start": 1182
+    },
+    {
+     "end": 1194,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1191
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1152,
+      "col": 13,
+      "line": 26
+     },
+     "start": {
+      "byte": 1147,
+      "col": 8,
+      "line": 26
+     }
+    }
+   ],
+   "inst_keys": [
+    "CD.IC.Oneish CD.IC.R _private.CarveDev.InstColA.0.CD.IC.zeroR",
+    "CD.IC.Zeroish CD.IC.R",
+    "OfNat Nat"
+   ],
+   "insts": [
+    "_private.CarveDev.InstColA.0.CD.IC.oneR",
+    "_private.CarveDev.InstColA.0.CD.IC.zeroR"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IC.one_a"
+   ],
+   "namespace": "CD.IC",
+   "opens": [],
+   "resolved": [
+    [
+     1147,
+     1152,
+     "CD.IC.one_a",
+     "b"
+    ],
+    [
+     1147,
+     1152,
+     "",
+     "b"
+    ],
+    [
+     1154,
+     1155,
+     "",
+     "b"
+    ],
+    [
+     1158,
+     1161,
+     "Nat"
+    ],
+    [
+     1166,
+     1174,
+     "CD.IC.Oneish.o"
+    ],
+    [
+     1177,
+     1178,
+     "CD.IC.R"
+    ],
+    [
+     1179,
+     1180,
+     ""
+    ],
+    [
+     1182,
+     1183,
+     "CD.IC.R.x"
+    ],
+    [
+     1191,
+     1194,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [
+    "_private.CarveDev.InstColA.0.CD.IC.oneR",
+    "_private.CarveDev.InstColA.0.CD.IC.zeroR"
+   ],
+   "sig_used_keys": [
+    "CD.IC.Oneish CD.IC.R _private.CarveDev.InstColA.0.CD.IC.zeroR",
+    "CD.IC.Zeroish CD.IC.R"
+   ],
+   "start": {
+    "byte": 1139,
+    "col": 0,
+    "line": 26
+   },
+   "used_keys": [
+    "CD.IC.Oneish CD.IC.R _private.CarveDev.InstColA.0.CD.IC.zeroR",
+    "CD.IC.Zeroish CD.IC.R"
+   ],
+   "value_start": {
+    "byte": 1188,
+    "col": 49,
+    "line": 26
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.IC.Verts",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1229,
+    "col": 33,
+    "line": 28
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1205,
+     "name": "Verts",
+     "role": "decl",
+     "start": 1200
+    },
+    {
+     "end": 1208,
+     "name": "n",
+     "role": "binder",
+     "start": 1207
+    },
+    {
+     "end": 1214,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1211
+    },
+    {
+     "end": 1227,
+     "name": "R",
+     "role": "ref",
+     "start": 1226
+    },
+    {
+     "end": 1229,
+     "name": "n",
+     "role": "ref",
+     "start": 1228
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1205,
+      "col": 9,
+      "line": 28
+     },
+     "start": {
+      "byte": 1200,
+      "col": 4,
+      "line": 28
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IC.Verts"
+   ],
+   "namespace": "CD.IC",
+   "opens": [],
+   "resolved": [
+    [
+     1200,
+     1205,
+     "CD.IC.Verts",
+     "b"
+    ],
+    [
+     1200,
+     1205,
+     "",
+     "b"
+    ],
+    [
+     1207,
+     1208,
+     "",
+     "b"
+    ],
+    [
+     1211,
+     1214,
+     "Nat"
+    ],
+    [
+     1226,
+     1227,
+     "CD.IC.R"
+    ],
+    [
+     1228,
+     1229,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1196,
+    "col": 0,
+    "line": 28
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 1223,
+    "col": 27,
+    "line": 28
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "CD.IC.instZeroishVerts",
+     "CD.IC.Zeroish",
+     [
+      "CD.IC.Verts"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1292,
+    "col": 53,
+    "line": 30
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1248,
+     "name": "n",
+     "role": "binder",
+     "start": 1247
+    },
+    {
+     "end": 1254,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1251
+    },
+    {
+     "end": 1265,
+     "name": "Zeroish",
+     "role": "ref",
+     "start": 1258
+    },
+    {
+     "end": 1267,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1267
+    },
+    {
+     "end": 1272,
+     "name": "Verts",
+     "role": "ref",
+     "start": 1267
+    },
+    {
+     "end": 1274,
+     "name": "n",
+     "role": "ref",
+     "start": 1273
+    }
+   ],
+   "ids": [],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [
+    "CD.IC.instZeroishVerts"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.IC",
+   "opens": [],
+   "resolved": [
+    [
+     1247,
+     1248,
+     "",
+     "b"
+    ],
+    [
+     1251,
+     1254,
+     "Nat"
+    ],
+    [
+     1258,
+     1265,
+     "CD.IC.Zeroish"
+    ],
+    [
+     1267,
+     1272,
+     "CD.IC.Verts"
+    ],
+    [
+     1273,
+     1274,
+     ""
+    ]
+   ],
+   "sig_insts": [
+    "CD.IC.instZeroishVerts"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1231,
+    "col": 0,
+    "line": 30
+   },
+   "used_keys": [
+    "CD.IC.Zeroish"
+   ],
+   "value_start": {
+    "byte": 1276,
+    "col": 45,
+    "line": 30
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "CD.IC.instInhabitedVerts",
+     "Inhabited",
+     [
+      "CD.IC.Verts"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1356,
+    "col": 55,
+    "line": 31
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1310,
+     "name": "n",
+     "role": "binder",
+     "start": 1309
+    },
+    {
+     "end": 1316,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1313
+    },
+    {
+     "end": 1329,
+     "name": "Inhabited",
+     "role": "ref",
+     "start": 1320
+    },
+    {
+     "end": 1331,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1331
+    },
+    {
+     "end": 1336,
+     "name": "Verts",
+     "role": "ref",
+     "start": 1331
+    },
+    {
+     "end": 1338,
+     "name": "n",
+     "role": "ref",
+     "start": 1337
+    }
+   ],
+   "ids": [],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [
+    "CD.IC.instInhabitedVerts"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.IC",
+   "opens": [],
+   "resolved": [
+    [
+     1309,
+     1310,
+     "",
+     "b"
+    ],
+    [
+     1313,
+     1316,
+     "Nat"
+    ],
+    [
+     1320,
+     1329,
+     "Inhabited"
+    ],
+    [
+     1331,
+     1336,
+     "CD.IC.Verts"
+    ],
+    [
+     1337,
+     1338,
+     ""
+    ]
+   ],
+   "sig_insts": [
+    "CD.IC.instInhabitedVerts"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1293,
+    "col": 0,
+    "line": 31
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 1340,
+    "col": 47,
+    "line": 31
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.IC.verts_zero",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1423,
+    "col": 65,
+    "line": 33
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1376,
+     "name": "verts_zero",
+     "role": "decl",
+     "start": 1366
+    },
+    {
+     "end": 1379,
+     "name": "n",
+     "role": "binder",
+     "start": 1378
+    },
+    {
+     "end": 1385,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1382
+    },
+    {
+     "end": 1390,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1390
+    },
+    {
+     "end": 1399,
+     "name": "Zeroish.z",
+     "role": "ref",
+     "start": 1390
+    },
+    {
+     "end": 1407,
+     "name": "Verts",
+     "role": "ref",
+     "start": 1402
+    },
+    {
+     "end": 1409,
+     "name": "n",
+     "role": "ref",
+     "start": 1408
+    },
+    {
+     "end": 1412,
+     "name": "x",
+     "role": "ref",
+     "start": 1411
+    },
+    {
+     "end": 1423,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1420
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1376,
+      "col": 18,
+      "line": 33
+     },
+     "start": {
+      "byte": 1366,
+      "col": 8,
+      "line": 33
+     }
+    }
+   ],
+   "inst_keys": [
+    "CD.IC.Zeroish CD.IC.Verts",
+    "OfNat Nat"
+   ],
+   "insts": [
+    "CD.IC.instZeroishVerts"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IC.verts_zero"
+   ],
+   "namespace": "CD.IC",
+   "opens": [],
+   "resolved": [
+    [
+     1366,
+     1376,
+     "CD.IC.verts_zero",
+     "b"
+    ],
+    [
+     1366,
+     1376,
+     "",
+     "b"
+    ],
+    [
+     1378,
+     1379,
+     "",
+     "b"
+    ],
+    [
+     1382,
+     1385,
+     "Nat"
+    ],
+    [
+     1390,
+     1399,
+     "CD.IC.Zeroish.z"
+    ],
+    [
+     1402,
+     1407,
+     "CD.IC.Verts"
+    ],
+    [
+     1408,
+     1409,
+     ""
+    ],
+    [
+     1411,
+     1412,
+     "CD.IC.R.x"
+    ],
+    [
+     1420,
+     1423,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [
+    "CD.IC.instZeroishVerts"
+   ],
+   "sig_used_keys": [
+    "CD.IC.Zeroish CD.IC.Verts"
+   ],
+   "start": {
+    "byte": 1358,
+    "col": 0,
+    "line": 33
+   },
+   "used_keys": [
+    "CD.IC.Zeroish CD.IC.Verts"
+   ],
+   "value_start": {
+    "byte": 1417,
+    "col": 59,
+    "line": 33
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1434,
+    "col": 9,
+    "line": 35
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1434,
+     "name": "CD.IC",
+     "role": "scope",
+     "start": 1429
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.IC",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1425,
+    "col": 0,
+    "line": 35
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1435,
+    "col": 0,
+    "line": 36
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1435,
+    "col": 0,
+    "line": 36
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/InstColA.lean",
+ "messages": [],
+ "mode": "elaborate"
+}

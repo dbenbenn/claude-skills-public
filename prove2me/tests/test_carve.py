@@ -97,7 +97,8 @@ def test_private_names_are_per_module(g):
     assert a in g.nodes and b in g.nodes
     assert a in g.nodes['CD.double_succ'].deps and b not in g.nodes['CD.double_succ'].deps
     assert b in g.nodes['CD.main'].deps
-    assert C.collision_renames(g) == {a: 'helper_p0', b: 'helper_p1'}
+    assert {k: v for k, v in C.collision_renames(g).items() if '.IC.' not in k} == \
+        {a: 'helper_p0', b: 'helper_p1'}
 
 
 def test_attributed_theorem_is_an_extra_root(g):
@@ -1849,3 +1850,77 @@ def test_collided_instance_is_imported_only_under_its_renamed_name():
     assert C.instance_imported(ik, {'OAI.Lech.ReesRoot.projectiveModule'}, ren) is False
     assert C.instance_imported(ik, {'OAI.Lech.ReesRoot.projectiveModule_p7'}, ren) is True
     assert C.instance_imported(ik, set(), {}) is False
+
+
+# Collided private local instances (Lech multiplicity, oaiq-032, 2026-10-27): InstColA and InstColB
+# each declare `private local instance zeroR` and `oneR`, renamed zeroR_p0/_p1 and oneR_p0/_p1;
+# `oneR`'s statement needs `zeroR` in force.
+
+IC_A, IC_B = '_private.CarveDev.InstColA.0.CD.IC.', '_private.CarveDev.InstColB.0.CD.IC.'
+IC_DEFS = {'CD.IC.R', 'CD.IC.Zeroish', 'CD.IC.Oneish'}
+
+
+def _section(txt, m):
+    return txt[txt.index('-- module ' + m):].split('\nend\n\n', 1)[0]
+
+
+def test_a_collided_local_instance_kept_from_another_module_still_comes_back(g):
+    # the file keeps InstColA's zeroR (zeroR_p0) and InstColB's oneR, whose statement needs
+    # InstColB's zeroR (zeroR_p1, imported): the public name `CD.IC.zeroR` of the kept copy made
+    # InstColB's look declared by the file, so nothing put it back in force (Lech L026: the kept
+    # scalarComm_p6 needed concreteRing of the same module, imported, and was cut by a repair)
+    keep = IC_DEFS | {IC_A + 'zeroR', IC_B + 'oneR'}
+    ren = C.collision_renames(g)
+    have = g.have_names(keep | {IC_B + 'zeroR'})
+    txt = C.Carver(g).carve(keep, have, deprivatize=True, rename=ren)
+    sec = _section(txt, 'CarveDev.InstColB')
+    assert 'attribute [local instance] CD.IC.zeroR_p1' in sec, sec
+    assert sec.index('attribute [local instance] CD.IC.zeroR_p1') < sec.index('instance oneR_p1')
+
+
+def test_a_reemitted_local_instance_brings_back_the_earlier_ones_it_used_first(g):
+    # one_b's record names only oneR (Lech: the declaration's term kept a defeq instance for
+    # concreteRing); oneR, emitted again, needs zeroR before it, which one_b alone never asked for
+    # (Def_OAIQ032L035: `baseAlgebra_r…` before `concreteRing_r…`, "typeclass instance problem is stuck")
+    g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    user = g.nodes['CD.IC.one_b']
+    c = g.infos[user.module].commands[user.cmd]
+    c.insts = c.sig_insts = [IC_B + 'oneR']
+    c.inst_keys = [k for k in c.inst_keys if not k.startswith('CD.IC.Zeroish')]
+    c.used_keys = c.sig_used_keys = []
+    for n in user.names:
+        for f in ('t', 'v'):
+            g.consts[n][f] = [x for x in g.consts[n][f] if x != IC_B + 'zeroR']
+    keep = IC_DEFS | {'CD.IC.one_b'}
+    txt = C.Carver(g).carve(keep, g.have_names(keep), rename=C.collision_renames(g))
+    sec = _section(txt, 'CarveDev.InstColB')
+    z = re.search(r'^private local instance zeroR_r\w+', sec, re.M)
+    o = re.search(r'^private local instance oneR_r\w+', sec, re.M)
+    assert z and o and z.start() < o.start() < sec.index('theorem one_b'), sec
+
+
+def _ic_plan(nodes0, nodes1):
+    return {'bundles': [{'name': 'IC0', 'nodes': sorted(nodes0), 'imports': []},
+                        {'name': 'IC1', 'nodes': sorted(nodes1), 'imports': ['IC0']}],
+            'stubs': {}, 'pieces': {}, 'nodes': []}
+
+
+def test_a_local_instance_its_imported_bundle_text_lacks_is_emitted_again_not_activated(g, tmp_path):
+    # a node can be in a bundle's plan `nodes` while that bundle's text lost the command (a repair
+    # cut the local instance), and `attribute [local instance] scalarComm_p6` named a constant no
+    # file declares (Def_OAIQ032L039:289): only what the imported text declares is activated
+    P = _ic_plan(IC_DEFS | {IC_B + 'zeroR'}, {IC_B + 'oneR'})
+    C.generate(g, P, str(tmp_path), what=('bundles',))
+    b1 = open(tmp_path / 'lib' / 'Def_IC1.lean').read()
+    assert 'attribute [local instance] CD.IC.zeroR_p1' in b1, b1
+    cut = open(tmp_path / 'lib' / 'Def_IC0.lean').read()
+    cut = re.search(r'^local instance zeroR_p1 .*$', cut, re.M).group(0)
+    C.generate(g, P, str(tmp_path), what=('bundles',), repairs={'Def_IC0.lean': [cut]})
+    assert 'zeroR_p1' not in open(tmp_path / 'lib' / 'Def_IC0.lean').read()
+    b1 = open(tmp_path / 'lib' / 'Def_IC1.lean').read()
+    assert 'attribute [local instance] CD.IC.zeroR_p1' not in b1, b1
+    assert re.search(r'^(?:private )?local instance zeroR_r\w+', b1, re.M), b1
+    # regenerating only IC1 reads IC0's text from the earlier run
+    C.generate(g, P, str(tmp_path), what=('bundles',), names={'IC1'})
+    assert 'attribute [local instance] CD.IC.zeroR_p1' not in open(tmp_path / 'lib' / 'Def_IC1.lean').read()
+

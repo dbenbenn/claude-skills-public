@@ -2670,7 +2670,7 @@ class Carver:
                     used.update(x.get('v', ()))
         return used
 
-    def _reactivate(self, info, c, m, drop, done, inst_names, have, sorried=False):
+    def _reactivate(self, info, c, m, drop, done, inst_names, have, sorried=False, chain=None):
         """The local instances in force at kept command c in its module that this file does not
         declare and c's elaboration used, put back in force. Their use can be invisible in the
         declaration graph (Hecke 7/8 AmplificationAllocationCost: `local instance : DecidableEq
@@ -2682,9 +2682,14 @@ class Carver:
           (FiniteRayExpansion's `Fintype (MulChar R ℂ)` in B002); inst_names maps a port name to
           the name Lean gave it in a published bundle that kept it anonymous;
         - not imported, or nobody's node (its generated name taken by another module's): its
-          command again, under a name unique to this file."""
+          command again, under a name unique to this file, after the earlier local instances its
+          own elaboration used (the same rules, recursively: Lech oaiq-032, a re-emitted
+          `baseAlgebra_r…` came before the `concreteRing` its statement needs).
+        `chain`: the scope the emitted text lands in (c's, or the kept
+        command's when re-emitting what a re-emitted instance needs)."""
         g = self.g
-        chain = tuple(o for o, _ in c.context)
+        if chain is None:
+            chain = tuple(o for o, _ in c.context)
         out = []
         used = self._used_instances(info, c, m, sorried)
         for vi in sorted(drop):
@@ -2704,7 +2709,10 @@ class Carver:
             # constants); the declaration graph keeps one per name, so this command is carved like
             # one that is not imported: emitted again
             ik = g.cmd_node.get((m, vi))
-            if not is_inst or (ik and pubname(ik) in self.keep_names):
+            # declared by this file: by its own node, not by another module's collided copy under
+            # the same public name (Lech oaiq-032: the kept concreteRing of one module stood in for
+            # the imported one of another, so it never came back)
+            if not is_inst or (ik and instance_imported(ik, self.keep_names, self.rename)):
                 continue
             done.add((vi, chain))
             if ik and instance_imported(ik, have, self.rename):
@@ -2723,6 +2731,8 @@ class Carver:
                     # used, but it names what this file lacks: the plan should have kept it
                     g.lost_instances.append((m, vc.start.line, c.start.line))
                 continue
+            # the earlier local instances its own elaboration used, first
+            out.append(self._reactivate(info, vc, m, drop, done, inst_names, have, chain=chain))
             short = pubname(ik).rsplit('.', 1)[-1] if ik else \
                 (decl['name'].rsplit('.', 1)[-1] if decl else 'localInst')
             self.re_count[short] += 1
@@ -3135,9 +3145,35 @@ def _ext_imports(g, plan, keys, statement_only=False):
 
 
 def _bundle_have(g, plan, names):
+    """The nodes the bundles `names` and what they import declare: their plan nodes, less the local
+    instances their text lost (`absent_instances`, set by `generate`)."""
     pos, bimp, _ = _plan_index(plan)
     cl = _bundle_closure(bimp, [pos[n] for n in names])
-    return {k for i in cl for k in plan['bundles'][i]['nodes']}
+    absent = plan.get('absent_instances') or {}
+    return {k for i in cl for k in plan['bundles'][i]['nodes']
+            if k not in absent.get(plan['bundles'][i]['name'], ())}
+
+
+def absent_instances(g, plan, name, text):
+    """The local instance nodes of bundle `name` that its text does not declare: a repair cut the
+    command (p2mlib.repair takes a `local instance` for a context command), so a file importing the
+    bundle must emit the command again, not `attribute [local instance]` a constant no file declares
+    (Lech oaiq-032, Def_OAIQ032L039:289: `scalarComm_p6`, cut from L026)."""
+    b = next(x for x in plan['bundles'] if x['name'] == name)
+    ren = collision_renames(g)
+    inst_names = getattr(g, 'instance_names', None) or {}
+    body = strip(text)
+    out = set()
+    for k in b['nodes']:
+        nd = g.nodes.get(k)
+        # the command, not nd.instance: DeclGraph reads the environment, where a local instance is
+        # no instance once its section ends
+        if nd is None or not _local_instance(g.infos[nd.module], g.infos[nd.module].commands[nd.cmd])[0]:
+            continue
+        short = instance_ref(k, inst_names, ren).rsplit('.', 1)[-1]
+        if not re.search(r'\binstance\s+' + re.escape(short) + r"(?![\w'.!?])", body):
+            out.add(k)
+    return out
 
 
 def _ext_have(g, plan, own, bundles=(), statements=()):
@@ -3292,11 +3328,25 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
         with open(path, 'w', encoding='utf-8') as f:
             f.write(txt)
         files.append(path)
-    if 'bundles' in what:
-        for b in plan['bundles']:
-            if names is None or b['name'] in names:
-                put(os.path.join(out, 'lib', 'Def_%s.lean' % b['name']),
-                    gen_bundle(g, plan, b['name'], collapse_mathlib), frozen_text.get(b['name']))
+        return txt
+    # what each bundle's text really declares: a later file activates only those local instances
+    # and emits the others again (`absent_instances`); a bundle not written now is read as it stands
+    # (published, or the earlier run's file)
+    plan = dict(plan, absent_instances={})
+    for b in plan['bundles']:
+        name = b['name']
+        path = os.path.join(out, 'lib', 'Def_%s.lean' % name)
+        if 'bundles' in what and (names is None or name in names):
+            txt = put(path, gen_bundle(g, plan, name, collapse_mathlib), frozen_text.get(name))
+        elif name in frozen_text:
+            txt = frozen_text[name]
+        elif os.path.exists(path):
+            txt = open(path, encoding='utf-8').read()
+        else:
+            continue
+        lost = absent_instances(g, plan, name, txt)
+        if lost:
+            plan['absent_instances'][name] = sorted(lost)
     for n in plan['nodes']:
         if names is not None and n not in names:
             continue
