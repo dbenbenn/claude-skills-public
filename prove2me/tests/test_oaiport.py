@@ -1086,7 +1086,8 @@ def test_aem_chain_tries_the_context_after_fun_prop():
     t = O.AEM_TAC
     assert t.startswith('first | fun_prop')
     for need in ('assumption', 'Measurable.aemeasurable', 'solve_by_elim', 'Continuous.aemeasurable',
-                 'MeasurePreserving.aemeasurable', 'QuasiMeasurePreserving.aemeasurable', 'measurability'):
+                 'MeasurePreserving.aemeasurable', 'QuasiMeasurePreserving.aemeasurable', 'measurability',
+                 'continuous_eval_const'):
         assert need in t, need
     assert t.index('fun_prop') < t.index('assumption') < t.index('measurability')
 

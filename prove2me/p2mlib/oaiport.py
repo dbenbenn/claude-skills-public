@@ -361,6 +361,7 @@ AEM_TAC = ("first | fun_prop | assumption | (apply Measurable.aemeasurable; solv
            "| (apply Continuous.aemeasurable; solve_by_elim) "
            "| (apply MeasureTheory.MeasurePreserving.aemeasurable; solve_by_elim) "
            "| (apply MeasureTheory.Measure.QuasiMeasurePreserving.aemeasurable; solve_by_elim) "
+           "| exact (continuous_eval_const _).aemeasurable "
            "| (apply Measurable.aemeasurable; measurability) | measurability")
 _PM_FALLBACK = "first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s)" % AEM_TAC
 
