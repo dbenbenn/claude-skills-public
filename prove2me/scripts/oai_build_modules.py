@@ -36,7 +36,7 @@ def opt(argv, name, default=None):
 def module_imports(d, pre, m):
     """The modules under `pre` that module m (folder `d`) imports directly."""
     t = open(os.path.join(d, *m.split('.')) + '.lean', encoding='utf-8').read()
-    return re.findall(r'^import %s\.([\w.]+)' % re.escape(pre), t, re.M)
+    return re.findall(r"^import %s\.([\w.']+)" % re.escape(pre), t, re.M)
 
 
 def module_order(d, pre, root):
