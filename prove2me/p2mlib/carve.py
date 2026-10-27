@@ -296,6 +296,16 @@ LOCAL_INSTANCE = re.compile(rb'(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?(?:noncomputab
                             rb'local\s+instance(?:\s*\(priority\s*:=[^)]*\))?', re.S)
 
 
+_PRIORITY = re.compile(rb'\binstance\s*\(priority\s*:=\s*([^)]*?)\s*\)')
+
+
+def _instance_priority(text):
+    """The `(priority := p)` an instance command's text gives (bytes), as text, else None."""
+    mt = LOCAL_INSTANCE.match(text)
+    mp = _PRIORITY.search(text, 0, mt.end()) if mt else None
+    return mp.group(1).decode('utf-8') if mp else None
+
+
 def _local_instance(info, c):
     """(is a `local instance`, byte offset where an anonymous one's name goes or None)."""
     t = info.text_bytes
@@ -2737,7 +2747,11 @@ class Carver:
                 continue
             done.add((vi, chain))
             if ik and instance_imported(ik, have, self.rename):
-                out.append('attribute [local instance] %s\n' % instance_ref(ik, inst_names, self.rename))
+                # at the source's priority: `attribute [local instance 2000] other` of the module
+                # must not win over a `(priority := 3000)` one (Auslander–Reiten oaiq-031)
+                prio = _instance_priority(info.text_bytes[vc.start.byte:vc.end.byte])
+                out.append('attribute [local instance%s] %s\n' % (' ' + prio if prio else '',
+                                                                 instance_ref(ik, inst_names, self.rename)))
                 continue
             # not imported: its command again under a name unique to this file, anonymous or
             # named (Erdős 3 v2: `local instance forecastModulusNeZero (Pr) (A) : NeZero …`, which

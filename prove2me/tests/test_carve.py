@@ -1993,3 +1993,16 @@ def test_uses_token_reads_identifiers_as_lean_does():
     assert not C._uses_token('(a : x.C)', 'C')
     assert not C._uses_token('(a : Cα)', 'C')          # Greek letters too
 
+
+
+def test_a_reactivated_local_instance_keeps_its_priority(g):
+    # oaiq-031: `local instance (priority := 3000) nativeSimpleScalar` came back as `attribute [local
+    # instance] …` (priority 1000), and the module's `attribute [local instance 2000]
+    # moduleCatBaseModule` won ("synthesized type class instance is not definitionally equal").
+    keep = LC_DEFS | {'CD.LC.tower_use'}
+    have = g.have_names(keep | {'CD.LC.actHi', 'CD.LC.towerHi', 'CD.LC.actLo'})
+    sec = _section(C.Carver(g).carve(keep, have), 'CarveDev.LocalCtx')
+    assert 'attribute [local instance 3000] CD.LC.actHi\n' in sec, sec
+    assert 'attribute [local instance] CD.LC.towerHi\n' in sec, sec
+    assert C._instance_priority(b'local instance (priority := high) x : A := a') == 'high'
+    assert C._instance_priority(b'local instance x : A := a') is None
