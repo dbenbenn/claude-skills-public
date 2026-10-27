@@ -1585,3 +1585,11 @@ def test_macro_identifiers_skip_tactic_names_and_binders():
     body = "repeat' first | rfl | simp [foo, Bar.baz] | (intro h; exact h.trans qux) | try apply quux 3"
     got = [x for _, _, x in O._macro_idents(body)]
     assert got == ['foo', 'Bar.baz', 'qux', 'quux']
+
+
+def test_elpnorm_norm_drops_its_measurability_argument():
+    # d13f23b's `eLpNorm_norm f hf` takes a measurability proof; ours is `eLpNorm_norm f` (oaiq-059)
+    src = ("    rw [Lp.norm_toLp,eLpNorm_norm (v i) (Lp.memLp (v i)).aestronglyMeasurable,Lp.norm_def]\n"
+           "        simp only [nLp, Lp.norm_toLp, eLpNorm_norm f hf.aestronglyMeasurable]\n")
+    assert O.core_rewrites(src) == ("    rw [Lp.norm_toLp,eLpNorm_norm (v i),Lp.norm_def]\n"
+                                    "        simp only [nLp, Lp.norm_toLp, eLpNorm_norm f]\n")
