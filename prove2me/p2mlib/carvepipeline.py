@@ -31,7 +31,7 @@ class StepFailed(Exception):
     pass
 
 
-ACCEPT_CAP = 200        # an accepted (atomic, unsplittable) item is excused only below this many seconds
+ACCEPT_CAP = 200        # a piece, or an accept_over item, is excused only below this many seconds
 
 
 def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR, accepted=()):
@@ -59,8 +59,11 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
         measured += 1
         if slowest is None or t['secs'] > slowest[1]:
             slowest = (key, t['secs'])
-        if key in accepted and t['secs'] <= ACCEPT_CAP:
-            continue                                   # pipeline.json accept_over: submit as is
+        if (key in accepted or key.startswith('piece:')) and t['secs'] <= ACCEPT_CAP:
+            # a piece is a proof: resubmittable, so submit as is and split only after two real
+            # timeouts (oaiq-035/037: a 106 s piece cost two ~1 h re-plans); bundles and statements
+            # freeze at publish. pipeline.json accept_over excuses any other item the same way
+            continue
         if t['secs'] > limit and name not in frozen:
             over.append((key, t['secs'], cost))
     ratio = max((secs / max(cost, 1.0) for _, secs, cost in over), default=1.0)

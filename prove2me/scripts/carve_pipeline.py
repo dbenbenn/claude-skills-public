@@ -44,8 +44,9 @@ its `prefixes` do not match the sources and the root module.
 `calibrate` reads what `measure` found: an item (not frozen) measured over 1.6 x the budget raises
 config `time_scale` to scale x (its measured seconds / its planned cost), forgets plan..measure and
 runs them again (cached files are not re-measured), at most twice; then it stops and lists the
-offenders. An atomic item re-planning cannot split (one theorem, measured under 200 s) is excused by
-listing `piece:NAME` in pipeline.json `accept_over`. Nothing is published before it. See p2mlib.carvepipeline.calibration.
+offenders. A piece (a proof: resubmittable) measured under 200 s never counts: submit it as is and
+split only after two real verifier timeouts. Another item is excused the same way by listing it
+(`bundle:NAME`) in pipeline.json `accept_over`. Nothing is published before it. See p2mlib.carvepipeline.calibration.
 
 Long runs: --detach starts the same run as its own systemd user unit (carve-<hash>, output appended to
 DIR/logs/driver.log) and returns at once; --wait [MINUTES] (default 100) then blocks until that run

@@ -299,7 +299,7 @@ def test_calibration_scales_by_the_worst_item_over_the_limit():
     r = CP.calibration(_plan({'B0': 55, 'B1': 55, 'B2': 30}, {'P': 50}),
                        {'bundle:B0': _t(85), 'bundle:B1': _t(128), 'bundle:B2': _t(20), 'piece:P': _t(90)},
                        1.2, 55)
-    assert [x[0] for x in r['over']] == ['bundle:B1', 'piece:P']
+    assert [x[0] for x in r['over']] == ['bundle:B1']             # a piece under the cap is resubmittable
     assert r['new_scale'] == round(1.2 * 128 / 55, 1) == 2.8
     # the old key form of times.json (the bare bundle name) counts
     assert CP.calibration(_plan({'B0': 55}), {'B0': _t(128)}, 1.2, 55)['over']
@@ -489,13 +489,14 @@ def test_from_still_forgets_the_step_and_everything_after(env):
 
 
 def test_calibration_excuses_accepted_items_under_the_hard_cap():
-    # an atomic piece (one theorem) that re-planning cannot split: ~100 s is submitted as is
-    plan = _plan({'B0': 55}, {'P': 46})
-    times = {'bundle:B0': _t(10), 'piece:P': _t(101)}
+    # pieces under the cap are excused anyway (test_a_piece_under_the_cap_never_forces_a_replan);
+    # accept_over excuses another item, e.g. a bundle one declaration re-planning cannot split
+    plan = _plan({'B0': 55, 'B1': 10})
+    times = {'bundle:B0': _t(101), 'bundle:B1': _t(5)}
     assert CP.calibration(plan, times, 8.0, 55)['over']
-    assert CP.calibration(plan, times, 8.0, 55, accepted=['piece:P'])['over'] == []
+    assert CP.calibration(plan, times, 8.0, 55, accepted=['bundle:B0'])['over'] == []
     # the hard cap still applies to an accepted item
-    assert CP.calibration(plan, {'piece:P': _t(250)}, 8.0, 55, accepted=['piece:P'])['over']
+    assert CP.calibration(plan, {'bundle:B0': _t(250)}, 8.0, 55, accepted=['bundle:B0'])['over']
 
 
 # ---- lean_src must be the root's import closure (2026-10-27) -------------------------------------
@@ -575,3 +576,17 @@ def test_wait_reads_the_last_detached_run():
     assert cp.wait_result('== detached 1\n== driver exit 1\n== detached 2\nrunning graph\n') is None
     assert cp.wait_result('== detached 1\n== driver exit 1\n== detached 2\npipeline ok\n== driver exit 0\n') == 0
     assert cp.wait_result('== detached 1\nstep failed\n== driver exit 1\n') == 1
+
+
+
+def test_a_piece_under_the_cap_never_forces_a_replan():
+    # oaiq-035/037 (KMedian): one piece measured 101-106 s against a 88 s limit; calibrate raised the
+    # scale twice (~1 h of measuring each, 11 -> 80 bundles), then stopped. A piece is a proof: it can
+    # be resubmitted, and the rule is to submit as is and split after two real timeouts. Bundles and
+    # statements freeze at publish, so they keep the strict limit.
+    r = CP.calibration(_plan({'B0': 55}, {'P': 46}), {'bundle:B0': _t(20), 'piece:P': _t(106)}, 8, 55)
+    assert r['over'] == [] and r['new_scale'] == 8
+    r = CP.calibration(_plan({'B0': 55}, {'P': 46}), {'bundle:B0': _t(20), 'piece:P': _t(250)}, 8, 55)
+    assert [x[0] for x in r['over']] == ['piece:P']
+    r = CP.calibration(_plan({'B0': 55}), {'bundle:B0': _t(106)}, 8, 55)
+    assert [x[0] for x in r['over']] == ['bundle:B0']
