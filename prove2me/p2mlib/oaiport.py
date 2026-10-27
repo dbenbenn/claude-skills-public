@@ -435,7 +435,7 @@ def _drop_map_smul_proof(text):
         if not w or a1 == w.end():
             i = k
             continue
-        is_exact = bool(re.search(r"\bexact[ \t]+$", text[max(0, m.start() - 12):m.start()]))
+        is_exact = bool(re.search(r"(?:\bexact[ \t]+|:=\s*)$", text[max(0, m.start() - 12):m.start()]))
         scalar = text[k:a1]
         k = a1
         named = ''

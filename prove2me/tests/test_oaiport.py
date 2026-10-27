@@ -541,6 +541,16 @@ def test_measure_map_smul_exact_keeps_explicit_arguments():
     assert "exact Measure.map_smul _ _ _\n" in out
 
 
+# A term-mode use after `:=` (same line or next) takes the two other explicit arguments as `_ _` too
+# (WeakHessian SpeedApprox/RnDerivSmul, oaiq-052).
+
+def test_measure_map_smul_term_mode_after_assign():
+    out = O.core_rewrites("  have he : a = b :=\n    Measure.map_smul _ (continuous_eval_const t).measurable.aemeasurable\n"
+                          "  _ = c := Measure.map_smul C hf.aemeasurable\n")
+    assert "Measure.map_smul _ _ _\n" in out
+    assert "Measure.map_smul C _ _\n" in out
+
+
 # d13f23b: `AddSubgroup.isClosed_of_discreteTopology (U := L)`; ours: `AddSubgroup.isClosed_of_discrete (H := L)`
 # (SingleLatticeCovering GridCounts/CircuitErrors, 2026-10-25).
 
