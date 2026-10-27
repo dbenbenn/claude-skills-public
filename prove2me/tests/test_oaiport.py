@@ -906,7 +906,10 @@ def test_birkhoff_sum_renames():
     out = O.core_rewrites("rw [birkhoffSum_succ_apply', hb]\nsimpa using birkhoffSum_add_right_apply T g m n x\nrw [birkhoffSum_succ_apply]\n")
     assert "rw [birkhoffSum_succ', hb]" in out
     assert "birkhoffSum_add T g m n x" in out
-    assert "birkhoffSum_succ_apply]" in out
+    assert "rw [birkhoffSum_succ]" in out
+    out = O.core_rewrites("simp only [birkhoffSum_zero_apply, x]\nrw [birkhoffSum_succ_apply, ih]\n")
+    assert "simp only [birkhoffSum_zero, x]" in out
+    assert "rw [birkhoffSum_succ, ih]" in out
     assert O.core_rewrites('(node i<minus i)') == '(node i < minus i)'
 
 
