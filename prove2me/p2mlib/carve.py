@@ -2057,6 +2057,12 @@ def _could_answer(inst_cmd, c):
         classes = (d[1],) + _PARENT_CLASSES.get(d[1], ())
         if any(p[0] in classes and heads <= set(p[1:]) for p in asked):
             return True
+        # a decidability instance can sit in an argument unification assigned (`rw [lemma]`, a `Finset`
+        # lemma's `[DecidableEq α]`), so nothing records a `Decidable*` problem; it counts when its
+        # type's head constants occur among the command's problems of any class (DilutedSpin
+        # `DecidableEq (Edge S)`, whose command asks only `Fintype Edge`)
+        if d[1].startswith('Decidable') and heads and any(heads <= set(p[1:]) for p in asked):
+            return True
     return False
 
 

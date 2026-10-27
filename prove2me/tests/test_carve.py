@@ -1792,6 +1792,21 @@ def test_a_fully_generic_local_instance_answers_any_problem_of_its_class():
     assert not C._could_answer(inst, other)
 
 
+def test_a_local_decidable_instance_is_kept_for_a_command_that_asks_about_its_type():
+    # DilutedSpin (oaiq-041): `local instance (S) : DecidableEq (Edge S) := Classical.decEq _` is used by
+    # `rw [requirements_selector]` through an instance argument unification assigns, so LeanInfo records
+    # neither the instance nor a `DecidableEq` problem; the command only asks `Fintype Edge`. A decidability
+    # instance is kept when its type's head constants occur among the command's problems.
+    import types
+    inst = types.SimpleNamespace(declares=[('inst', 'DecidableEq', ['Edge'])])
+    asked = types.SimpleNamespace(inst_keys=['Fintype Edge', 'Fintype Sample'])
+    other = types.SimpleNamespace(inst_keys=['Fintype Sample'])
+    assert C._could_answer(inst, asked)
+    assert not C._could_answer(inst, other)
+    nonDecidable = types.SimpleNamespace(declares=[('inst', 'Fintype', ['Edge'])])
+    assert not C._could_answer(nonDecidable, types.SimpleNamespace(inst_keys=['DecidableEq Sample', 'Foo Edge']))
+
+
 def test_reactivated_instance_uses_its_collision_rename():
     # Lech/Dutta (oaiq-032): ten modules declare `private local instance concreteRing`; the bundle
     # deprivatizes them as concreteRing_p0.., and a piece's `attribute [local instance]` named the
