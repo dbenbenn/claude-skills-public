@@ -12,6 +12,10 @@ usage (from the prove2me workspace):
                                                              -- role, what Lean resolved them to, the
                                                              -- instances and notations each command
                                                              -- used (see "--idents when elaborating")
+  lake env lean --run LeanInfo.lean FILE.lean --idents --module M --no-decls -DautoImplicit=false \
+      --olean OUT.olean --ilean OUT.ilean                  -- also the build: write the module's
+                                                             -- .olean/.ilean as `lean -o`/`-i` would
+                                                             -- (see "Building with LeanInfo")
   lake env lean --run LeanInfo.lean FILE.lean --candidates M1,M2,...
                                                              -- also import these modules and
                                                              -- report copies of their theorems
@@ -52,6 +56,21 @@ Prints one JSON object:
 In parse-only mode the commands that change how later text parses (`namespace`, `section`, `end`,
 `open`, `set_option`, `universe`, notation, `syntax`, `macro`) are still elaborated, so scoped
 and in-file notation parse; declarations are not, and `decls` is empty.
+
+## Building with LeanInfo
+
+`--olean`/`--ilean` (with the build's `-Dname=value` options) write the module's outputs from the
+same elaboration, so one pass both builds a ported module and gives the carver its reading
+(oai_build_modules.py through p2mlib.leaninfo.build_module, 2026-10-27; before, each module was
+elaborated twice: `lean -o` in the build, LeanInfo in `carve.py graph`). Nothing is written when
+an error was reported. Checked against `lean -o` on CylinderCovering modules: the `.ilean` is
+byte-identical; the `.olean` has the same imports and constants (names, types, values) and
+differs only in the `extraModUses` entries `shake` reads (which import is used, keyed by the
+`isExporting` flag of the moment: `lean` elaborates proofs asynchronously, outside the exporting
+context, this tool synchronously). Linter messages are recorded into the `.olean` as `lean` does
+(Linter.recordLints). `build_ms` in the JSON is the time spent importing, elaborating and
+writing the outputs -- the module's compile time, without this tool's own reporting -- which the
+build logs for the carve cost model.
 
 The prove2me scripts ask this instead of matching Lean with regular expressions
 (scripts/README.md, "What LeanInfo reports").
@@ -550,6 +569,24 @@ unsafe def main (args : List String) : IO UInt32 := do
   let candidates : Array Name := match args.dropWhile (· != "--candidates") with
     | _ :: ms :: _ => (ms.splitOn ",").filter (· ≠ "") |>.map String.toName |>.toArray
     | _ => #[]
+  let argAfter (flag : String) : Option String := match args.dropWhile (· != flag) with
+    | _ :: v :: _ => some v
+    | _ => none
+  let oleanOut? := argAfter "--olean"
+  let ileanOut? := argAfter "--ilean"
+  -- `-Dname=value` as `lean` takes it (the build passes -DautoImplicit=false)
+  let mut dOpts : Options := {}
+  for a in args do
+    if a.startsWith "-D" then
+      match ((a.drop 2).toString).splitOn "=" with
+      | [k, v] =>
+        let dv : DataValue := if v == "true" then .ofBool true else if v == "false" then .ofBool false
+          else match v.toNat? with | some k => .ofNat k | none => .ofString v
+        dOpts := dOpts.insert (String.toName k) dv
+      | _ => pure ()
+  -- build time: importing, elaborating and writing outputs, not the reporting
+  let buildNs ← IO.mkRef (0 : Nat)
+  let t0 ← IO.monoNanosNow
   initSearchPath (← findSysroot)
   enableInitializersExecution
   let input ← IO.FS.readFile path
@@ -557,13 +594,17 @@ unsafe def main (args : List String) : IO UInt32 := do
   let fm := inputCtx.fileMap
   let (header, parserState, messages) ← Parser.parseHeader inputCtx
   -- synchronous elaboration: every declaration's value is in the environment when we read it
-  let opts : Options := Elab.async.set {} false
+  let opts : Options := Elab.async.set dOpts false
   let (env, messages) ← processHeaderCore (HeaderSyntax.startPos header)
     (HeaderSyntax.imports header ++ candidates.map fun m => ({ module := m } : Import))
     (HeaderSyntax.isModule header)
     opts messages inputCtx (headerStx? := header) (mainModule := mainModule)
   let headerEnv := env
+  buildNs.modify (· + ((← IO.monoNanosNow) - t0))
   let factsRef ← IO.mkRef (#[] : Array (List (String × Json)))
+  -- for --olean/--ilean: each command's messages (its lints) and info trees
+  let lintsRef ← IO.mkRef (#[] : Array (Option Syntax × MessageLog))
+  let treesRef ← IO.mkRef (#[] : Array InfoTree)
   let kindsRef ← IO.mkRef ({} : NameSet)
   -- one loop for both modes, like Frontend.processCommand but keeping every message (elaboration
   -- resets the command state's log per command -- Elab/Command.lean, elabCommandTopLevel -- and
@@ -591,7 +632,9 @@ unsafe def main (args : List String) : IO UInt32 := do
     let mut cmdRefs : NameSet := ∅
     let mut facts : List (String × Json) := []
     if !parseOnly || shapesParsing cmd.getKind then
+      let te ← IO.monoNanosNow
       elabCommandAtFrontend cmd
+      buildNs.modify (· + ((← IO.monoNanosNow) - te))
       emsgs := (← getCommandState).messages.reportedPlusUnreported.toArray
       unless parseOnly do
         -- the info state, like the message log, is per command (elabCommandTopLevel resets both),
@@ -599,6 +642,8 @@ unsafe def main (args : List String) : IO UInt32 := do
         let info ← IO.wait (← getCommandState).infoState.substituteLazy
         let trees := info.trees.toArray.map (·.substitute info.assignment)
         cmdRefs := referencedConsts trees
+        if ileanOut?.isSome then treesRef.modify (· ++ trees)
+        if oleanOut?.isSome then lintsRef.modify (·.push (some cmd, (← getCommandState).messages))
         if idents then
           facts ← factsJ (← getCommandState).env headerEnv cmd trees
           -- the syntax kinds a notation (or syntax) command adds, and the ones of this file a
@@ -748,9 +793,26 @@ unsafe def main (args : List String) : IO UInt32 := do
     msgsJ := msgsJ.push <| Json.mkObj [
       ("severity", toJson sev), ("start", positionJ fm m.pos), ("end", positionJ fm (m.endPos.getD m.pos)),
       ("text", toJson (← m.data.toString))]
+  -- the build's outputs, as `lean -o`/`-i` writes them (Frontend.runFrontend), when nothing failed
+  let failed := msgArr.any (·.severity == .error)
+  let tw ← IO.monoNanosNow
+  if let some o := oleanOut? then
+    unless failed || parseOnly do
+      let env ← Linter.recordLints fm finalEnv (← lintsRef.get)
+      writeModule (writeIR := !Compiler.compiler.postponeCompile.get opts) env o
+  if let some il := ileanOut? then
+    unless failed || parseOnly do
+      let references := Lean.Server.findModuleRefs fm (← treesRef.get) (localVars := false)
+      let (moduleRefs, decls) ← references.toLspModuleRefs
+      let ilean : Lean.Server.Ilean := {
+        module := mainModule, directImports := Server.collectImports header,
+        references := moduleRefs, decls }
+      IO.FS.writeFile il <| Json.compress <| toJson ilean
+  buildNs.modify (· + ((← IO.monoNanosNow) - tw))
   IO.println <| Json.compress <| Json.mkObj [
     ("file", toJson path), ("mode", toJson (if parseOnly then "parse" else "elaborate")),
-    ("commands", toJson commandsJ), ("decls", toJson declsSorted), ("messages", toJson msgsJ)]
+    ("commands", toJson commandsJ), ("decls", toJson declsSorted), ("messages", toJson msgsJ),
+    ("build_ms", toJson ((← buildNs.get) / 1000000))]
   return 0
 
 end LeanInfo

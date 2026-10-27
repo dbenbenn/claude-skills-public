@@ -17,8 +17,14 @@ usage: oai_build_modules.py FOLDER ROOT [--force] [--log BUILD.log] [--elab-log 
               replayed modules have no time, so keep the earlier logs too (carve_prep.py config
               reads every build_elab*.log, later ones winning) or pass --force
 
-One Lean process at a time (the box cap is three, shared). A failed module's outputs are removed
-and the script exits 1 with its first errors."""
+One Lean process at a time (the box cap is shared). A failed module's outputs are removed and the
+script exits 1 with its first errors.
+
+Each module compiles through the compiled LeanInfo (p2mlib.leaninfo.build_module, 2026-10-27): the
+same elaboration writes the .olean/.ilean and caches the reading `carve.py graph` needs, which
+before cost a second elaboration of every module. The logged seconds are LeanInfo's build_ms (its
+import, elaboration and output writing; about `lean`'s CPU time plus 0.4-1 s). Without the compiled
+tool it falls back to `lean -o`."""
 import os
 import re
 import resource
@@ -27,6 +33,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
+from p2mlib import leaninfo  # noqa: E402
 
 
 def opt(argv, name, default=None):
@@ -98,6 +105,17 @@ def build(ws, folder, root, force=False, log=None):
         src = os.path.join(d, *m.split('.')) + '.lean'
         if not force and not stale(m, src, out + '.olean', module_imports(d, pre, m), rebuilt, olean_of):
             say('✔ [%d/%d] Replayed %s' % (i + 1, len(order), mod))
+            continue
+        res = leaninfo.build_module(src, mod, out + '.olean', out + '.ilean', ws=ws)
+        if res is not None:
+            ok, cpu, errs = res
+            total += cpu
+            if not ok:
+                say('✖ [%d/%d] FAILED %s (%.1fs)' % (i + 1, len(order), mod, cpu))
+                print('\n'.join(errs[:10]))
+                return False, lines
+            rebuilt.add(m)
+            say('✔ [%d/%d] Built %s (%.1fs)' % (i + 1, len(order), mod, cpu))
             continue
         ru0 = resource.getrusage(resource.RUSAGE_CHILDREN)
         r = subprocess.run(['lake', 'env', 'lean', '-j1', '-DautoImplicit=false', '-R', ws,

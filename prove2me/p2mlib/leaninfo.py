@@ -208,8 +208,10 @@ def parse(data, text_bytes=b''):
     return Info(data['file'], data['mode'], cmds, decls, msgs, text_bytes)
 
 
-def _key(path, parse_only, ws, candidates=(), idents=False, module=None, no_decls=False):
+def _key(path, parse_only, ws, candidates=(), idents=False, module=None, no_decls=False, options=()):
     h = hashlib.sha256()
+    for o in options:
+        h.update(('option:' + o).encode())
     if idents:
         h.update(b'idents')
     if module:
@@ -293,7 +295,7 @@ def native_tool(ws):
 
 
 def raw(path, parse_only=False, ws=None, timeout=3000, candidates=(), idents=False, module=None,
-        no_decls=False):
+        no_decls=False, options=()):
     """LeanInfo's JSON for `path` as a dict, uncached (tests/record_fixtures.py records it)."""
     path = os.path.abspath(path)
     ws = ws or workspace()
@@ -301,7 +303,8 @@ def raw(path, parse_only=False, ws=None, timeout=3000, candidates=(), idents=Fal
     tool = [exe] if exe else ['lean', '--run', TOOL]
     args = ['lake', 'env'] + tool + [path] + (['--parse-only'] if parse_only else []) + \
         (['--candidates', ','.join(candidates)] if candidates else []) + (['--idents'] if idents else []) + \
-        (['--module', module] if module else []) + (['--no-decls'] if no_decls else [])
+        (['--module', module] if module else []) + (['--no-decls'] if no_decls else []) + \
+        ['-D' + o for o in options]
     r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout)
     out = r.stdout.strip().split('\n')[-1] if r.stdout.strip() else ''
     try:
@@ -311,22 +314,64 @@ def raw(path, parse_only=False, ws=None, timeout=3000, candidates=(), idents=Fal
 
 
 def run(path, parse_only=False, ws=None, use_cache=True, timeout=3000, candidates=(), idents=False,
-        module=None, no_decls=False):
+        module=None, no_decls=False, options=()):
     """LeanInfo on `path`. `candidates`: published modules to import beside the file's own, so each
     theorem reports `same_statement_as` (elaborate mode; see lean/LeanInfo.lean). `idents`: every
     command also reports its identifiers by role, and when elaborating what Lean resolved them to
     and the instances it used (the carver's input). `module`: the file's module name (private
-    names then read as in its .olean). `no_decls`: skip the per-declaration report."""
+    names then read as in its .olean). `no_decls`: skip the per-declaration report. `options`:
+    Lean options as `name=value` (`-D`), e.g. the build's autoImplicit=false."""
     path = os.path.abspath(path)
     ws = ws or workspace()
     text = open(path, 'rb').read()
     candidates = list(candidates)
-    key = _key(path, parse_only, ws, candidates, idents, module, no_decls)
+    key = _key(path, parse_only, ws, candidates, idents, module, no_decls, options)
     cf = os.path.join(CACHE, key + '.json')
     if use_cache and os.path.exists(cf):
         return parse(json.load(open(cf)), text)
-    data = raw(path, parse_only, ws, timeout, candidates, idents, module, no_decls)
+    data = raw(path, parse_only, ws, timeout, candidates, idents, module, no_decls, options)
     if use_cache:
         os.makedirs(CACHE, exist_ok=True)
         json.dump(data, open(cf, 'w'))
     return parse(data, text)
+
+
+BUILD_OPTIONS = ('autoImplicit=false',)   # what the verifier and `lean -DautoImplicit=false` use
+
+
+def build_module(path, module, olean, ilean, options=BUILD_OPTIONS, ws=None, timeout=3000):
+    """Compile `path` as `module` into olean/ilean with the compiled LeanInfo, and cache the reading
+    `carve.module_info` asks for (idents, no decls, these options) from the same elaboration, so
+    `carve.py graph` does not elaborate the module again (2026-10-27). Returns (ok, build seconds,
+    errors as `lean` prints them: FILE:LINE:COL: error: TEXT), or None without the compiled tool
+    (then compile with `lean -o`). Nothing is written or cached when Lean reported an error."""
+    path = os.path.abspath(path)
+    ws = ws or workspace()
+    exe = native_tool(ws)
+    if not exe:
+        return None
+    # the key hashes the imports' builds as they are now (built before this module)
+    key = _key(path, False, ws, (), True, module, True, options)
+    for f in (olean, ilean):
+        os.makedirs(os.path.dirname(os.path.abspath(f)), exist_ok=True)
+    args = ['lake', 'env', exe, path, '--idents', '--module', module, '--no-decls'] + \
+        ['-D' + o for o in options] + ['--olean', olean, '--ilean', ilean]
+    r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout)
+    out = r.stdout.strip().split('\n')[-1] if r.stdout.strip() else ''
+    try:
+        data = json.loads(out)
+    except ValueError:
+        tail = (r.stdout + r.stderr)[-2000:]
+        return False, 0.0, ['%s:1:0: error: LeanInfo failed (exit %s): %s' % (path, r.returncode, tail)]
+    secs = data.get('build_ms', 0) / 1000.0
+    errs = ['%s:%d:%d: error: %s' % (path, m['start']['line'], m['start']['col'], m['text'])
+            for m in data['messages'] if m['severity'] == 'error']
+    if errs or r.returncode:
+        for f in (olean, ilean):
+            if os.path.exists(f):
+                os.remove(f)
+        return False, secs, errs or ['%s:1:0: error: LeanInfo exit %s' % (path, r.returncode)]
+    os.makedirs(CACHE, exist_ok=True)
+    with open(os.path.join(CACHE, key + '.json'), 'w') as f:
+        json.dump(data, f)
+    return True, secs, []

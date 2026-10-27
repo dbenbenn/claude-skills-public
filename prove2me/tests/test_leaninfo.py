@@ -248,3 +248,73 @@ def test_interpreted_switch(monkeypatch, tmp_path):
     monkeypatch.setenv('P2M_LEANINFO_INTERPRETED', '1')
     monkeypatch.setattr(LI.subprocess, 'run', lambda *a, **k: (_ for _ in ()).throw(AssertionError('built')))
     assert LI.native_tool(_ws(tmp_path)) is None
+
+
+# ---- building a module with LeanInfo (2026-10-27) ----------------------------------------------
+# The build elaborated each ported module with `lean -o`, then `carve.py graph` elaborated it again
+# with LeanInfo. build_module does both in one pass and leaves the reading in the cache.
+
+def test_options_are_passed_and_keyed(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(LI, 'native_tool', lambda ws: '/bin/leaninfo')
+    monkeypatch.setattr(LI.subprocess, 'run', lambda args, **k: seen.append(args) or _Done(out='{"x": 1}'))
+    f = tmp_path / 'F.lean'
+    f.write_text('')
+    ws = _ws(tmp_path)
+    LI.raw(str(f), ws=ws, options=('autoImplicit=false',))
+    assert '-DautoImplicit=false' in seen[0]
+    assert LI._key(str(f), False, ws, options=('autoImplicit=false',)) != LI._key(str(f), False, ws)
+
+
+def _info_json(path, errors=(), build_ms=1500):
+    return json.dumps({'file': path, 'mode': 'elaborate', 'commands': [], 'decls': [], 'build_ms': build_ms,
+                       'messages': [{'severity': 'error', 'start': {'line': l, 'col': c, 'byte': 0},
+                                     'end': {'line': l, 'col': c, 'byte': 0}, 'text': t} for l, c, t in errors]})
+
+
+def test_build_module_writes_outputs_and_caches_the_graph_reading(monkeypatch, tmp_path):
+    monkeypatch.setattr(LI, 'CACHE', str(tmp_path / 'cache'))
+    monkeypatch.setattr(LI, 'native_tool', lambda ws: '/bin/leaninfo')
+    ws = _ws(tmp_path)
+    f = tmp_path / 'ws' / 'M.lean'
+    f.write_text('theorem t : True := trivial\n')
+    seen = []
+
+    def fake(args, **k):
+        seen.append(args)
+        open(args[args.index('--olean') + 1], 'w').close()
+        return _Done(out=_info_json(str(f)))
+    monkeypatch.setattr(LI.subprocess, 'run', fake)
+    out = str(tmp_path / 'out' / 'M')
+    ok, secs, errs = LI.build_module(str(f), 'P.M', out + '.olean', out + '.ilean', ws=ws)
+    assert ok and secs == 1.5 and errs == []
+    a = seen[0]
+    assert a[:4] == ['lake', 'env', '/bin/leaninfo', str(f)]
+    for x in ('--idents', '--no-decls', '-DautoImplicit=false'):
+        assert x in a
+    assert a[a.index('--module') + 1] == 'P.M' and a[a.index('--ilean') + 1] == out + '.ilean'
+
+    def boom(*a, **k):
+        raise AssertionError('graph elaborated a module the build had already read')
+    monkeypatch.setattr(LI.subprocess, 'run', boom)
+    import importlib
+    C = importlib.import_module('p2mlib.carve')
+    monkeypatch.setattr(C, 'module_path', lambda src, m: str(f))
+    assert C.module_info(ws, 'P.M', ws=ws).path == str(f)
+
+
+def test_build_module_reports_errors_like_lean(monkeypatch, tmp_path):
+    monkeypatch.setattr(LI, 'CACHE', str(tmp_path / 'cache'))
+    monkeypatch.setattr(LI, 'native_tool', lambda ws: '/bin/leaninfo')
+    ws = _ws(tmp_path)
+    f = tmp_path / 'ws' / 'M.lean'
+    f.write_text('x')
+    monkeypatch.setattr(LI.subprocess, 'run', lambda *a, **k: _Done(out=_info_json(str(f), [(3, 4, 'unknown identifier `foo`')])))
+    ok, secs, errs = LI.build_module(str(f), 'P.M', str(tmp_path / 'M.olean'), str(tmp_path / 'M.ilean'), ws=ws)
+    assert not ok and errs == ['%s:3:4: error: unknown identifier `foo`' % f]
+    assert not os.listdir(str(tmp_path / 'cache')) if os.path.isdir(str(tmp_path / 'cache')) else True
+
+
+def test_build_module_needs_the_native_tool(monkeypatch, tmp_path):
+    monkeypatch.setattr(LI, 'native_tool', lambda ws: None)
+    assert LI.build_module('M.lean', 'P.M', 'o', 'i', ws=_ws(tmp_path)) is None

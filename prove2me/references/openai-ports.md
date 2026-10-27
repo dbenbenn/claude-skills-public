@@ -200,9 +200,13 @@ back WA. The lessons:
 - **The carver reads what Lean elaborated, not the source text** (2026-10-24). `carve.py graph`
   runs `lean/LeanInfo.lean --idents` *elaborating* each module (`--module M --no-decls`; cached
   by content under `~/.cache/p2m/leaninfo`). It costs about the module's own compile CPU time
-  (FormalBoxes: 87 s against 93 s), so a first `graph` is about one more build of the port. Since
-  2026-10-27 the tool runs compiled (`p2mlib.leaninfo.native_tool`), saving the ~3 s per module it
-  spent re-elaborating itself under `lean --run` (CylinderCovering: 5.4 -> 3.0 s and 21 -> 17 s CPU). For
+  (FormalBoxes: 87 s against 93 s). Since 2026-10-27 the tool runs compiled
+  (`p2mlib.leaninfo.native_tool`), and `oai_build_modules.py` compiles each module through it
+  (`leaninfo.build_module`: one elaboration writes the .olean/.ilean and caches this reading, with
+  the build's `autoImplicit=false`), so after a build `graph` reads every module from the cache
+  instead of elaborating the port a second time. Before, the two passes were about two thirds and
+  one third of all Lean slot time on the box. A module built some other way (by hand with `lean -o`,
+  or before this change) is still elaborated by `graph`, as before. For
   every command it records from the info trees:
   - `resolved`: what each identifier token resolved to, the name part and each field part
     (`A.coord_eq` with `A : Space`, `(e).f`, an `open`-resolved name, a `simp only [h]` lemma, a

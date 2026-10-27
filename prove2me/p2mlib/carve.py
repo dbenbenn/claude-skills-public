@@ -135,9 +135,11 @@ def module_path(src_root, m):
 
 def module_info(src_root, m, ws=None, use_cache=True):
     """LeanInfo of module m under src_root, elaborated (its imports must be built), with its
-    identifiers, what Lean resolved each to and the instances each command used; cached."""
+    identifiers, what Lean resolved each to and the instances each command used; cached (usually
+    already, by the build: oai_build_modules.py compiles through leaninfo.build_module with the
+    same options, so the module is not elaborated twice)."""
     return leaninfo.run(module_path(src_root, m), idents=True, module=m, no_decls=True, ws=ws,
-                        use_cache=use_cache)
+                        use_cache=use_cache, options=leaninfo.BUILD_OPTIONS)
 
 
 def compile_file(path, module, olean_dir, ws=None, timeout=3000):

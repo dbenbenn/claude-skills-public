@@ -311,6 +311,8 @@ def test_module_port_inlines_tactic_macros_across_modules():
 
 def _fake_lean(monkeypatch, built):
     import subprocess
+    # the plain `lean -o` path: no compiled LeanInfo (leaninfo.build_module then returns None)
+    monkeypatch.setenv('P2M_LEANINFO_INTERPRETED', '1')
 
     def run(args, **kw):
         out = args[args.index('-o') + 1]
