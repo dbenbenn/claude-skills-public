@@ -391,6 +391,39 @@ class Pipeline:
             cfg['collapse_mathlib'] = False
         cfg.update(self.p.get('config_set') or {})
         json.dump(cfg, open(path, 'w'), indent=1)
+        self.state['config_set_applied'] = dict(self.p.get('config_set') or {})
+
+    def sync_config_set(self):
+        """pipeline.json `config_set` keys changed since `config` applied them go straight into
+        config.json, and the steps that read them run again: from `gen` for `patches` (post-carve
+        literal patches), from `plan` for anything else. Re-running `config` instead would regenerate
+        config.json and lose what calibrate wrote (time_scale). oaiq-051: a resume never applied new
+        patches, and measure kept failing on unpatched text."""
+        path = os.path.join(self.d, 'config.json')
+        rec = self.state['steps'].get('config')
+        if not rec or rec['status'] != 'done' or not os.path.exists(path):
+            return
+        want = dict(self.p.get('config_set') or {})
+        if 'config_set_applied' not in self.state:           # a state from before this was recorded
+            self.state['config_set_applied'] = want
+            return
+        old = self.state['config_set_applied']
+        changed = sorted(k for k in set(want) | set(old) if want.get(k) != old.get(k))
+        if not changed:
+            return
+        cfg = json.load(open(path))
+        for k in changed:
+            if k in want:
+                cfg[k] = want[k]
+            else:
+                cfg.pop(k, None)
+        json.dump(cfg, open(path, 'w'), indent=1)
+        self.state['config_set_applied'] = want
+        frm = 'gen' if set(changed) <= {'patches'} else 'plan'
+        print('== config_set changed (%s): config.json updated; re-running from %s' % (', '.join(changed), frm), flush=True)
+        if frm in self.state['steps']:
+            self.invalidate(frm)
+        self.save()
 
     def step_graph(self):
         self.run_cmds('graph', [self.tool('carve', 'graph', 'config.json')])
@@ -411,7 +444,11 @@ class Pipeline:
         self.run_cmds('order', [self.tool('carve', 'order', 'config.json')])
 
     def step_measure(self):
-        self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *(self.p.get('measure_flags') or []))])
+        # every failing file in one run, not one per ~12 min round (oaiq-051), as the build does
+        flags = list(self.p.get('measure_flags') or [])
+        if '--keep-going' not in flags:
+            flags.append('--keep-going')
+        self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *flags)])
 
     def step_calibrate(self):
         cfg = json.load(open(os.path.join(self.d, 'config.json')))
@@ -489,6 +526,7 @@ class Pipeline:
 
     # -- driver -----------------------------------------------------------------------------
     def run(self, stop_after=None, only_redo=()):
+        self.sync_config_set()
         redo = set(only_redo)
         while True:
             self.restart = False

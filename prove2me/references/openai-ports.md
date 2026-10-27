@@ -114,7 +114,8 @@ Problem336).** Fix each at the cause; none needs a macro.
   `⟨hg.aestronglyMeasurable, _⟩`), `MemLp.mul` swapped its factors; `norm_num [table defs]` leaves `vecCons`
   lookups or `Int.toNat 205` unevaluated where `simp [same]` evaluates them (oaiq-033/038); `rw
   [AddMonoidAlgebra.coeff_zero]` on an `MvPolynomial.coeff` goal is `MvPolynomial.coeff_zero` (and `coeff_add`);
-  `tauto` no longer unfolds an applied set-builder membership; a multi-line `convert … using 1; first | rfl |
+  `tauto` no longer unfolds an applied set-builder membership; `simpa only [ite_true]` no longer fires on an
+  `if True` whose `Decidable` instance is not the standard one (use `↓reduceIte`, oaiq-056); a multi-line `convert … using 1; first | rfl |
   ring` closes only the first goal (use `<;>`) (oaiq-045); `omit [BorelSpace E]` on a lemma that uses stdGaussian
   (oaiq-048).
 - *"not type-correct under the `implicit` transparency level"* in `rw`/`simp`/`dsimp` (category theory,
@@ -164,8 +165,9 @@ and new `carve.py` inside one carve. So:
   and mid-graph on every port over ~300 modules (oaiq-033..049); a killed wait costs nothing. Since a932a18 the
   build leaves `graph` its LeanInfo reading, so `graph` takes seconds after a build.
 - Parameters live in `DIR/pipeline.json`: a different CLI value is refused, so edit the file. A changed
-  `config_set.patches` needs `--redo config` and `--redo gen` (config alone leaves the generated files
-  unpatched). Editing the patches file and resuming re-ports (stale-step detection). `--def` takes
+  `config_set` in pipeline.json reaches config.json on the next resume by itself, without re-running `config`
+  (which would reset calibrate's `time_scale`): `patches` re-runs from `gen`, any other key from `plan`
+  (oaiq-051). `measure` keeps going past a failing file and lists them all. Editing the patches file and resuming re-ports (stale-step detection). `--def` takes
   `Definitions.Def_X` (a bare `Def_X` is read so); `--measure-flag` takes the `=` form. `oai_meta.json`
   `prefixes` are the port's own prefixes, `OAI.<top directory>` (what `oai_port_modules` strips, e.g.
   `OAI.Algebra`), never the result's folder: step `config` refuses another value (oaiq-031: 181 links

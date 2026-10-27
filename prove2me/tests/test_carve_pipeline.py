@@ -650,3 +650,39 @@ def test_meta_prefixes_must_be_the_ports(tmp_path):
     assert why and 'OAI.Algebra' in why and 'port' in why
     meta.write_text(json.dumps({'prefixes': ['OAI.Algebra']}))
     assert CP.check_meta(str(meta), str(lean), 'OAI.Algebra.AuslanderReiten.All') is None
+
+
+# ---- config_set edits after `config` ran (oaiq-051, 2026-10-27) ----------------------------------
+# A post-carve proof fix goes in config `patches`; set in pipeline.json's config_set on a resume, it
+# never reached config.json (the config step was done), so measure kept failing on unpatched text.
+
+def test_a_changed_config_set_reaches_config_json_and_reruns_from_gen(env):
+    run(env, *ARGS, '--config-set', json.dumps({'budget_note': 'a'}), '--stop-after', 'measure')
+    cfg_path = env.dir / 'config.json'
+    cfg = json.load(open(cfg_path))
+    cfg['time_scale'] = 8                                    # what calibrate wrote: must survive
+    json.dump(cfg, open(cfg_path, 'w'))
+    p = json.load(open(env.dir / 'pipeline.json'))
+    p['config_set'] = {'budget_note': 'a', 'patches': 'carve_patches.json'}
+    json.dump(p, open(env.dir / 'pipeline.json', 'w'))
+    env.log.write_text('')
+    r = run(env, '--stop-after', 'measure')
+    assert r.returncode == 0, r.stderr
+    cfg = json.load(open(cfg_path))
+    assert cfg['patches'] == 'carve_patches.json' and cfg['time_scale'] == 8
+    called = tools_called(env)
+    assert ('carve_prep', 'config') not in called and called[0] == ('carve', 'gen')
+    assert 'config_set changed' in r.stdout
+    # another key re-plans
+    p['config_set']['forced_note'] = 1
+    json.dump(p, open(env.dir / 'pipeline.json', 'w'))
+    env.log.write_text('')
+    run(env, '--stop-after', 'measure')
+    assert tools_called(env)[0] == ('carve', 'plan')
+
+
+def test_measure_keeps_going_past_a_failed_file(env):
+    # oaiq-051: carve_measure stopped at the first failing proof, ~12 min per fix
+    run(env, *ARGS, '--stop-after', 'measure')
+    m = [c for c in calls(env) if c.get('tool') == 'carve_measure'][0]
+    assert '--keep-going' in m['argv']
