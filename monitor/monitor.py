@@ -14,6 +14,7 @@ import re
 import socket
 import threading
 import time
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import agents as AG
@@ -459,6 +460,7 @@ class State:
     status = b'{}'
     costs = {}                      # agent -> [[t, cost]], from the sampler
     agents = (0, b'{}')             # (time, body) cache of /agents.json
+    inboxes_conf = os.path.expanduser('~/claude/monitor/inboxes.json')   # step() sets MONITOR_HOME's
 
 
 def step(home, now=None):
@@ -496,7 +498,8 @@ def step(home, now=None):
     res['trouble'] = res.get('trouble', [])
     status = build_status(now, secs, problems, system, health_flags(HEALTH_FLAGS, now), lean_view(procs, prev, now),
                           trouble=res['trouble'])
-    status['inboxes'] = inboxes(os.path.join(home, 'inboxes.json'), now)
+    State.inboxes_conf = os.path.join(home, 'inboxes.json')
+    status['inboxes'] = inboxes(State.inboxes_conf, now)
     status['quota'] = {'series': quota['series'], 'columns': ['t', 'five_hour %', 'five_hour resets', 'seven_day %', 'seven_day resets']}
     save_json(os.path.join(st, 'resources.json'), res)
     save_json(os.path.join(st, 'history.json'), hist)
@@ -542,6 +545,27 @@ def agent_file(path, query):
     return 200, body, AG.FILES[parts[2]] + '; charset=utf-8', {'X-Start': 0, 'X-End': len(body), 'X-Size': size}
 
 
+def inbox_file(path):
+    """(status, body, content type) for /inbox/<n>/<file>: file <file> of the n-th directory in
+    inboxes.json, read-only: a plain visible name, no symlink, inside that directory, capped."""
+    parts = path.strip('/').split('/')
+    if len(parts) != 3 or not parts[1].isdigit():
+        return 404, b'not found', 'text/plain'
+    name = urllib.parse.unquote(parts[2])
+    try:
+        conf = json.load(open(State.inboxes_conf))
+        d = os.path.realpath(os.path.expanduser(conf[int(parts[1])]['dir']))
+    except (OSError, ValueError, IndexError, KeyError, TypeError):
+        return 404, b'not found', 'text/plain'
+    if not name or name.startswith('.') or '/' in name or os.sep in name:
+        return 404, b'not found', 'text/plain'
+    p = os.path.join(d, name)
+    if os.path.islink(p) or not os.path.isfile(p) or os.path.dirname(os.path.realpath(p)) != d:
+        return 404, b'not found', 'text/plain'
+    with open(p, 'rb') as f:
+        return 200, f.read(AG.MAX_BYTES), 'text/plain; charset=utf-8'
+
+
 def agents_body(now=None):
     now = now or time.time()
     if now - State.agents[0] > 5:
@@ -562,6 +586,8 @@ class Handler(BaseHTTPRequestHandler):
                 body = agents_body()
             elif path.startswith('/agent/'):
                 code, body, ctype, extra = agent_file(path, query)
+            elif path.startswith('/inbox/'):
+                code, body, ctype = inbox_file(path)
             else:
                 f = www_file(path)
                 if not f:

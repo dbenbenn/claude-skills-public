@@ -150,4 +150,5 @@ categories (`fold_row`).
 
 **Inboxes.** `MONITOR_HOME/inboxes.json` lists directories whose files wait for someone:
 `[{"label", "dir", "ignore": ["README.md"]}]`. The page shows each one's count, oldest age and file names
-under the title (amber when anything waits). The prove2me lessons inbox is the first.
+under the title (amber when anything waits), each name a link to `/inbox/<n>/<file>` (read-only, plain
+names inside that directory, no symlinks). The prove2me lessons inbox is the first.

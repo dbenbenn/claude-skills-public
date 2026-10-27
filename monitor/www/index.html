@@ -15,7 +15,7 @@ h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14
 .card{background:var(--surface-1);border-radius:10px;padding:14px 16px;margin:0 0 14px}
 .alarm{background:var(--alarm);color:#fff;padding:10px 14px;border-radius:8px;margin:0 0 14px}
 .inbox{border:1px solid var(--grid);border-left:4px solid var(--good);background:var(--surface-1);padding:8px 14px;border-radius:8px;margin:0 0 14px;font-size:14px}
-.inbox.waiting{border-left-color:var(--warn)}.inbox b{font-weight:600}.inbox .items{color:var(--text-secondary);font-size:13px;overflow-wrap:anywhere}
+.inbox.waiting{border-left-color:var(--warn)}.inbox b{font-weight:600}.inbox .items{color:var(--text-secondary);font-size:13px;overflow-wrap:anywhere}.inbox .items a{color:var(--series-1)}
 .alarm b{display:block;margin-bottom:2px}.alarm ul{margin:0;padding-left:18px}.alarm li{overflow-wrap:anywhere}
 .ph{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--grid);cursor:pointer}
 .ph:first-child{border-top:0}.ph.sel .n{text-decoration:underline;text-underline-offset:3px}
@@ -241,8 +241,8 @@ async function load(){
   ib.hidden = !IB.length;
   ib.className = 'inbox' + (IB.some(e => e.count) ? ' waiting' : '');
   const age = n => n == null ? '' : n < 3600 ? Math.round(n/60) + ' min' : n < 172800 ? Math.round(n/3600) + ' h' : Math.round(n/86400) + ' days';
-  ib.innerHTML = IB.map(e => e.missing ? `<div><b>${esc(e.label)}</b>: directory missing (${esc(e.dir)})</div>`
-    : e.count ? `<div><b>${esc(e.label)}: ${e.count} waiting</b> · oldest ${esc(age(e.oldest_s))}<div class="items">${e.items.map(esc).join(' · ')}${e.count > e.items.length ? ' …' : ''}</div></div>`
+  ib.innerHTML = IB.map((e, i) => e.missing ? `<div><b>${esc(e.label)}</b>: directory missing (${esc(e.dir)})</div>`
+    : e.count ? `<div><b>${esc(e.label)}: ${e.count} waiting</b> · oldest ${esc(age(e.oldest_s))}<div class="items">${e.items.map(n => `<a href="/inbox/${i}/${encodeURIComponent(n)}" target="_blank" rel="noopener">${esc(n)}</a>`).join(' · ')}${e.count > e.items.length ? ' …' : ''}</div></div>`
     : `<div><b>${esc(e.label)}</b>: empty</div>`).join('');
   const C = s.cleared || [];
   document.getElementById('cleared-box').hidden = !C.length;

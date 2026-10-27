@@ -114,3 +114,22 @@ def test_step_adds_quota_and_costs(tmp_path, monkeypatch):
     st = json.loads((home / 'state' / 'status.json').read_text())
     assert st['quota']['series'][-1][:2] == [1793010000, 20.0]
     assert json.loads((home / 'state' / 'agent_costs.json').read_text())['a'][-1][1] == 1.5
+
+
+def test_inbox_files_are_served_read_only(server, tmp_path, monkeypatch):
+    # 2026-10-27 (dbenbenn): the page's inbox box links to each waiting file
+    base, _ = server
+    d = tmp_path / 'inbox'
+    d.mkdir()
+    (d / 'oaiq-031-lesson.md').write_text('# a lesson\n')
+    (d / '.hidden.md').write_text('no')
+    (tmp_path / 'private.txt').write_text('private')
+    (d / 'link.md').symlink_to(tmp_path / 'private.txt')
+    conf = tmp_path / 'inboxes.json'
+    conf.write_text(json.dumps([{'label': 'L', 'dir': str(d)}]))
+    monkeypatch.setattr(M.State, 'inboxes_conf', str(conf))
+    code, body, h = get(base, '/inbox/0/oaiq-031-lesson.md')
+    assert code == 200 and body == b'# a lesson\n' and h['Content-Type'].startswith('text/plain')
+    for bad in ('/inbox/0/link.md', '/inbox/0/.hidden.md', '/inbox/0/..%2Fprivate.txt', '/inbox/0/../private.txt',
+                '/inbox/1/oaiq-031-lesson.md', '/inbox/x/oaiq-031-lesson.md', '/inbox/0/absent.md'):
+        assert get(base, bad)[0] == 404, bad
