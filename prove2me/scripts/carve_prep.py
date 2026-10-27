@@ -466,6 +466,7 @@ def missing_names(md_text, local, in_library, skip=(), suffix=''):
                 continue
             hit = any(re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(x), local) for x in {nm, last}) \
                 or (suffix and re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(last + suffix), local)) \
+                or re.search(r'(?<![\w])%s_p\d+(?![\w\'])' % re.escape(last), local) \
                 or in_library(last)
             if not hit:
                 bad.append(nm)

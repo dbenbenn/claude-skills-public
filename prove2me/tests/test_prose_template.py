@@ -372,3 +372,10 @@ def test_stub_statement_reads_an_indented_theorem():
     decl, ns, opens = T.stub_statement(text)
     assert decl.strip().startswith('theorem general_hard') and 'sorry' not in decl
     assert ns == 'OAI.VariableWL'
+
+
+def test_missing_names_accepts_collision_renamed_instance():
+    # carve.py renames private local instances that collide across modules to name_pN
+    md = 'It holds `OAI.Foo.concreteRing`.'
+    local = 'local instance concreteRing_p2 (s : Nat) : CommRing Nat := inferInstance'
+    assert CP.missing_names(md, local, lambda n: False) == []
