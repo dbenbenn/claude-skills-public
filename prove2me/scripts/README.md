@@ -33,7 +33,10 @@ with no arguments.
 
 ## What LeanInfo reports
 
-`lake env lean --run lean/LeanInfo.lean FILE [--parse-only] [--candidates M1,M2,…]` prints JSON:
+`lake env lean --run lean/LeanInfo.lean FILE [--parse-only] [--candidates M1,M2,…]` prints JSON.
+`p2mlib.leaninfo` runs the same tool compiled instead (`native_tool`: built once per LeanInfo.lean
+and toolchain into `~/.cache/p2m/leaninfo-bin/`, same JSON, about 3 s and 2 GB less per call;
+`P2M_LEANINFO_INTERPRETED=1` forces `lean --run`). The JSON holds:
 - **Commands:** kind, ranges, declared names and their `declId` ranges, attributes, `decl_kind`
   (Mathlib's `lemma` counts as a theorem), where the value starts (`:=`), namespace, opens, and
   scope context (the opener commands and the open/variable/universe/include/omit/set_option

@@ -163,3 +163,88 @@ def test_cache_key_changes_when_a_candidate_is_built(tmp_path):
     olean.parent.mkdir(parents=True)
     olean.write_bytes(b'built')
     assert LI._key(str(f), False, str(ws), candidates=['Theorems.Cand']) != before
+
+
+# ---- the native build of LeanInfo (2026-10-27) -------------------------------------------------
+# `lean --run LeanInfo.lean` re-elaborated the tool and interpreted it on every module: +3 s and
+# ~2 GB per call. The compiled tool printed byte-identical JSON at 19-44% less CPU.
+
+class _Done:
+    def __init__(self, rc=0, out=''):
+        self.returncode, self.stdout, self.stderr = rc, out, ''
+
+
+def _ws(tmp_path, toolchain='leanprover/lean4:v4.33.1\n'):
+    ws = tmp_path / 'ws'
+    ws.mkdir(exist_ok=True)
+    (ws / 'lean-toolchain').write_text(toolchain)
+    return str(ws)
+
+
+def test_raw_runs_the_native_tool_when_there_is_one(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(LI, 'native_tool', lambda ws: '/bin/leaninfo')
+    monkeypatch.setattr(LI.subprocess, 'run', lambda args, **k: seen.append(args) or _Done(out='{"x": 1}'))
+    f = tmp_path / 'F.lean'
+    f.write_text('')
+    assert LI.raw(str(f), ws=_ws(tmp_path), idents=True) == {'x': 1}
+    assert seen[0][:4] == ['lake', 'env', '/bin/leaninfo', str(f)] and '--run' not in seen[0]
+    assert '--idents' in seen[0]
+
+
+def test_raw_falls_back_to_lean_run(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(LI, 'native_tool', lambda ws: None)
+    monkeypatch.setattr(LI.subprocess, 'run', lambda args, **k: seen.append(args) or _Done(out='{"x": 1}'))
+    f = tmp_path / 'F.lean'
+    f.write_text('')
+    LI.raw(str(f), ws=_ws(tmp_path))
+    assert seen[0][:5] == ['lake', 'env', 'lean', '--run', LI.TOOL]
+
+
+def test_native_tool_builds_once_and_reuses(monkeypatch, tmp_path):
+    monkeypatch.setattr(LI, 'BIN_CACHE', str(tmp_path / 'bin'))
+    monkeypatch.delenv('P2M_LEANINFO_INTERPRETED', raising=False)
+    builds = []
+
+    def fake_build(args, cwd=None, **k):
+        builds.append(cwd)
+        exe = os.path.join(cwd, '.lake', 'build', 'bin', 'leaninfo')
+        os.makedirs(os.path.dirname(exe))
+        open(exe, 'w').close()
+        os.chmod(exe, 0o755)
+        return _Done()
+    monkeypatch.setattr(LI.subprocess, 'run', fake_build)
+    ws = _ws(tmp_path)
+    exe = LI.native_tool(ws)
+    assert exe and os.access(exe, os.X_OK) and len(builds) == 1
+    assert open(os.path.join(builds[0], 'LeanInfo.lean'), 'rb').read() == open(LI.TOOL, 'rb').read()
+    assert open(os.path.join(builds[0], 'lean-toolchain')).read() == 'leanprover/lean4:v4.33.1\n'
+    assert LI.native_tool(ws) == exe and len(builds) == 1
+
+
+def test_native_tool_depends_on_the_toolchain(monkeypatch, tmp_path):
+    monkeypatch.setattr(LI, 'BIN_CACHE', str(tmp_path / 'bin'))
+    a = LI.native_dir(_ws(tmp_path, 'leanprover/lean4:v4.33.1\n'))
+    b = LI.native_dir(_ws(tmp_path, 'leanprover/lean4:v4.34.0\n'))
+    assert a != b
+
+
+def test_failed_native_build_is_remembered(monkeypatch, tmp_path):
+    monkeypatch.setattr(LI, 'BIN_CACHE', str(tmp_path / 'bin'))
+    monkeypatch.delenv('P2M_LEANINFO_INTERPRETED', raising=False)
+    monkeypatch.setattr(LI.subprocess, 'run', lambda *a, **k: _Done(rc=1, out='error: boom'))
+    ws = _ws(tmp_path)
+    assert LI.native_tool(ws) is None
+
+    def boom(*a, **k):
+        raise AssertionError('a failed build is retried on every call')
+    monkeypatch.setattr(LI.subprocess, 'run', boom)
+    assert LI.native_tool(ws) is None
+    assert 'boom' in open(os.path.join(LI.native_dir(ws), 'FAILED')).read()
+
+
+def test_interpreted_switch(monkeypatch, tmp_path):
+    monkeypatch.setenv('P2M_LEANINFO_INTERPRETED', '1')
+    monkeypatch.setattr(LI.subprocess, 'run', lambda *a, **k: (_ for _ in ()).throw(AssertionError('built')))
+    assert LI.native_tool(_ws(tmp_path)) is None

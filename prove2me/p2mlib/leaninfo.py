@@ -14,17 +14,35 @@ Positions are UTF-8 byte offsets into the file, so cut source text with `info.te
 
 Results are cached in ~/.cache/p2m/leaninfo, keyed by the file's content, the mode, LeanInfo.lean
 itself and the modification times of the workspace modules the file imports directly.
+
+LeanInfo runs compiled (`native_tool`): built once per LeanInfo.lean and toolchain into
+~/.cache/p2m/leaninfo-bin/<key>/, it prints the same JSON as `lean --run LeanInfo.lean` without
+re-elaborating and interpreting the tool on every call (2026-10-27: 3.0 s instead of 5.4 s CPU on a
+small module, 17 s instead of 21 s on a large one, 6.8 instead of 8.7 GB). A failed build is
+recorded there (FAILED) and the interpreted tool used instead; P2M_LEANINFO_INTERPRETED=1 forces it.
 """
+import fcntl
 import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOL = os.path.join(os.path.dirname(HERE), 'lean', 'LeanInfo.lean')
 CACHE = os.path.expanduser('~/.cache/p2m/leaninfo')
+BIN_CACHE = os.path.expanduser('~/.cache/p2m/leaninfo-bin')
+
+_LAKEFILE = """name = "leaninfo"
+defaultTargets = ["leaninfo"]
+
+[[lean_exe]]
+name = "leaninfo"
+root = "LeanInfo"
+supportInterpreter = true
+"""
 
 
 def workspace():
@@ -226,12 +244,62 @@ def _key(path, parse_only, ws, candidates=(), idents=False, module=None, no_decl
     return h.hexdigest()
 
 
+def _toolchain(ws):
+    tc = os.path.join(ws, 'lean-toolchain')
+    return open(tc).read() if os.path.exists(tc) else ''
+
+
+def native_dir(ws):
+    """Where the compiled LeanInfo for this LeanInfo.lean and the workspace's toolchain lives."""
+    h = hashlib.sha256(open(TOOL, 'rb').read() + b'\0' + _toolchain(ws).encode() + _LAKEFILE.encode())
+    return os.path.join(BIN_CACHE, h.hexdigest()[:20])
+
+
+def native_tool(ws):
+    """The compiled LeanInfo executable, built on first use (one builder at a time; ~20 s), or None
+    to fall back to `lean --run` (the build failed before, or P2M_LEANINFO_INTERPRETED is set)."""
+    if os.environ.get('P2M_LEANINFO_INTERPRETED'):
+        return None
+    d = native_dir(ws)
+    exe = os.path.join(d, '.lake', 'build', 'bin', 'leaninfo')
+    if os.access(exe, os.X_OK):
+        return exe
+    if os.path.exists(os.path.join(d, 'FAILED')):
+        return None
+    os.makedirs(BIN_CACHE, exist_ok=True)
+    with open(d + '.lock', 'w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if os.access(exe, os.X_OK):
+            return exe
+        if os.path.exists(os.path.join(d, 'FAILED')):
+            return None
+        os.makedirs(d, exist_ok=True)
+        shutil.copyfile(TOOL, os.path.join(d, 'LeanInfo.lean'))
+        with open(os.path.join(d, 'lean-toolchain'), 'w') as f:
+            f.write(_toolchain(ws))
+        with open(os.path.join(d, 'lakefile.toml'), 'w') as f:
+            f.write(_LAKEFILE)
+        env = {k: v for k, v in os.environ.items() if k != 'LEAN_PATH'}
+        try:
+            r = subprocess.run(['lake', 'build'], cwd=d, env=env, capture_output=True, text=True, timeout=1800)
+            ok, log = r.returncode == 0, (r.stdout or '') + (r.stderr or '')
+        except (OSError, subprocess.SubprocessError) as e:
+            ok, log = False, repr(e)
+        if ok and os.access(exe, os.X_OK):
+            return exe
+        with open(os.path.join(d, 'FAILED'), 'w') as f:
+            f.write(log[-4000:] or 'no executable after lake build')
+        return None
+
+
 def raw(path, parse_only=False, ws=None, timeout=3000, candidates=(), idents=False, module=None,
         no_decls=False):
     """LeanInfo's JSON for `path` as a dict, uncached (tests/record_fixtures.py records it)."""
     path = os.path.abspath(path)
     ws = ws or workspace()
-    args = ['lake', 'env', 'lean', '--run', TOOL, path] + (['--parse-only'] if parse_only else []) + \
+    exe = native_tool(ws)
+    tool = [exe] if exe else ['lean', '--run', TOOL]
+    args = ['lake', 'env'] + tool + [path] + (['--parse-only'] if parse_only else []) + \
         (['--candidates', ','.join(candidates)] if candidates else []) + (['--idents'] if idents else []) + \
         (['--module', module] if module else []) + (['--no-decls'] if no_decls else [])
     r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout)
