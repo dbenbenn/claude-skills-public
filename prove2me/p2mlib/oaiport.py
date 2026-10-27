@@ -931,16 +931,118 @@ def module_sources(lean_root, prefixes):
     return out
 
 
+def _scopes(lines, known_ns=()):
+    """(namespace, [opened namespaces]) in force at each line. An `open X` inside namespace `A.B`
+    opens each of `A.B.X`, `A.X`, `O.X` (O already open) that is a namespace of `known_ns`, else `X`;
+    it lasts to the `end` of its section or namespace. `open … in` and `open scoped` are skipped."""
+    frames, out = [['', [], []]], []         # [kind, namespace parts, opens]
+    for l in lines:
+        ns = '.'.join(p for f in frames for p in f[1])
+        opens = [o for f in frames for o in f[2]]
+        out.append((ns, opens))
+        m = re.match(r'^\s*(?:noncomputable\s+)?(namespace|section|end)\b\s*(\S*)', l)
+        if m and m.group(1) == 'namespace':
+            frames += [['ns', [q], []] for q in m.group(2).split('.')]
+        elif m and m.group(1) == 'section':
+            frames.append(['sec', [], []])
+        elif m:
+            for _ in range(m.group(2).count('.') + 1 if m.group(2) else 1):
+                if len(frames) > 1:
+                    frames.pop()
+        o = re.match(r'^\s*open\s+(?!scoped\b)(.*)$', l)
+        if o and not re.search(r'\bin\s*$', l):
+            words = re.sub(r'\((?:[^()])*\)|\b(?:hiding|renaming)\b.*$', ' ', o.group(1)).split()
+            for w in words:
+                cands = []
+                parts = ns.split('.') if ns else []
+                for k in range(len(parts), 0, -1):
+                    cands.append('.'.join(parts[:k]) + '.' + w)
+                cands += [x + '.' + w for x in opens] + [w]
+                found = [c for c in cands if c in known_ns]
+                frames[-1][2].extend(found or [w])
+                opens = opens + (found or [w])
+    return out
+
+
+def _resolve(ident, ns, opens, decls):
+    """The declarations of `decls` (full names) that `ident` names at a site in namespace `ns` with
+    `opens` in force: the innermost namespace prefix that has it wins; at the root, the root name and
+    every opened namespace's (more than one is ambiguous). A name `decls` does not hold (Mathlib's, a
+    hypothesis) gives the empty set."""
+    if ident.startswith('_root_.'):
+        return {ident[7:]} & decls
+    parts = ns.split('.') if ns else []
+    for k in range(len(parts), 0, -1):
+        c = '.'.join(parts[:k]) + '.' + ident
+        if c in decls:
+            return {c}
+    return ({o + '.' + ident for o in opens} | {ident}) & decls
+
+
+_MACRO_BINDERS = re.compile(r"\b(?:intro|intros|rintro|rename_i|fun|λ|obtain|rcases|have|let|set|with)\b([^;|=⟩]*)")
+
+
+_TACTIC_COMBINATORS = {'repeat', "repeat'", 'try', 'all_goals', 'any_goals', 'focus', 'iterate', 'with_reducible',
+                       'with_reducible_and_instances', 'with_unfolding_all', 'on_goal', 'pick_goal', 'case', 'next'}
+
+
+def _macro_idents(body):
+    """[(start, end, identifier)] of the term identifiers in a tactic macro body: not a tactic name
+    (first word after `|`, `;`, `<;>`, `(` in tactic position, or the start), not a dotted field
+    (`x.foo` after a non-name), not a name the body binds itself (intro/fun/have …), nor `h.trans` of one."""
+    bound = set()
+    for m in _MACRO_BINDERS.finditer(body):
+        bound.update(re.findall(r"[^\W\d][\w']*", m.group(1).split(':')[0]))
+    out = []
+    for m in re.finditer(r"(?<![\w.'])(?:_root_\.)?%s(?:\.%s)*(?![\w'!?])" % (SEG, SEG), body):
+        k, tac = m.start(), True
+        while True:
+            j = k - 1
+            while j >= 0 and body[j] in ' \t\n':
+                j -= 1
+            if j < 0 or body[j] in '|;>·':
+                break
+            if body[j] == '(':
+                k = j
+                continue
+            w = re.search(r"([\w']+)(?:[ \t]+\d+)?$", body[:j + 1])
+            if w and w.group(1) in _TACTIC_COMBINATORS:
+                break
+            tac = False
+            break
+        if not tac and m.group(0).split('.')[0] not in bound:
+            out.append((m.start(), m.end(), m.group(0)))
+    return out
+
+
 def inline_module_macros(sources):
     """`sources` with every tactic macro removed and inlined (leantext.inline_tactic_macros) in its
     own module and in each module that imports it, directly or not (WLIdentification 2026-10-23:
-    the module route kept `macro "word_poly"`, which carve.py gen refuses; oai_port.py inlines)."""
+    the module route kept `macro "word_poly"`, which carve.py gen refuses; oai_port.py inlines).
+
+    An inlined macro's names resolve at the use site, not where Lean resolved them (the macro's
+    namespace and `open`s): MatchingCount (oaiq-051) defined `tree_cost` under `open
+    MatchingFPRAS.TreeTyped`, and `ExecutableOptions.polynomial_map` captured its `apply
+    polynomial_map` at the use sites. So each identifier of a macro body that resolves to exactly one
+    ported declaration at the definition site, and to something else at some use site, is written as
+    that full name in every inlined copy (`_root_.` when a namespace could capture even that). A name
+    the definition site does not resolve to one ported declaration (Mathlib's, a hypothesis, an
+    ambiguity) is left alone, with a warning when a use site resolves it to a ported one. Not seen:
+    `open … in`, local hypotheses at the use site, structure fields and constructors."""
+    import warnings
     from .leantext import tactic_macros, inline_macro_uses
-    stripped, own, imps = {}, {}, {}
+    stripped, own, imps, where = {}, {}, {}, {}
     for oai, (short, t) in sources.items():
         stripped[oai], own[oai] = tactic_macros(t)
         imps[oai] = [x for x in re.findall(r'^import (\S+)', t, re.M) if x in sources]
-    seen = {}
+        lines = t.split('\n')
+        for name in own[oai]:
+            m = re.search(r'^[ \t]*(?:(?:local|scoped)[ \t]+)?macro[ \t]+"%s"' % re.escape(name), t, re.M)
+            where[name] = (oai, t[:m.start()].count('\n') if m else 0)
+    decls_of = {oai: {d[0] for d in declarations(stripped[oai].split('\n')) if d[0]} for oai in sources}
+    every = set().union(*decls_of.values()) if decls_of else set()
+    known_ns = {'.'.join(n.split('.')[:k]) for n in every for k in range(1, n.count('.') + 1)}
+    seen, closure = {}, {}
 
     def visible(m, stack=()):
         if m not in seen:
@@ -951,7 +1053,52 @@ def inline_module_macros(sources):
             out.update(own[m])
             seen[m] = out
         return seen[m]
-    return {oai: (short, inline_macro_uses(stripped[oai], visible(oai)))
+
+    def reach(m, stack=()):
+        if m not in closure:
+            out = set(decls_of[m])
+            for x in imps[m]:
+                if x not in stack:
+                    out |= reach(x, stack + (m,))
+            closure[m] = out
+        return closure[m]
+
+    scopes = {oai: _scopes(sources[oai][1].split('\n'), known_ns) for oai in sources}
+    sscopes = {oai: _scopes(stripped[oai].split('\n'), known_ns) for oai in sources}
+    bodies = {}
+    for name, (doai, dline) in where.items():
+        body = own[doai][name]
+        ns, opens = scopes[doai][dline]
+        idents = [(a, b, x, _resolve(x, ns, opens, reach(doai))) for a, b, x in _macro_idents(body)]
+        qualify, warned = {}, set()
+        for uoai in sources:
+            if name not in visible(uoai):
+                continue
+            ls = stripped[uoai].split('\n')
+            for i, l in enumerate(ls):
+                if not re.search(r"(?<![\w.'])%s(?![\w'!?])" % re.escape(name), l):
+                    continue
+                uns, uopens = sscopes[uoai][i]
+                for a, b, x, d in idents:
+                    u = _resolve(x, uns, uopens, reach(uoai))
+                    if u == d:
+                        continue
+                    if len(d) == 1:
+                        qualify[x] = next(iter(d))
+                    elif u and (x, uoai) not in warned:
+                        warned.add((x, uoai))
+                        warnings.warn('inlined macro %s: `%s` resolves to %s in %s (line %d, namespace %s) but '
+                                      'to %s where the macro is defined; check that site by hand'
+                                      % (name, x, ', '.join(sorted(u)), uoai, i + 1, uns or '(root)',
+                                         ', '.join(sorted(d)) or 'no ported declaration'), stacklevel=2)
+        for a, b, x, d in reversed(idents):
+            if x in qualify:
+                f = qualify[x]
+                if any(n.endswith('.' + f) for n in every):
+                    f = '_root_.' + f
+                body = body[:a] + f + body[b:]
+        bodies[name] = body
+    return {oai: (short, inline_macro_uses(stripped[oai], {n: bodies[n] for n in visible(oai)}))
             for oai, (short, _) in sources.items()}
 
 

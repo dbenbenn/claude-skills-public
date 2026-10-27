@@ -1469,3 +1469,88 @@ def test_mgf_gaussian_real_takes_the_map_equation():
                    "    have hh := mgf_gaussianReal (X := id) (p := gaussianReal 0 1) (by simp) (a i)\n"
                    "  rw [mgf_gaussianReal (μ := 0) (v := v) (by simp)]\n"
                    "  simp [mgf_gaussianReal]\n")
+
+
+# ---------------------------------------------------------------- inlined macros keep their definition-site names
+# MatchingCount (oaiq-051, 2026-10-27): `macro "tree_cost"` is defined in `namespace OAI` under
+# `open MatchingFPRAS.TreeTyped`, so its `apply polynomial_map` meant `TreeTyped.polynomial_map`. Inlined
+# in `namespace MatchingFPRAS.ExecutableOptions` (which declares its own `polynomial_map`), the short name
+# was captured, and `with_reducible repeat' (first | …)` silently left goals. The worker qualified 260
+# sites by patch.
+
+MC = 'OAI.Combinatorics.MatchingCount.'
+MC_SOURCES = {
+    MC + 'Complexity.TreePolynomialCollections': ('Complexity_TreePolynomialCollections', (
+        'import Mathlib\n\nnamespace OAI\n\nnamespace MatchingFPRAS.TreeTyped\nopen Polynomial\n\n'
+        'lemma polynomial_map {f : A → B} {F : Realizer f} (hF : PolynomialTime F) :\n'
+        '    PolynomialTime (map F) := by\n  sorry\n\n'
+        'lemma polynomial_add : PolynomialTime add := by\n  sorry\n\n'
+        'end MatchingFPRAS.TreeTyped\n\nend OAI\n')),
+    MC + 'Complexity.TreeCostTactic': ('Complexity_TreeCostTactic', (
+        'import Mathlib\nimport OAI.Combinatorics.MatchingCount.Complexity.TreePolynomialCollections\n\n'
+        'namespace OAI\n\nopen MatchingFPRAS.TreeTyped\n\n'
+        'macro "tree_cost" : tactic => `(tactic|\n'
+        '  (with_reducible repeat\' (first\n    | assumption\n    | exact polynomial_add\n'
+        '    | apply polynomial_map\n    | apply Nat.le_refl)))\n\nend OAI\n')),
+    MC + 'Sampling.TreeOptions': ('Sampling_TreeOptions', (
+        'import Mathlib\nimport OAI.Combinatorics.MatchingCount.Complexity.TreeCostTactic\n\n'
+        'namespace OAI\n\nnamespace MatchingFPRAS.ExecutableOptions\nopen TreeTyped TreeFraction\n\n'
+        'lemma polynomial_map {f : C×A→B} {F : Realizer f} (hF : PolynomialTime F) :\n'
+        '    PolynomialTime (mapRealizer F) := by\n  tree_cost\n\n'
+        'lemma polynomial_listSingleton : PolynomialTime listSingleton := by\n  tree_cost\n\n'
+        'end MatchingFPRAS.ExecutableOptions\n\n'
+        'lemma polynomial_other : PolynomialTime other := by\n  tree_cost\n\nend OAI\n')),
+}
+
+
+def test_inlined_macro_names_are_qualified_where_a_use_site_captures_them():
+    out = O.inline_module_macros(MC_SOURCES)
+    opts = out[MC + 'Sampling.TreeOptions'][1]
+    assert 'tree_cost' not in opts
+    q = 'apply OAI.MatchingFPRAS.TreeTyped.polynomial_map'
+    assert opts.count(q) == 3                                     # every inlined copy, one text per port
+    assert 'apply polynomial_map' not in opts
+    # outside ExecutableOptions (and its `open TreeTyped`) the short `polynomial_add` names nothing: qualified too
+    assert opts.count('exact OAI.MatchingFPRAS.TreeTyped.polynomial_add') == 3
+    assert opts.count('apply Nat.le_refl') == 3                    # a Mathlib name is left alone
+    assert 'assumption' in opts and 'with_reducible' in opts and 'OAI.first' not in opts
+    # a name every use site resolves as the definition did keeps its short form (no churn for patches)
+    src = dict(MC_SOURCES)
+    k2 = MC + 'Sampling.TreeOptions'
+    src[k2] = (src[k2][0], src[k2][1].split('lemma polynomial_other')[0] + 'end OAI\n')
+    opts = O.inline_module_macros(src)[k2][1]
+    assert opts.count('exact polynomial_add') == 2 and opts.count('TreeTyped.polynomial_map') == 2
+
+
+def test_inlined_macro_name_without_a_definition_site_resolution_warns_on_capture():
+    # `polynomial_listCons` is not declared where the macro is defined (a Mathlib or hypothesis name, as far
+    # as the port can tell), but the use site's namespace declares one: no guess, a warning
+    src = dict(MC_SOURCES)
+    k = MC + 'Complexity.TreeCostTactic'
+    src[k] = (src[k][0], src[k][1].replace('| apply Nat.le_refl', '| apply polynomial_listCons'))
+    k2 = MC + 'Sampling.TreeOptions'
+    src[k2] = (src[k2][0], src[k2][1].replace(
+        'end MatchingFPRAS.ExecutableOptions', 'lemma polynomial_listCons : True := trivial\n\n'
+        'end MatchingFPRAS.ExecutableOptions'))
+    with pytest.warns(UserWarning, match=r'tree_cost.*polynomial_listCons.*ExecutableOptions'):
+        out = O.inline_module_macros(src)
+    assert 'apply polynomial_listCons' in out[k2][1]
+
+
+def test_inlined_macro_names_qualify_with_root_when_the_full_name_is_shadowed():
+    src = dict(MC_SOURCES)
+    k2 = MC + 'Sampling.TreeOptions'
+    src[k2] = (src[k2][0], src[k2][1].replace(
+        'end MatchingFPRAS.ExecutableOptions', 'end MatchingFPRAS.ExecutableOptions\n\n'
+        'namespace OAI.MatchingFPRAS.TreeTyped\nlemma polynomial_map : True := trivial\n'
+        'end OAI.MatchingFPRAS.TreeTyped\n'))
+    opts = O.inline_module_macros(src)[k2][1]
+    assert opts.count('apply _root_.OAI.MatchingFPRAS.TreeTyped.polynomial_map') == 3
+
+
+def test_macro_identifiers_skip_tactic_names_and_binders():
+    # WLIdentification `word_poly`: `repeat' first | rfl | simp` — `first` is a tactic, though
+    # `SchemaRealizer.first` is a ported declaration at a use site
+    body = "repeat' first | rfl | simp [foo, Bar.baz] | (intro h; exact h.trans qux) | try apply quux 3"
+    got = [x for _, _, x in O._macro_idents(body)]
+    assert got == ['foo', 'Bar.baz', 'qux', 'quux']
