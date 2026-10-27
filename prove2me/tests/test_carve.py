@@ -1780,6 +1780,18 @@ def test_a_local_borel_space_instance_answers_an_opens_measurable_space_problem(
     assert not C._could_answer(inst, other)
 
 
+def test_a_fully_generic_local_instance_answers_any_problem_of_its_class():
+    # DilutedSpin (oaiq-041, 2026-10-27): `local instance (β : Type) : DecidableEq β := Classical.decEq β`
+    # declares no head constants, so the heads-subset test never fired; a piece asking `DecidableEq Option`
+    # lost the instance and failed to synthesize `DecidableEq (Option S.Vertex)`.
+    import types
+    inst = types.SimpleNamespace(declares=[('inst', 'DecidableEq', [])])
+    asked = types.SimpleNamespace(inst_keys=['DecidableEq Option'])
+    other = types.SimpleNamespace(inst_keys=['Fintype Option'])
+    assert C._could_answer(inst, asked)
+    assert not C._could_answer(inst, other)
+
+
 def test_reactivated_instance_uses_its_collision_rename():
     # Lech/Dutta (oaiq-032): ten modules declare `private local instance concreteRing`; the bundle
     # deprivatizes them as concreteRing_p0.., and a piece's `attribute [local instance]` named the

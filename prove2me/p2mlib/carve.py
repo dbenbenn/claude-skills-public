@@ -2051,9 +2051,9 @@ def _could_answer(inst_cmd, c):
     LeanInfo's `inst_keys`."""
     asked = [x.split() for x in c.inst_keys or ()]
     for d in inst_cmd.declares or ():
-        if not d[1] or not d[2]:
+        if not d[1]:
             continue
-        heads = set(d[2])
+        heads = set(d[2] or ())                      # none: a fully generic `(β : Type) : DecidableEq β`
         classes = (d[1],) + _PARENT_CLASSES.get(d[1], ())
         if any(p[0] in classes and heads <= set(p[1:]) for p in asked):
             return True
