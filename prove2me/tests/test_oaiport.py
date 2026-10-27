@@ -1326,3 +1326,146 @@ def test_compat_has_finsupp_mapdomain_fintype():
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                             'compat_4_34.lean')).read()
     assert '_root_.Finsupp.mapDomain_fintype' in src and '∑ i, Finsupp.single (f i) (v i)' in src
+
+
+# ---------------------------------------------------------------- eLpNorm-family argument drift
+# Signatures checked against both Mathlibs (d13f23b via `git show` in the workspace's mathlib checkout; ours 0df444a):
+# d13f23b's `eLpNorm_eq_eLpNorm' hp0 hptop hf`, `eLpNorm_nnreal_eq_eLpNorm' hp hf`, `eLpNorm_mono_real hf h` and
+# `Lp.eLpNorm_le_of_ae_tendsto bound hf hg h_tendsto` take a measurability proof ours does not (oaiq-038, oaiq-048).
+
+def test_elpnorm_eq_elpnorm_prime_drops_its_third_argument():
+    src = ("  rw [eLpNorm_eq_eLpNorm' (p := 2) (by norm_num) (by norm_num) hmeas,\n"
+           "    eLpNorm_eq_eLpNorm' (p := 2) (by norm_num) (by norm_num)\n"
+           "      (hmeas ds), ENNReal.toReal_ofNat]\n"
+           "  rw [eLpNorm_eq_eLpNorm' (by norm_num) (by norm_num) hmem.aestronglyMeasurable]\n"
+           "  simpa only [eLpNorm_eq_eLpNorm' (by norm_num : (2 : ℝ≥0∞) ≠ 0)\n"
+           "    (by norm_num)] using h\n")
+    out = O.core_rewrites(src)
+    assert out == ("  rw [eLpNorm_eq_eLpNorm' (p := 2) (by norm_num) (by norm_num),\n"
+                   "    eLpNorm_eq_eLpNorm' (p := 2) (by norm_num) (by norm_num), ENNReal.toReal_ofNat]\n"
+                   "  rw [eLpNorm_eq_eLpNorm' (by norm_num) (by norm_num)]\n"
+                   "  simpa only [eLpNorm_eq_eLpNorm' (by norm_num : (2 : ℝ≥0∞) ≠ 0)\n"
+                   "    (by norm_num)] using h\n")
+
+
+def test_a_dropped_argument_never_comes_from_the_next_tactic():
+    # a two-argument call at the end of its line: the next line is a new tactic, not a third argument
+    src = ("  have h := eLpNorm_eq_eLpNorm' hp0 hptop\n"
+           "  exact foo\n"
+           "  have h2 := eLpNorm_mono_real\n"
+           "  hb\n"
+           "  exact eLpNorm_nnreal_eq_eLpNorm' hp\n"
+           "  simp\n")
+    assert O.core_rewrites(src) == src
+
+
+def test_elpnorm_nnreal_and_mono_real_drop_their_measurability_argument():
+    src = ("      (eLpNorm_nnreal_eq_eLpNorm' (p:=(n:NNReal)) (by exact_mod_cast hn.ne') hsm)\n"
+           "    simpa using (eLpNorm_nnreal_eq_eLpNorm' (p := 2) (by norm_num) hf)\n"
+           "    eLpNorm_mono_real (hm n).aestronglyMeasurable (hdom n)\n"
+           "  apply (eLpNorm_mono_real\n"
+           "    (continuous_matrix (fun _ _ => (hp _).smooth.continuous)).aestronglyMeasurable\n"
+           "    (fun y => splitMatrix_norm_le _ e)).trans\n"
+           "  have hb := eLpNorm_mono_real (μ:=law) (p:=p) hg hb\n")
+    out = O.core_rewrites(src)
+    assert out == ("      (eLpNorm_nnreal_eq_eLpNorm' (p:=(n:NNReal)) (by exact_mod_cast hn.ne'))\n"
+                   "    simpa using (eLpNorm_nnreal_eq_eLpNorm' (p := 2) (by norm_num))\n"
+                   "    eLpNorm_mono_real (hdom n)\n"
+                   "  apply (eLpNorm_mono_real\n"
+                   "    (fun y => splitMatrix_norm_le _ e)).trans\n"
+                   "  have hb := eLpNorm_mono_real (μ:=law) (p:=p) hb\n")
+
+
+def test_lp_elpnorm_le_of_ae_tendsto_drops_the_limit_measurability():
+    src = ("  have he := Lp.eLpNorm_le_of_ae_tendsto (.of_forall hbound) hFm hmeas hlim\n"
+           "  apply Lp.eLpNorm_le_of_ae_tendsto (u := atTop) (Eventually.of_forall hb)\n"
+           "    (fun index => (hm index).aestronglyMeasurable)\n"
+           "    (Measure.measurable_rnDeriv γ s).ennreal_toReal.aestronglyMeasurable\n"
+           "  apply Eventually.of_forall\n"
+           "  refine (Lp.eLpNorm_le_of_ae_tendsto (C := c) ?_ (fun j => Lp.aestronglyMeasurable (f j)) hg hl)\n"
+           "  apply eLpNorm_le_of_ae_tendsto a b c d\n")
+    out = O.core_rewrites(src)
+    assert out == ("  have he := Lp.eLpNorm_le_of_ae_tendsto (.of_forall hbound) hFm hlim\n"
+                   "  apply Lp.eLpNorm_le_of_ae_tendsto (u := atTop) (Eventually.of_forall hb)\n"
+                   "    (fun index => (hm index).aestronglyMeasurable)\n"
+                   "  apply Eventually.of_forall\n"
+                   "  refine (Lp.eLpNorm_le_of_ae_tendsto (C := c) ?_ (fun j => Lp.aestronglyMeasurable (f j)) hl)\n"
+                   "  apply eLpNorm_le_of_ae_tendsto a b c d\n")
+
+
+# ours ADDS a measurability argument to `eLpNorm_sum_le` (hfs), `eLpNorm_le_eLpNorm_of_exponent_le` (hf) and the
+# Bochner `tendsto_integral_of_L1'` (hfi). It goes in by name, so its place among the positional arguments does not
+# matter, with a tactic that finds it (oaiq-038, oaiq-048).
+
+def test_added_measurability_arguments_go_in_by_name():
+    src = ("        exact eLpNorm_sum_le hp_enn\n"
+           "    have h := eLpNorm_sum_le (f := f) (s := s) (μ := μ) (by norm_num : (1 : ℝ≥0∞) ≤ 2)\n"
+           "    _ ≤ eLpNorm v 2 μ := eLpNorm_le_eLpNorm_of_exponent_le (by norm_num)\n"
+           "  apply (eLpNorm_le_eLpNorm_of_exponent_le (μ:=μ) (f:=g) hp).trans\n"
+           "  tendsto_integral_of_L1' f (Eventually.of_forall hu) (tendsto_eLpNorm_one hf hu hlim)\n"
+           "    tendsto_integral_of_L1' Y\n")
+    out = O.core_rewrites(src)
+    sum_tac = "(hfs := fun _ _ => by %s)" % O.AESM_TAC
+    one_tac = "(hf := by %s)" % O.AESM_TAC
+    assert ("exact eLpNorm_sum_le %s hp_enn\n" % sum_tac) in out
+    assert ("eLpNorm_sum_le %s (f := f)" % sum_tac) in out
+    assert ("eLpNorm_le_eLpNorm_of_exponent_le %s (by norm_num)\n" % one_tac) in out
+    assert ("(eLpNorm_le_eLpNorm_of_exponent_le %s (μ:=μ)" % one_tac) in out
+    assert ("tendsto_integral_of_L1' (hfi := by %s) f (Eventually" % O.AESM_TAC) in out
+    assert ("tendsto_integral_of_L1' (hfi := by %s) Y\n" % O.AESM_TAC) in out
+    assert O.core_rewrites(out) == out
+
+
+def test_added_measurability_argument_not_inserted_where_already_given():
+    # the vector-measure `tendsto_integral_of_L1' f hfi …` already took `hfi` in d13f23b; a name inside a longer
+    # name, `@`-explicit uses and an already named argument are left alone
+    src = ("  exact tendsto_integral_of_L1' f hf.aestronglyMeasurable hFi hF\n"
+           "  exact eLpNorm_sum_le_foo h\n"
+           "  exact @eLpNorm_sum_le _ _ _ h\n"
+           "  exact eLpNorm_le_eLpNorm_of_exponent_le (hf := hm) hpq\n")
+    assert O.core_rewrites(src) == src
+
+
+# renames: d13f23b's `Filter.eventuallyEqSet_univ` is our `Filter.eventuallyEq_univ`; its `eLpNorm_indicator_const`
+# takes a NullMeasurableSet (every use), which is our `eLpNorm_indicator_const₀` (ours wants a MeasurableSet).
+
+def test_eventually_eq_set_univ_and_indicator_const_renamed():
+    src = ("    exact measure_congr (Filter.eventuallyEqSet_univ.mpr hη)\n"
+           "    exact eventuallyEqSet_univ.mp (ae_eq_univ.mpr hc)\n"
+           "    rw [eLpNorm_indicator_const hZ.nullMeasurableSet (by norm_num) (by norm_num)]\n"
+           "  rw [he, eLpNorm_indicator_const (s := {x | N ≤ ρ x})\n")
+    out = O.core_rewrites(src)
+    assert out == ("    exact measure_congr (Filter.eventuallyEq_univ.mpr hη)\n"
+                   "    exact eventuallyEq_univ.mp (ae_eq_univ.mpr hc)\n"
+                   "    rw [eLpNorm_indicator_const₀ hZ.nullMeasurableSet (by norm_num) (by norm_num)]\n"
+                   "  rw [he, eLpNorm_indicator_const₀ (s := {x | N ≤ ρ x})\n")
+    keep = ("rw [eLpNorm_indicator_const₀ hs hp hp', eLpNorm_indicator_const' hs h hp, eLpNorm_indicator_const_le]\n"
+            "exact Filter.eventuallyEqSet_univ_foo\n")
+    assert O.core_rewrites(keep) == keep
+
+
+# d13f23b's `mgf_gaussianReal` takes `HasLaw X (gaussianReal μ v) p`; ours takes its `map_eq` field,
+# `p.map X = gaussianReal μ v` (oaiq-004, oaiq-036). An anonymous constructor keeps its second component; a named
+# HasLaw proof gets `.map_eq`; `(by simp)` proves either and is kept.
+
+def test_mgf_gaussian_real_takes_the_map_equation():
+    src = ("  rw [mgf_gaussianReal ⟨hX.aemeasurable, hX.map_eq_gaussianReal⟩,\n"
+           "  have H := mgf_gaussianReal\n"
+           "    ⟨(innerSL ℝ v).continuous.measurable.aemeasurable,\n"
+           "      IsGaussian.map_eq_gaussianReal (μ := stdGaussian E) (innerSL ℝ v)⟩ a\n"
+           "  rw [mgf_gaussianReal (hB.hasLaw_eval t)]\n"
+           "    rw [← mgf_pos_iff, mgf_gaussianReal hX]\n"
+           "  have he := mgf_gaussianReal hl 1\n"
+           "    have hh := mgf_gaussianReal (X := id) (p := gaussianReal 0 1) (by simp) (a i)\n"
+           "  rw [mgf_gaussianReal (μ := 0) (v := v) (by simp)]\n"
+           "  simp [mgf_gaussianReal]\n")
+    out = O.core_rewrites(src)
+    assert out == ("  rw [mgf_gaussianReal hX.map_eq_gaussianReal,\n"
+                   "  have H := mgf_gaussianReal\n"
+                   "    (IsGaussian.map_eq_gaussianReal (μ := stdGaussian E) (innerSL ℝ v)) a\n"
+                   "  rw [mgf_gaussianReal (hB.hasLaw_eval t).map_eq]\n"
+                   "    rw [← mgf_pos_iff, mgf_gaussianReal hX.map_eq]\n"
+                   "  have he := mgf_gaussianReal hl.map_eq 1\n"
+                   "    have hh := mgf_gaussianReal (X := id) (p := gaussianReal 0 1) (by simp) (a i)\n"
+                   "  rw [mgf_gaussianReal (μ := 0) (v := v) (by simp)]\n"
+                   "  simp [mgf_gaussianReal]\n")

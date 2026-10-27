@@ -416,6 +416,163 @@ def _arg_end(text, k):
     return m.end() if m else r
 
 
+# The tactic that proves `AEStronglyMeasurable f μ` (or each `f i`) where ours added that argument to a lemma
+# d13f23b states without it (eLpNorm_sum_le, eLpNorm_le_eLpNorm_of_exponent_le, tendsto_integral_of_L1';
+# oaiq-038, oaiq-048). Same order as AEM_TAC: fun_prop, the context, Lp elements, then measurability.
+AESM_TAC = ("first | fun_prop | assumption | solve_by_elim | exact Lp.aestronglyMeasurable _ "
+            "| (apply Measurable.aestronglyMeasurable; solve_by_elim) "
+            "| (apply Continuous.aestronglyMeasurable; solve_by_elim) "
+            "| (apply Measurable.aestronglyMeasurable; measurability) | measurability")
+
+_BRACKETS = {'(': ')', '⟨': '⟩', '‹': '›', '[': ']', '{': '}'}
+_NOT_ARGS = {'at', 'with', 'using', 'from', 'only', 'by', 'fun', 'λ', 'then', 'else', 'do', 'in', 'generalizing',
+             'says', 'calc', 'if', 'match', 'show', 'have', 'let', 'exact', 'rw', 'simp', 'apply', 'refine'}
+
+
+def _balanced_end(text, q):
+    """End of the bracketed group opening at q (any of ( ⟨ ‹ [ { nested), or None if it never closes."""
+    stack, r = [], q
+    while r < len(text):
+        c = text[r]
+        if c in _BRACKETS:
+            stack.append(_BRACKETS[c])
+        elif stack and c == stack[-1]:
+            stack.pop()
+        r += 1
+        if not stack:
+            return r
+    return None
+
+
+def _innermost_open_bracket(text, j):
+    """The innermost bracket still open at j, counting from the last line that starts in column 0 (the
+    enclosing declaration), or None."""
+    start = j
+    while start > 0:
+        start = text.rfind('\n', 0, start - 1) + 1
+        if not text[start:start + 1].isspace():
+            break
+    stack = []
+    for c in text[start:j]:
+        if c in _BRACKETS:
+            stack.append(c)
+        elif stack and c == _BRACKETS[stack[-1]]:
+            stack.pop()
+    return stack[-1] if stack else None
+
+
+def _call_args(text, j):
+    """The arguments of the application whose head name ends at j, as (named, start, end, ws_start) tuples:
+    `( … )` / `⟨ … ⟩` / `‹ … ›` groups (with any `.field` chain), plain terms, `?_`; named `(x := …)` marked.
+    An argument on a later line must be indented past the head's line (otherwise it is the next tactic or a
+    `calc` step) unless the head sits directly in a `rw [ … ]`/`simp [ … ]` list, a `_` opening a line is a
+    `calc` step, and keywords, operators and closing brackets end it."""
+    ls = text.rfind('\n', 0, j) + 1
+    base = len(text[ls:j]) - len(text[ls:j].lstrip(' \t'))
+    if _innermost_open_bracket(text, j) == '[':
+        base = -1
+    ws = re.compile(r"[ \t]*(?:\n[ \t]*)*")
+    word = re.compile(r"\?[\w']*|[^\W\d][\w.'!?]*|\d[\w.]*")
+    suffix = re.compile(r"(?:\.[\w']+)*⁻?¹?")
+    args, k = [], j
+    while True:
+        q = ws.match(text, k).end()
+        gap = text[k:q]
+        if q == k or q >= len(text):
+            break
+        if '\n' in gap and len(gap) - gap.rfind('\n') - 1 <= base:
+            break
+        c = text[q]
+        if c in '(⟨‹':
+            e = _balanced_end(text, q)
+            if e is None:
+                break
+            e = suffix.match(text, e).end()
+            named = bool(re.match(r"\(\s*[\w']+\s*:=", text[q:]))
+        else:
+            m = word.match(text, q)
+            if not m or m.group(0) in _NOT_ARGS or (m.group(0) == '_' and '\n' in gap):
+                break
+            e, named = m.end(), False
+        args.append((named, q, e, k))
+        k = e
+    return args
+
+
+def _drop_nth_arg(text, pattern, n):
+    """Drop the n-th positional argument (1-based; named arguments skipped) after each match of `pattern`, with
+    the whitespace before it. A call with fewer positional arguments is left alone."""
+    out, i = [], 0
+    for m in re.finditer(pattern, text):
+        if m.start() < i:
+            continue
+        pos = [a for a in _call_args(text, m.end()) if not a[0]]
+        if len(pos) >= n:
+            _, _, e, w = pos[n - 1]
+            out.append(text[i:w])
+            i = e
+    return ''.join(out) + text[i:]
+
+
+def _insert_named_arg(text, pattern, name, value, keep=None):
+    """Insert ` (name := value)` right after each match of `pattern` (a named argument, so its place among the
+    positional ones does not matter), unless the call names it already or `keep(text, positional_args)` says so."""
+    out, i = [], 0
+    for m in re.finditer(pattern, text):
+        args = _call_args(text, m.end())
+        if any(a[0] and re.match(r"\(\s*%s\s*:=" % re.escape(name), text[a[1]:]) for a in args):
+            continue
+        if keep and keep(text, [a for a in args if not a[0]]):
+            continue
+        out.append(text[i:m.end()] + ' (%s := %s)' % (name, value))
+        i = m.end()
+    return ''.join(out) + text[i:]
+
+
+def _split_top_commas(s):
+    parts, depth, cur = [], 0, ''
+    for c in s:
+        if c in _BRACKETS:
+            depth += 1
+        elif c in _BRACKETS.values():
+            depth -= 1
+        if c == ',' and depth == 0:
+            parts.append(cur)
+            cur = ''
+        else:
+            cur += c
+    return parts + [cur]
+
+
+def _mgf_gaussian_real_map_eq(text):
+    """d13f23b's `mgf_gaussianReal (hX : HasLaw X (gaussianReal μ v) p)`; ours takes `hX : p.map X = gaussianReal μ v`,
+    HasLaw's `map_eq` field (oaiq-004, oaiq-036). `⟨hm, heq⟩` becomes `heq`, a HasLaw term `h` becomes
+    `h.map_eq`; `(by …)` (simp proves either) and `_`/`?_` stay."""
+    out, i = [], 0
+    for m in re.finditer(r"(?<![\w.'])(?:ProbabilityTheory\.)?mgf_gaussianReal(?![\w'])", text):
+        if m.start() < i:
+            continue
+        pos = [a for a in _call_args(text, m.end()) if not a[0]]
+        if not pos:
+            continue
+        _, q, e, _ = pos[0]
+        arg = text[q:e]
+        if arg.startswith('⟨') and arg.endswith('⟩'):
+            parts = _split_top_commas(arg[1:-1])
+            if len(parts) != 2:
+                continue
+            new = parts[1].strip()
+            if not re.fullmatch(r"[\w.'?]+", new):
+                new = '(' + new + ')'
+        elif re.match(r"\(\s*by\b", arg) or arg in ('_', '?_') or arg.startswith('?') or arg.startswith('‹'):
+            continue
+        else:
+            new = arg + '.map_eq'
+        out.append(text[i:q] + new)
+        i = e
+    return ''.join(out) + text[i:]
+
+
 def _drop_map_smul_proof(text):
     """d13f23b's `Measure.map_smul c hf` takes an AEMeasurable proof; ours is `map_smul c μ f` with none
     (SingleLatticeCovering 2026-10-25; Brenier/SmoothObstruction oaiq-005). The proof is the argument after
@@ -543,11 +700,28 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"(?m)^[ \t]*(?:rw \[unifIntegrable_iff'\]|apply unifIntegrable_iff'\.mpr)[ \t]*\n", "", text)
     # d13f23b's `Filter.eventuallyEmptyOrUniv_iff'` is our `Filter.eventuallyConst_set'` (FiniteFactor, 2026-10-25)
     text = re.sub(r"(?<![\w'])eventuallyEmptyOrUniv_iff'", "eventuallyConst_set'", text)
-    # d13f23b's `eLpNorm_eq_lintegral_rpow_enorm_toReal hp0 hptop hf` has a third, measurability argument;
-    # ours has two (MemoryPrecision, 2026-10-25)
+    # d13f23b's `eLpNorm_eq_lintegral_rpow_enorm_toReal hp0 hptop hf` and `eLpNorm_eq_eLpNorm' hp0 hptop hf` have a
+    # third, measurability argument, `eLpNorm_nnreal_eq_eLpNorm' hp hf` a second, `eLpNorm_mono_real hf h` a first
+    # and `Lp.eLpNorm_le_of_ae_tendsto bound hf hg h` a third (`hg`); ours have none (MemoryPrecision 2026-10-25,
+    # oaiq-038, oaiq-048)
+    for _n, _k in (("eLpNorm_eq_lintegral_rpow_enorm_toReal", 3), ("eLpNorm_eq_eLpNorm'", 3),
+                   ("eLpNorm_nnreal_eq_eLpNorm'", 2), ("eLpNorm_mono_real", 1)):
+        text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?" + re.escape(_n) + r"(?![\w'])", _k)
+    text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?Lp\.eLpNorm_le_of_ae_tendsto(?![\w'])", 3)
+    # ours added a measurability argument to `eLpNorm_sum_le` (hfs, first), `eLpNorm_le_eLpNorm_of_exponent_le`
+    # (hf, second) and the Bochner `tendsto_integral_of_L1'` (hfi, second): passed by name (oaiq-038, oaiq-048).
+    # The vector-measure `tendsto_integral_of_L1' f hfi …` took it already in d13f23b.
+    _pre = r"(?<![\w.'@])(?:MeasureTheory\.)?"
+    text = _insert_named_arg(text, _pre + r"eLpNorm_sum_le(?![\w'])", 'hfs', 'fun _ _ => by ' + AESM_TAC)
+    text = _insert_named_arg(text, _pre + r"eLpNorm_le_eLpNorm_of_exponent_le(?![\w'])", 'hf', 'by ' + AESM_TAC)
+    text = _insert_named_arg(text, _pre + r"tendsto_integral_of_L1'(?![\w'])", 'hfi', 'by ' + AESM_TAC,
+                             keep=lambda t, pos: len(pos) > 1 and 'stronglymeasurable' in t[pos[1][1]:pos[1][2]].lower())
+    # d13f23b renames: `Filter.eventuallyEqSet_univ` is our `Filter.eventuallyEq_univ`; `eLpNorm_indicator_const`
+    # (NullMeasurableSet, every use) is our `eLpNorm_indicator_const₀` (ours wants a MeasurableSet)
+    text = re.sub(r"(?<![\w'])eventuallyEqSet_univ(?![\w'])", 'eventuallyEq_univ', text)
+    text = re.sub(r"(?<![\w'])eLpNorm_indicator_const(?![\w'])", 'eLpNorm_indicator_const₀', text)
+    text = _mgf_gaussian_real_map_eq(text)    # HasLaw argument -> its map_eq (oaiq-004, oaiq-036)
     _a = r"(?:\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|[\w.']+)"
-    text = re.sub(r"(?<![\w.'])(eLpNorm_eq_lintegral_rpow_enorm_toReal\s+" + _a + r"\s+" + _a + r")\s+"
-                  r"[\w.']*\.aestronglyMeasurable(?![\w'])", r"\1", text)
     # d13f23b's `eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top hp0 hptop hf` has a third, measurability
     # argument; ours has two (Elasticity Regularity, 2026-10-26)
     text = re.sub(r"(?<![\w.'])(eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top\s+" + _a + r"\s+" + _a + r")\s+"
