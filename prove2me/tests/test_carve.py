@@ -1960,3 +1960,36 @@ def test_local_instances_are_recognised_and_never_owned_across_modules(g):
     if users:
         assert 'CD.Co.instCoeFunTstForallNat' in g.inst_owners(
             ['CD.Co.instCoeFunTstForallNat'], 'x', users[0], len(g.infos[users[0]].commands))
+
+
+# Local context a carved file must put back (Auslander–Reiten, oaiq-031, 2026-10-27): the
+# LocalCtx module.
+
+LC_DEFS = {'CD.LC.Wc', 'CD.LC.Act', 'CD.LC.Tower', 'CD.LC.needsTower'}
+
+
+def test_a_local_notation_written_against_a_modifier_letter_is_kept_for_a_first_declaration(g):
+    # `Cᵐᵒᵖ` (here `Cᵒᵖ`): Lean reads the token `C` then the postfix; the textual use test took the
+    # modifier letters for identifier characters, so a bundle whose first kept declaration was
+    # simpleRightAction lost `local notation "C"` ("Unknown identifier `C`"), while a neighbouring
+    # bundle keeping rightSimpleDualEquiv (written `C`) had it. The postfix itself was lost the same way.
+    keep = {'CD.LC.Opp', 'CD.LC.Wc', 'CD.LC.oppSelf'}
+    sec = _section(carve(g, keep), 'CarveDev.LocalCtx')
+    assert 'local notation "C" => Wc 3' in sec, sec
+    assert 'local postfix:max "ᵒᵖ" => Opp' in sec, sec
+    # a declaration written without them still drops them
+    sec = _section(carve(g, {'CD.LC.Opp', 'CD.LC.Wc', 'CD.LC.needsTower', 'CD.LC.Act', 'CD.LC.Tower'}),
+                   'CarveDev.LocalCtx')
+    assert 'local notation "C" => Wc' not in sec and 'local postfix:max' not in sec, sec
+
+
+def test_uses_token_reads_identifiers_as_lean_does():
+    assert C._uses_token('(a : Cᵐᵒᵖ)', 'C')
+    assert C._uses_token('(a : C⁻¹)', 'C')
+    assert not C._uses_token('(a : Cat)', 'C')
+    assert not C._uses_token('(a : C₁)', 'C')          # subscripts are identifier characters
+    assert not C._uses_token("(a : C')", 'C')
+    assert not C._uses_token('(a : C?)', 'C')
+    assert not C._uses_token('(a : x.C)', 'C')
+    assert not C._uses_token('(a : Cα)', 'C')          # Greek letters too
+

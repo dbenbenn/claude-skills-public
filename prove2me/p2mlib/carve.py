@@ -336,9 +336,17 @@ def _in_scope(info, vi, c):
     return b[:len(a)] == a
 
 
+# the characters Lean reads inside an identifier (Lean.isIdRest: ASCII letters and digits, `_ ' ! ?`,
+# letter-like symbols, subscripts). Not Python's `\w`, which takes modifier letters too: `Cᵐᵒᵖ` is the
+# token `C` and the postfix `ᵐᵒᵖ` (Auslander–Reiten oaiq-031: a bundle whose first declarations were
+# written `Cᵐᵒᵖ` lost `local notation "C"`)
+_ID = (r"A-Za-z0-9_'!?\u03b1-\u03ba\u03bc-\u03c9\u0391-\u03a0\u03a2-\u03a9\u03ca-\u03fb"
+       r"\u1f00-\u1ffe\u2100-\u214f\U0001d49c-\U0001d59f\u2080-\u2089\u2090-\u209c\u1d62-\u1d6a\u2c7c")
+
+
 def _uses_token(text, tok):
-    if re.match(r"^[\w'.]+$", tok):
-        return re.search(r"(?<![\w'.])%s(?![\w'])" % re.escape(tok), text) is not None
+    if re.match(r"^[%s.]+$" % _ID, tok):
+        return re.search(r"(?<![%s.])%s(?![%s])" % (_ID, re.escape(tok), _ID), text) is not None
     return tok in text
 
 
@@ -2450,9 +2458,12 @@ class Carver:
             # a local instance counts even when dropped: the file may re-emit it for a kept
             # declaration in its scope (Erdős 3 v2: `local instance … : NeZero Ncrt` came back,
             # `local notation "Ncrt"` had gone)
+            # by Lean's record (the command's syntax contains the notation's kind) or by its text
+            kinds = set(c.declares_kinds or ())
             used = any((c2.index not in drop or _local_instance(info, c2)[0]) and
                        _in_scope(info, c.index, c2) and
-                       any(_uses_token(strip(info.slice(*info.command_span(c2.index))), tk) for tk in toks)
+                       (bool(kinds & set(c2.kinds_used or ())) or
+                        any(_uses_token(strip(info.slice(*info.command_span(c2.index))), tk) for tk in toks))
                        for c2 in info.commands[c.index + 1:])
             if not used:
                 drop.add(c.index)

@@ -1,0 +1,2536 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 844,
+    "col": 101,
+    "line": 11
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 861,
+    "col": 15,
+    "line": 13
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 861,
+     "name": "CD.LC",
+     "role": "scope",
+     "start": 856
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 846,
+    "col": 0,
+    "line": 13
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.LC.Opp",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 895,
+    "col": 30,
+    "line": 15
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 870,
+     "name": "Opp",
+     "role": "decl",
+     "start": 867
+    },
+    {
+     "end": 874,
+     "name": "α",
+     "role": "binder",
+     "start": 872
+    },
+    {
+     "end": 895,
+     "name": "α",
+     "role": "ref",
+     "start": 893
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 870,
+      "col": 7,
+      "line": 15
+     },
+     "start": {
+      "byte": 867,
+      "col": 4,
+      "line": 15
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LC.Opp"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     867,
+     870,
+     "CD.LC.Opp",
+     "b"
+    ],
+    [
+     867,
+     870,
+     "",
+     "b"
+    ],
+    [
+     872,
+     874,
+     "",
+     "b"
+    ],
+    [
+     893,
+     895,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 863,
+    "col": 0,
+    "line": 15
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 890,
+    "col": 26,
+    "line": 15
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.LC.Wc",
+     "",
+     []
+    ],
+    [
+     "CD.LC.Wc.x",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 935,
+    "col": 9,
+    "line": 18
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 909,
+     "name": "Wc",
+     "role": "decl",
+     "start": 907
+    },
+    {
+     "end": 912,
+     "name": "n",
+     "role": "binder",
+     "start": 911
+    },
+    {
+     "end": 918,
+     "name": "Nat",
+     "role": "ref",
+     "start": 915
+    },
+    {
+     "end": 929,
+     "name": "x",
+     "role": "ref",
+     "start": 928
+    },
+    {
+     "end": 935,
+     "name": "Nat",
+     "role": "ref",
+     "start": 932
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 909,
+      "col": 12,
+      "line": 17
+     },
+     "start": {
+      "byte": 907,
+      "col": 10,
+      "line": 17
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LC.Wc"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     907,
+     909,
+     "CD.LC.Wc",
+     "b"
+    ],
+    [
+     907,
+     909,
+     "",
+     "b"
+    ],
+    [
+     911,
+     912,
+     "",
+     "b"
+    ],
+    [
+     915,
+     918,
+     "Nat"
+    ],
+    [
+     928,
+     929,
+     "CD.LC.Wc.x",
+     "b"
+    ],
+    [
+     932,
+     935,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 897,
+    "col": 0,
+    "line": 17
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.LC.Act.act",
+     "",
+     []
+    ],
+    [
+     "CD.LC.Act",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 990,
+    "col": 19,
+    "line": 21
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 946,
+     "name": "Act",
+     "role": "decl",
+     "start": 943
+    },
+    {
+     "end": 950,
+     "name": "α",
+     "role": "binder",
+     "start": 948
+    },
+    {
+     "end": 970,
+     "name": "act",
+     "role": "ref",
+     "start": 967
+    },
+    {
+     "end": 976,
+     "name": "Nat",
+     "role": "ref",
+     "start": 973
+    },
+    {
+     "end": 983,
+     "name": "α",
+     "role": "ref",
+     "start": 981
+    },
+    {
+     "end": 990,
+     "name": "α",
+     "role": "ref",
+     "start": 988
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 946,
+      "col": 9,
+      "line": 20
+     },
+     "start": {
+      "byte": 943,
+      "col": 6,
+      "line": 20
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LC.Act"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     943,
+     946,
+     "",
+     "b"
+    ],
+    [
+     943,
+     946,
+     "CD.LC.Act",
+     "b"
+    ],
+    [
+     948,
+     950,
+     "",
+     "b"
+    ],
+    [
+     967,
+     970,
+     "CD.LC.Act.act",
+     "b"
+    ],
+    [
+     973,
+     976,
+     "Nat"
+    ],
+    [
+     981,
+     983,
+     ""
+    ],
+    [
+     988,
+     990,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 937,
+    "col": 0,
+    "line": 20
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.LC.Tower",
+     "",
+     []
+    ],
+    [
+     "CD.LC.Tower.ok",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1075,
+    "col": 31,
+    "line": 24
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1003,
+     "name": "Tower",
+     "role": "decl",
+     "start": 998
+    },
+    {
+     "end": 1007,
+     "name": "β",
+     "role": "binder",
+     "start": 1005
+    },
+    {
+     "end": 1010,
+     "name": "α",
+     "role": "binder",
+     "start": 1008
+    },
+    {
+     "end": 1023,
+     "name": "Act",
+     "role": "ref",
+     "start": 1020
+    },
+    {
+     "end": 1026,
+     "name": "α",
+     "role": "ref",
+     "start": 1024
+    },
+    {
+     "end": 1045,
+     "name": "ok",
+     "role": "ref",
+     "start": 1043
+    },
+    {
+     "end": 1053,
+     "name": "a",
+     "role": "ref",
+     "start": 1052
+    },
+    {
+     "end": 1058,
+     "name": "α",
+     "role": "ref",
+     "start": 1056
+    },
+    {
+     "end": 1067,
+     "name": "Act.act",
+     "role": "ref",
+     "start": 1060
+    },
+    {
+     "end": 1071,
+     "name": "a",
+     "role": "ref",
+     "start": 1070
+    },
+    {
+     "end": 1075,
+     "name": "a",
+     "role": "ref",
+     "start": 1074
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1003,
+      "col": 11,
+      "line": 23
+     },
+     "start": {
+      "byte": 998,
+      "col": 6,
+      "line": 23
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LC.Tower"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     998,
+     1003,
+     "",
+     "b"
+    ],
+    [
+     998,
+     1003,
+     "CD.LC.Tower",
+     "b"
+    ],
+    [
+     1005,
+     1007,
+     "",
+     "b"
+    ],
+    [
+     1008,
+     1010,
+     "",
+     "b"
+    ],
+    [
+     1020,
+     1023,
+     "CD.LC.Act"
+    ],
+    [
+     1024,
+     1026,
+     ""
+    ],
+    [
+     1043,
+     1045,
+     "CD.LC.Tower.ok",
+     "b"
+    ],
+    [
+     1052,
+     1053,
+     "",
+     "b"
+    ],
+    [
+     1056,
+     1058,
+     ""
+    ],
+    [
+     1060,
+     1067,
+     "CD.LC.Act.act"
+    ],
+    [
+     1070,
+     1071,
+     ""
+    ],
+    [
+     1074,
+     1075,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 992,
+    "col": 0,
+    "line": 23
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.LC.needsTower",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1138,
+    "col": 58,
+    "line": 26
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1091,
+     "name": "needsTower",
+     "role": "decl",
+     "start": 1081
+    },
+    {
+     "end": 1095,
+     "name": "α",
+     "role": "binder",
+     "start": 1093
+    },
+    {
+     "end": 1108,
+     "name": "Act",
+     "role": "ref",
+     "start": 1105
+    },
+    {
+     "end": 1111,
+     "name": "α",
+     "role": "ref",
+     "start": 1109
+    },
+    {
+     "end": 1119,
+     "name": "Tower",
+     "role": "ref",
+     "start": 1114
+    },
+    {
+     "end": 1123,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1120
+    },
+    {
+     "end": 1126,
+     "name": "α",
+     "role": "ref",
+     "start": 1124
+    },
+    {
+     "end": 1133,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1130
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1091,
+      "col": 14,
+      "line": 26
+     },
+     "start": {
+      "byte": 1081,
+      "col": 4,
+      "line": 26
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LC.needsTower"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1081,
+     1091,
+     "CD.LC.needsTower",
+     "b"
+    ],
+    [
+     1081,
+     1091,
+     "",
+     "b"
+    ],
+    [
+     1093,
+     1095,
+     "",
+     "b"
+    ],
+    [
+     1105,
+     1108,
+     "CD.LC.Act"
+    ],
+    [
+     1109,
+     1111,
+     ""
+    ],
+    [
+     1114,
+     1119,
+     "CD.LC.Tower"
+    ],
+    [
+     1120,
+     1123,
+     "Nat"
+    ],
+    [
+     1124,
+     1126,
+     ""
+    ],
+    [
+     1130,
+     1133,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1077,
+    "col": 0,
+    "line": 26
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 1134,
+    "col": 54,
+    "line": 26
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1147,
+    "col": 7,
+    "line": 28
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.section",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1140,
+    "col": 0,
+    "line": 28
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [
+    "_private.CarveDev.LocalCtx.0.CD.LC.«term_ᵒᵖ»"
+   ],
+   "end": {
+    "byte": 1181,
+    "col": 29,
+    "line": 29
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1181,
+     "name": "Opp",
+     "role": "ref",
+     "start": 1178
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.mixfix",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1178,
+     1181,
+     "CD.LC.Opp"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1148,
+    "col": 0,
+    "line": 29
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [
+    "_private.CarveDev.LocalCtx.0.CD.LC.termC"
+   ],
+   "end": {
+    "byte": 1208,
+    "col": 26,
+    "line": 30
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1206,
+     "name": "Wc",
+     "role": "ref",
+     "start": 1204
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.notation",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1204,
+     1206,
+     "CD.LC.Wc"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1182,
+    "col": 0,
+    "line": 30
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.LC.oppSelf",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1250,
+    "col": 32,
+    "line": 32
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1221,
+     "name": "oppSelf",
+     "role": "decl",
+     "start": 1214
+    },
+    {
+     "end": 1224,
+     "name": "a",
+     "role": "binder",
+     "start": 1223
+    },
+    {
+     "end": 1250,
+     "name": "a",
+     "role": "ref",
+     "start": 1249
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1221,
+      "col": 11,
+      "line": 32
+     },
+     "start": {
+      "byte": 1214,
+      "col": 4,
+      "line": 32
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [
+    "_private.CarveDev.LocalCtx.0.CD.LC.termC",
+    "_private.CarveDev.LocalCtx.0.CD.LC.«term_ᵒᵖ»"
+   ],
+   "names": [
+    "CD.LC.oppSelf"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1214,
+     1221,
+     "CD.LC.oppSelf",
+     "b"
+    ],
+    [
+     1214,
+     1221,
+     "",
+     "b"
+    ],
+    [
+     1223,
+     1224,
+     "",
+     "b"
+    ],
+    [
+     1249,
+     1250,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1210,
+    "col": 0,
+    "line": 32
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 1246,
+    "col": 28,
+    "line": 32
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.LC.oppSelf_eq",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1307,
+    "col": 51,
+    "line": 34
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1270,
+     "name": "oppSelf_eq",
+     "role": "decl",
+     "start": 1260
+    },
+    {
+     "end": 1273,
+     "name": "a",
+     "role": "binder",
+     "start": 1272
+    },
+    {
+     "end": 1294,
+     "name": "oppSelf",
+     "role": "ref",
+     "start": 1287
+    },
+    {
+     "end": 1296,
+     "name": "a",
+     "role": "ref",
+     "start": 1295
+    },
+    {
+     "end": 1300,
+     "name": "a",
+     "role": "ref",
+     "start": 1299
+    },
+    {
+     "end": 1307,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1304
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1270,
+      "col": 18,
+      "line": 34
+     },
+     "start": {
+      "byte": 1260,
+      "col": 8,
+      "line": 34
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [
+    "_private.CarveDev.LocalCtx.0.CD.LC.termC",
+    "_private.CarveDev.LocalCtx.0.CD.LC.«term_ᵒᵖ»"
+   ],
+   "names": [
+    "CD.LC.oppSelf_eq"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1260,
+     1270,
+     "CD.LC.oppSelf_eq",
+     "b"
+    ],
+    [
+     1260,
+     1270,
+     "",
+     "b"
+    ],
+    [
+     1272,
+     1273,
+     "",
+     "b"
+    ],
+    [
+     1287,
+     1294,
+     "CD.LC.oppSelf"
+    ],
+    [
+     1295,
+     1296,
+     ""
+    ],
+    [
+     1299,
+     1300,
+     ""
+    ],
+    [
+     1304,
+     1307,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1252,
+    "col": 0,
+    "line": 34
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 1301,
+    "col": 45,
+    "line": 34
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.LC.plainC",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1340,
+    "col": 31,
+    "line": 36
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1319,
+     "name": "plainC",
+     "role": "decl",
+     "start": 1313
+    },
+    {
+     "end": 1322,
+     "name": "a",
+     "role": "binder",
+     "start": 1321
+    },
+    {
+     "end": 1333,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1330
+    },
+    {
+     "end": 1340,
+     "name": "a.x",
+     "role": "ref",
+     "start": 1337
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1319,
+      "col": 10,
+      "line": 36
+     },
+     "start": {
+      "byte": 1313,
+      "col": 4,
+      "line": 36
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [
+    "_private.CarveDev.LocalCtx.0.CD.LC.termC"
+   ],
+   "names": [
+    "CD.LC.plainC"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1313,
+     1319,
+     "CD.LC.plainC",
+     "b"
+    ],
+    [
+     1313,
+     1319,
+     "",
+     "b"
+    ],
+    [
+     1321,
+     1322,
+     "",
+     "b"
+    ],
+    [
+     1330,
+     1333,
+     "Nat"
+    ],
+    [
+     1337,
+     1338,
+     ""
+    ],
+    [
+     1337,
+     1340,
+     "CD.LC.Wc.x"
+    ],
+    [
+     1339,
+     1340,
+     "CD.LC.Wc.x"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1309,
+    "col": 0,
+    "line": 36
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 1334,
+    "col": 25,
+    "line": 36
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1344,
+    "col": 3,
+    "line": 37
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1341,
+    "col": 0,
+    "line": 37
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1353,
+    "col": 7,
+    "line": 39
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.section",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1346,
+    "col": 0,
+    "line": 39
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [
+    "reducible"
+   ],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 14
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.LC.actLo",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1437,
+    "col": 75,
+    "line": 40
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1365,
+     "name": "reducible",
+     "role": "attr",
+     "start": 1356
+    },
+    {
+     "end": 1376,
+     "name": "actLo",
+     "role": "decl",
+     "start": 1371
+    },
+    {
+     "end": 1379,
+     "name": "n",
+     "role": "binder",
+     "start": 1378
+    },
+    {
+     "end": 1385,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1382
+    },
+    {
+     "end": 1392,
+     "name": "Act",
+     "role": "ref",
+     "start": 1389
+    },
+    {
+     "end": 1394,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1394
+    },
+    {
+     "end": 1396,
+     "name": "Wc",
+     "role": "ref",
+     "start": 1394
+    },
+    {
+     "end": 1398,
+     "name": "n",
+     "role": "ref",
+     "start": 1397
+    },
+    {
+     "end": 1411,
+     "name": "k",
+     "role": "ref",
+     "start": 1410
+    },
+    {
+     "end": 1413,
+     "name": "a",
+     "role": "ref",
+     "start": 1412
+    },
+    {
+     "end": 1423,
+     "name": "a.x",
+     "role": "ref",
+     "start": 1420
+    },
+    {
+     "end": 1427,
+     "name": "k",
+     "role": "ref",
+     "start": 1426
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1376,
+      "col": 22,
+      "line": 40
+     },
+     "start": {
+      "byte": 1371,
+      "col": 17,
+      "line": 40
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LC.actLo"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1371,
+     1376,
+     "CD.LC.actLo",
+     "b"
+    ],
+    [
+     1371,
+     1376,
+     "",
+     "b"
+    ],
+    [
+     1378,
+     1379,
+     "",
+     "b"
+    ],
+    [
+     1382,
+     1385,
+     "Nat"
+    ],
+    [
+     1389,
+     1392,
+     "CD.LC.Act"
+    ],
+    [
+     1394,
+     1396,
+     "CD.LC.Wc"
+    ],
+    [
+     1397,
+     1398,
+     ""
+    ],
+    [
+     1410,
+     1411,
+     "",
+     "b"
+    ],
+    [
+     1412,
+     1413,
+     "",
+     "b"
+    ],
+    [
+     1420,
+     1421,
+     ""
+    ],
+    [
+     1420,
+     1423,
+     "CD.LC.Wc.x"
+    ],
+    [
+     1422,
+     1423,
+     "CD.LC.Wc.x"
+    ],
+    [
+     1426,
+     1427,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1354,
+    "col": 0,
+    "line": 40
+   },
+   "used_keys": [
+    "CD.LC.Act"
+   ],
+   "value_start": {
+    "byte": 1400,
+    "col": 46,
+    "line": 40
+   }
+  },
+  {
+   "attrs": [
+    "local instance 2000"
+   ],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 14
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1475,
+    "col": 37,
+    "line": 41
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1475,
+     "name": "actLo",
+     "role": "ref",
+     "start": 1470
+    }
+   ],
+   "ids": [],
+   "inst_keys": [
+    "CD.LC.Act CD.LC.Wc"
+   ],
+   "insts": [
+    "CD.LC.actLo"
+   ],
+   "kind": "Lean.Parser.Command.attribute",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1470,
+     1475,
+     "CD.LC.actLo"
+    ]
+   ],
+   "sig_insts": [
+    "CD.LC.actLo"
+   ],
+   "sig_used_keys": [
+    "CD.LC.Act CD.LC.Wc"
+   ],
+   "start": {
+    "byte": 1438,
+    "col": 0,
+    "line": 41
+   },
+   "used_keys": [
+    "CD.LC.Act CD.LC.Wc"
+   ]
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      16
+     ],
+     "opener": 14
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "CD.LC.actHi",
+     "CD.LC.Act",
+     [
+      "CD.LC.Wc"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1560,
+    "col": 80,
+    "line": 42
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1515,
+     "name": "actHi",
+     "role": "decl",
+     "start": 1510
+    },
+    {
+     "end": 1518,
+     "name": "n",
+     "role": "binder",
+     "start": 1517
+    },
+    {
+     "end": 1524,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1521
+    },
+    {
+     "end": 1531,
+     "name": "Act",
+     "role": "ref",
+     "start": 1528
+    },
+    {
+     "end": 1533,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1533
+    },
+    {
+     "end": 1535,
+     "name": "Wc",
+     "role": "ref",
+     "start": 1533
+    },
+    {
+     "end": 1537,
+     "name": "n",
+     "role": "ref",
+     "start": 1536
+    },
+    {
+     "end": 1552,
+     "name": "a",
+     "role": "ref",
+     "start": 1551
+    },
+    {
+     "end": 1557,
+     "name": "a",
+     "role": "ref",
+     "start": 1556
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1515,
+      "col": 39,
+      "line": 42
+     },
+     "start": {
+      "byte": 1510,
+      "col": 34,
+      "line": 42
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [
+    "CD.LC.actHi"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LC.actHi"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1510,
+     1515,
+     "CD.LC.actHi",
+     "b"
+    ],
+    [
+     1510,
+     1515,
+     "",
+     "b"
+    ],
+    [
+     1517,
+     1518,
+     "",
+     "b"
+    ],
+    [
+     1521,
+     1524,
+     "Nat"
+    ],
+    [
+     1528,
+     1531,
+     "CD.LC.Act"
+    ],
+    [
+     1533,
+     1535,
+     "CD.LC.Wc"
+    ],
+    [
+     1536,
+     1537,
+     ""
+    ],
+    [
+     1551,
+     1552,
+     "",
+     "b"
+    ],
+    [
+     1556,
+     1557,
+     ""
+    ]
+   ],
+   "sig_insts": [
+    "CD.LC.actHi"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1476,
+    "col": 0,
+    "line": 42
+   },
+   "used_keys": [
+    "CD.LC.Act"
+   ],
+   "value_start": {
+    "byte": 1539,
+    "col": 63,
+    "line": 42
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      16
+     ],
+     "opener": 14
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "CD.LC.towerHi",
+     "CD.LC.Tower",
+     [
+      "Nat",
+      "CD.LC.Wc",
+      "CD.LC.actHi"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1634,
+    "col": 69,
+    "line": 43
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1583,
+     "name": "towerHi",
+     "role": "decl",
+     "start": 1576
+    },
+    {
+     "end": 1586,
+     "name": "n",
+     "role": "binder",
+     "start": 1585
+    },
+    {
+     "end": 1592,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1589
+    },
+    {
+     "end": 1601,
+     "name": "Tower",
+     "role": "ref",
+     "start": 1596
+    },
+    {
+     "end": 1605,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1602
+    },
+    {
+     "end": 1607,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1607
+    },
+    {
+     "end": 1609,
+     "name": "Wc",
+     "role": "ref",
+     "start": 1607
+    },
+    {
+     "end": 1611,
+     "name": "n",
+     "role": "ref",
+     "start": 1610
+    },
+    {
+     "end": 1631,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1628
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1583,
+      "col": 22,
+      "line": 43
+     },
+     "start": {
+      "byte": 1576,
+      "col": 15,
+      "line": 43
+     }
+    }
+   ],
+   "inst_keys": [
+    "CD.LC.Act CD.LC.Wc",
+    "OfNat Nat"
+   ],
+   "insts": [
+    "CD.LC.actHi",
+    "CD.LC.towerHi"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LC.towerHi"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1576,
+     1583,
+     "CD.LC.towerHi",
+     "b"
+    ],
+    [
+     1576,
+     1583,
+     "",
+     "b"
+    ],
+    [
+     1585,
+     1586,
+     "",
+     "b"
+    ],
+    [
+     1589,
+     1592,
+     "Nat"
+    ],
+    [
+     1596,
+     1601,
+     "CD.LC.Tower"
+    ],
+    [
+     1602,
+     1605,
+     "Nat"
+    ],
+    [
+     1607,
+     1609,
+     "CD.LC.Wc"
+    ],
+    [
+     1610,
+     1611,
+     ""
+    ],
+    [
+     1628,
+     1631,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [
+    "CD.LC.actHi",
+    "CD.LC.towerHi"
+   ],
+   "sig_used_keys": [
+    "CD.LC.Act CD.LC.Wc"
+   ],
+   "start": {
+    "byte": 1561,
+    "col": 0,
+    "line": 43
+   },
+   "used_keys": [
+    "CD.LC.Act CD.LC.Wc",
+    "CD.LC.Tower"
+   ],
+   "value_start": {
+    "byte": 1613,
+    "col": 52,
+    "line": 43
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      16
+     ],
+     "opener": 14
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.LC.tower_use",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1736,
+    "col": 94,
+    "line": 45
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1653,
+     "name": "tower_use",
+     "role": "decl",
+     "start": 1644
+    },
+    {
+     "end": 1656,
+     "name": "n",
+     "role": "binder",
+     "start": 1655
+    },
+    {
+     "end": 1662,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1659
+    },
+    {
+     "end": 1666,
+     "name": "a",
+     "role": "binder",
+     "start": 1665
+    },
+    {
+     "end": 1671,
+     "name": "Wc",
+     "role": "ref",
+     "start": 1669
+    },
+    {
+     "end": 1673,
+     "name": "n",
+     "role": "ref",
+     "start": 1672
+    },
+    {
+     "end": 1684,
+     "name": "Act.act",
+     "role": "ref",
+     "start": 1677
+    },
+    {
+     "end": 1688,
+     "name": "a",
+     "role": "ref",
+     "start": 1687
+    },
+    {
+     "end": 1692,
+     "name": "a",
+     "role": "ref",
+     "start": 1691
+    },
+    {
+     "end": 1707,
+     "name": "needsTower",
+     "role": "ref",
+     "start": 1697
+    },
+    {
+     "end": 1709,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1709
+    },
+    {
+     "end": 1711,
+     "name": "Wc",
+     "role": "ref",
+     "start": 1709
+    },
+    {
+     "end": 1713,
+     "name": "n",
+     "role": "ref",
+     "start": 1712
+    },
+    {
+     "end": 1728,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1725
+    },
+    {
+     "end": 1733,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1730
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1653,
+      "col": 17,
+      "line": 45
+     },
+     "start": {
+      "byte": 1644,
+      "col": 8,
+      "line": 45
+     }
+    }
+   ],
+   "inst_keys": [
+    "CD.LC.Act CD.LC.Wc",
+    "CD.LC.Tower Nat CD.LC.Wc CD.LC.actHi",
+    "OfNat Nat"
+   ],
+   "insts": [
+    "CD.LC.actHi",
+    "CD.LC.towerHi"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LC.tower_use"
+   ],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [
+    [
+     1644,
+     1653,
+     "CD.LC.tower_use",
+     "b"
+    ],
+    [
+     1644,
+     1653,
+     "",
+     "b"
+    ],
+    [
+     1655,
+     1656,
+     "",
+     "b"
+    ],
+    [
+     1659,
+     1662,
+     "Nat"
+    ],
+    [
+     1665,
+     1666,
+     "",
+     "b"
+    ],
+    [
+     1669,
+     1671,
+     "CD.LC.Wc"
+    ],
+    [
+     1672,
+     1673,
+     ""
+    ],
+    [
+     1677,
+     1684,
+     "CD.LC.Act.act"
+    ],
+    [
+     1687,
+     1688,
+     ""
+    ],
+    [
+     1691,
+     1692,
+     ""
+    ],
+    [
+     1697,
+     1707,
+     "CD.LC.needsTower"
+    ],
+    [
+     1709,
+     1711,
+     "CD.LC.Wc"
+    ],
+    [
+     1712,
+     1713,
+     ""
+    ],
+    [
+     1725,
+     1728,
+     "rfl"
+    ],
+    [
+     1730,
+     1733,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [
+    "CD.LC.actHi",
+    "CD.LC.towerHi"
+   ],
+   "sig_used_keys": [
+    "CD.LC.Act CD.LC.Wc",
+    "CD.LC.Tower Nat CD.LC.Wc CD.LC.actHi"
+   ],
+   "start": {
+    "byte": 1636,
+    "col": 0,
+    "line": 45
+   },
+   "used_keys": [
+    "CD.LC.Act CD.LC.Wc",
+    "CD.LC.Tower Nat CD.LC.Wc CD.LC.actHi"
+   ],
+   "value_start": {
+    "byte": 1719,
+    "col": 81,
+    "line": 45
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      16
+     ],
+     "opener": 14
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1740,
+    "col": 3,
+    "line": 46
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1737,
+    "col": 0,
+    "line": 46
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1751,
+    "col": 9,
+    "line": 48
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1751,
+     "name": "CD.LC",
+     "role": "scope",
+     "start": 1746
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.LC",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1742,
+    "col": 0,
+    "line": 48
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1752,
+    "col": 0,
+    "line": 49
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1752,
+    "col": 0,
+    "line": 49
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/LocalCtx.lean",
+ "messages": [],
+ "mode": "elaborate"
+}
