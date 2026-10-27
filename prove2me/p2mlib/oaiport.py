@@ -640,6 +640,12 @@ STDSIMPLEX_SHIM = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(_
 # workspace; carve_prep config treats its declarations as external)
 STDSIMPLEX_BUNDLE = 'Definitions.Def_OAIStdSimplexCompat'
 STDSIMPLEX_MODULE = 'StdSimplexCompat'
+# `SimplexCategory.toTopHomeo` lands in the subtype here and in the structure in d13f23b: structure
+# mode calls `toTopHomeoD` (module-route only), declared in this module on top of the shim
+STDSIMPLEX_TOP_MODULE = 'StdSimplexTopCompat'
+STDSIMPLEX_TOP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                              'StdSimplexTopCompat.lean')
+_TOPHOMEO = re.compile(r"(?<![\w'])toTopHomeo(_naturality_apply)?(?![\w'])")
 STDSIMPLEX_MODES = ('auto', 'structure', 'subtype', 'off')
 # Mathlib d13f23b files our Mathlib (0df444a) does not have; the shim provides their content
 STDSIMPLEX_MISSING_IMPORTS = tuple('Mathlib.Geometry.Convex.ConvexSpace.' + m for m in (
@@ -688,6 +694,8 @@ def stdsimplex_rewrite(text, mode):
     text = _MISSING_IMPORT.sub('', text)
     if mode == 'subtype':
         text = _SIMPLEX.sub('OAI.SStd', text)
+    elif mode == 'structure':
+        text = _TOPHOMEO.sub(lambda m: 'toTopHomeoD' + (m.group(1) or ''), text)
     return text
 
 
@@ -829,7 +837,10 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
             t = stdsimplex_rewrite(t, smode)
             ls = t.split('\n')
             k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
-            t = '\n'.join(ls[:k] + ['import %s.%s' % (mod, STDSIMPLEX_MODULE)] + ls[k:])
+            imps = ['import %s.%s' % (mod, STDSIMPLEX_MODULE)]
+            if 'toTopHomeoD' in t:
+                imps.append('import %s.%s' % (mod, STDSIMPLEX_TOP_MODULE))
+            t = '\n'.join(ls[:k] + imps + ls[k:])
         ls = t.split('\n')
         k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
         t = '\n'.join(ls[:k] + [''] + (LINT + header).rstrip().split('\n') + ls[k:])
@@ -870,6 +881,8 @@ def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', head
     files['Compat.lean'] = cimp + '\n\n' + compat_block(compat_text, compat_ns)[0]
     if any(('import %s.%s\n' % (mod, STDSIMPLEX_MODULE)) in x for x in files.values()):
         files[STDSIMPLEX_MODULE + '.lean'] = stdsimplex_shim()
+    if any(('import %s.%s\n' % (mod, STDSIMPLEX_TOP_MODULE)) in x for x in files.values()):
+        files[STDSIMPLEX_TOP_MODULE + '.lean'] = open(STDSIMPLEX_TOP, encoding='utf-8').read().replace('@MOD@', mod)
     return files
 
 

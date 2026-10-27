@@ -1249,3 +1249,39 @@ def test_core_rewrites_isometry_antilipschitzWith_is_antilipschitz():
     assert 'Isometry.antilipschitz hf' in out
     assert 'hf.antilipschitzWith' in out  # not an isometry: left alone
     assert O.core_rewrites(out) == out
+
+
+# `SimplexCategory.toTopHomeo` takes the realization of Δ[n] to the subtype `stdSimplex` here and to
+# the structure `Convexity.StdSimplex` in d13f23b (TripleGlobe/Thomason, oaiq-043, 2026-10-27: 22 uses
+# in one module alone, each needing a hand bridge). Ports in structure mode call the shim's
+# `toTopHomeoD` instead, declared in the module StdSimplexTopCompat.
+
+TOPHOMEO_SRC = ('import Mathlib\nnamespace OAI.T\nopen Convexity\n'
+                'def f (n : ℕ) (x : |Δ[n]|) : StdSimplex ℝ (Fin (n + 1)) := (SimplexCategory.mk n).toTopHomeo x\n'
+                'example (j : SimplexCategory) := j.left.toTopHomeo.symm\n'
+                'theorem t := SimplexCategory.toTopHomeo_naturality_apply\n'
+                'def keep := myToTopHomeo\ndef keep2 := toTopHomeoD\nend OAI.T\n')
+
+
+def test_tophomeo_is_renamed_in_structure_mode_only():
+    s = O.stdsimplex_rewrite(TOPHOMEO_SRC, 'structure')
+    assert '(SimplexCategory.mk n).toTopHomeoD x' in s and 'j.left.toTopHomeoD.symm' in s
+    assert 'SimplexCategory.toTopHomeoD_naturality_apply' in s
+    assert 'myToTopHomeo' in s and 'toTopHomeoD' in s and 'toTopHomeoDD' not in s
+    assert 'toTopHomeo ' not in s.replace('toTopHomeoD', '')
+    assert 'toTopHomeo' in O.stdsimplex_rewrite(TOPHOMEO_SRC, 'subtype')
+    assert 'toTopHomeoD_naturality' not in O.stdsimplex_rewrite(TOPHOMEO_SRC, 'subtype')
+
+
+def test_module_route_adds_the_tophomeo_module_where_used():
+    src = {'OAI.G.A': ('A', TOPHOMEO_SRC),
+           'OAI.G.B': ('B', 'import OAI.G.A\nnamespace OAI.G\ndef g (n : ℕ) : StdSimplex ℝ (Fin (n+1)) := default\nend OAI.G\n')}
+    files = O.module_files(src, 'Solutions.G', (), '')
+    assert 'import Solutions.G.StdSimplexTopCompat' in files['A.lean']
+    assert 'StdSimplexTopCompat' not in files['B.lean']
+    top = files['StdSimplexTopCompat.lean']
+    assert 'import Solutions.G.StdSimplexCompat' in top and '@MOD@' not in top
+    assert 'def SimplexCategory.toTopHomeoD' in top and 'theorem SimplexCategory.toTopHomeoD_naturality_apply' in top
+    assert 'sorry' not in top
+    files = O.module_files({'OAI.G.A': ('A', SIMPLEX_SRC)}, 'Solutions.G', (), '')
+    assert 'StdSimplexTopCompat.lean' not in files
