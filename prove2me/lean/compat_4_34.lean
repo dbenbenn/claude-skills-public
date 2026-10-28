@@ -20,6 +20,26 @@ theorem Measurable.of_eval {δ ι : Type*} {π : ι → Type*} [MeasurableSpace 
 theorem _root_.AEMeasurable.of_eval {δ ι : Type*} [Countable ι] {π : ι → Type*} [MeasurableSpace δ]
     [∀ i, MeasurableSpace (π i)] {μ : MeasureTheory.Measure δ} {f : δ → ∀ i, π i}
     (h : ∀ i, AEMeasurable (fun a => f a i) μ) : AEMeasurable f μ := aemeasurable_pi_lambda f h
+/-- Mathlib d13f23b's `LipschitzOnWith.comp_absolutelyContinuousOnInterval`: a Lipschitz function of an
+absolutely continuous one is absolutely continuous (Boltzmann EntropyIntegralBalance and JetSupersolutions,
+oaiq-080). -/
+theorem _root_.LipschitzOnWith.comp_absolutelyContinuousOnInterval {g f : ℝ → ℝ} {s : Set ℝ} {K : NNReal}
+    {a b : ℝ} (hg : LipschitzOnWith K g s) (hmaps : ∀ t ∈ Set.uIcc a b, f t ∈ s)
+    (hf : AbsolutelyContinuousOnInterval f a b) :
+    AbsolutelyContinuousOnInterval (fun t => g (f t)) a b := by
+  have h0 := hf
+  unfold AbsolutelyContinuousOnInterval at h0 ⊢
+  have h1 := h0.const_mul (K : ℝ)
+  rw [mul_zero] at h1
+  refine squeeze_zero' ?_ ?_ h1
+  · exact Filter.Eventually.of_forall (fun E => Finset.sum_nonneg (fun i _ => dist_nonneg))
+  · refine Filter.eventually_inf_principal.2 (Filter.Eventually.of_forall (fun E hE => ?_))
+    rw [Finset.mul_sum]
+    refine Finset.sum_le_sum (fun i hi => ?_)
+    have hi' := hE.left i hi
+    have := hg (hmaps _ hi'.left) (hmaps _ hi'.right)
+    have h2 := ENNReal.toReal_mono (ENNReal.mul_ne_top ENNReal.coe_ne_top (edist_ne_top _ _)) this
+    rwa [ENNReal.toReal_mul, ← dist_edist, ← dist_edist, ENNReal.coe_toReal] at h2
 /-- Mathlib d13f23b's `Finset.equivOfEq`: the equivalence between the subtypes of equal finsets
 (Coboundary CongruenceFrames, 2026-10-26). -/
 def _root_.Finset.equivOfEq {α : Type*} {s t : Finset α} (h : s = t) : s ≃ t :=

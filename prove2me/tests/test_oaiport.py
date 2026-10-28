@@ -2101,3 +2101,11 @@ def test_convert_using_one_ring_gets_an_inequality_fallback():
     assert '(convert neg_le_neg hD using 1 <;> ring) | exact (le_of_eq (by ring)).trans ((neg_le_neg hD).trans' in out2
     # idempotent
     assert O.core_rewrites(out) == out
+
+
+def test_compat_has_lipschitz_comp_absolutely_continuous():
+    # d13f23b's `hC.comp_absolutelyContinuousOnInterval maps hF` (Boltzmann, oaiq-080)
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem _root_.LipschitzOnWith.comp_absolutelyContinuousOnInterval' in src
