@@ -408,6 +408,12 @@ noncomputable def IsUnital.toNormedRing {A : Type*} [NonUnitalNormedRing A] [h :
     natCast_succ := fun n => rfl
     intCast_ofNat := fun n => rfl
     intCast_negSucc := fun n => rfl }
+/-- A closed commutative ⋆-subalgebra of a C⋆-algebra is a commutative C⋆-algebra, found by instance search
+in d13f23b (Kadison similarity, oaiq-075). -/
+noncomputable instance starSubalgebraCommCStarAlgebra {B : Type*} [CStarAlgebra B] (A : StarSubalgebra ℂ B)
+    [IsClosed (A : Set B)] [IsMulCommutative A] : CommCStarAlgebra A :=
+  { StarSubalgebra.cstarAlgebra A with
+    mul_comm := fun a b => IsMulCommutative.is_comm.comm a b }
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod

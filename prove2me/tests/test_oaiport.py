@@ -1717,6 +1717,12 @@ def test_the_compat_block_declares_is_unital():
     assert re.search(r'^noncomputable def IsUnital\.toNormedRing\b', block, re.M)
 
 
+def test_the_compat_block_declares_comm_cstar_subalgebra_instance():
+    # a closed commutative star subalgebra is a `CommCStarAlgebra` (Kadison similarity, oaiq-075)
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^noncomputable instance starSubalgebraCommCStarAlgebra\b', block, re.M)
+
+
 # ---------------------------------------------------------------- the map fallback names its measurability first
 # oaiq-054 (HardSphere), oaiq-061 (Perceptron), oaiq-071 (CoulombAtom), oaiq-072 (SKGap): the chain timed out or hit
 # maxRecDepth where a hypothesis or a lemma of the port proved the map measurable at once. Snippets from the sources.
