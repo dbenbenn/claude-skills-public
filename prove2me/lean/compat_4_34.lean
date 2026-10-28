@@ -523,6 +523,14 @@ theorem _root_.Matrix.posSemidef_is_closed {n : Type*} [Fintype n] :
   refine IsClosed.inter ?_ (isClosed_iInter fun x => ?_)
   · exact isClosed_eq (Continuous.matrix_conjTranspose continuous_id) continuous_id
   · exact isClosed_le continuous_const (by fun_prop)
+section OAIVecLookup
+variable {α : Type _}
+@[simp] theorem vecCons3_one (a b c : α) : (![a, b, c] : Fin 3 → α) 1 = b := rfl
+@[simp] theorem vecCons3_two (a b c : α) : (![a, b, c] : Fin 3 → α) 2 = c := rfl
+@[simp] theorem vecCons4_one (a b c d : α) : (![a, b, c, d] : Fin 4 → α) 1 = b := rfl
+@[simp] theorem vecCons4_two (a b c d : α) : (![a, b, c, d] : Fin 4 → α) 2 = c := rfl
+@[simp] theorem vecCons4_three (a b c d : α) : (![a, b, c, d] : Fin 4 → α) 3 = d := rfl
+end OAIVecLookup
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod

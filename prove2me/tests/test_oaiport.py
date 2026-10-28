@@ -441,6 +441,17 @@ def test_compat_has_walk_length_le_bypass_length_iff():
 
 
 
+def test_compat_has_vector_literal_lookup_simp_lemmas():
+    # `norm_num` (not `simp`) leaves `![a, b, c, d] 2` unevaluated here, which d13f23b evaluates; the compat
+    # block's rfl simp lemmas fix every `fin_cases … <;> norm_num [tables]` site at once (oaiq-091:
+    # ~10 EinsteinFour modules patched by hand before)
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for n in ('vecCons3_two', 'vecCons4_one', 'vecCons4_two', 'vecCons4_three'):
+        assert '@[simp] theorem ' + n in src, n
+
+
 def test_compat_has_matrix_posSemidef_is_closed():
     # d13f23b's `Matrix.posSemidef_is_closed` (EinsteinFour JacobiCompressionLimit, Cavity ports; oaiq-091)
     import os
