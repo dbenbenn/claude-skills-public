@@ -118,6 +118,26 @@ Problem336).** Fix each at the cause; none needs a macro.
   `if True` whose `Decidable` instance is not the standard one (use `↓reduceIte`, oaiq-056); a multi-line `convert … using 1; first | rfl |
   ring` closes only the first goal (use `<;>`) (oaiq-045); `omit [BorelSpace E]` on a lemma that uses stdGaussian
   (oaiq-048).
+- *Rewritten by the port since 2026-10-28* (f6bb691, d0c5d2c, f76350b): the `Measure.map` fallback tries
+  the mapped function's named measurability facts first (a hypothesis about it, or a `foo_measurable` /
+  `measurable_foo` lemma anywhere in the port), then a bounded `infer_instance`, then `AEM_TAC`; also
+  `inferInstanceAs (IsProbabilityMeasure (_.map _))`, `by unfold foo; infer_instance`, and the dot form
+  `μ.map F` where `μ` is bound as a `ProbabilityMeasure`; `MemLp.mul`/`fun_mul`/`mul'` by argument name in our
+  factor order; `Submodule.isTopologicalAddGroup` (now `topologicalAddGroup`), `LinearMap.coe_ofClass`,
+  `Ordinal.lt_wf.induction` (now `WellFoundedLT.induction`, case `ind`), `unifIntegrable_iff.2`,
+  `cgf_gaussianReal`, `isProbabilityMeasure_of_map`, `FiniteMeasure.mass_map_le`, `lintegral_bind_le`,
+  `lintegral_map_le` (compat lemmas with d13f23b's signatures), `simp [ite_true]` gains `if_true` (ours
+  takes only the standard `Decidable True`), `Finset.antidiagonal` outside Hahn-series files. Left by hand:
+  a `measurability` fallback can still hit maxRecDepth when no named fact exists.
+- *Drift verified but not automated* (needs types or a compat lemma): `unifIntegrable_iff.mp`/`.1` (ours has
+  no iff: our `UnifIntegrable` is the real ε-δ, measurable-set, indicator form; a safe special case is
+  `unifIntegrable_iff.mp hf.1` → `hf.unifIntegrable`); `UniformIntegrable` has three components here, two in
+  d13f23b (`.1`/`.2` shift); `HasGaussianLaw` has one field, `isGaussian_map` (drop the `aemeasurable`
+  component of a constructor; `HasGaussianLaw.aemeasurable` is a lemma); `LinearPMap.ker` and its lemmas are
+  gone (`inverse_graph` and friends take `f.toFun.ker = ⊥`); `dite_true` takes only the standard instance;
+  `toSSetObjEquiv` on singular simplices needs a subtype-to-structure bridge in `--stdsimplex auto` (oaiq-066:
+  compose with the homeomorphism and add a naturality lemma; an import of `StdSimplexTopCompat` cannot be
+  patched in, so inline it).
 - *"not type-correct under the `implicit` transparency level"* in `rw`/`simp`/`dsimp` (category theory,
   homological algebra; oaiq-032). Fix per failing module, never as a port default (making
   `backward.isDefEq.respectTransparency false` a header default broke modules that had built: synthInstance and
