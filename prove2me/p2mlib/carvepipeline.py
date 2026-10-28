@@ -493,7 +493,7 @@ class Pipeline:
         self.state['replans'] = n + 1
         # work/repairs.json keys its cuts by file name, and a re-plan renumbers the bundles: the old
         # cuts would be re-applied to other files (oaiq-039: bundle 30 lost two imports it needs)
-        rp = os.path.join(self.d, cfg.get('work') or 'work', 'repairs.json')
+        rp = os.path.join(os.path.expanduser(cfg.get('work') or os.path.join(self.d, 'carve_work')), 'repairs.json')
         if os.path.exists(rp):
             os.replace(rp, rp.replace('repairs.json', 'repairs.before-replan-%d.json' % (n + 1)))
         self.invalidate('plan')
