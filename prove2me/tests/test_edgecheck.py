@@ -123,19 +123,25 @@ def test_drop_records_the_cut_so_it_survives_gen(tmp_path):
     assert M.drop_cuts({'false': ['Theorems.Thm_U'], 'restore': {'Theorems.Thm_U': ['Definitions.Def_S']}}) is None
 
 
-def test_a_false_bundle_import_is_replaced_by_the_bundles_it_brought_in():
-    # a bundle importing a bundle it only needs for that bundle's own imports (oaiq-037 K032 -> K018):
-    # the cut carries the replacement, applies once and survives a re-apply after gen
+def test_a_false_definitions_import_is_reported_not_cut_and_never_fails_the_run():
+    # oaiq-039/075 (2026-10-28): cutting a bundle's false import of another bundle (or replacing it, as
+    # 9d7c60a2 did for oaiq-037) broke files that used it transitively or named its instances in
+    # `attribute [-instance]` lines. Definitions imports are not theorem-graph edges: reported, kept,
+    # and the run does not fail on them; a false `import Theorems.*` still does.
     import carve_measure as M
-    from p2mlib import repair as RP
-    text = 'import Mathlib\nimport Definitions.Def_A\nimport Definitions.Def_B\n\ndef x := 1\n'
-    cuts = M.drop_cuts({'false': ['Definitions.Def_B'],
-                        'restore': {'Definitions.Def_B': ['Definitions.Def_C', 'Definitions.Def_D']}})
-    assert cuts and len(cuts) == 1
-    new, applied, stale = RP.apply_cuts(text, cuts)
-    assert new == ('import Mathlib\nimport Definitions.Def_A\nimport Definitions.Def_C\n'
-                   'import Definitions.Def_D\n\ndef x := 1\n') and applied == cuts and not stale
-    assert M.reapply(new, cuts) == (new, [])
+    assert M.drop_cuts({'false': ['Definitions.Def_B'],
+                        'restore': {'Definitions.Def_B': ['Definitions.Def_C']}}) is None
+    assert M.drop_cuts({'false': ['Definitions.Def_B', 'Theorems.Thm_U'], 'restore': {}}) == ['import Theorems.Thm_U']
+    plan = {'stubs': {'A.u': {}}, 'targets': [], 'external': [], 'statement_suffix': ''}
+    edges = {'bundle:B1': {'file': 'Def_B1.lean', 'false': ['Definitions.Def_B0'],
+                           'imports': {'Definitions.Def_B0': 'false'}, 'restore': {}},
+             'piece:A.u': {'file': 'Sol_A_u.lean', 'false': [], 'imports': {}, 'restore': {}}}
+    rep = M.edge_report(plan, edges)
+    assert [f['graph_edge'] for f in rep['false_edges']] == [False]
+    assert M.failing_false_edges(rep) == []
+    edges['piece:A.u'] = {'file': 'Sol_A_u.lean', 'false': ['Theorems.Thm_A_v'],
+                          'imports': {'Theorems.Thm_A_v': 'false'}, 'restore': {}}
+    assert [f['import'] for f in M.failing_false_edges(M.edge_report(plan, edges))] == ['Theorems.Thm_A_v']
 
 
 def test_recorded_cuts_already_applied_by_gen_are_not_stale():

@@ -36,9 +36,10 @@ carver infers edges partly from source text, and a false one compiles fine and g
 published graph (PosteriorReplicas 2026-10-23). Results are cached by the file's text and its
 checked imports in <work>/edges.json; <work>/false_edges.json lists each false edge (item, file,
 import, the statement it names, a bundle to import instead if any) and the statements no file
-imports any more (orphaned: not a target or forced, so drop them from the plan). Any false edge
-fails the run unless --allow-false-edges. --drop-false-edges cuts each false import that needs no
-replacement, records the cut in <work>/repairs.json (re-applied after every `carve.py gen`, like
+imports any more (orphaned: not a target or forced, so drop them from the plan). A false theorem
+import (`import Theorems.*`, a theorem-graph edge) fails the run unless --allow-false-edges; a false
+definitions import is reported and kept (cutting one broke dependants, oaiq-039/075).
+--drop-false-edges cuts each false theorem import that needs no replacement, records the cut in <work>/repairs.json (re-applied after every `carve.py gen`, like
 the context-command repairs) and re-measures the file.
 """
 import hashlib
@@ -330,27 +331,32 @@ class Measure:
             rep = edge_report(self.plan, {i: e for i, e in self.edges.items() if i in self.times})
             json.dump(rep, open(os.path.join(self.cfg['work'], 'false_edges.json'), 'w'), indent=1)
             print_edge_report(rep)
-            if rep['false_edges'] and not self.allow_false:
+            if failing_false_edges(rep) and not self.allow_false:
                 ok = False
         return ok
 
 
 def drop_cuts(res):
-    """The repair cuts that remove a file's false imports. A false bundle import that brought in
-    bundles the file needs is replaced by them (a cut `import old\\0import new...`, p2mlib.repair);
-    a statement import that needs a bundle in its place is left to a person (None)."""
-    if not res.get('false'):
+    """The repair cuts that remove a file's false theorem imports (`import Theorems.*`, the
+    theorem-graph edges). A false definitions import is left in place: cutting or replacing it broke
+    files that used it transitively or named its instances in `attribute [-instance]` lines (oaiq-039,
+    oaiq-075), and it is no graph edge. A statement import that needs a bundle in its place is left to
+    a person (None)."""
+    graph = [m for m in res.get('false') or () if m.startswith('Theorems.')]
+    if not graph:
         return None
     cuts = []
-    for m in res['false']:
-        back = res.get('restore', {}).get(m)
-        if not back:
-            cuts.append('import ' + m)
-        elif m.startswith('Definitions.') and all(r.startswith('Definitions.') for r in back):
-            cuts.append('import ' + m + '\0' + '\n'.join('import ' + r for r in back))
-        else:
+    for m in graph:
+        if res.get('restore', {}).get(m):
             return None
+        cuts.append('import ' + m)
     return cuts
+
+
+def failing_false_edges(rep):
+    """The false edges that fail a measure: theorem-graph edges only (definitions imports are
+    reported and kept, 2026-10-28)."""
+    return [f for f in rep['false_edges'] if f.get('graph_edge')]
 
 
 def edge_report(plan, edges):
@@ -367,9 +373,12 @@ def edge_report(plan, edges):
             if m in e.get('false', []):
                 fix = ('replace it by `import %s`' % ', '.join(e['restore'][m])) if e.get('restore', {}).get(m) \
                     else 'drop the import line (--drop-false-edges)'
+                graph = m.startswith('Theorems.')
+                if not graph:
+                    fix = 'none needed: a definitions import is no theorem-graph edge (kept)'
                 out.append({'item': item, 'file': e.get('file'), 'import': m, 'verdict': v,
                             'statement': by_module.get(m), 'restore': e.get('restore', {}).get(m, []),
-                            'fix': fix})
+                            'fix': fix, 'graph_edge': graph})
             else:
                 imported.add(m)
                 if v == 'dead':
@@ -385,8 +394,8 @@ def print_edge_report(rep):
     if not rep['false_edges']:
         print('edge check: no false edges', flush=True)
     for f in rep['false_edges']:
-        print('FALSE EDGE %s (%s): import %s [%s]; fix: %s' % (f['item'], f['file'], f['import'],
-                                                            f['verdict'], f['fix']), flush=True)
+        print('%s %s (%s): import %s [%s]; fix: %s' % ('FALSE EDGE' if f.get('graph_edge') else 'unused definitions import',
+                                                    f['item'], f['file'], f['import'], f['verdict'], f['fix']), flush=True)
     for f in rep.get('dead_imports', []):
         print('DEAD IMPORT %s (%s): import %s is used only by declarations `solution` never reaches;'
               ' prune them (prune_solution.py)' % (f['item'], f['file'], f['import']), flush=True)
