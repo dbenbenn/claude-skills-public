@@ -391,3 +391,19 @@ def test_template_forced_gives_a_cost_forced_node_template_prose(tmp_path):
     assert rep['needs_written'] == ['explanation OAI.main (goal)']
     assert 'prose/OAI_Fam_named.md' in rep['written']
     assert 'explanations/OAI_Fam_named.md' in rep['written']
+
+
+def test_check_text_memoizes_name_lookups_across_files():
+    import re as _re
+    local = 'lemma bar_lemma (x : Nat) : x = x := rfl'
+    md = 'The declaration `OAI.Foo.bar_lemma` and `missing_name_xyz`.\n'
+    cache = {}
+    assert CP.missing_names(md, local, lambda n: False, cache=cache) == ['missing_name_xyz']
+    calls = []
+    real = _re.search
+    CP.re.search = lambda *a, **k: (calls.append(1), real(*a, **k))[1]
+    try:
+        assert CP.missing_names(md, local, lambda n: False, cache=cache) == ['missing_name_xyz']
+    finally:
+        CP.re.search = real
+    assert calls == []

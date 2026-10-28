@@ -459,8 +459,10 @@ def stub_comments(texts):
     return sorted(n for n, t in texts.items() if re.search(r'/-|--', t))
 
 
-def missing_names(md_text, local, in_library, skip=(), suffix=''):
-    """The Lean-looking names in backticks found neither in `local` text nor by `in_library`."""
+def missing_names(md_text, local, in_library, skip=(), suffix='', cache=None):
+    """The Lean-looking names in backticks found neither in `local` text nor by `in_library`.
+    `cache` (a dict kept by the caller for one `local`) memoizes the lookup per name: a carve with
+    thousands of prose files otherwise rescans the whole text once per name (oaiq-050)."""
     md_text = re.sub(r'^---\n.*?\n---\n', '', md_text, flags=re.S)      # front matter: source URLs
     md_text = re.sub(r'^```.*?^```[ \t]*$', '', md_text, flags=re.M | re.S)   # fenced Lean: verbatim code
     bad = []
@@ -474,10 +476,16 @@ def missing_names(md_text, local, in_library, skip=(), suffix=''):
             last = nm.split('.')[-1]
             if re.match(r'inst[A-Z]', last):     # an anonymous instance's generated name is never in the source text
                 continue
-            hit = any(re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(x), local) for x in {nm, last}) \
-                or (suffix and re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(last + suffix), local)) \
-                or re.search(r'(?<![\w])%s_p\d+(?![\w\'])' % re.escape(last), local) \
-                or in_library(last)
+            key = (nm, suffix)
+            if cache is not None and key in cache:
+                hit = cache[key]
+            else:
+                hit = any(re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(x), local) for x in {nm, last}) \
+                    or (suffix and re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(last + suffix), local)) \
+                    or re.search(r'(?<![\w])%s_p\d+(?![\w\'])' % re.escape(last), local) \
+                    or in_library(last)
+                if cache is not None:
+                    cache[key] = hit
             if not hit:
                 bad.append(nm)
     return bad
@@ -524,14 +532,14 @@ def cmd_check_text(argv):
             seen[name] = bool(rg) and any(subprocess.run(['rg', '-q', '-w', '-F', name, r], executable=rg).returncode == 0
                                           for r in roots)
         return seen[name]
-    bad = 0
+    bad, name_cache = 0, {}
     for f in sorted(glob.glob(P + '/prose/*.md') + glob.glob(P + '/explanations/*.md')):
         t = open(f, encoding='utf-8').read()
         if '/explanations/' in f:
             for pr in E.problems(t):
                 bad += 1
                 print('EXPLANATION %s: %s' % (os.path.basename(f), pr))
-        for nm in missing_names(t, local, in_library, skip, suffix):
+        for nm in missing_names(t, local, in_library, skip, suffix, cache=name_cache):
             bad += 1
             print('NOT FOUND %s: %s' % (os.path.basename(f), nm))
     stubs = {os.path.basename(f): open(f, encoding='utf-8').read() for f in glob.glob(P + '/out/lib/Thm_*.lean')}
