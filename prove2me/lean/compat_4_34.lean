@@ -176,6 +176,73 @@ instance closedSubmoduleInner {𝕜 E : Type*} [RCLike 𝕜] [NormedAddCommGroup
     (K : ClosedSubmodule 𝕜 E) : InnerProductSpace 𝕜 K :=
   inferInstanceAs (InnerProductSpace 𝕜 K.toSubmodule)
 end Y
+/-- d13f23b's `NonUnitalStarAlgHom.map_le_map_iff`: an injective ⋆-homomorphism of non-unital C⋆-algebras
+reflects the order (Kadison similarity, oaiq-075). -/
+theorem _root_.NonUnitalStarAlgHom.map_le_map_iff {F A B : Type*} [NonUnitalCStarAlgebra A]
+    [NonUnitalCStarAlgebra B] [PartialOrder A] [StarOrderedRing A] [PartialOrder B]
+    [StarOrderedRing B] [FunLike F A B] [NonUnitalAlgHomClass F ℂ A B] [StarHomClass F A B]
+    (φ : F) (hφ : Function.Injective φ) {a b : A} : φ a ≤ φ b ↔ a ≤ b := by
+  refine ⟨fun h => ?_, fun h => ?_⟩
+  · rw [← sub_nonneg] at h ⊢
+    rw [← map_sub] at h
+    generalize b - a = z at h
+    have hsa : IsSelfAdjoint z := by
+      apply hφ
+      rw [map_star]
+      exact IsSelfAdjoint.of_nonneg h
+    let ψ := Unitization.starMap (φ : A →⋆ₙₐ[ℂ] B)
+    have hψ : Function.Injective ψ := Unitization.starMap_injective hφ
+    have hz : 0 ≤ (ψ (z : Unitization ℂ A)) := by
+      rw [Unitization.starMap_inr]
+      exact Unitization.inr_nonneg_iff.mpr h
+    have hsa' : IsSelfAdjoint (z : Unitization ℂ A) := hsa.inr ℂ
+    rw [← Unitization.inr_nonneg_iff]
+    rw [StarOrderedRing.nonneg_iff_spectrum_nonneg (R := ℝ) _ hsa'] 
+    intro x hx
+    have := (StarOrderedRing.nonneg_iff_spectrum_nonneg (R := ℝ) _ (hsa'.map ψ)).mp hz
+    rw [hsa'.map_spectrum_real ψ hψ] at this
+    exact this x hx
+  · exact OrderHomClass.mono φ h
+/-- d13f23b's `IsSelfAdjoint.norm_le_max_of_le_of_le`: a selfadjoint element squeezed between `a` and `b`
+has norm at most `max ‖a‖ ‖b‖` (Kadison similarity, oaiq-075). -/
+theorem _root_.IsSelfAdjoint.norm_le_max_of_le_of_le {A : Type*} [CStarAlgebra A] [PartialOrder A]
+    [StarOrderedRing A] {a b x : A} (hlo : a ≤ x) (hhi : x ≤ b) (hx : IsSelfAdjoint x) :
+    ‖x‖ ≤ max ‖a‖ ‖b‖ := by
+  by_cases! nontriv : Nontrivial A
+  swap
+  · have : x = 0 := Subsingleton.elim _ _
+    simp [this]
+  have hb : IsSelfAdjoint b := by
+    have h1 : IsSelfAdjoint (b - x) := IsSelfAdjoint.of_nonneg (sub_nonneg.mpr hhi)
+    simpa using h1.add hx
+  have ha : IsSelfAdjoint a := by
+    have h1 : IsSelfAdjoint (x - a) := IsSelfAdjoint.of_nonneg (sub_nonneg.mpr hlo)
+    simpa using hx.sub h1
+  have hbx : x ≤ algebraMap ℝ A ‖b‖ := hhi.trans hb.le_algebraMap_norm_self
+  have hax : -(algebraMap ℝ A ‖a‖) ≤ x := ha.neg_algebraMap_norm_le_self.trans hlo
+  rcases CStarAlgebra.norm_or_neg_norm_mem_spectrum hx with h | h
+  · exact ((le_algebraMap_iff_spectrum_le hx).mp hbx _ h).trans (le_max_right _ _)
+  · have hax' : algebraMap ℝ A (-‖a‖) ≤ x := by simpa using hax
+    have := (algebraMap_le_cfc_iff (R := ℝ) id (-‖a‖) x).mp (by rwa [cfc_id ℝ x hx]) _ h
+    simp only [id] at this
+    exact (by linarith : ‖x‖ ≤ ‖a‖).trans (le_max_left _ _)
+/-- d13f23b's `LinearIsometry.completion`: a linear isometry extends to the completions
+(Kadison similarity, oaiq-075). -/
+noncomputable def _root_.LinearIsometry.completion {𝕜 E F : Type*} [NontriviallyNormedField 𝕜]
+    [SeminormedAddCommGroup E] [NormedSpace 𝕜 E] [SeminormedAddCommGroup F] [NormedSpace 𝕜 F]
+    (f : E →ₗᵢ[𝕜] F) :
+    UniformSpace.Completion E →ₗᵢ[𝕜] UniformSpace.Completion F :=
+  { toLinearMap := f.toContinuousLinearMap.completion.toLinearMap
+    norm_map' := by
+      intro x
+      refine UniformSpace.Completion.induction_on x (isClosed_eq (by fun_prop) (by fun_prop)) ?_
+      intro y
+      simp }
+@[simp]
+theorem _root_.LinearIsometry.completion_apply_coe {𝕜 E F : Type*} [NontriviallyNormedField 𝕜]
+    [SeminormedAddCommGroup E] [NormedSpace 𝕜 E] [SeminormedAddCommGroup F] [NormedSpace 𝕜 F]
+    (f : E →ₗᵢ[𝕜] F) (x : E) : f.completion (x : UniformSpace.Completion E) = (f x : UniformSpace.Completion F) :=
+  ContinuousLinearMap.completion_apply_coe f.toContinuousLinearMap x
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod

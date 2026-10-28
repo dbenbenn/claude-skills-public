@@ -1641,3 +1641,13 @@ def test_the_compat_block_declares_extend_of_isometry_and_closed_submodule_norms
     assert re.search(r'^theorem _root_\.LinearMap\.extendOfIsometry_eq\b', block, re.M)
     assert re.search(r'^instance closedSubmoduleNormedAddCommGroup\b', block, re.M)
     assert re.search(r'^instance closedSubmoduleInner\b', block, re.M)
+
+
+def test_the_compat_block_declares_c_star_order_and_completion_lemmas():
+    # d13f23b's `NonUnitalStarAlgHom.map_le_map_iff`, `IsSelfAdjoint.norm_le_max_of_le_of_le` and
+    # `LinearIsometry.completion` (Kadison similarity, oaiq-075); ours has none of them
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^theorem _root_\.NonUnitalStarAlgHom\.map_le_map_iff\b', block, re.M)
+    assert re.search(r'^theorem _root_\.IsSelfAdjoint\.norm_le_max_of_le_of_le\b', block, re.M)
+    assert re.search(r'^noncomputable def _root_\.LinearIsometry\.completion\b', block, re.M)
+    assert re.search(r'^theorem _root_\.LinearIsometry\.completion_apply_coe\b', block, re.M)
