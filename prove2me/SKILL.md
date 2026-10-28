@@ -1280,6 +1280,7 @@ script prints its usage when run with no arguments.
 | `link_mentions.py` | Link the published theorems that a live mission's texts name by their full Lean names. |
 | `live_milestones.py` | Add milestones to a live mission, or edit one, from .md files; a dry run unless --go. |
 | `merge.py` | Concatenate a mission's shared modules into one self-contained prove2.me solution file. |
+| `mkpatches.py` | Port patches from hand-repaired modules: diff the repaired module-route port against the pristine one and write the patches.json entries that reproduce the repairs. |
 | `oai_batch.py` | Port and check many published OAI goals locally, one single-file port each (never submits). |
 | `oai_build_modules.py` | Compile ported modules (oai_port_modules.py) one at a time, -j1, in import order, into the workspace build tree, printing one `lake build`-format line per module with its CPU seconds (what carve.parse_build_log reads); then write the elaboration log the carve cost model wants. |
 | `oai_fetch.py` | Fetch an openai/math module's OAI.* import closure at a commit, into DEST/lean/... (files already there are reused). |
