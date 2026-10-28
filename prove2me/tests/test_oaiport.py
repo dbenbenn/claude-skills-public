@@ -2295,6 +2295,8 @@ def test_smoothness_order_simp_gets_le_top_fallback():
     assert "contDiffOn' (by %s : (k : ℕ∞ω) ≤ ∞) (by %s)" % (fb, fb) in out
     assert "of_le (by %s)).contDiffAt" % fb in out
     assert "have h : 0 < x := by simp\n" in out and "exact foo (by simp)\n" in out
+    out_show = O.core_rewrites("      (show (i : ℕ∞ω) ≤ ∞ by simp)\n    have hn := T.norm_iteratedFDeriv_comp_left h\n")
+    assert "(show (i : ℕ∞ω) ≤ ∞ by first | simp | exact_mod_cast le_top)" in out_show
     assert O.core_rewrites(out) == out
 
 
