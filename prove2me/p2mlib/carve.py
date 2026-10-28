@@ -1550,6 +1550,17 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         byname = {b['name']: b for b in old['bundles']}
         fz_chunks = [[k for k in byname[n]['nodes'] if k in g.nodes] for n in names]
     ext = {g.owner.get(k, k): m for k, m in (external_defs or {}).items()}
+    if frozen:
+        # the frozen bundles import what their own carve took from someone else's published
+        # bundles (its `external_defs`), so this carve does too: otherwise those declarations
+        # become bundle material of this carve, a frozen bundle "needs" them from a new bundle
+        # and the plan has a cycle (oaiq-057: DimensionTen Channel extending oaiq-033's carve,
+        # whose Def_DimensionTenPair this carve's targets do not import; "needs krausMap from
+        # bundle OAIQ033D009, not imported")
+        for k, m in (old.get('external_defs') or {}).items():
+            k = g.owner.get(k, k)
+            if k in g.nodes and k not in ext:
+                ext[k] = m
     for k in ext:
         if k not in g.nodes:
             raise CarveError('unknown external definition %s' % k)

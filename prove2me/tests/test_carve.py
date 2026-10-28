@@ -2043,3 +2043,26 @@ def test_a_used_local_instance_brings_its_prop_partner_on_the_same_carrier():
     sec = _section(C.Carver(g).carve(keep, have), 'CarveDev.LocalCtx')
     assert 'attribute [local instance 3000] CD.LC.actHi\n' in sec, sec
     assert 'CD.LC.towerHi' not in sec and re.search(r'^local instance towerHi_r\w+', sec, re.M), sec
+
+
+def test_extending_a_frozen_carve_keeps_its_external_definitions_external(g, ext_plan):
+    # oaiq-057 (DimensionTen Channel extending oaiq-033's published carve): the first carve took
+    # Mat, krausMap's types, … from Def_DimensionTenPair (its external_defs); the second carve's
+    # targets import only Def_DimensionTenChannel, so those declarations became its own bundle
+    # material, a frozen bundle "needed" them from a new bundle, and `plan` failed ("needs krausMap
+    # from bundle OAIQ033D009, not imported", plus an import cycle). The frozen bundles import the
+    # first carve's external bundle, so the second carve does too.
+    names = [b['name'] for b in ext_plan['bundles']]
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    frozen=(ext_plan, names), bundle_prefix='NEW')
+    assert p['external_defs'] == {'CD.double': 'Definitions.Def_Ext'}
+    assert all('CD.double' not in b['nodes'] for b in p['bundles'])
+    assert [b['name'] for b in p['bundles'][:len(names)]] == names
+    assert C.check_plan(g, p) == []
+    # this carve's own external_defs win over the frozen carve's
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    frozen=(ext_plan, names), bundle_prefix='NEW',
+                    external_defs={'CD.double': 'Definitions.Def_Mine'})
+    assert p['external_defs'] == {'CD.double': 'Definitions.Def_Mine'}
