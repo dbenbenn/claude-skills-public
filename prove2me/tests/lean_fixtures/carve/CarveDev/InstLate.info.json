@@ -439,20 +439,259 @@
      "opener": 0
     }
    ],
-   "declares": [],
+   "decl_kind": "Lean.Parser.Command.abbrev",
+   "declares": [
+    [
+     "CD.LI.NatOpt",
+     "",
+     []
+    ]
+   ],
    "declares_kinds": [],
    "end": {
-    "byte": 461,
-    "col": 9,
+    "byte": 486,
+    "col": 34,
     "line": 14
    },
    "heads": [],
    "idents": [
     {
-     "end": 461,
+     "end": 465,
+     "name": "NatOpt",
+     "role": "decl",
+     "start": 459
+    },
+    {
+     "end": 482,
+     "name": "Option",
+     "role": "ref",
+     "start": 476
+    },
+    {
+     "end": 486,
+     "name": "Nat",
+     "role": "ref",
+     "start": 483
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 465,
+      "col": 13,
+      "line": 14
+     },
+     "start": {
+      "byte": 459,
+      "col": 7,
+      "line": 14
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LI.NatOpt"
+   ],
+   "namespace": "CD.LI",
+   "opens": [],
+   "resolved": [
+    [
+     459,
+     465,
+     "CD.LI.NatOpt",
+     "b"
+    ],
+    [
+     459,
+     465,
+     "",
+     "b"
+    ],
+    [
+     476,
+     482,
+     "Option"
+    ],
+    [
+     483,
+     486,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 452,
+    "col": 0,
+    "line": 14
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 473,
+    "col": 21,
+    "line": 14
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "CD.LI.natOptInhabited",
+     "Inhabited",
+     [
+      "CD.LI.NatOpt"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "doc": {
+    "end": 577,
+    "start": 488
+   },
+   "end": {
+    "byte": 637,
+    "col": 55,
+    "line": 17
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 602,
+     "name": "natOptInhabited",
+     "role": "decl",
+     "start": 587
+    },
+    {
+     "end": 614,
+     "name": "Inhabited",
+     "role": "ref",
+     "start": 605
+    },
+    {
+     "end": 621,
+     "name": "NatOpt",
+     "role": "ref",
+     "start": 615
+    },
+    {
+     "end": 632,
+     "name": "some",
+     "role": "ref",
+     "start": 628
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 602,
+      "col": 24,
+      "line": 17
+     },
+     "start": {
+      "byte": 587,
+      "col": 9,
+      "line": 17
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [
+    "CD.LI.natOptInhabited"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LI.natOptInhabited"
+   ],
+   "namespace": "CD.LI",
+   "opens": [],
+   "resolved": [
+    [
+     587,
+     602,
+     "CD.LI.natOptInhabited",
+     "b"
+    ],
+    [
+     587,
+     602,
+     "",
+     "b"
+    ],
+    [
+     605,
+     614,
+     "Inhabited"
+    ],
+    [
+     615,
+     621,
+     "CD.LI.NatOpt"
+    ],
+    [
+     628,
+     632,
+     "Option.some"
+    ]
+   ],
+   "sig_insts": [
+    "CD.LI.natOptInhabited"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 488,
+    "col": 0,
+    "line": 16
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 622,
+    "col": 44,
+    "line": 17
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 648,
+    "col": 9,
+    "line": 19
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 648,
      "name": "CD.LI",
      "role": "scope",
-     "start": 456
+     "start": 643
     }
    ],
    "ids": [],
@@ -467,9 +706,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 452,
+    "byte": 639,
     "col": 0,
-    "line": 14
+    "line": 19
    },
    "used_keys": []
   },
@@ -484,9 +723,9 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 462,
+    "byte": 649,
     "col": 0,
-    "line": 15
+    "line": 20
    },
    "heads": [],
    "idents": [],
@@ -502,9 +741,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 462,
+    "byte": 649,
     "col": 0,
-    "line": 15
+    "line": 20
    },
    "used_keys": []
   }

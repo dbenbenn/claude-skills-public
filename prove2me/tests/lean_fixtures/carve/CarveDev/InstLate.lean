@@ -11,4 +11,9 @@ instance boxInhabited : Inhabited Box := ⟨⟨7⟩⟩
 
 def defaultBox : Box := default
 
+abbrev NatOpt : Type := Option Nat
+
+/-- An instance on an abbrev of a library type: InstBase's `opt_default` never saw it. -/
+instance natOptInhabited : Inhabited NatOpt := ⟨some 7⟩
+
 end CD.LI

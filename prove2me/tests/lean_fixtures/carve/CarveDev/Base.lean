@@ -115,6 +115,17 @@ theorem aux_eq : AUX = 1 := rfl
 
 end CD.Aux
 
+/- PeriodicLattice (oaiq-067): a module's own `@[simp]` rfl lemma about library constants only,
+used by a later `simp` through the default simp set: dsimp-style, so no term names it, and no
+constant of its statement is the project's. -/
+namespace CD
+@[simp] theorem lcm23 : Nat.lcm 2 3 = 6 := rfl
+
+theorem uses_lcm23 (n : Nat) : n + Nat.lcm 2 3 = n + 6 := by simp
+
+theorem uses_lcm23_only (n : Nat) : n + 0 = n := by simp only [Nat.add_zero]
+end CD
+
 /- A scoped notation: its namespace exists only once this module's text is in force, so whatever
 opens it must see the bundle that carries the notation (Erdős 3 v2: `open scoped Indicator`). -/
 namespace CDScope

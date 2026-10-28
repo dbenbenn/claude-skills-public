@@ -2723,8 +2723,10 @@ class Carver:
           command again, under a name unique to this file, after the earlier local instances its
           own elaboration used (the same rules, recursively: Lech oaiq-032, a re-emitted
           `baseAlgebra_r…` came before the `concreteRing` its statement needs).
-        A local instance on the same type (argument heads) as one c used comes back with it
-        (`_sibling_used`). `chain`: the scope the emitted text lands in (c's, or the kept
+        A local instance on the same type (argument heads) as one c used, or of the same class,
+        comes back with it (`_sibling_used`), and so does one whose type mentions a declaration c
+        uses (`_carrier_used`), unless a kept instance of its class between it and c would then
+        lose to it (`_overtakes`). `chain`: the scope the emitted text lands in (c's, or the kept
         command's when re-emitting what a re-emitted instance needs)."""
         g = self.g
         if chain is None:
@@ -2742,7 +2744,9 @@ class Carver:
                 names = {x[0] for x in vc.declares or ()} or set(g.nodes[ik0].names if ik0 else ())
                 keys = {'key:' + ' '.join([x[1]] + list(x[2])) for x in vc.declares or () if x[1]}
                 if not (names | keys) & used and not (not sorried and _could_answer(vc, c)):
-                    if not self._sibling_used(info, vc, c, used):
+                    if not (self._sibling_used(info, vc, c, used) or
+                            self._carrier_used(info, vc, c, m, sorried)) or \
+                            self._overtakes(info, vc, c, drop):
                         continue
                     sibling = True
             # ik None: a local instance that is nobody's node. An instance of a Prop class is a
@@ -2790,23 +2794,57 @@ class Carver:
     def _sibling_used(self, info, vc, c, used):
         """Did command c use another local instance of its module, in scope at c, of another class
         on the same carrier as local instance vc (a type among the argument heads of both, LeanInfo
-        `declares`)? Then vc comes back too: both were in force in the port, and a use of vc can
-        leave no record (Thomason oaiq-043: `local instance : Fintype (OrdinalVertices n)` beside the
-        kept `LinearOrder` one on that synonym; partialLastVertex needed it, though neither its
-        constants, `insts` nor `inst_keys` show a Fintype problem; Auslander–Reiten oaiq-031: the
-        Prop partner `IsScalarTower k A M` of a used `Module k M`, whose heads list A and the
-        instances too, never named by a term, "failed to synthesize SMulCommClass k R …")."""
+        `declares`), or of vc's own class? Then vc comes back too: both were in force in the port,
+        and a use of vc can leave no record (Thomason oaiq-043: `local instance : Fintype
+        (OrdinalVertices n)` beside the kept `LinearOrder` one on that synonym; partialLastVertex
+        needed it, though neither its constants, `insts` nor `inst_keys` show a Fintype problem;
+        Auslander–Reiten oaiq-031: the Prop partner `IsScalarTower k A M` of a used `Module k M`,
+        whose heads list A and the instances too, never named by a term, "failed to synthesize
+        SMulCommClass k R …"; SharpRamsey oaiq-060: `BDE : DecidableEq (Fin w × Bool)` beside the
+        used `IDE : DecidableEq (Slots w n)` and `TDE`, all `Classical.decEq _`, BDE's use replaced
+        by a defeq instance in the statement's term, which then failed "synthesized type class
+        instance is not definitionally equal"). Same-class siblings come back in their source
+        order, so the one that won in the port still wins (`_overtakes` guards a kept one)."""
         classes = {x[1] for x in vc.declares or () if x[1]}
-        mine = self._carriers(info, [h for x in vc.declares or () if x[1] for h in x[2]])
-        if not mine:
+        if not classes:
             return False
+        mine = self._carriers(info, [h for x in vc.declares or () if x[1] for h in x[2]])
         for c2 in info.commands[:c.index]:
             if c2.index == vc.index or not _in_scope(info, c2.index, c) or \
                     not _local_instance(info, c2)[0]:
                 continue
-            # not one of vc's own class: emitted before c, vc would take priority over the one c used
-            if any(x[1] and x[1] not in classes and x[0] in used and mine & self._carriers(info, x[2])
-                   for x in c2.declares or ()):
+            for x in c2.declares or ():
+                if not x[1] or x[0] not in used:
+                    continue
+                if x[1] in classes or (mine and mine & self._carriers(info, x[2])):
+                    return True
+        return False
+
+    def _carrier_used(self, info, vc, c, m, sorried):
+        """Does local instance vc's type mention a project declaration (not its class) that kept
+        command c uses (a stub: its statement)? Then vc comes back: it was in force there in the
+        port, and its use can leave no instance constant (SimpleOvergroups oaiq-066: a `CoeFun` on
+        `FunctionalTree.diagonalRep`, unfolded by coercion elaboration, "Function expected at
+        ↑(diagonalRep A)"; `Primcodable (Symbols k i)` on an abbrev, whose problem the record shows
+        as `Encodable (Source.Symbols …)`; Thomason oaiq-043 the same)."""
+        g = self.g
+        k = g.cmd_node.get((m, c.index))
+        ik = g.cmd_node.get((m, vc.index))
+        if not k or not ik:
+            return False
+        classes = {x[1] for x in vc.declares or () if x[1]}
+        mention = {x for x in g.nodes[ik].tdeps - {ik} - classes
+                   if x in g.nodes and not g.nodes[x].instance and not g.is_local_instance(x)}
+        nd = g.nodes[k]
+        return bool(mention & (nd.sig if sorried else nd.deps | nd.sig))
+
+    @staticmethod
+    def _overtakes(info, vc, c, drop):
+        """Would local instance vc, put back in force just before c, take priority over a kept
+        instance of its class that the port declared after it (and so preferred)?"""
+        classes = {x[1] for x in vc.declares or () if x[1]}
+        for c2 in info.commands[vc.index + 1:c.index]:
+            if c2.index not in drop and any(x[1] in classes for x in c2.declares or ()):
                 return True
         return False
 

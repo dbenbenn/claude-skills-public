@@ -45,4 +45,29 @@ local instance towerHi (n : Nat) : Tower Nat (Wc n) := ⟨fun _ => rfl⟩
 theorem tower_use (n : Nat) (a : Wc n) : Act.act 0 a = a ∧ needsTower (Wc n) = 0 := ⟨rfl, rfl⟩
 end
 
+section
+/- SharpRamsey (oaiq-060): same-class local instances; the statement's record names only one. -/
+class Dq (α : Type) where
+  d : Nat
+
+local instance dqPair : Dq (Nat × Bool) := ⟨1⟩
+local instance dqW (n : Nat) : Dq (Wc n) := ⟨2⟩
+
+theorem dq_use (n : Nat) : Dq.d (Wc n) = 2 ∧ Dq.d (Nat × Bool) = 1 := ⟨rfl, rfl⟩
+
+instance dqNat : Dq Nat := ⟨0⟩
+
+theorem dq_use_late (n : Nat) : Dq.d (Wc n) = 2 ∧ Dq.d (Nat × Bool) = 1 := ⟨rfl, rfl⟩
+end
+
+section
+/- SimpleOvergroups (oaiq-066): a local `CoeFun` on a type synonym; coercion elaboration unfolds
+it, so no constant and no instance problem of `wcfn_apply` names it ("Function expected"). -/
+def WcFn (n : Nat) : Type := Wc n
+
+local instance (n : Nat) : CoeFun (WcFn n) (fun _ => Nat → Nat) := ⟨fun w k => Wc.x w + k⟩
+
+theorem wcfn_apply (n : Nat) (w : WcFn n) : w 3 = Wc.x w + 3 := rfl
+end
+
 end CD.LC

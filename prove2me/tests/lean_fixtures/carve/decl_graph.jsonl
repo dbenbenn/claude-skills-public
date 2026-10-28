@@ -16,6 +16,7 @@
 {"i":false,"k":"ctor","m":"CarveDev.InstColA","n":"CD.IC.R.mk","p":false,"r":[14,10,14,11],"s":false,"t":["CD.IC.R"],"u":[],"v":[]}
 {"i":false,"k":"ctor","m":"CarveDev.InstColA","n":"CD.IC.Zeroish.mk","p":false,"r":[17,6,17,13],"s":false,"t":["CD.IC.Zeroish"],"u":[],"v":[]}
 {"i":false,"k":"ctor","m":"CarveDev.LocalCtx","n":"CD.LC.Act.mk","p":false,"r":[20,6,20,9],"s":false,"t":["CD.LC.Act"],"u":[],"v":[]}
+{"i":false,"k":"ctor","m":"CarveDev.LocalCtx","n":"CD.LC.Dq.mk","p":false,"r":[50,6,50,8],"s":false,"t":["CD.LC.Dq"],"u":[],"v":[]}
 {"i":false,"k":"ctor","m":"CarveDev.LocalCtx","n":"CD.LC.Tower.mk","p":true,"r":[23,6,23,11],"s":false,"t":["CD.LC.Act","CD.LC.Tower","CD.LC.Act.act"],"u":[],"v":[]}
 {"i":false,"k":"ctor","m":"CarveDev.LocalCtx","n":"CD.LC.Wc.mk","p":false,"r":[17,10,17,12],"s":false,"t":["CD.LC.Wc"],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Alt","n":"CD.List.headOr","p":false,"r":[5,0,6,51],"s":false,"t":[],"u":[],"v":[]}
@@ -49,8 +50,8 @@
 {"i":false,"k":"def","m":"CarveDev.Base","n":"CD.pred","p":false,"r":[41,0,42,29],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"CD.unusedDef","p":false,"r":[23,0,23,24],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"CD.usesSorried","p":false,"r":[30,0,30,62],"s":false,"t":[],"u":[],"v":["CD.double","CD.sorried"]}
-{"i":false,"k":"def","m":"CarveDev.Base","n":"CDScope.anchor","p":false,"r":[122,0,123,21],"s":false,"t":[],"u":[],"v":[]}
-{"i":false,"k":"def","m":"CarveDev.Base","n":"CDScope.«term⟪_⟫»","p":false,"r":[121,0,121,40],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.Base","n":"CDScope.anchor","p":false,"r":[133,0,134,21],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.Base","n":"CDScope.«term⟪_⟫»","p":false,"r":[132,0,132,40],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"_private.CarveDev.Base.0.CD.Aux._aux_CarveDev_Base___macroRules__private_CarveDev_Base_0_CD_Aux_termAUX_1","p":false,"r":[110,0,110,31],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"_private.CarveDev.Base.0.CD.Aux._aux_CarveDev_Base___unexpand_CD_Aux_auxOnly_1","p":false,"r":[110,0,110,31],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"_private.CarveDev.Base.0.CD.Aux.termAUX","p":false,"r":[110,0,110,31],"s":false,"t":[],"u":[],"v":[]}
@@ -169,6 +170,7 @@
 {"i":false,"k":"def","m":"CarveDev.InstColA","n":"_private.CarveDev.InstColA.0.CD.IC.zeroR","p":false,"r":[23,0,23,63],"s":false,"t":["CD.IC.R","CD.IC.Zeroish"],"u":[],"v":["CD.IC.R","CD.IC.R.mk","CD.IC.Zeroish.mk"]}
 {"i":false,"k":"def","m":"CarveDev.InstColB","n":"_private.CarveDev.InstColB.0.CD.IC.oneR","p":false,"r":[6,0,6,61],"s":false,"t":["CD.IC.Oneish","CD.IC.R","_private.CarveDev.InstColB.0.CD.IC.zeroR"],"u":[],"v":["CD.IC.R","_private.CarveDev.InstColB.0.CD.IC.zeroR","CD.IC.Oneish.mk","CD.IC.R.mk"]}
 {"i":false,"k":"def","m":"CarveDev.InstColB","n":"_private.CarveDev.InstColB.0.CD.IC.zeroR","p":false,"r":[5,0,5,63],"s":false,"t":["CD.IC.R","CD.IC.Zeroish"],"u":[],"v":["CD.IC.R","CD.IC.R.mk","CD.IC.Zeroish.mk"]}
+{"i":false,"k":"def","m":"CarveDev.InstLate","n":"CD.LI.NatOpt","p":false,"r":[14,0,14,34],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.InstLate","n":"CD.LI.defaultBox","p":false,"r":[12,0,12,31],"s":false,"t":["CD.LI.Box"],"u":[],"v":["CD.LI.Box","CD.LI.boxInhabited"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Act.act","p":false,"r":[21,2,21,5],"s":false,"t":["CD.LC.Act"],"u":[],"v":["CD.LC.Act"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Act.casesOn","p":false,"r":[20,0,21,19],"s":false,"t":["CD.LC.Act","CD.LC.Act.mk"],"u":["u"],"v":["CD.LC.Act","CD.LC.Act.mk","CD.LC.Act.rec"]}
@@ -177,6 +179,13 @@
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Act.noConfusion","p":false,"r":[20,0,21,19],"s":false,"t":["CD.LC.Act","CD.LC.Act.noConfusionType"],"u":["u"],"v":["CD.LC.Act","CD.LC.Act.casesOn","CD.LC.Act.noConfusionType"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Act.noConfusionType","p":false,"r":null,"s":false,"t":["CD.LC.Act"],"u":["u"],"v":["CD.LC.Act","CD.LC.Act.casesOn"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Act.recOn","p":false,"r":[20,0,21,19],"s":false,"t":["CD.LC.Act","CD.LC.Act.mk"],"u":["u"],"v":["CD.LC.Act","CD.LC.Act.mk","CD.LC.Act.rec"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Dq.casesOn","p":false,"r":[50,0,51,9],"s":false,"t":["CD.LC.Dq","CD.LC.Dq.mk"],"u":["u"],"v":["CD.LC.Dq","CD.LC.Dq.mk","CD.LC.Dq.rec"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Dq.ctorIdx","p":false,"r":null,"s":false,"t":["CD.LC.Dq"],"u":[],"v":["CD.LC.Dq"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Dq.d","p":false,"r":[51,2,51,3],"s":false,"t":["CD.LC.Dq"],"u":[],"v":["CD.LC.Dq"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Dq.mk.noConfusion","p":false,"r":[50,6,50,8],"s":false,"t":["CD.LC.Dq","CD.LC.Dq.mk"],"u":["u"],"v":["CD.LC.Dq","CD.LC.Dq.mk","CD.LC.Dq.noConfusion"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Dq.noConfusion","p":false,"r":[50,0,51,9],"s":false,"t":["CD.LC.Dq","CD.LC.Dq.noConfusionType"],"u":["u"],"v":["CD.LC.Dq","CD.LC.Dq.casesOn","CD.LC.Dq.noConfusionType"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Dq.noConfusionType","p":false,"r":null,"s":false,"t":["CD.LC.Dq"],"u":["u"],"v":["CD.LC.Dq","CD.LC.Dq.casesOn"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Dq.recOn","p":false,"r":[50,0,51,9],"s":false,"t":["CD.LC.Dq","CD.LC.Dq.mk"],"u":["u"],"v":["CD.LC.Dq","CD.LC.Dq.mk","CD.LC.Dq.rec"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Opp","p":false,"r":[15,0,15,30],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Tower.casesOn","p":false,"r":[23,0,24,31],"s":false,"t":["CD.LC.Act","CD.LC.Tower","CD.LC.Act.act","CD.LC.Tower.mk"],"u":["u"],"v":["CD.LC.Act","CD.LC.Tower","CD.LC.Act.act","CD.LC.Tower.mk","CD.LC.Tower.rec"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Tower.recOn","p":false,"r":[23,0,24,31],"s":false,"t":["CD.LC.Act","CD.LC.Tower","CD.LC.Act.act","CD.LC.Tower.mk"],"u":["u"],"v":["CD.LC.Act","CD.LC.Tower","CD.LC.Act.act","CD.LC.Tower.mk","CD.LC.Tower.rec"]}
@@ -187,8 +196,12 @@
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Wc.noConfusionType","p":false,"r":null,"s":false,"t":["CD.LC.Wc"],"u":["u"],"v":["CD.LC.Wc","CD.LC.Wc.casesOn"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Wc.recOn","p":false,"r":[17,0,18,9],"s":false,"t":["CD.LC.Wc","CD.LC.Wc.mk"],"u":["u"],"v":["CD.LC.Wc","CD.LC.Wc.mk","CD.LC.Wc.rec"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.Wc.x","p":false,"r":[18,2,18,3],"s":false,"t":["CD.LC.Wc"],"u":[],"v":["CD.LC.Wc"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.WcFn","p":false,"r":[66,0,66,33],"s":false,"t":[],"u":[],"v":["CD.LC.Wc"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.actHi","p":false,"r":[42,0,42,80],"s":false,"t":["CD.LC.Act","CD.LC.Wc"],"u":[],"v":["CD.LC.Wc","CD.LC.Act.mk"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.actLo","p":false,"r":[40,0,40,75],"s":false,"t":["CD.LC.Act","CD.LC.Wc"],"u":[],"v":["CD.LC.Wc","CD.LC.Act.mk","CD.LC.Wc.mk","CD.LC.Wc.x"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.dqPair","p":false,"r":[53,0,53,46],"s":false,"t":["CD.LC.Dq"],"u":[],"v":["CD.LC.Dq.mk"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.dqW","p":false,"r":[54,0,54,47],"s":false,"t":["CD.LC.Dq","CD.LC.Wc"],"u":[],"v":["CD.LC.Wc","CD.LC.Dq.mk"]}
+{"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.instCoeFunWcFnForallNat","p":false,"r":[68,0,68,90],"s":false,"t":["CD.LC.WcFn"],"u":[],"v":["CD.LC.WcFn","CD.LC.Wc.x"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.needsTower","p":false,"r":[26,0,26,58],"s":false,"t":["CD.LC.Act","CD.LC.Tower"],"u":[],"v":["CD.LC.Act","CD.LC.Tower"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.oppSelf","p":false,"r":[32,0,32,32],"s":false,"t":["CD.LC.Opp","CD.LC.Wc"],"u":[],"v":["CD.LC.Opp","CD.LC.Wc"]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.plainC","p":false,"r":[36,0,36,31],"s":false,"t":["CD.LC.Wc"],"u":[],"v":["CD.LC.Wc","CD.LC.Wc.x"]}
@@ -233,6 +246,7 @@
 {"i":false,"k":"inductive","m":"CarveDev.InstColA","n":"CD.IC.R","p":false,"r":[14,0,15,9],"s":false,"t":[],"u":[],"v":["CD.IC.R.mk"]}
 {"i":false,"k":"inductive","m":"CarveDev.InstColA","n":"CD.IC.Zeroish","p":false,"r":[17,0,18,7],"s":false,"t":[],"u":[],"v":["CD.IC.Zeroish.mk"]}
 {"i":false,"k":"inductive","m":"CarveDev.LocalCtx","n":"CD.LC.Act","p":false,"r":[20,0,21,19],"s":false,"t":[],"u":[],"v":["CD.LC.Act.mk"]}
+{"i":false,"k":"inductive","m":"CarveDev.LocalCtx","n":"CD.LC.Dq","p":false,"r":[50,0,51,9],"s":false,"t":[],"u":[],"v":["CD.LC.Dq.mk"]}
 {"i":false,"k":"inductive","m":"CarveDev.LocalCtx","n":"CD.LC.Tower","p":false,"r":[23,0,24,31],"s":false,"t":["CD.LC.Act"],"u":[],"v":["CD.LC.Tower.mk"]}
 {"i":false,"k":"inductive","m":"CarveDev.LocalCtx","n":"CD.LC.Wc","p":false,"r":[17,0,18,9],"s":false,"t":[],"u":[],"v":["CD.LC.Wc.mk"]}
 {"i":false,"k":"rec","m":"CarveDev.Base","n":"CD.Space.rec","p":false,"r":[10,0,13,14],"s":false,"t":["CD.Space","CD.Space.mk"],"u":["u"],"v":[]}
@@ -252,6 +266,7 @@
 {"i":false,"k":"rec","m":"CarveDev.InstColA","n":"CD.IC.R.rec","p":false,"r":[14,0,15,9],"s":false,"t":["CD.IC.R","CD.IC.R.mk"],"u":["u"],"v":[]}
 {"i":false,"k":"rec","m":"CarveDev.InstColA","n":"CD.IC.Zeroish.rec","p":false,"r":[17,0,18,7],"s":false,"t":["CD.IC.Zeroish","CD.IC.Zeroish.mk"],"u":["u"],"v":[]}
 {"i":false,"k":"rec","m":"CarveDev.LocalCtx","n":"CD.LC.Act.rec","p":false,"r":[20,0,21,19],"s":false,"t":["CD.LC.Act","CD.LC.Act.mk"],"u":["u"],"v":[]}
+{"i":false,"k":"rec","m":"CarveDev.LocalCtx","n":"CD.LC.Dq.rec","p":false,"r":[50,0,51,9],"s":false,"t":["CD.LC.Dq","CD.LC.Dq.mk"],"u":["u"],"v":[]}
 {"i":false,"k":"rec","m":"CarveDev.LocalCtx","n":"CD.LC.Tower.rec","p":false,"r":[23,0,24,31],"s":false,"t":["CD.LC.Act","CD.LC.Tower","CD.LC.Act.act","CD.LC.Tower.mk"],"u":["u"],"v":[]}
 {"i":false,"k":"rec","m":"CarveDev.LocalCtx","n":"CD.LC.Wc.rec","p":false,"r":[17,0,18,9],"s":false,"t":["CD.LC.Wc","CD.LC.Wc.mk"],"u":["u"],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Alt","n":"CD.List.headOr_nil","p":true,"r":[8,0,8,41],"s":false,"t":["CD.List.headOr"],"u":[],"v":["CD.List.headOr"]}
@@ -265,6 +280,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.Wide.mk.injEq","p":true,"r":null,"s":false,"t":["CD.Wide","CD.Wide.mk"],"u":[],"v":["CD.Wide","CD.Wide.mk","CD.Wide.mk.inj"]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.Wide.mk.sizeOf_spec","p":true,"r":null,"s":false,"t":["CD.Wide","CD.Wide.mk","CD.Wide.rec"],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.double_eq","p":true,"r":[21,0,21,53],"s":false,"t":["CD.double"],"u":[],"v":["CD.double"]}
+{"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.lcm23","p":true,"r":[122,0,122,46],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.natAbs_cd","p":true,"r":[57,0,60,60],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.no_inst_use","p":true,"r":[73,0,75,42],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.sorried","p":true,"r":[27,0,28,39],"s":true,"t":["CD.double"],"u":[],"v":["CD.double"]}
@@ -272,6 +288,8 @@
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.unused_thm","p":true,"r":[25,0,25,41],"s":false,"t":["CD.unusedDef"],"u":[],"v":["CD.unusedDef"]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.uses_hdef","p":true,"r":[81,0,81,50],"s":false,"t":["CD.Wide","CD.cdLocalInst","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.cdLocalInst","CD.Wide.w"]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.uses_hdef2","p":true,"r":[91,0,91,52],"s":false,"t":["CD.Wide","CD.cdLocalInst2","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.cdLocalInst2","CD.Wide.w"]}
+{"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.uses_lcm23","p":true,"r":[124,0,124,65],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.uses_lcm23_only","p":true,"r":[126,0,126,76],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.uses_local_inst","p":true,"r":[72,0,72,55],"s":false,"t":["CD.Wide","CD.cdLocalInst","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.cdLocalInst","CD.Wide.w"]}
 {"i":false,"k":"theorem","m":"CarveDev.Coer","n":"CD.Co.Fn.mk.inj","p":true,"r":null,"s":false,"t":["CD.Co.Fn","CD.Co.Fn.mk"],"u":[],"v":["CD.Co.Fn","CD.Co.Fn.mk","CD.Co.Fn.mk.noConfusion"]}
 {"i":false,"k":"theorem","m":"CarveDev.Coer","n":"CD.Co.Fn.mk.injEq","p":true,"r":null,"s":false,"t":["CD.Co.Fn","CD.Co.Fn.mk"],"u":[],"v":["CD.Co.Fn","CD.Co.Fn.mk","CD.Co.Fn.mk.inj"]}
@@ -326,6 +344,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.box_default","p":true,"r":[48,0,50,50],"s":false,"t":["CD.LI.Box","CD.LI.boxInhabitedA","CD.LI.Box.b"],"u":[],"v":["CD.LI.Box","CD.LI.boxInhabitedA","CD.LI.Box.b"]}
 {"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.box_default_local","p":true,"r":[52,0,54,90],"s":false,"t":["CD.LI.Box","CD.LI.Box.b","CD.LI.Box.get"],"u":[],"v":["CD.LI.Box","CD.LI.Box.get"]}
 {"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.box_get","p":true,"r":[41,0,41,46],"s":false,"t":["CD.LI.Box","CD.LI.Box.b","CD.LI.Box.get"],"u":[],"v":["CD.LI.Box","CD.LI.Box.get"]}
+{"i":false,"k":"theorem","m":"CarveDev.InstBase","n":"CD.LI.opt_default","p":true,"r":[56,0,59,58],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.InstColA","n":"CD.IC.R.mk.inj","p":true,"r":null,"s":false,"t":["CD.IC.R","CD.IC.R.mk"],"u":[],"v":["CD.IC.R","CD.IC.R.mk","CD.IC.R.mk.noConfusion"]}
 {"i":false,"k":"theorem","m":"CarveDev.InstColA","n":"CD.IC.R.mk.injEq","p":true,"r":null,"s":false,"t":["CD.IC.R","CD.IC.R.mk"],"u":[],"v":["CD.IC.R","CD.IC.R.mk","CD.IC.R.mk.inj"]}
 {"i":false,"k":"theorem","m":"CarveDev.InstColA","n":"CD.IC.R.mk.sizeOf_spec","p":true,"r":null,"s":false,"t":["CD.IC.R","CD.IC.R.mk","CD.IC.R.rec"],"u":[],"v":[]}
@@ -337,9 +356,12 @@
 {"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.Wc.mk.inj","p":true,"r":null,"s":false,"t":["CD.LC.Wc","CD.LC.Wc.mk"],"u":[],"v":["CD.LC.Wc","CD.LC.Wc.mk","CD.LC.Wc.mk.noConfusion"]}
 {"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.Wc.mk.injEq","p":true,"r":null,"s":false,"t":["CD.LC.Wc","CD.LC.Wc.mk"],"u":[],"v":["CD.LC.Wc","CD.LC.Wc.mk","CD.LC.Wc.mk.inj"]}
 {"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.Wc.mk.sizeOf_spec","p":true,"r":null,"s":false,"t":["CD.LC.Wc","CD.LC.Wc.mk","CD.LC.Wc.rec"],"u":[],"v":[]}
+{"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.dq_use","p":true,"r":[56,0,56,80],"s":false,"t":["CD.LC.Wc","CD.LC.dqPair","CD.LC.dqW","CD.LC.Dq.d"],"u":[],"v":["CD.LC.Wc","CD.LC.dqPair","CD.LC.dqW","CD.LC.Dq.d"]}
+{"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.dq_use_late","p":true,"r":[60,0,60,85],"s":false,"t":["CD.LC.Wc","CD.LC.dqPair","CD.LC.dqW","CD.LC.Dq.d"],"u":[],"v":["CD.LC.Wc","CD.LC.dqPair","CD.LC.dqW","CD.LC.Dq.d"]}
 {"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.oppSelf_eq","p":true,"r":[34,0,34,51],"s":false,"t":["CD.LC.Opp","CD.LC.Wc","CD.LC.oppSelf"],"u":[],"v":["CD.LC.Opp","CD.LC.Wc","CD.LC.oppSelf"]}
 {"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.towerHi","p":true,"r":[43,0,43,69],"s":false,"t":["CD.LC.Tower","CD.LC.Wc","CD.LC.actHi"],"u":[],"v":["CD.LC.Wc","CD.LC.actHi","CD.LC.Act.act","CD.LC.Tower.mk"]}
 {"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.tower_use","p":true,"r":[45,0,45,94],"s":false,"t":["CD.LC.Wc","CD.LC.actHi","CD.LC.needsTower","CD.LC.towerHi","CD.LC.Act.act"],"u":[],"v":["CD.LC.Wc","CD.LC.actHi","CD.LC.needsTower","CD.LC.towerHi","CD.LC.Act.act"]}
+{"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.wcfn_apply","p":true,"r":[70,0,70,67],"s":false,"t":["CD.LC.WcFn","CD.LC.Wc.x"],"u":[],"v":["CD.LC.WcFn","CD.LC.Wc.x"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.NoteNs.uses_x","p":true,"r":[164,0,164,33],"s":false,"t":["CD.Wide","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.Wide.w"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.Space.cd_unused_simp","p":true,"r":[120,0,124,21],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.Space.coord_eq","p":true,"r":[12,0,12,55],"s":false,"t":["CD.Space","CD.Space.coord"],"u":[],"v":["CD.Space","CD.Space.coord"]}
@@ -376,6 +398,8 @@
 {"i":true,"k":"def","m":"CarveDev.InstBase","n":"CD.Ex.instCodingNat","p":false,"r":[23,0,23,29],"s":false,"t":["CD.Ex.Coding"],"u":[],"v":["CD.Ex.Coding.mk"]}
 {"i":true,"k":"def","m":"CarveDev.InstBase","n":"CD.LI.boxInhabitedA","p":false,"r":[46,0,46,47],"s":false,"t":["CD.LI.Box"],"u":[],"v":["CD.LI.Box","CD.LI.Box.mk"]}
 {"i":true,"k":"def","m":"CarveDev.InstLate","n":"CD.LI.boxInhabited","p":false,"r":[9,0,10,46],"s":false,"t":["CD.LI.Box"],"u":[],"v":["CD.LI.Box","CD.LI.Box.mk"]}
+{"i":true,"k":"def","m":"CarveDev.InstLate","n":"CD.LI.natOptInhabited","p":false,"r":[16,0,17,55],"s":false,"t":["CD.LI.NatOpt"],"u":[],"v":["CD.LI.NatOpt"]}
+{"i":true,"k":"def","m":"CarveDev.LocalCtx","n":"CD.LC.dqNat","p":false,"r":[58,0,58,30],"s":false,"t":["CD.LC.Dq"],"u":[],"v":["CD.LC.Dq.mk"]}
 {"i":true,"k":"theorem","m":"CarveDev.Coer","n":"CD.Co.instPosFive","p":true,"r":[54,0,54,43],"s":false,"t":["CD.Co.Pos"],"u":[],"v":["CD.Co.Pos.mk"]}
 {"imports":["Init","Init","CarveDev.Base"],"module":"CarveDev.Alt"}
 {"imports":["Init","Init","CarveDev.Base"],"module":"CarveDev.Fields"}

@@ -53,4 +53,9 @@ theorem box_default : (default : Box).b = 1 := rfl
 no instance a carved file newly shows can take part. -/
 theorem box_default_local [Inhabited Box] : (default : Box).get = (default : Box).b := rfl
 
+/-- CoulombAtom (oaiq-071): instance search solves `Inhabited (Option Nat)` here, and InstLate's
+`natOptInhabited` on the abbrev `NatOpt` (= `Option Nat`), visible in a carved file through a
+bundle, would win; its type mentions no project declaration this one uses (only `NatOpt`). -/
+theorem opt_default : (default : Option Nat) = none := rfl
+
 end CD.LI

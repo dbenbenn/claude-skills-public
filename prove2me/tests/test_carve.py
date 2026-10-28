@@ -1651,11 +1651,14 @@ def test_every_attribute_lean_restricts_to_the_declaring_file_is_known():
     assert not C.restricted_attribute('attribute [local instance_reducible] foo')
 
 
-def test_a_local_instance_that_won_a_subproblem_comes_back_though_no_term_names_it():
+def test_a_local_instance_that_won_a_subproblem_comes_back_though_no_term_names_it(monkeypatch):
     # Kirchberg–Rørdam (batch 3): `local instance : SMul ℂ Defect` answered a subproblem while
     # `Defect →ₗ[ℂ] A` was elaborated, and the final term kept a defeq instance instead: no constant,
     # no `insts` entry. Carved without it, instance search timed out (the agent raised
     # synthInstance.maxHeartbeats). The problems instance search solved (`inst_keys`) still show it.
+    # (uses_local_inst uses Wide, so the carrier rule brings the instance back anyway; it is off
+    # here, to pin the inst_keys test alone.)
+    monkeypatch.setattr(C.Carver, '_carrier_used', lambda *a: False)
     for asked, comes_back in ((['Inhabited CD.Wide'], True), (['Inhabited CD.Wide CD.Other'], True),
                               (['Inhabited CD.Other'], False), (['Nonempty CD.Wide'], False), ([], False)):
         g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
@@ -2066,3 +2069,62 @@ def test_extending_a_frozen_carve_keeps_its_external_definitions_external(g, ext
                     frozen=(ext_plan, names), bundle_prefix='NEW',
                     external_defs={'CD.double': 'Definitions.Def_Mine'})
     assert p['external_defs'] == {'CD.double': 'Definitions.Def_Mine'}
+
+
+def _dq_graph():
+    """The fixture graph with dq_use's and dq_use_late's records naming only dqW (SharpRamsey
+    oaiq-060: the statement's term kept a defeq instance in place of the BDE it used)."""
+    g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    for t in ('CD.LC.dq_use', 'CD.LC.dq_use_late'):
+        user = g.nodes[t]
+        c = g.infos[user.module].commands[user.cmd]
+        c.insts = [x for x in c.insts if x != 'CD.LC.dqPair']
+        c.sig_insts = [x for x in c.sig_insts if x != 'CD.LC.dqPair']
+        for f in ('inst_keys', 'used_keys', 'sig_used_keys'):
+            setattr(c, f, [x for x in getattr(c, f) or () if x != 'CD.LC.Dq Prod'])
+        for n in user.names:
+            for f in ('t', 'v'):
+                g.consts[n][f] = [x for x in g.consts[n][f] if x != 'CD.LC.dqPair']
+    return g
+
+
+def test_a_used_local_instance_brings_its_same_class_siblings_in_source_order():
+    # oaiq-060: `local instance BDE : DecidableEq (Fin w × Bool)`, `TDE`, `IDE : DecidableEq (Slots
+    # w n)`, all `Classical.decEq _`; the statements' records named IDE (and TDE), their stubs got
+    # those and not BDE, and failed "synthesized type class instance is not definitionally equal".
+    # Here dqPair (Dq (Nat × Bool)) and dqW (Dq (Wc n)); dq_use's record names only dqW. Both come
+    # back, in source order, so the one that won in the port still wins.
+    g = _dq_graph()
+    keep = {'CD.LC.Wc', 'CD.LC.Dq', 'CD.LC.dq_use'}
+    for sorry in ({'CD.LC.dq_use'}, set()):
+        sec = _section(C.Carver(g).carve(keep, g.have_names(keep), sorry=sorry), 'CarveDev.LocalCtx')
+        a = re.search(r'^local instance dqPair_r\w+ : Dq \(Nat × Bool\)', sec, re.M)
+        w = re.search(r'^local instance dqW_r\w+ \(n : Nat\) : Dq \(Wc n\)', sec, re.M)
+        assert a and w and a.start() < w.start() < sec.index('theorem dq_use'), sec
+    # a kept instance of the class that the port declared after the sibling (dqNat): put back
+    # before dq_use_late, the sibling would take priority over it, so it stays out
+    keep = {'CD.LC.Wc', 'CD.LC.Dq', 'CD.LC.dqNat', 'CD.LC.dq_use_late'}
+    sec = _section(C.Carver(g).carve(keep, g.have_names(keep), sorry={'CD.LC.dq_use_late'}),
+                   'CarveDev.LocalCtx')
+    assert 'dqPair' not in sec and re.search(r'^local instance dqW_r', sec, re.M), sec
+
+
+def test_a_local_instance_on_a_type_a_declaration_uses_comes_back_though_nothing_records_its_use(g):
+    # oaiq-066 (and oaiq-043): a `local instance : CoeFun (FunctionalTree.diagonalRep A) …` is
+    # unfolded by coercion elaboration, so no constant, `insts` or `inst_keys` entry of its users
+    # names it; the bundles lost it ("Function expected at ↑(diagonalRep A)"). Same for
+    # `Primcodable (Symbols k i)` on an abbrev. A local instance whose type mentions a project
+    # declaration the kept one uses comes back. Here the CoeFun on WcFn and wcfn_apply (`w 3`).
+    nd = g.nodes['CD.LC.wcfn_apply']
+    c = g.infos[nd.module].commands[nd.cmd]
+    assert not c.insts and not [x for x in c.inst_keys or () if x.startswith('CoeFun')]
+    keep = {'CD.LC.Wc', 'CD.LC.WcFn', 'CD.LC.wcfn_apply'}
+    for sorry in ({'CD.LC.wcfn_apply'}, set()):
+        sec = _section(C.Carver(g).carve(keep, g.have_names(keep), sorry=sorry), 'CarveDev.LocalCtx')
+        s = re.search(r'^local instance instCoeFunWcFnForallNat_r\w+ \(n : Nat\) : CoeFun', sec, re.M)
+        assert s and s.start() < sec.index('theorem wcfn_apply'), sec
+    # carried by a bundle: activated
+    have = g.have_names(keep | {'CD.LC.instCoeFunWcFnForallNat'})
+    sec = _section(C.Carver(g).carve(keep, have), 'CarveDev.LocalCtx')
+    assert re.search(r'^attribute \[local instance\] CD\.LC\.instCoeFunWcFnForallNat$', sec, re.M), sec
+

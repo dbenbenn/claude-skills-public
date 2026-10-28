@@ -2053,20 +2053,173 @@
      "opener": 9
     }
    ],
-   "declares": [],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.LI.opt_default",
+     "",
+     []
+    ]
+   ],
    "declares_kinds": [],
+   "doc": {
+    "end": 2115,
+    "start": 1831
+   },
    "end": {
-    "byte": 1840,
-    "col": 9,
-    "line": 56
+    "byte": 2174,
+    "col": 58,
+    "line": 59
    },
    "heads": [],
    "idents": [
     {
-     "end": 1840,
+     "end": 2135,
+     "name": "opt_default",
+     "role": "decl",
+     "start": 2124
+    },
+    {
+     "end": 2139,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 2139
+    },
+    {
+     "end": 2146,
+     "name": "default",
+     "role": "ref",
+     "start": 2139
+    },
+    {
+     "end": 2155,
+     "name": "Option",
+     "role": "ref",
+     "start": 2149
+    },
+    {
+     "end": 2159,
+     "name": "Nat",
+     "role": "ref",
+     "start": 2156
+    },
+    {
+     "end": 2167,
+     "name": "none",
+     "role": "ref",
+     "start": 2163
+    },
+    {
+     "end": 2174,
+     "name": "rfl",
+     "role": "ref",
+     "start": 2171
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 2135,
+      "col": 19,
+      "line": 59
+     },
+     "start": {
+      "byte": 2124,
+      "col": 8,
+      "line": 59
+     }
+    }
+   ],
+   "inst_keys": [
+    "Inhabited Option"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.LI.opt_default"
+   ],
+   "namespace": "CD.LI",
+   "opens": [],
+   "resolved": [
+    [
+     2124,
+     2135,
+     "CD.LI.opt_default",
+     "b"
+    ],
+    [
+     2124,
+     2135,
+     "",
+     "b"
+    ],
+    [
+     2139,
+     2146,
+     "Inhabited.default"
+    ],
+    [
+     2149,
+     2155,
+     "Option"
+    ],
+    [
+     2156,
+     2159,
+     "Nat"
+    ],
+    [
+     2163,
+     2167,
+     "Option.none"
+    ],
+    [
+     2171,
+     2174,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1831,
+    "col": 0,
+    "line": 56
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 2168,
+    "col": 52,
+    "line": 59
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 9
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 2185,
+    "col": 9,
+    "line": 61
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 2185,
      "name": "CD.LI",
      "role": "scope",
-     "start": 1835
+     "start": 2180
     }
    ],
    "ids": [],
@@ -2081,9 +2234,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 1831,
+    "byte": 2176,
     "col": 0,
-    "line": 56
+    "line": 61
    },
    "used_keys": []
   },
@@ -2098,9 +2251,9 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 1841,
+    "byte": 2186,
     "col": 0,
-    "line": 57
+    "line": 62
    },
    "heads": [],
    "idents": [],
@@ -2116,9 +2269,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 1841,
+    "byte": 2186,
     "col": 0,
-    "line": 57
+    "line": 62
    },
    "used_keys": []
   }

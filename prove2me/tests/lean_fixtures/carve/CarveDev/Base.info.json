@@ -5215,17 +5215,17 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 4089,
-    "col": 17,
-    "line": 120
+    "byte": 4126,
+    "col": 12,
+    "line": 121
    },
    "heads": [],
    "idents": [
     {
-     "end": 4089,
-     "name": "CDScope",
+     "end": 4126,
+     "name": "CD",
      "role": "scope",
-     "start": 4082
+     "start": 4124
     }
    ],
    "ids": [],
@@ -5240,14 +5240,16 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 4072,
+    "byte": 4114,
     "col": 0,
-    "line": 120
+    "line": 121
    },
    "used_keys": []
   },
   {
-   "attrs": [],
+   "attrs": [
+    "simp"
+   ],
    "context": [
     {
      "cmds": [
@@ -5260,130 +5262,52 @@
      "opener": 55
     }
    ],
-   "declares": [],
-   "declares_kinds": [
-    "CDScope.«term⟪_⟫»"
-   ],
-   "end": {
-    "byte": 4134,
-    "col": 40,
-    "line": 121
-   },
-   "heads": [],
-   "idents": [
-    {
-     "end": 4113,
-     "name": "x",
-     "role": "ref",
-     "start": 4112
-    },
-    {
-     "end": 4132,
-     "name": "CD.double",
-     "role": "ref",
-     "start": 4123
-    },
-    {
-     "end": 4134,
-     "name": "x",
-     "role": "ref",
-     "start": 4133
-    }
-   ],
-   "ids": [],
-   "inst_keys": [],
-   "insts": [],
-   "kind": "Lean.Parser.Command.notation",
-   "kinds_used": [],
-   "names": [],
-   "namespace": "CDScope",
-   "opens": [],
-   "resolved": [
-    [
-     4112,
-     4113,
-     "",
-     "b"
-    ],
-    [
-     4123,
-     4132,
-     "CD.double"
-    ],
-    [
-     4133,
-     4134,
-     "",
-     "b"
-    ]
-   ],
-   "sig_insts": [],
-   "sig_used_keys": [],
-   "start": {
-    "byte": 4090,
-    "col": 0,
-    "line": 121
-   },
-   "used_keys": []
-  },
-  {
-   "attrs": [],
-   "context": [
-    {
-     "cmds": [
-      1
-     ],
-     "opener": null
-    },
-    {
-     "cmds": [],
-     "opener": 55
-    }
-   ],
-   "decl_kind": "Lean.Parser.Command.definition",
+   "decl_kind": "Lean.Parser.Command.theorem",
    "declares": [
     [
-     "CDScope.anchor",
+     "CD.lcm23",
      "",
      []
     ]
    ],
    "declares_kinds": [],
-   "doc": {
-    "end": 4226,
-    "start": 4135
-   },
    "end": {
-    "byte": 4248,
-    "col": 21,
-    "line": 123
+    "byte": 4173,
+    "col": 46,
+    "line": 122
    },
    "heads": [],
    "idents": [
     {
-     "end": 4237,
-     "name": "anchor",
+     "end": 4148,
+     "name": "lcm23",
      "role": "decl",
-     "start": 4231
+     "start": 4143
     },
     {
-     "end": 4243,
-     "name": "Nat",
+     "end": 4158,
+     "name": "Nat.lcm",
      "role": "ref",
-     "start": 4240
+     "start": 4151
+    },
+    {
+     "end": 4173,
+     "name": "rfl",
+     "role": "ref",
+     "start": 4170
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 4237,
-      "col": 10,
-      "line": 123
+      "byte": 4148,
+      "col": 21,
+      "line": 122
      },
      "start": {
-      "byte": 4231,
-      "col": 4,
-      "line": 123
+      "byte": 4143,
+      "col": 16,
+      "line": 122
      }
     }
    ],
@@ -5394,41 +5318,344 @@
    "kind": "Lean.Parser.Command.declaration",
    "kinds_used": [],
    "names": [
-    "CDScope.anchor"
+    "CD.lcm23"
    ],
-   "namespace": "CDScope",
+   "namespace": "CD",
    "opens": [],
    "resolved": [
     [
-     4231,
-     4237,
+     4143,
+     4148,
+     "CD.lcm23",
+     "b"
+    ],
+    [
+     4143,
+     4148,
      "",
      "b"
     ],
     [
-     4231,
-     4237,
-     "CDScope.anchor",
-     "b"
+     4151,
+     4158,
+     "Nat.lcm"
     ],
     [
-     4240,
-     4243,
-     "Nat"
+     4170,
+     4173,
+     "rfl"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 4135,
+    "byte": 4127,
     "col": 0,
     "line": 122
    },
    "used_keys": [],
    "value_start": {
-    "byte": 4244,
-    "col": 17,
-    "line": 123
+    "byte": 4167,
+    "col": 40,
+    "line": 122
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 55
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_lcm23",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 4240,
+    "col": 65,
+    "line": 124
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 4193,
+     "name": "uses_lcm23",
+     "role": "decl",
+     "start": 4183
+    },
+    {
+     "end": 4196,
+     "name": "n",
+     "role": "binder",
+     "start": 4195
+    },
+    {
+     "end": 4202,
+     "name": "Nat",
+     "role": "ref",
+     "start": 4199
+    },
+    {
+     "end": 4207,
+     "name": "n",
+     "role": "ref",
+     "start": 4206
+    },
+    {
+     "end": 4217,
+     "name": "Nat.lcm",
+     "role": "ref",
+     "start": 4210
+    },
+    {
+     "end": 4225,
+     "name": "n",
+     "role": "ref",
+     "start": 4224
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 4193,
+      "col": 18,
+      "line": 124
+     },
+     "start": {
+      "byte": 4183,
+      "col": 8,
+      "line": 124
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.uses_lcm23"
+   ],
+   "namespace": "CD",
+   "opens": [],
+   "resolved": [
+    [
+     4183,
+     4193,
+     "CD.uses_lcm23",
+     "b"
+    ],
+    [
+     4183,
+     4193,
+     "",
+     "b"
+    ],
+    [
+     4195,
+     4196,
+     "",
+     "b"
+    ],
+    [
+     4199,
+     4202,
+     "Nat"
+    ],
+    [
+     4206,
+     4207,
+     ""
+    ],
+    [
+     4210,
+     4217,
+     "Nat.lcm"
+    ],
+    [
+     4224,
+     4225,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 4175,
+    "col": 0,
+    "line": 124
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 4230,
+    "col": 55,
+    "line": 124
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 55
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.uses_lcm23_only",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 4318,
+    "col": 76,
+    "line": 126
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 4265,
+     "name": "uses_lcm23_only",
+     "role": "decl",
+     "start": 4250
+    },
+    {
+     "end": 4268,
+     "name": "n",
+     "role": "binder",
+     "start": 4267
+    },
+    {
+     "end": 4274,
+     "name": "Nat",
+     "role": "ref",
+     "start": 4271
+    },
+    {
+     "end": 4279,
+     "name": "n",
+     "role": "ref",
+     "start": 4278
+    },
+    {
+     "end": 4287,
+     "name": "n",
+     "role": "ref",
+     "start": 4286
+    },
+    {
+     "end": 4317,
+     "name": "Nat.add_zero",
+     "role": "ref",
+     "start": 4305
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 4265,
+      "col": 23,
+      "line": 126
+     },
+     "start": {
+      "byte": 4250,
+      "col": 8,
+      "line": 126
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.uses_lcm23_only"
+   ],
+   "namespace": "CD",
+   "opens": [],
+   "resolved": [
+    [
+     4250,
+     4265,
+     "CD.uses_lcm23_only",
+     "b"
+    ],
+    [
+     4250,
+     4265,
+     "",
+     "b"
+    ],
+    [
+     4267,
+     4268,
+     "",
+     "b"
+    ],
+    [
+     4271,
+     4274,
+     "Nat"
+    ],
+    [
+     4278,
+     4279,
+     ""
+    ],
+    [
+     4286,
+     4287,
+     ""
+    ],
+    [
+     4305,
+     4317,
+     "Nat.add_zero"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 4242,
+    "col": 0,
+    "line": 126
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 4288,
+    "col": 46,
+    "line": 126
    }
   },
   {
@@ -5448,17 +5675,17 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 4260,
-    "col": 11,
-    "line": 124
+    "byte": 4325,
+    "col": 6,
+    "line": 127
    },
    "heads": [],
    "idents": [
     {
-     "end": 4260,
-     "name": "CDScope",
+     "end": 4325,
+     "name": "CD",
      "role": "scope",
-     "start": 4253
+     "start": 4323
     }
    ],
    "ids": [],
@@ -5467,15 +5694,15 @@
    "kind": "Lean.Parser.Command.end",
    "kinds_used": [],
    "names": [],
-   "namespace": "CDScope",
+   "namespace": "CD",
    "opens": [],
    "resolved": [],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 4249,
+    "byte": 4319,
     "col": 0,
-    "line": 124
+    "line": 127
    },
    "used_keys": []
   },
@@ -5492,9 +5719,286 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 4261,
+    "byte": 4539,
+    "col": 17,
+    "line": 131
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 4539,
+     "name": "CDScope",
+     "role": "scope",
+     "start": 4532
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 4522,
     "col": 0,
-    "line": 125
+    "line": 131
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 60
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [
+    "CDScope.«term⟪_⟫»"
+   ],
+   "end": {
+    "byte": 4584,
+    "col": 40,
+    "line": 132
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 4563,
+     "name": "x",
+     "role": "ref",
+     "start": 4562
+    },
+    {
+     "end": 4582,
+     "name": "CD.double",
+     "role": "ref",
+     "start": 4573
+    },
+    {
+     "end": 4584,
+     "name": "x",
+     "role": "ref",
+     "start": 4583
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.notation",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CDScope",
+   "opens": [],
+   "resolved": [
+    [
+     4562,
+     4563,
+     "",
+     "b"
+    ],
+    [
+     4573,
+     4582,
+     "CD.double"
+    ],
+    [
+     4583,
+     4584,
+     "",
+     "b"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 4540,
+    "col": 0,
+    "line": 132
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 60
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CDScope.anchor",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "doc": {
+    "end": 4676,
+    "start": 4585
+   },
+   "end": {
+    "byte": 4698,
+    "col": 21,
+    "line": 134
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 4687,
+     "name": "anchor",
+     "role": "decl",
+     "start": 4681
+    },
+    {
+     "end": 4693,
+     "name": "Nat",
+     "role": "ref",
+     "start": 4690
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 4687,
+      "col": 10,
+      "line": 134
+     },
+     "start": {
+      "byte": 4681,
+      "col": 4,
+      "line": 134
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CDScope.anchor"
+   ],
+   "namespace": "CDScope",
+   "opens": [],
+   "resolved": [
+    [
+     4681,
+     4687,
+     "",
+     "b"
+    ],
+    [
+     4681,
+     4687,
+     "CDScope.anchor",
+     "b"
+    ],
+    [
+     4690,
+     4693,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 4585,
+    "col": 0,
+    "line": 133
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 4694,
+    "col": 17,
+    "line": 134
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 60
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 4710,
+    "col": 11,
+    "line": 135
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 4710,
+     "name": "CDScope",
+     "role": "scope",
+     "start": 4703
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CDScope",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 4699,
+    "col": 0,
+    "line": 135
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 4711,
+    "col": 0,
+    "line": 136
    },
    "heads": [],
    "idents": [],
@@ -5510,9 +6014,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 4261,
+    "byte": 4711,
     "col": 0,
-    "line": 125
+    "line": 136
    },
    "used_keys": []
   }
