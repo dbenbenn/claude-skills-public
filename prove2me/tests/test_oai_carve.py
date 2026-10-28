@@ -270,6 +270,19 @@ def test_filter_patches_drops_single_file_only_patches():
     assert O.apply_patches('theorem b_thm', [pm], route='single') == 'theorem b_thm'
 
 
+def test_filter_patches_accepts_compat_imports_option(tmp_path):
+    # carve_pipeline passes the port's `--compat-imports narrow` to filter-patches too (oaiq-092): its
+    # value is not a module prefix
+    p = tmp_path / 'p.json'
+    p.write_text(json.dumps([{'old': 'theorem b_thm', 'new': 'theorem b_thm'}]))
+    c = tmp_path / 'compat.lean'
+    c.write_text(COMPAT)
+    out = tmp_path / 'out.json'
+    CP.main(['filter-patches', str(p), LEAN, str(out), 'OAI.Fam', '--compat', str(c),
+             '--compat-imports', 'narrow'])
+    assert len(json.load(open(str(out)))) == 1
+
+
 def test_filter_patches_command_line(tmp_path):
     p = tmp_path / 'p.json'
     p.write_text(json.dumps([{'old': 'Finset.prod_le_prod₀ = Finset.prod_le_prod₀', 'new': 'x', 'allow_drop': True},

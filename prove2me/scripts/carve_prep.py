@@ -328,7 +328,7 @@ def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='
 
 
 def cmd_filter_patches(argv):
-    pos = positional(argv, ('--compat-ns', '--compat', '--header', '--stdsimplex'))
+    pos = positional(argv, ('--compat-ns', '--compat', '--header', '--stdsimplex', '--compat-imports'))
     if len(pos) < 4:
         sys.exit(__doc__)
     src, lean_root, out, prefixes = pos[0], pos[1], pos[2], pos[3:]
