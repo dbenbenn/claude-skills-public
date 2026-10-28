@@ -1124,7 +1124,7 @@ def convert_funext_rfl_to_congr_deriv(text):
 
 _CONVERT_EXT = re.compile(
     r"(?m)^(?P<ind>[ \t]*)convert (?P<e>(?:(?! using \d)(?<!convert)(?!convert ).)+?) using 1\n"
-    r"(?P=ind)· (?:ext|funext) (?P<v>\w+)\n(?P<body>(?:(?P=ind)  \S.*\n|(?P=ind)   .*\n)+)(?P=ind)· ", re.S)
+    r"(?P=ind)· (?:ext|funext) (?P<v>\w+)\n(?P<body>(?:(?P=ind)  [^\n]*\n)+)(?P=ind)· ", re.S)
 
 
 def convert_ext_to_congr_of_eventually_eq(text):
