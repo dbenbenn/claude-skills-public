@@ -2306,3 +2306,12 @@ def test_compat_narrow_imports_cover_the_compat_lemmas():
     for m in ('Mathlib.MeasureTheory.Function.AbsolutelyContinuous', 'Mathlib.MeasureTheory.Function.UniformIntegrable',
               'Mathlib.MeasureTheory.Measure.FiniteMeasure'):
         assert m in O.COMPAT_NARROW_IMPORTS
+
+
+def test_compat_narrow_imports_build_the_whole_compat_block():
+    # the compat block (kernels, GNS, von Neumann algebras, Schwartz growth, Loewner order, ...) must build on the
+    # narrow imports, which leave out CStarMatrix (oaiq-092: its HMul instance breaks `rw [Matrix.sum_mul]`)
+    for m in ('Mathlib.Probability.Kernel.CondDistrib', 'Mathlib.Analysis.CStarAlgebra.GelfandNaimarkSegal',
+              'Mathlib.Analysis.VonNeumannAlgebra.Basic', 'Mathlib.Analysis.Distribution.SchwartzSpace.Basic',
+              'Mathlib.Analysis.InnerProductSpace.Positive', 'Mathlib.Geometry.Manifold.IsManifold.Basic'):
+        assert m in O.COMPAT_NARROW_IMPORTS

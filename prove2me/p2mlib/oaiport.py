@@ -1807,6 +1807,18 @@ COMPAT_NARROW_IMPORTS = (
     'Mathlib.MeasureTheory.Function.AbsolutelyContinuous',
     'Mathlib.MeasureTheory.Function.UniformIntegrable',
     'Mathlib.MeasureTheory.Measure.FiniteMeasure',
+    'Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Range',
+    'Mathlib.Analysis.CStarAlgebra.GelfandNaimarkSegal',
+    'Mathlib.Analysis.CStarAlgebra.Hom',
+    'Mathlib.Analysis.Distribution.SchwartzSpace.Basic',
+    'Mathlib.Analysis.InnerProductSpace.Positive',
+    'Mathlib.Analysis.InnerProductSpace.StarOrder',
+    'Mathlib.Analysis.Matrix.Order',
+    'Mathlib.Analysis.VonNeumannAlgebra.Basic',
+    'Mathlib.Geometry.Manifold.IsManifold.Basic',
+    'Mathlib.Probability.Kernel.CondDistrib',
+    'Mathlib.Probability.Kernel.Defs',
+    'Mathlib.Topology.Algebra.LinearMapCompletion',
 )
 
 
