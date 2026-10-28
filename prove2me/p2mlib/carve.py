@@ -76,6 +76,19 @@ def attribute_entries(txt):
     return None
 
 
+# attributes that declare new constants from their target (`foo_assoc`, `Foo.ext`, `bar_apply`,
+# the additive copy): applied a second time, in a file importing the first application, Lean
+# reports "has already been declared" (SimpleAmenable oaiq-065: `attribute [reassoc]
+# Data.s₀_comp_δ₁` kept in a bundle importing Data's bundle)
+GENERATING_ATTRIBUTES = {'reassoc', 'elementwise', 'simps', 'to_additive', 'to_dual', 'mk_iff', 'ext'}
+
+
+def generating_attribute(txt):
+    """Does an `attribute [...]` command set an attribute that declares new constants?"""
+    return any(e.split()[0] in GENERATING_ATTRIBUTES for e in attribute_entries(txt) or ()
+               if e.split())
+
+
 def restricted_attribute(txt):
     """Does an `attribute [...]` command set, globally, an attribute only the declaring file may?"""
     return any(e.split()[0] in RESTRICTED_ATTRIBUTES for e in attribute_entries(txt) or ()
@@ -2339,6 +2352,23 @@ def _apply(text_bytes, base, edits):
     return out, cur
 
 
+def _attribute_list_end(t, a, b):
+    """Byte offset just past the `]` closing the attribute list of the command in t[a:b] (b if none)."""
+    i = t.find(b'[', a, b)
+    if i < 0:
+        return b
+    depth = 0
+    for j in range(i, b):
+        ch = t[j:j + 1]
+        if ch in b'([{':
+            depth += 1
+        elif ch in b')]}':
+            depth -= 1
+            if depth == 0:
+                return j + 1
+    return b
+
+
 def _cmd_text(info, c, edits):
     t = info.text_bytes
     parts, cur = _apply(t, c.start.byte, edits)
@@ -2658,10 +2688,14 @@ class Carver:
                 txt = leanedit.text(info, c.index)
                 refs = [i for i in c.idents or [] if i['role'] == 'ref']
                 gone = [i for i in refs if self._gone(i['name'], c, m, have, opens, idn=i)]
-                ents = attribute_entries(txt) if restricted_attribute(txt) else None
+                ents = attribute_entries(txt) if restricted_attribute(txt) or generating_attribute(txt) else None
                 if gone and len(gone) == len(refs):
                     drop.add(c.index)
                 elif ents is not None:
+                    # the targets: the identifiers after the attribute list (`reassoc (attr := simp)`
+                    # names `simp` inside it)
+                    lend = _attribute_list_end(t, c.start.byte, c.end.byte)
+                    refs = [i for i in refs if i['start'] >= lend]
                     # attributes Lean lets only the declaring file set: the command is in its
                     # target's module (the port compiled), so the bundle that declares the target
                     # carries it, persistently; this file keeps it only for its own declarations
@@ -2670,8 +2704,15 @@ class Carver:
                     # command stay on every target the file has.
                     mine = [i for i in refs if i not in gone and not self._gone(i['name'], c, m, keep_names, opens, idn=i)]
                     names = lambda L: ' '.join(t[i['start']:i['end']].decode('utf-8') for i in L)
-                    rest = [e for e in ents if not restricted_attribute('attribute [%s] x' % e)]
-                    res = [e for e in ents if e not in rest]
+                    rest = [e for e in ents if not restricted_attribute('attribute [%s] x' % e)
+                            and not generating_attribute('attribute [%s] x' % e)]
+                    res = [e for e in ents if e not in rest and restricted_attribute('attribute [%s] x' % e)]
+                    # a declaring attribute on a target of this module: the file declaring the target
+                    # applies it (its constants travel with the target's node); on a target of
+                    # another module (or the library) the command itself is the only application
+                    gen = [e for e in ents if e not in rest and e not in res]
+                    mine_gen = mine + [i for i in refs if i not in gone and i not in mine and
+                                       m not in self._ref_modules(i, c, m)]
                     # a declaration of someone else's published bundle (external_defs) is carried by
                     # no bundle of this carve, and Lean lets only its own file set the attribute
                     # globally: keep it here, `local` (reducibility needs allowUnsafeReducibility)
@@ -2689,8 +2730,10 @@ class Carver:
                                 self.pre.add('attribute [local %s] _root_.%s\n' % (e, full))
                     if rest and refs and len(gone) < len(refs):
                         out.append('attribute [%s] %s' % (', '.join(rest), names([i for i in refs if i not in gone])))
-                    if mine:
+                    if mine and res:
                         out.append('attribute [%s] %s' % (', '.join(res), names(mine)))
+                    if mine_gen and gen:
+                        out.append('attribute [%s] %s' % (', '.join(gen), names(mine_gen)))
                     if out:
                         reps[c.index] = '\n'.join(out)
                     else:
@@ -2763,6 +2806,13 @@ class Carver:
         body = body.strip('\n')
         return ('section\n-- module %s\n' % m + (body + '\n' if body else '') +
                 ''.join(x + '\n' for x in closers) + 'end\n\n')
+
+    def _ref_modules(self, idn, c, m):
+        """The modules of the project declarations identifier idn of command c resolves to."""
+        g = self.g
+        r = g.reading(g.infos[m], c, idn)
+        return {g.nodes[g.owner[n]].module for n in (r.consts if r is not None else ())
+                if g.is_project(n) and g.owner.get(n) in g.nodes}
 
     def _used_instances(self, info, c, m, sorried):
         """The instances kept command c's elaboration used (LeanInfo `insts`, which sees instance

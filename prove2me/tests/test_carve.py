@@ -2189,3 +2189,27 @@ def test_a_default_simp_call_depends_on_its_modules_earlier_rfl_simp_lemmas(g):
 @pytest.mark.lean
 def test_default_simp_lemmas_compile(g, tmp_path):
     _compile_in_publish_order(g, _lcm_plan(g), tmp_path)
+
+
+def test_an_attribute_that_declares_constants_is_applied_once_where_its_target_is(g):
+    # SimpleAmenable (oaiq-065): `attribute [reassoc] Data.s₀_comp_δ₁` was kept in a bundle importing
+    # the bundle that declares Data (and so already has `…_assoc`): "`…s₀_comp_δ₁_assoc` has already
+    # been declared". Such an attribute (reassoc, simps, to_additive, ext, …) on a target of its own
+    # module stays only in the file declaring the target; the generated constants are the target
+    # node's. Here `attribute [ext] Pt` (Pt.ext, Pt.ext_iff).
+    assert g.owner['CD.Co.Pt.ext'] == 'CD.Co.Pt'
+    out = C.Carver(g).carve({'CD.Co.pt_eq'}, g.have_names({'CD.Co.pt_eq', 'CD.Co.Pt'}))
+    assert 'theorem pt_eq' in out and not re.search(r'^attribute \[ext\]', out, re.M), out
+    out = C.Carver(g).carve({'CD.Co.Pt'}, g.have_names({'CD.Co.Pt'}))
+    assert re.search(r'^attribute \[ext\] Pt$', out, re.M), out
+    assert C.generating_attribute('attribute [reassoc (attr := simp)] foo')
+    assert not C.generating_attribute('attribute [simp] foo')
+    assert C._attribute_list_end(b'attribute [reassoc (attr:=simp)] a b', 0, 36) == 32
+
+
+@pytest.mark.lean
+def test_declaring_attributes_compile(g, tmp_path):
+    p = C.make_plan(g, ['CD.Co.pt_eq'], budget=100, bundle_budget=100, cost=C.size_costs(g),
+                    bundle_prefix='GA', chunker='schedule', pinned=[['CD.Co.Pt']])
+    assert any('CD.Co.Pt' in b['nodes'] for b in p['bundles'])
+    _compile_in_publish_order(g, p, tmp_path)

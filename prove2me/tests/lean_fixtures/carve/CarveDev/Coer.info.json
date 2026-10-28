@@ -2089,6 +2089,491 @@
    "decl_kind": "Lean.Parser.Command.structure",
    "declares": [
     [
+     "CD.Co.Pt.b",
+     "",
+     []
+    ],
+    [
+     "CD.Co.Pt.a",
+     "",
+     []
+    ],
+    [
+     "CD.Co.Pt",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "doc": {
+    "end": 1841,
+    "start": 1630
+   },
+   "end": {
+    "byte": 1880,
+    "col": 9,
+    "line": 55
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1854,
+     "name": "Pt",
+     "role": "decl",
+     "start": 1852
+    },
+    {
+     "end": 1864,
+     "name": "a",
+     "role": "ref",
+     "start": 1863
+    },
+    {
+     "end": 1870,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1867
+    },
+    {
+     "end": 1874,
+     "name": "b",
+     "role": "ref",
+     "start": 1873
+    },
+    {
+     "end": 1880,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1877
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1854,
+      "col": 12,
+      "line": 53
+     },
+     "start": {
+      "byte": 1852,
+      "col": 10,
+      "line": 53
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Co.Pt"
+   ],
+   "namespace": "CD.Co",
+   "opens": [],
+   "resolved": [
+    [
+     1852,
+     1854,
+     "CD.Co.Pt",
+     "b"
+    ],
+    [
+     1852,
+     1854,
+     "",
+     "b"
+    ],
+    [
+     1863,
+     1864,
+     "CD.Co.Pt.a",
+     "b"
+    ],
+    [
+     1867,
+     1870,
+     "Nat"
+    ],
+    [
+     1873,
+     1874,
+     "CD.Co.Pt.b",
+     "b"
+    ],
+    [
+     1877,
+     1880,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1630,
+    "col": 0,
+    "line": 50
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [
+    "ext"
+   ],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 2
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1900,
+    "col": 18,
+    "line": 57
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1900,
+     "name": "Pt",
+     "role": "ref",
+     "start": 1898
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.attribute",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.Co",
+   "opens": [],
+   "resolved": [
+    [
+     1898,
+     1900,
+     "CD.Co.Pt"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1882,
+    "col": 0,
+    "line": 57
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 2
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Co.pt_eq",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1984,
+    "col": 82,
+    "line": 59
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1915,
+     "name": "pt_eq",
+     "role": "decl",
+     "start": 1910
+    },
+    {
+     "end": 1918,
+     "name": "p",
+     "role": "binder",
+     "start": 1917
+    },
+    {
+     "end": 1920,
+     "name": "q",
+     "role": "binder",
+     "start": 1919
+    },
+    {
+     "end": 1925,
+     "name": "Pt",
+     "role": "ref",
+     "start": 1923
+    },
+    {
+     "end": 1930,
+     "name": "h1",
+     "role": "binder",
+     "start": 1928
+    },
+    {
+     "end": 1936,
+     "name": "p.a",
+     "role": "ref",
+     "start": 1933
+    },
+    {
+     "end": 1942,
+     "name": "q.a",
+     "role": "ref",
+     "start": 1939
+    },
+    {
+     "end": 1947,
+     "name": "h2",
+     "role": "binder",
+     "start": 1945
+    },
+    {
+     "end": 1953,
+     "name": "p.b",
+     "role": "ref",
+     "start": 1950
+    },
+    {
+     "end": 1959,
+     "name": "q.b",
+     "role": "ref",
+     "start": 1956
+    },
+    {
+     "end": 1964,
+     "name": "p",
+     "role": "ref",
+     "start": 1963
+    },
+    {
+     "end": 1968,
+     "name": "q",
+     "role": "ref",
+     "start": 1967
+    },
+    {
+     "end": 1978,
+     "name": "Pt.ext",
+     "role": "ref",
+     "start": 1972
+    },
+    {
+     "end": 1981,
+     "name": "h1",
+     "role": "ref",
+     "start": 1979
+    },
+    {
+     "end": 1984,
+     "name": "h2",
+     "role": "ref",
+     "start": 1982
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1915,
+      "col": 13,
+      "line": 59
+     },
+     "start": {
+      "byte": 1910,
+      "col": 8,
+      "line": 59
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Co.pt_eq"
+   ],
+   "namespace": "CD.Co",
+   "opens": [],
+   "resolved": [
+    [
+     1910,
+     1915,
+     "CD.Co.pt_eq",
+     "b"
+    ],
+    [
+     1910,
+     1915,
+     "",
+     "b"
+    ],
+    [
+     1917,
+     1918,
+     "",
+     "b"
+    ],
+    [
+     1919,
+     1920,
+     "",
+     "b"
+    ],
+    [
+     1923,
+     1925,
+     "CD.Co.Pt"
+    ],
+    [
+     1928,
+     1930,
+     "",
+     "b"
+    ],
+    [
+     1933,
+     1934,
+     ""
+    ],
+    [
+     1933,
+     1936,
+     "CD.Co.Pt.a"
+    ],
+    [
+     1935,
+     1936,
+     "CD.Co.Pt.a"
+    ],
+    [
+     1939,
+     1940,
+     ""
+    ],
+    [
+     1939,
+     1942,
+     "CD.Co.Pt.a"
+    ],
+    [
+     1941,
+     1942,
+     "CD.Co.Pt.a"
+    ],
+    [
+     1945,
+     1947,
+     "",
+     "b"
+    ],
+    [
+     1950,
+     1951,
+     ""
+    ],
+    [
+     1950,
+     1953,
+     "CD.Co.Pt.b"
+    ],
+    [
+     1952,
+     1953,
+     "CD.Co.Pt.b"
+    ],
+    [
+     1956,
+     1957,
+     ""
+    ],
+    [
+     1956,
+     1959,
+     "CD.Co.Pt.b"
+    ],
+    [
+     1958,
+     1959,
+     "CD.Co.Pt.b"
+    ],
+    [
+     1963,
+     1964,
+     ""
+    ],
+    [
+     1967,
+     1968,
+     ""
+    ],
+    [
+     1972,
+     1978,
+     "CD.Co.Pt.ext"
+    ],
+    [
+     1979,
+     1981,
+     ""
+    ],
+    [
+     1982,
+     1984,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1902,
+    "col": 0,
+    "line": 59
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 1969,
+    "col": 67,
+    "line": 59
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 2
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
      "CD.Co.Pos.out",
      "",
      []
@@ -2101,54 +2586,54 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 1677,
+    "byte": 2033,
     "col": 13,
-    "line": 52
+    "line": 63
    },
    "heads": [],
    "idents": [
     {
-     "end": 1640,
+     "end": 1996,
      "name": "Pos",
      "role": "decl",
-     "start": 1637
+     "start": 1993
     },
     {
-     "end": 1643,
+     "end": 1999,
      "name": "n",
      "role": "binder",
-     "start": 1642
+     "start": 1998
     },
     {
-     "end": 1649,
+     "end": 2005,
      "name": "Nat",
      "role": "ref",
-     "start": 1646
+     "start": 2002
     },
     {
-     "end": 1669,
+     "end": 2025,
      "name": "out",
      "role": "ref",
-     "start": 1666
+     "start": 2022
     },
     {
-     "end": 1677,
+     "end": 2033,
      "name": "n",
      "role": "ref",
-     "start": 1676
+     "start": 2032
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 1640,
+      "byte": 1996,
       "col": 9,
-      "line": 51
+      "line": 62
      },
      "start": {
-      "byte": 1637,
+      "byte": 1993,
       "col": 6,
-      "line": 51
+      "line": 62
      }
     }
    ],
@@ -2166,46 +2651,46 @@
    "opens": [],
    "resolved": [
     [
-     1637,
-     1640,
+     1993,
+     1996,
      "CD.Co.Pos",
      "b"
     ],
     [
-     1637,
-     1640,
+     1993,
+     1996,
      "",
      "b"
     ],
     [
-     1642,
-     1643,
+     1998,
+     1999,
      "",
      "b"
     ],
     [
-     1646,
-     1649,
+     2002,
+     2005,
      "Nat"
     ],
     [
-     1666,
-     1669,
+     2022,
+     2025,
      "CD.Co.Pos.out",
      "b"
     ],
     [
-     1676,
-     1677,
+     2032,
+     2033,
      ""
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 1631,
+    "byte": 1987,
     "col": 0,
-    "line": 51
+    "line": 62
    },
    "used_keys": []
   },
@@ -2235,36 +2720,36 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 1726,
+    "byte": 2082,
     "col": 43,
-    "line": 54
+    "line": 65
    },
    "heads": [],
    "idents": [
     {
-     "end": 1699,
+     "end": 2055,
      "name": "instPosFive",
      "role": "decl",
-     "start": 1688
+     "start": 2044
     },
     {
-     "end": 1705,
+     "end": 2061,
      "name": "Pos",
      "role": "ref",
-     "start": 1702
+     "start": 2058
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 1699,
+      "byte": 2055,
       "col": 20,
-      "line": 54
+      "line": 65
      },
      "start": {
-      "byte": 1688,
+      "byte": 2044,
       "col": 9,
-      "line": 54
+      "line": 65
      }
     }
    ],
@@ -2285,20 +2770,20 @@
    "opens": [],
    "resolved": [
     [
-     1688,
-     1699,
+     2044,
+     2055,
      "",
      "b"
     ],
     [
-     1688,
-     1699,
+     2044,
+     2055,
      "CD.Co.instPosFive",
      "b"
     ],
     [
-     1702,
-     1705,
+     2058,
+     2061,
      "CD.Co.Pos"
     ]
    ],
@@ -2307,17 +2792,17 @@
    ],
    "sig_used_keys": [],
    "start": {
-    "byte": 1679,
+    "byte": 2035,
     "col": 0,
-    "line": 54
+    "line": 65
    },
    "used_keys": [
     "CD.Co.Pos"
    ],
    "value_start": {
-    "byte": 1708,
+    "byte": 2064,
     "col": 29,
-    "line": 54
+    "line": 65
    }
   },
   {
@@ -2344,66 +2829,66 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 1769,
+    "byte": 2125,
     "col": 41,
-    "line": 56
+    "line": 67
    },
    "heads": [],
    "idents": [
     {
-     "end": 1740,
+     "end": 2096,
      "name": "needsPos",
      "role": "decl",
-     "start": 1732
+     "start": 2088
     },
     {
-     "end": 1743,
+     "end": 2099,
      "name": "n",
      "role": "binder",
-     "start": 1742
+     "start": 2098
     },
     {
-     "end": 1749,
+     "end": 2105,
      "name": "Nat",
      "role": "ref",
-     "start": 1746
+     "start": 2102
     },
     {
-     "end": 1755,
+     "end": 2111,
      "name": "Pos",
      "role": "ref",
-     "start": 1752
+     "start": 2108
     },
     {
-     "end": 1757,
+     "end": 2113,
      "name": "n",
      "role": "ref",
-     "start": 1756
+     "start": 2112
     },
     {
-     "end": 1764,
+     "end": 2120,
      "name": "Nat",
      "role": "ref",
-     "start": 1761
+     "start": 2117
     },
     {
-     "end": 1769,
+     "end": 2125,
      "name": "n",
      "role": "ref",
-     "start": 1768
+     "start": 2124
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 1740,
+      "byte": 2096,
       "col": 12,
-      "line": 56
+      "line": 67
      },
      "start": {
-      "byte": 1732,
+      "byte": 2088,
       "col": 4,
-      "line": 56
+      "line": 67
      }
     }
    ],
@@ -2418,61 +2903,61 @@
    "opens": [],
    "resolved": [
     [
-     1732,
-     1740,
+     2088,
+     2096,
      "CD.Co.needsPos",
      "b"
     ],
     [
-     1732,
-     1740,
+     2088,
+     2096,
      "",
      "b"
     ],
     [
-     1742,
-     1743,
+     2098,
+     2099,
      "",
      "b"
     ],
     [
-     1746,
-     1749,
+     2102,
+     2105,
      "Nat"
     ],
     [
-     1752,
-     1755,
+     2108,
+     2111,
      "CD.Co.Pos"
     ],
     [
-     1756,
-     1757,
+     2112,
+     2113,
      ""
     ],
     [
-     1761,
-     1764,
+     2117,
+     2120,
      "Nat"
     ],
     [
-     1768,
-     1769,
+     2124,
+     2125,
      ""
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 1728,
+    "byte": 2084,
     "col": 0,
-    "line": 56
+    "line": 67
    },
    "used_keys": [],
    "value_start": {
-    "byte": 1765,
+    "byte": 2121,
     "col": 37,
-    "line": 56
+    "line": 67
    }
   },
   {
@@ -2492,9 +2977,9 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 1778,
+    "byte": 2134,
     "col": 7,
-    "line": 58
+    "line": 69
    },
    "heads": [],
    "idents": [],
@@ -2510,9 +2995,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 1771,
+    "byte": 2127,
     "col": 0,
-    "line": 58
+    "line": 69
    },
    "used_keys": []
   },
@@ -2520,11 +3005,11 @@
    "attrs": [],
    "binders": [
     {
-     "end": 2028,
+     "end": 2384,
      "names": [
       "h"
      ],
-     "start": 2008
+     "start": 2364
     }
    ],
    "context": [
@@ -2540,29 +3025,29 @@
     },
     {
      "cmds": [],
-     "opener": 21
+     "opener": 24
     }
    ],
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 2028,
+    "byte": 2384,
     "col": 29,
-    "line": 62
+    "line": 73
    },
    "heads": [],
    "idents": [
     {
-     "end": 2010,
+     "end": 2366,
      "name": "h",
      "role": "binder",
-     "start": 2009
+     "start": 2365
     },
     {
-     "end": 2021,
+     "end": 2377,
      "name": "needsPos",
      "role": "ref",
-     "start": 2013
+     "start": 2369
     }
    ],
    "ids": [],
@@ -2580,14 +3065,14 @@
    "opens": [],
    "resolved": [
     [
-     2009,
-     2010,
+     2365,
+     2366,
      "",
      "b"
     ],
     [
-     2013,
-     2021,
+     2369,
+     2377,
      "CD.Co.needsPos"
     ]
    ],
@@ -2598,9 +3083,9 @@
     "CD.Co.Pos OfNat.ofNat"
    ],
    "start": {
-    "byte": 1999,
+    "byte": 2355,
     "col": 0,
-    "line": 62
+    "line": 73
    },
    "used_keys": [
     "CD.Co.Pos OfNat.ofNat"
@@ -2621,9 +3106,9 @@
     },
     {
      "cmds": [
-      22
+      25
      ],
-     "opener": 21
+     "opener": 24
     }
    ],
    "decl_kind": "Lean.Parser.Command.theorem",
@@ -2636,36 +3121,36 @@
    ],
    "declares_kinds": [],
    "end": {
-    "byte": 2061,
+    "byte": 2417,
     "col": 31,
-    "line": 64
+    "line": 75
    },
    "heads": [],
    "idents": [
     {
-     "end": 2046,
+     "end": 2402,
      "name": "var_user",
      "role": "decl",
-     "start": 2038
+     "start": 2394
     },
     {
-     "end": 2061,
+     "end": 2417,
      "name": "rfl",
      "role": "ref",
-     "start": 2058
+     "start": 2414
     }
    ],
    "ids": [
     {
      "end": {
-      "byte": 2046,
+      "byte": 2402,
       "col": 16,
-      "line": 64
+      "line": 75
      },
      "start": {
-      "byte": 2038,
+      "byte": 2394,
       "col": 8,
-      "line": 64
+      "line": 75
      }
     }
    ],
@@ -2682,35 +3167,35 @@
    "opens": [],
    "resolved": [
     [
-     2038,
-     2046,
+     2394,
+     2402,
      "",
      "b"
     ],
     [
-     2038,
-     2046,
+     2394,
+     2402,
      "CD.Co.var_user",
      "b"
     ],
     [
-     2058,
-     2061,
+     2414,
+     2417,
      "rfl"
     ]
    ],
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 2030,
+    "byte": 2386,
     "col": 0,
-    "line": 64
+    "line": 75
    },
    "used_keys": [],
    "value_start": {
-    "byte": 2055,
+    "byte": 2411,
     "col": 25,
-    "line": 64
+    "line": 75
    }
   },
   {
@@ -2728,17 +3213,17 @@
     },
     {
      "cmds": [
-      22
+      25
      ],
-     "opener": 21
+     "opener": 24
     }
    ],
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 2065,
+    "byte": 2421,
     "col": 3,
-    "line": 65
+    "line": 76
    },
    "heads": [],
    "idents": [],
@@ -2754,9 +3239,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 2062,
+    "byte": 2418,
     "col": 0,
-    "line": 65
+    "line": 76
    },
    "used_keys": []
   },
@@ -2777,17 +3262,17 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 2076,
+    "byte": 2432,
     "col": 9,
-    "line": 67
+    "line": 78
    },
    "heads": [],
    "idents": [
     {
-     "end": 2076,
+     "end": 2432,
      "name": "CD.Co",
      "role": "scope",
-     "start": 2071
+     "start": 2427
     }
    ],
    "ids": [],
@@ -2802,9 +3287,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 2067,
+    "byte": 2423,
     "col": 0,
-    "line": 67
+    "line": 78
    },
    "used_keys": []
   },
@@ -2821,9 +3306,9 @@
    "declares": [],
    "declares_kinds": [],
    "end": {
-    "byte": 2077,
+    "byte": 2433,
     "col": 0,
-    "line": 68
+    "line": 79
    },
    "heads": [],
    "idents": [],
@@ -2839,9 +3324,9 @@
    "sig_insts": [],
    "sig_used_keys": [],
    "start": {
-    "byte": 2077,
+    "byte": 2433,
     "col": 0,
-    "line": 68
+    "line": 79
    },
    "used_keys": []
   }

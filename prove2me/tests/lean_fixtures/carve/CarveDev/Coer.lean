@@ -47,6 +47,17 @@ attribute [instance_reducible] rdef
 
 theorem rdef_pos : 0 < rdef 0 := by decide
 
+/-- SimpleAmenable (oaiq-065): an attribute that declares constants (`reassoc` there, `ext` here:
+`Pt.ext`, `Pt.ext_iff`), applied again in a file importing the first application: "has already
+been declared". -/
+structure Pt where
+  a : Nat
+  b : Nat
+
+attribute [ext] Pt
+
+theorem pt_eq (p q : Pt) (h1 : p.a = q.a) (h2 : p.b = q.b) : p = q := Pt.ext h1 h2
+
 
 class Pos (n : Nat) : Prop where
   out : 0 < n
