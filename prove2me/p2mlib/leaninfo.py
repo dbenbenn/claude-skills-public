@@ -356,7 +356,10 @@ def build_module(path, module, olean, ilean, options=BUILD_OPTIONS, ws=None, tim
         os.makedirs(os.path.dirname(os.path.abspath(f)), exist_ok=True)
     args = ['lake', 'env', exe, path, '--idents', '--module', module, '--no-decls'] + \
         ['-D' + o for o in options] + ['--olean', olean, '--ilean', ilean]
-    r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout)
+    # build_ms is the cost model's input, planned against the verifier's single thread: pin one thread
+    # (lean-cap gives untimed calls two since 2026-10-28)
+    env = dict(os.environ, LEAN_NUM_THREADS='1')
+    r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout, env=env)
     out = r.stdout.strip().split('\n')[-1] if r.stdout.strip() else ''
     try:
         data = json.loads(out)

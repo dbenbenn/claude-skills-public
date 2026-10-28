@@ -318,3 +318,22 @@ def test_build_module_reports_errors_like_lean(monkeypatch, tmp_path):
 def test_build_module_needs_the_native_tool(monkeypatch, tmp_path):
     monkeypatch.setattr(LI, 'native_tool', lambda ws: None)
     assert LI.build_module('M.lean', 'P.M', 'o', 'i', ws=_ws(tmp_path)) is None
+
+
+def test_build_module_pins_one_thread_for_its_timing(monkeypatch, tmp_path):
+    # build_ms feeds the carve cost model, which plans for the verifier's single thread; lean-cap
+    # gives untimed calls 2 threads since 2026-10-28, so the build pins 1 itself
+    monkeypatch.setattr(LI, 'CACHE', str(tmp_path / 'cache'))
+    monkeypatch.setattr(LI, 'native_tool', lambda ws: '/bin/leaninfo')
+    monkeypatch.setenv('LEAN_NUM_THREADS', '4')
+    ws = _ws(tmp_path)
+    f = tmp_path / 'ws' / 'M.lean'
+    f.write_text('x')
+    seen = {}
+
+    def fake(args, env=None, **k):
+        seen['env'] = env
+        return _Done(out=_info_json(str(f)))
+    monkeypatch.setattr(LI.subprocess, 'run', fake)
+    LI.build_module(str(f), 'P.M', str(tmp_path / 'M.olean'), str(tmp_path / 'M.ilean'), ws=ws)
+    assert seen['env'] is not None and seen['env']['LEAN_NUM_THREADS'] == '1'
