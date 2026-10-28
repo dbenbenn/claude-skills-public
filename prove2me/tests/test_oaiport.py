@@ -1685,3 +1685,22 @@ def test_the_compat_block_declares_state_monotone_and_cauchy_schwarz():
     block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
     assert re.search(r'^theorem monotone_of_opNorm_eq_one_of_apply_one\b', block, re.M)
     assert re.search(r'^theorem _root_\.PositiveLinearMap\.norm_map_star_mul_sq_le\b', block, re.M)
+
+
+# openai/math modules begin with `open Lean in run_cmd modifyEnv fun env => … nameDenyListExt.addEntry env "name"`
+# (a library-suggestion deny list). prove2.me's soundness guard rejects `run_cmd` and `modifyEnv`, so a bundle
+# or piece carrying one is refused ("definition does not compile"; Kadison commutator, oaiq-039).
+
+def test_library_suggestion_deny_list_blocks_are_removed():
+    src = ('namespace OAI\n\nopen Lean in\nrun_cmd modifyEnv fun env =>\n'
+           '  let env := Lean.LibrarySuggestions.nameDenyListExt.addEntry env "a"\n'
+           '  Lean.LibrarySuggestions.nameDenyListExt.addEntry env "b"\n\nnoncomputable section\n'
+           'open Lean in\nrun_cmd modifyEnv fun env =>\n  Lean.LibrarySuggestions.nameDenyListExt.addEntry env "c"\n\n'
+           'theorem t : True := trivial\n')
+    out = O.core_rewrites(src)
+    assert 'run_cmd' not in out and 'modifyEnv' not in out and 'nameDenyListExt' not in out
+    assert out == 'namespace OAI\n\nnoncomputable section\ntheorem t : True := trivial\n' or \
+        out.replace('\n\n\n', '\n\n').count('theorem t : True := trivial') == 1
+    # another run_cmd is left to fail loudly
+    other = 'run_cmd Lean.logInfo "x"\n'
+    assert O.core_rewrites(other) == other

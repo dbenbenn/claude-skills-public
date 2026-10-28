@@ -716,6 +716,11 @@ def core_rewrites(text, compat_ns='OAI'):
     # `ENNReal.ofReal_pos.mpr h`; ours takes the real `h : 0 < ε` (CAT0Fillings, oaiq-029)
     text = re.sub(r"(tendstoUniformlyOn_of_ae_tendsto'[^\n]*(?:\n[^\n]*){0,3}?)\(ENNReal\.ofReal_pos\.mpr "
                   r"(\((?:[^()]|\([^()]*\))*\)|[\w.']+)\)", r"\1\2", text)
+    # openai/math modules start with a library-suggestion deny list, `open Lean in run_cmd modifyEnv …
+    # nameDenyListExt.addEntry env "name"`; the platform's soundness guard refuses `run_cmd` and `modifyEnv`
+    # (Kadison commutator, oaiq-039), and the list only steers `grind`/library suggestions: drop the block
+    text = re.sub(r"(?m)^open Lean in\nrun_cmd modifyEnv fun env =>\n(?:[ \t]+[^\n]*nameDenyListExt[^\n]*\n|[ \t]+[^\n]*\n)+\n?",
+                  lambda m: '' if 'nameDenyListExt' in m.group(0) else m.group(0), text)
     # d13f23b's `NonUnitalStarRingHom.ofClass f` is the compat block's `nonUnitalStarRingHomOfClass`
     # (Kadison commutator, oaiq-039; Kaplansky quotient, oaiq-015)
     text = re.sub(r"(?<![\w.'])NonUnitalStarRingHom\.ofClass(?![\w'])", pre + 'nonUnitalStarRingHomOfClass', text)
