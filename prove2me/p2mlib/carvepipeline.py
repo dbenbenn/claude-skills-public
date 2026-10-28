@@ -158,7 +158,7 @@ def check_meta(path, lean_src, root_module):
         return '%s: no prefix of %s is a prefix of the root module %s' % (path, pre, root_module)
     # the port strips its own prefixes, OAI.<top directory>, from module names; any other value makes
     # every link repeat a directory (oaiq-031: OAI.Algebra.AuslanderReiten, 181 broken links)
-    port = openai_prefixes(lean_src)
+    port = [p for p in openai_prefixes(lean_src) if p.startswith('OAI.')]
     wrong = [p for p in pre if p not in port]
     if wrong:
         return ('%s: prefixes %s are not the port\'s module prefixes (%s, what oai_port_modules strips); '
@@ -215,8 +215,16 @@ def outside_closure(lean_src, root_module):
 
 
 def openai_prefixes(lean_src):
+    """The module prefixes the port takes: OAI.<directory> for each directory of OAI/, then each other
+    top directory of the sources that holds Lean files (a third-party package the closure imports and
+    the openai/math repo does not ship, e.g. PrimeNumberTheoremAnd, StrongPNT; oaiq-083)."""
     oai = os.path.join(lean_src, 'OAI')
-    return ['OAI.' + d for d in sorted(os.listdir(oai)) if os.path.isdir(os.path.join(oai, d))]
+    out = ['OAI.' + d for d in sorted(os.listdir(oai)) if os.path.isdir(os.path.join(oai, d))]
+    for d in sorted(os.listdir(lean_src)):
+        top = os.path.join(lean_src, d)
+        if d != 'OAI' and os.path.isdir(top) and any(f.endswith('.lean') for _, _, fs in os.walk(top) for f in fs):
+            out.append(d)
+    return out
 
 
 def _now():

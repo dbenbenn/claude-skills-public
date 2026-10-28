@@ -655,6 +655,24 @@ def test_meta_prefixes_must_be_the_ports(tmp_path):
     assert CP.check_meta(str(meta), str(lean), 'OAI.Algebra.AuslanderReiten.All') is None
 
 
+def test_vendored_packages_are_ported_with_the_oai_prefixes(tmp_path):
+    # oaiq-083: JointDickman imports PrimeNumberTheoremAnd and StrongPNT, third-party packages the
+    # openai/math repo does not ship; their sources placed beside OAI/ in src/lean must be ported
+    # (as modules under their own top directory) and must not make the OAI-only meta prefixes wrong
+    lean = tmp_path / 'lean'
+    (lean / 'OAI' / 'NumberTheory').mkdir(parents=True)
+    (lean / 'PrimeNumberTheoremAnd' / 'Erdos970').mkdir(parents=True)
+    (lean / 'PrimeNumberTheoremAnd' / 'Erdos970' / 'A.lean').write_text('import Mathlib\n')
+    (lean / 'StrongPNT').mkdir()
+    (lean / 'StrongPNT' / 'B.lean').write_text('import Mathlib\n')
+    (lean / 'Empty').mkdir()
+    assert CP.openai_prefixes(str(lean)) == ['OAI.NumberTheory', 'PrimeNumberTheoremAnd', 'StrongPNT']
+    meta = tmp_path / 'oai_meta.json'
+    meta.write_text(json.dumps({'title': 'T', 'date': 'd', 'family': '12', 'commit': 'a' * 40,
+                                'prefixes': ['OAI.NumberTheory']}))
+    assert CP.check_meta(str(meta), str(lean), 'OAI.NumberTheory.Main') is None
+
+
 # ---- config_set edits after `config` ran (oaiq-051, 2026-10-27) ----------------------------------
 # A post-carve proof fix goes in config `patches`; set in pipeline.json's config_set on a resume, it
 # never reached config.json (the config step was done), so measure kept failing on unpatched text.
