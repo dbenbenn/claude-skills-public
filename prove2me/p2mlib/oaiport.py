@@ -856,7 +856,7 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"(?<![\w.'])PowerSeries\.order_zero_of_isUnit(?![\w'])", 'PowerSeries.order_zero_of_unit', text)
     text = re.sub(r"(?<![\w'])((?:Finset\.)?sum_le_sum_of_subset_of_nonpos)(?![\w'₀])", r"\1'", text)
     text = re.sub(r"(?<![\w.'])IsCompactElement\.exists_finset_of_le_iSup(?![\w'])",
-                  'CompleteLattice.IsCompactElement.exists_finset_of_le_iSup', text)
+                  'CompleteLattice.IsCompactElement.exists_finset_of_le_iSup _', text)
     return split_partial_namespaces(text)
 
 

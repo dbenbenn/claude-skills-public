@@ -1622,6 +1622,12 @@ def test_pi_exponent_renames():
     assert 'Ideal.comap_lt_comap_of_integral_mem_sdiff h x' in out
     assert 'PowerSeries.order_zero_of_unit (u' in out
     assert "Finset.sum_le_sum_of_subset_of_nonpos' (f := a)" in out
-    assert 'CompleteLattice.IsCompactElement.exists_finset_of_le_iSup hN' in out
+    assert 'CompleteLattice.IsCompactElement.exists_finset_of_le_iSup _ hN' in out
     # idempotent: already-qualified names are left alone
     assert O.core_rewrites(out) == out
+
+
+def test_the_compat_block_declares_transcendental_ne_zero():
+    # d13f23b's `Transcendental.ne_zero` (PiExponent CurveZeroPole, oaiq-068); ours has none
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^theorem _root_\.Transcendental\.ne_zero\b', block, re.M)
