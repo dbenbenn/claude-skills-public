@@ -55,7 +55,7 @@ class FakeApi:
         self.published = dict(published or {'A.top': 'TOP'})    # name -> id
         self.posted, self.jobs, self.subs, self.n = [], {}, {}, 0
         self.proved = set()
-        self.foreign, self.texts, self.proofs = {}, {}, {}
+        self.foreign, self.texts, self.proofs, self.also = {}, {}, {}, {}
 
     def live_proofs(self, name):
         """The live proofs of the theorem `name`: [{id, author, status, content}]."""
@@ -111,10 +111,13 @@ class FakeApi:
             return {'status': st, 'theorem_id': 'id-' + name}
         return {'status': st, 'error_message': err}
 
-    def verify(self, tid, path, explanation):
+    def verify(self, tid, path, explanation, also=None):
         assert tid in self.published.values(), 'piece before its statement'
         assert len(explanation) >= 200
         name = next(n for n, i in self.published.items() if i == tid)
+        if self.proofs.get(name) and not also:      # submit_verify.guard
+            raise RuntimeError('theorem %s already has %d live proof(s)' % (tid, len(self.proofs[name])))
+        self.also[name] = also
         self.posted.append(('verify', name))
         self.n += 1
         self.subs['s%d' % self.n] = name
@@ -470,3 +473,26 @@ def test_a_second_heartbeat_timeout_waits_for_a_person(split):
     r, summary = run(cfg, api)
     st = json.loads((d / 'run_state.json').read_text())
     assert st['bundle:XB001']['state'] == 'raise_heartbeats' and api.posted.count(('def', 'XB001')) == 2
+
+
+def test_a_piece_held_by_the_live_proof_guard_goes_on_once_its_comparison_is_written(split):
+    # oaiq-068: the goal had four SKETCH_ACCEPTED proofs by others; the guard refused ours and the
+    # worker submitted it by hand. The comparison (submit_all.py's convention) is the person's answer.
+    d, cfg = split
+    api = FakeApi()
+    api.proofs['A.top'] = [{'id': 'other', 'author': 'wurtle', 'status': 'SKETCH_ACCEPTED', 'content': 'x'}]
+    run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.top']['state'] == 'stop' and 'live proof' in st['piece:A.top']['last']
+    assert ('verify', 'A.top') not in api.posted
+    (d / 'comparisons').mkdir()
+    (d / 'comparisons' / 'A_top.md').write_text('Same as other: the same reflexivity.\n')
+    run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.top']['state'] == 'stop' and st['piece:A.top']['last'].startswith('settled: Same as other')
+    assert ('verify', 'A.top') not in api.posted
+    note = 'Different from other: ours goes through `A.mid`, theirs reduces to an open leaf.\n'
+    (d / 'comparisons' / 'A_top.md').write_text(note)
+    run(cfg, api)
+    assert ('verify', 'A.top') in api.posted and api.also['A.top'] == note.strip()
+    assert json.loads((d / 'run_state.json').read_text())['piece:A.top']['state'] == 'live'

@@ -94,8 +94,13 @@ class Runner:
         self._restart_changed()
 
     def file_sha(self, item):
-        p = self.info(item)['file']
-        return hashlib.sha1(open(p, 'rb').read()).hexdigest() if os.path.exists(p) else None
+        f = self.info(item)
+        if not os.path.exists(f['file']):
+            return None
+        h = hashlib.sha1(open(f['file'], 'rb').read())
+        if f.get('comparison') and os.path.exists(f['comparison']):
+            h.update(b'\0' + open(f['comparison'], 'rb').read())   # writing one answers a refusal
+        return h.hexdigest()
 
     def _restart_changed(self):
         """A terminal item (it waits for a person) whose file changed since it was sent starts over:
@@ -119,8 +124,10 @@ class Runner:
         if kind == 'statement':
             return {'kind': kind, 'name': name, 'file': os.path.join(out, 'lib', 'Thm_%s.lean' % s),
                     'text': os.path.join(prose, '%s.md' % s)}
+        cmp_dir = self.cfg.get('comparisons') or os.path.join(os.path.dirname(self.cfg['explanations']), 'comparisons')
         return {'kind': kind, 'name': name, 'file': os.path.join(out, 'solutions', 'Sol_%s.lean' % s),
-                'text': os.path.join(self.cfg['explanations'], '%s.md' % s), 'node': n}
+                'text': os.path.join(self.cfg['explanations'], '%s.md' % s), 'node': n,
+                'comparison': os.path.join(cmp_dir, '%s.md' % s)}
 
     def check(self, item):
         """None if the item's files are ready to send, else why not."""
@@ -326,7 +333,7 @@ class Runner:
                 self._submit_one(x, stmts)
             except Exception as e:                       # a refused post: this item waits for a person
                 st = self.st(x)
-                st.update(state='stop', last=str(e)[:500])
+                st.update(state='stop', last=str(e)[:500], sha=self.file_sha(x))
                 self.log(x, 'refused', str(e)[:200])
                 self.save()
         for i in range(0, len(stmts), BATCH):
@@ -378,7 +385,17 @@ class Runner:
             if not tid:
                 self.blocked[x] = 'no theorem id for ' + f['name']
                 return
-            sid = self.api.verify(tid, f['file'], open(f['text'], encoding='utf-8').read())
+            # someone else's live proof: the guard refuses ours until a person has read it and written
+            # comparisons/<slug>.md, "Different from <id>: ..." (sent as the reason) or "Same as <id>: ..."
+            # (settled, not sent); submit_all.py's convention (oaiq-068)
+            also = open(f['comparison'], encoding='utf-8').read().strip() if os.path.exists(f['comparison']) else ''
+            if also.startswith('Same as'):
+                st.update(state='stop', last='settled: ' + also.split('\n')[0][:300], sha=self.file_sha(x))
+                self.log(x, 'settled', also.split('\n')[0][:200])
+                self.save()
+                return
+            expl = open(f['text'], encoding='utf-8').read()
+            sid = self.api.verify(tid, f['file'], expl, also=also) if also else self.api.verify(tid, f['file'], expl)
             st.update(state='inflight', sid=sid, sha=self.file_sha(x))
             self.log(x, 'submit piece (try %d)' % (sum(st['history'].values()) + 1), sid)
             self.save()
@@ -540,8 +557,8 @@ class LiveApi:
         r = self._call('GET', '/publish-jobs/' + jid)
         return r if isinstance(r, dict) and not r.get('__error') else {'status': 'PENDING'}
 
-    def verify(self, tid, path, explanation):
-        return self._ok(self._post(tid, path, explanation), 'verify')['submission_id']
+    def verify(self, tid, path, explanation, also=None):
+        return self._ok(self._post(tid, path, explanation, also=also), 'verify')['submission_id']
 
     def verdict(self, sid):
         r = self._call('GET', '/verify?submission_id=' + sid)

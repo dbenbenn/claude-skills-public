@@ -117,7 +117,11 @@ Problem336).** Fix each at the cause; none needs a macro.
   `tauto` no longer unfolds an applied set-builder membership; `simpa only [ite_true]` no longer fires on an
   `if True` whose `Decidable` instance is not the standard one (use `↓reduceIte`, oaiq-056); a multi-line `convert … using 1; first | rfl |
   ring` closes only the first goal (use `<;>`) (oaiq-045); `omit [BorelSpace E]` on a lemma that uses stdGaussian
-  (oaiq-048).
+  (oaiq-048); `omit [CompleteSpace H] in` where our order on `H →L[ℂ] H` needs it: remove only the `omit`s Lean
+  rejects, never all (`~/claude/p2m-standalone/openai-ports/oaiq-039/fix_omits_from_errors.py` writes those patches from a module's errors); an instance
+  body `by unfold; infer_instance` on a type synonym breaks `simp`/`rw` instance matching, `inferInstanceAs` fixes
+  it (oaiq-075); the port's `first | infer_instance | exact Measure.isProbabilityMeasure_map …` line times out at
+  `whnf` when the measure is a `let`: name `Measure.isProbabilityMeasure_map hφ.aemeasurable` (oaiq-074).
 - *Rewritten by the port since 2026-10-28* (f6bb691, d0c5d2c, f76350b): the `Measure.map` fallback tries
   the mapped function's named measurability facts first (a hypothesis about it, or a `foo_measurable` /
   `measurable_foo` lemma anywhere in the port), then a bounded `infer_instance`, then `AEM_TAC`; also
@@ -528,8 +532,13 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   `config_set.external_theorems` (`{lean name: "Theorems.Thm_<name with _>"}`) after `fetch_theorems.py
   --names`; a bundle of another author that declares the same names as the goal's own bundle cannot be
   combined with it, so take a `statement_suffix`.
+- **A goal someone else has already proved** (oaiq-068: four SKETCH_ACCEPTED reductions of the goal by others):
+  split_run's piece is refused by the live-proof guard and waits. Read their proof; write
+  `<carve>/publish/comparisons/<slug>.md` (beside `explanations/`), "Different from <id>: …" or "Same as <id>: …",
+  and resume `--publish`: a "Different" piece is sent with that reason, a "Same" one is settled unsent.
 - **Iterating on drift fixes:** edit the ported file in `prove2me_workspace/Solutions/FOLDER` and compile it
-  alone (`lake env lean FILE`, seconds), then turn the diff into patches whose `count` is taken over the
+  alone (`lake env lean FILE`, seconds), or the whole closure with in-place edits (`lake build ROOT` keeps going
+  past failures and caches, so a round is minutes; oaiq-075), then turn the diff into patches whose `count` is taken over the
   unpatched port, never the patched workspace (oaiq-063, -071, -072). A patch `why` lands in the piece's
   explanation: write Lean names in it in backticks (oaiq-064: a hypothesis `he` failed the pronoun check).
 

@@ -7,7 +7,12 @@ RUN.json: {"plan", "out", "prose", "explanations", "state", "log", "source", "ta
 (paths may start with ~). Without --go it looks the plan's bundles and statements up on the
 platform (reads only) and prints what a run would adopt as already live, any live name whose text
 differs from ours (a run refuses to post anything then), what it would send first and what is
-blocked; it writes neither the platform nor the state file. --offline skips the lookups."""
+blocked; it writes neither the platform nor the state file. --offline skips the lookups.
+
+A piece whose theorem has someone else's live proof is refused (submit_verify's guard) and waits.
+Read that proof, then write `comparisons/<slug>.md` beside `explanations/` (or RUN.json "comparisons"):
+"Different from <id>: ..." sends ours with it as the reason on the next run; "Same as <id>: ..."
+settles the item unsent (submit_all.py's convention; oaiq-068)."""
 import json
 import os
 import sys
