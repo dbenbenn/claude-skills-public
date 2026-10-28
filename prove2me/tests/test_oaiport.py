@@ -1704,3 +1704,10 @@ def test_library_suggestion_deny_list_blocks_are_removed():
     # another run_cmd is left to fail loudly
     other = 'run_cmd Lean.logInfo "x"\n'
     assert O.core_rewrites(other) == other
+
+
+def test_the_compat_block_declares_is_unital():
+    # d13f23b's `IsUnital` and `IsUnital.toNormedRing` (Kadison similarity CStarCorner, oaiq-075)
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^class IsUnital\b', block, re.M)
+    assert re.search(r'^noncomputable def IsUnital\.toNormedRing\b', block, re.M)

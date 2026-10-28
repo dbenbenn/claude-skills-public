@@ -387,6 +387,27 @@ theorem _root_.PositiveLinearMap.norm_map_star_mul_sq_le {A : Type*} [CStarAlgeb
   have h2 := mul_self_le_mul_self (norm_nonneg _) h
   rw [← ha, ← hb]
   simpa [sq, mul_mul_mul_comm] using h2
+/-- Mathlib d13f23b's `IsUnital`: a non-unital ring with a two-sided identity element (Kadison similarity,
+oaiq-075). -/
+class IsUnital (A : Type*) [NonUnitalRing A] : Prop where
+  exists_one : ∃ e : A, ∀ a : A, e * a = a ∧ a * e = a
+
+/-- d13f23b's `IsUnital.toNormedRing`: a non-unital normed ring with an identity is a normed ring. -/
+@[instance_reducible]
+noncomputable def IsUnital.toNormedRing {A : Type*} [NonUnitalNormedRing A] [h : IsUnital A] :
+    NormedRing A :=
+  let e := h.exists_one.choose
+  have he := h.exists_one.choose_spec
+  letI : One A := ⟨e⟩
+  letI : NatCast A := ⟨Nat.unaryCast⟩
+  letI : IntCast A := ⟨Int.castDef⟩
+  { ‹NonUnitalNormedRing A› with
+    one_mul := fun a => (he a).1
+    mul_one := fun a => (he a).2
+    natCast_zero := rfl
+    natCast_succ := fun n => rfl
+    intCast_ofNat := fun n => rfl
+    intCast_negSucc := fun n => rfl }
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod
