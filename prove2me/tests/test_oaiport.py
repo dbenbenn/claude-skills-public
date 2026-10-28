@@ -858,6 +858,22 @@ def test_convert_using_semicolon_ring_closes_all_goals():
     assert "convert h using 1 <;> first | (with_reducible_and_instances rfl) | (simp)" in out
 
 
+def test_convert_using_chain_continued_on_next_line_stays_one_tactic():
+    # WellCapRegularity (oaiq-092): `convert … using 1 <;> (try funext y) <;>` with the last tactic on the
+    # next line, and a convert whose term spans lines: wrap the whole chain after the diamond-closing rfl
+    one = "  convert h using 1 <;> (try funext y) <;>\n    (dsimp [f]; all_goals ring)\n"
+    out = O.core_rewrites(one)
+    assert out == ("  convert h using 1 <;> first | (with_reducible_and_instances rfl) | "
+                   "((try funext y) <;>\n    (dsimp [f]; all_goals ring))\n")
+    two = "  convert (a.add\n    b) using 1 <;> (try funext y) <;>\n    (dsimp; all_goals ring)\n"
+    out = O.core_rewrites(two)
+    assert out == ("  convert (a.add\n    b) using 1 <;> first | (with_reducible_and_instances rfl) | "
+                   "((try funext y) <;>\n    (dsimp; all_goals ring))\n")
+    # an earlier convert without `using` is not swallowed
+    three = "  convert foo\n  convert bar using 1; simp\n"
+    assert "convert foo\n  convert bar using 1 <;> first" in O.core_rewrites(three)
+
+
 def test_convert_using_semicolon_parenthesised_first_closes_all_goals():
     # KServer (oaiq-017, 2026-10-26): `convert h using 1; (first | rfl | ring)` runs only on the first goal
     src = "    convert hm using 1; (first | rfl | ring)\n    convert h using 1; (first | rfl | simp)\n"
