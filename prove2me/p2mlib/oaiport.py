@@ -909,7 +909,7 @@ def _simp_lists_add_if_true(text):
     `simp only [ite_true]` stops firing on an `if True` whose instance came from elsewhere (oaiq-056,
     BalancedRyser oaiq-063). Our `if_true` is the general lemma: every simp-family list that names
     `ite_true` names `if_true` too (added, not renamed: ours is rfl, which `dsimp` and simp's dsimp steps
-    need; `rw` lists are left alone, where an unused `if_true` would fail)."""
+    need; `rw` lists are left alone, where an unused `if_true` would fail). `ite_false` gets `if_false`."""
     out, i = [], 0
     for m in re.finditer(r"(?<![\w.'])(?:simp|simpa|simp_all|simp_arith|field_simp)\b[?!]?[^\[\n]*?\[", text):
         if m.start() < i:
@@ -918,12 +918,42 @@ def _simp_lists_add_if_true(text):
         e = _balanced_end(text, q)
         if e is None:
             continue
-        lst = text[q:e]
-        if re.search(r"(?<![\w.'@])ite_true(?![\w'])", lst) and not re.search(r"(?<![\w.'])if_true(?![\w'])", lst):
-            lst = re.sub(r"(?<![\w.'@←])(ite_true)(?![\w'])", r"\1, if_true", lst, count=1)
-            out.append(text[i:q] + lst)
+        lst = new = text[q:e]
+        for b in ('true', 'false'):     # ite_false likewise (oaiq-078)
+            if re.search(r"(?<![\w.'@])ite_%s(?![\w'])" % b, new) and not re.search(r"(?<![\w.'])if_%s(?![\w'])" % b, new):
+                new = re.sub(r"(?<![\w.'@←])(ite_%s)(?![\w'])" % b, r"\1, if_%s" % b, new, count=1)
+        if new != lst:
+            out.append(text[i:q] + new)
             i = e
     return ''.join(out) + text[i:]
+
+
+def mathlib_token_idents(text):
+    """Identifiers that full Mathlib turns into tokens, escaped (oaiq-082: Std-only OpenAI modules, but
+    our Compat imports Mathlib): a bare `variables` (Mathlib's command keyword) becomes `«variables»`
+    (dotted `F.variables` is unaffected and names the same field), and an index `c[j]` with a variable
+    `c` becomes `(c)[j]`, since `c[` opens the cycle notation; a `c[1, 2]` with a top-level comma is that
+    notation and stays. Read outside comments and literals."""
+    from .leantext import code_only
+    code, edits = code_only(text), []
+    for m in re.finditer(r"(?<![\w'.!?\u2080-\u209c«])variables(?![\w'!?\u2080-\u209c»])", code):
+        edits.append((m.start(), m.end(), '«variables»'))
+    for m in re.finditer(r"(?<![\w'.!?\u2080-\u209c«(])c\[", code):
+        depth, j, comma = 0, m.end() - 1, False
+        while j < len(code):
+            ch = code[j]
+            depth += ch in '([{'
+            depth -= ch in ')]}'
+            if ch == ',' and depth == 1:
+                comma = True
+            if depth == 0:
+                break
+            j += 1
+        if not comma:
+            edits.append((m.start(), m.start() + 1, '(c)'))
+    for a, b, new in sorted(edits, reverse=True):
+        text = text[:a] + new + text[b:]
+    return text
 
 
 def _finset_antidiagonal(text):
@@ -1118,6 +1148,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # Mathlib adds the global tokens `<m ≤m <i ≤i ≤s <r ≤r ≤c`; `1<m` with a variable `m` then fails
     # to parse. Space them unless written as the notation (` <m `).
     text = re.sub(r"(?<=[^\s<≤])([<≤])([misrc])", r" \1 \2", text)
+    text = mathlib_token_idents(text)
     text = re.sub(r"(?<![\w.'])(?:_root_\.)?TensorProduct\.inductionOn(?![\w'])",
                   pre + 'tensorInductionOn', text)
     # `FreeGroup.induction_on`'s first case is `one` in d13f23b and `C1` here (Eilenberg–Ganea

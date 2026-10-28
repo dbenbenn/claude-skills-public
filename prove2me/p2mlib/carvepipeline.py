@@ -71,10 +71,21 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
             continue                                   # pipeline.json accept_over
         if t['secs'] > limit and name not in frozen:
             over.append((key, t['secs'], cost))
+    # a statement over the limit publishes, but every verify that imports it compiles its module and
+    # fails (opus-kadison, oaiq-039: 110 s and 176 s); re-planning cannot shrink it and accept_over does
+    # not excuse it. Published (frozen) and external statements are someone's already.
+    statements_over, ext = [], set(plan.get('external') or ())
+    for n in plan.get('stubs') or {}:
+        t = times.get('statement:' + n)
+        if n in ext or n in frozen or not t or not t.get('ok'):
+            continue
+        measured += 1
+        if t['secs'] > limit:
+            statements_over.append(('statement:' + n, t['secs']))
     ratio = max((secs / max(cost, 1.0) for _, secs, cost in over), default=1.0)
     new_scale = round(min(MAX_SCALE, max(scale * 1.1, scale * ratio)), 1) if over else scale
     return {'over': over, 'ratio': ratio, 'new_scale': new_scale, 'limit': limit, 'measured': measured,
-            'slowest': slowest}
+            'slowest': slowest, 'statements_over': statements_over}
 
 
 def module_root_name(rootmod, prefixes, files):
@@ -478,7 +489,11 @@ class Pipeline:
         if not (os.path.exists(plan_path) and os.path.exists(times_path)):
             return 'skipped'                                       # nothing was measured
         plan, times = json.load(open(plan_path)), json.load(open(times_path))
-        fz = (cfg.get('frozen') or {}).get('bundles') or ()
+        frozen = cfg.get('frozen') or {}
+        fz = list(frozen.get('bundles') or ())
+        fp = os.path.expanduser(frozen.get('plan') or '')
+        if fp and os.path.exists(os.path.join(self.d, fp)):
+            fz += list((json.load(open(os.path.join(self.d, fp))).get('stubs') or {}))   # live statements
         res = calibration(plan, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
                           accepted=self.p.get('accept_over') or ())
         log = os.path.join(self.d, 'logs', 'calibrate.log')
@@ -487,6 +502,17 @@ class Pipeline:
             _now(), res['measured'], cfg.get('budget', 55), res['limit'], res['slowest'])]
         for key, secs, cost in res['over']:
             lines.append('  over: %s measured %.0f s, planned %.0f s' % (key, secs, cost))
+        if res['statements_over']:
+            open(log, 'a').write('\n'.join(lines + ['  statement over: %s measured %.0f s' % x
+                                                     for x in res['statements_over']]) + '\n')
+            raise StepFailed(
+                "step 'calibrate': statement module(s) over the %.0f s limit: %s. A statement publishes, but every "
+                "verify that imports it compiles its module and times out (opus-kadison, oaiq-039), and re-planning "
+                "cannot shrink one. Profile it (`lean -o x.olean -Dprofiler=true`): if `.olean serialization` "
+                "dominates, the statement's type is huge; name its large sides or subterms with `abbrev`s in a "
+                "bundle (only declaration types cost, a definition's value is cheap) and state it with them "
+                "(references/openai-ports.md \"Slow or odd failures\"); log %s"
+                % (res['limit'], ', '.join('%s (%.0f s)' % x for x in res['statements_over']), log))
         if not res['over']:
             open(log, 'a').write('\n'.join(lines + ['fits the model; time_scale %g kept' % cfg.get('time_scale', 1.5)]) + '\n')
             return None
@@ -504,7 +530,7 @@ class Pipeline:
                 "Find what is slow before splitting. (1) Compile the piece's check file with "
                 "`lean -o x.olean -Dprofiler=true`: if `.olean serialization` dominates while elaboration is fast, "
                 "the statement's type is huge (oaiq-075: 316 s of 341 s, a term re-embedded thousands of times); "
-                "name the big term with a def by a patch, do not split. (2) Else "
+                "name its large sides or subterms with `abbrev`s in a bundle and state it with them (declaration types cost, a definition's value is cheap; opus-kadison), do not split. (2) Else "
                 "`-Dtrace.profiler=true -Dtrace.profiler.threshold=20000` shows the slow declaration or tactic "
                 "(oaiq-074: one fun_prop goal, 53 s). (3) Kernel computation (`decide +kernel`, `native_decide`) or "
                 "plain bulk: force the heavy lemmas into statements, listing them in pipeline.json `forced` (a private "

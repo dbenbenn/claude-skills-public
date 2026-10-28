@@ -110,7 +110,9 @@ Problem336).** Fix each at the cause; none needs a macro.
   `mgf_gaussianReal heq`. By hand: an `apply` followed by one bullet per goal (delete the dropped goal's bullet),
   a `rw [foo a b]` that left the removed argument as a side goal, an `AESM_TAC` site where nothing fixes the
   function yet (`simpa … using eLpNorm_sum_le (…)` with no `(f := …)`).
-- *Smaller drift seen once or twice, patched per site:* `MemLp g p μ` is a pair (a bare `lt_top` proof needs
+- *Smaller drift seen once or twice, patched per site:* `A ≤ᵐ[μ] B ∪ ⋃ …` with sets of sets fails to
+  synthesize `Union (Set E → Prop)`: ascribe `(B ∪ … : Set (Set E))`; after `filter_upwards`, a `simp` on
+  `(X ∩ B) ω` needs `show ω ∈ X ∩ B` first (oaiq-078); `MemLp g p μ` is a pair (a bare `lt_top` proof needs
   `⟨hg.aestronglyMeasurable, _⟩`), `MemLp.mul` swapped its factors; `norm_num [table defs]` leaves `vecCons`
   lookups or `Int.toNat 205` unevaluated where `simp [same]` evaluates them (oaiq-033/038); `rw
   [AddMonoidAlgebra.coeff_zero]` on an `MvPolynomial.coeff` goal is `MvPolynomial.coeff_zero` (and `coeff_add`);
@@ -450,7 +452,8 @@ back WA. The lessons:
     `theorem _check : type_of% @T := @solution`): it reproduces the locationless WA.
   - The verifier compiles a solution **without its target in scope**; carved pieces must also
     re-activate local instances (`attribute [local instance] x` when the bundle exports `x`),
-    avoid tokens full Mathlib adds (`Δ_[1]^[n]` → `Δ_[1] ^[n]`), and drop a theorem a published
+    avoid tokens full Mathlib adds (`Δ_[1]^[n]` → `Δ_[1] ^[n]`; the port escapes a bare `variables` as
+    `«variables»` and an index `c[j]` as `(c)[j]`, oaiq-082), and drop a theorem a published
     bundle already declares. Config `external_defs`, `statement_suffix`, `patches` (post-carve
     proof fixes) support a fresh split beside an abandoned one.
 
@@ -462,13 +465,24 @@ back WA. The lessons:
   1. `lean -o x.olean -Dprofiler=true FILE` (with `LEAN_PATH=<carve>/olean:$(lake env printenv LEAN_PATH)`).
      If `.olean serialization` dominates while elaboration is fast (oaiq-075: 316 s of 328, `sorry` just as slow),
      the statement's *type* is huge: print `Expr.sizeWithoutSharing` per binder (`forallTelescope` in a
-     `#eval show MetaM Unit`). Remedy: a patch that names the big term with a `def`/structure. Never `forced`:
+     `#eval show MetaM Unit`). Only declaration *types* cost: the same term inside a proof or as a definition's
+     value writes in 0.2 s (opus-kadison: 105 s as a theorem's type). Remedy: `abbrev`s naming the large sides or
+     subterms, in a bundle (in the same `attribute [-instance]` context as the stubs), and the statement restated
+     with them; its piece starts with `unfold` of them, and importers still work, even `with_reducible exact`,
+     since an `abbrev` unfolds at reducible transparency. Where the type cannot shrink (a frozen statement),
+     declaring OpenAI's theorem directly as `theorem _root_.solution` instead of `<name>_oai` plus a `solution`
+     copy halves the serialization (98 s to 61 s). Profile the `chk/` file whose name matches the current plan:
+  earlier plans' files stay there (oaiq-078). A *statement* over the limit stops calibrate: it publishes,
+     but every verify that imports it times out compiling it. Never `forced`:
      the item is already one small proof.
   2. `lean -Dtrace.profiler=true -Dtrace.profiler.threshold=20000 FILE` names the slow tactic with its position;
      plain `-Dprofiler` gives only the cumulative "type checking" (oaiq-074: one `fun_prop` measurability goal
      took 53 s; `Real.continuous_exp.aestronglyMeasurable` as a term fixed it).
   3. No heavy declaration, just many small lemmas: force two or three mid-chain theorems (`forced`, chosen by
-     transitive-closure size at about 1/3, 1/2, 5/6 of the total; oaiq-031, oaiq-074).
+     transitive-closure size at about 1/3, 1/2, 5/6 of the total; oaiq-031, oaiq-074). Verifier data
+     (oaiq-078): pieces at 118-126 s local CPU timed out three times; 93.7, 99.6 and 102.7 s passed first time,
+     so the real limit is about 100-110 s, below `PIECE_CAP` (150 s, kept so that a piece is tried before it is
+     split).
 - **`(kernel) deterministic timeout` where the elaborator accepted every step** (oaiq-068): typically a goal
   equating `f a i₁` with `f a i₂` for two proofs of a Prop-valued instance argument (a `letI … := h ▸
   inferInstance` in two statements). State the irrelevance as a lemma, `@f … i₁ = @f … i₂ := by cases
@@ -499,6 +513,18 @@ back WA. The lessons:
   stripped: `~/claude/p2m-standalone/openai-ports/oaiq-083/prep_upstream.py`; the `Erdos970` forks are in `prove2me_workspace/Solutions/OAIChowla`)
   and resume; the port takes them as OpenAI's. Look for statements already published from them (the Chowla
   split) to use as `external_theorems`.
+- **The CoeT WA on universe-polymorphic statements** (opus-kadison, oaiq-039; also Erdős 3 v2 and oaiq-003 Rokhlin).
+  The verifier's plain comparison of `solution`'s type with the target's fails for some polymorphic statements
+  (why is unknown: locally it succeeds), and the fallback `CoeT` search then times out at `typeclass` 20000 on a
+  heavy type. That fallback reproduces exactly: it failed locally for precisely the 13 rejected statements of 246
+  polymorphic ones. Private probes: binders with conclusion `True`, or `{H : Type}` instead of `Type*`, or no
+  `attribute [-instance]` line, were all accepted, so the trigger is polymorphism plus a heavy type. The local
+  check runs the fallback (19c7a63), so carve_measure reports such a piece. Remedy: state it monomorphically if
+  every importer is; else `carve.py fold CONFIG NODE…` (config `folded`) folds the statement into every importer's
+  piece, whose live statements stay, and only those pieces are resubmitted (through split_run with a
+  `comparisons/` note on each, since the old sketches are live). Regenerate pieces of a published carve with the
+  carve's own snapshot (pipeline_state.json `snapshot`): a newer carver emits more `attribute [-instance]` lines
+  than the frozen stubs have. A re-plan with a snapshot older than 19c7a63 drops the fold.
 - **Unused imports of a definitions bundle are kept** (oaiq-075, 733702b). carve_measure reports them and fails
   or cuts only false edges between statements: a later bundle's `attribute [-instance]` line can name an
   instance it sees only through that import, and cutting it broke 17 items with "Unknown constant".
@@ -531,7 +557,10 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   derived from the targets (keep the goal's own `Def_` in it); earlier published statements go in
   `config_set.external_theorems` (`{lean name: "Theorems.Thm_<name with _>"}`) after `fetch_theorems.py
   --names`; a bundle of another author that declares the same names as the goal's own bundle cannot be
-  combined with it, so take a `statement_suffix`.
+  combined with it, so take a `statement_suffix`. Another user's *stalled* carve of the same goal (oaiq-082:
+  ten bundles, a SKETCH_ACCEPTED goal reduction to three Open leaves nobody proved): do not extend their leaves;
+  carve under a `statement_suffix` and add the second decomposition, whose goal piece goes in with a
+  comparisons note (below) and was Proved at once, having no open leaf.
 - **A goal someone else has already proved** (oaiq-068: four SKETCH_ACCEPTED reductions of the goal by others):
   split_run's piece is refused by the live-proof guard and waits. Read their proof; write
   `<carve>/publish/comparisons/<slug>.md` (beside `explanations/`), "Different from <id>: …" or "Same as <id>: …",

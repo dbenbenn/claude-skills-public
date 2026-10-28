@@ -1129,9 +1129,10 @@ Failures that no local build reproduces. The detail and the case behind each is 
 | `CE` "Unknown constant `<target>`" | The solution mentions the target, which is not in scope when it compiles. Write `theorem solution : type_of% @T_dev := @T_dev`. |
 | `WA` "universe level metavariables" | A universe nothing pins: see Expansion 5 (disproofs, and universes only under `max`). |
 | `WA` "does not match the target type", `CoeT` typeclass timeout | A raw `Classical.choose (Classical.choose_spec …)` in a binder type. Name it with `let` after the colon. |
+| `WA` "failed to synthesize CoeT (∀ {H : Type ?u.4} …) x (∀ {H : Type ?u.3} …)", printed types identical | A universe-polymorphic statement with a heavy type: the verifier's plain type comparison fails and its `CoeT` fallback runs out of `typeclass` budget (opus-kadison, oaiq-039). Never resubmit unchanged: the local check (`localcheck`, since 19c7a63) runs that fallback; state it monomorphically if every importer is, or `carve.py fold` it into its importers' pieces. |
 | "unknown universe level", or `SORRY` on a declaration above the real fault | The verifier runs with `autoImplicit` off and `lake env lean` does not. Hoist every `universe` line to the top of an assembled file. |
 | "FAILED: Compilation timed out after 300s", "Verification timed out after 300s" | The item itself is slow. Retry unchanged first; after about two real timeouts split it into pieces of about 60 s or less at `-j1` locally. |
-| "Module compilation timed out" | A cold worker building imported bundles. Retry unchanged, never split. |
+| "Module compilation timed out" | A cold worker building imported bundles. Retry unchanged, never split, unless an imported *statement* module takes over about 90 s locally (`lean -o`): then every importer fails, and the statement needs restating (its large sides as `abbrev`s in a bundle). |
 | `whnf` heartbeat timeout on the server only | A `rfl` proof: rewrite it without the deep unfolding. A definition: `set_option maxHeartbeats 1000000 in`. |
 | "Source too large for token scanner" | The 1 MiB cap. Split into published statements; a disproof cannot import, so golf it. |
 | `dependency_oom` ("Lean exited with code 137") | Heavy computations in bundles a piece imports together; see `references/openai-ports.md`. |

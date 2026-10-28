@@ -824,3 +824,24 @@ def test_name_check_builds_a_read_only_run_from_the_carve(tmp_path, monkeypatch)
     assert seen['readonly'] and seen['write'] is False
     assert seen['cfg']['plan'] == str(work / 'plan.json') and seen['cfg']['out'] == str(out)
     assert not os.path.exists(seen['cfg']['state'])            # nothing written
+
+
+def test_calibration_reports_a_slow_statement_apart_and_accept_over_does_not_excuse_it():
+    # opus-kadison (oaiq-039): statements at 110 s and 176 s published, then every verify that imported
+    # them failed ("Failed to resolve platform imports: Module compilation timed out"); calibrate never
+    # looked at statements
+    plan = dict(_plan({'B0': 55}), stubs={'A.slow': {}, 'A.fine': {}, 'A.live': {}}, external=['A.ext'])
+    times = {'bundle:B0': _t(20), 'statement:A.slow': _t(110), 'statement:A.fine': _t(16),
+             'statement:A.live': _t(120), 'statement:A.ext': _t(300)}
+    r = CP.calibration(plan, times, 1.2, 55, frozen=['A.live'], accepted=['statement:A.slow'])
+    assert r['over'] == [] and r['statements_over'] == [('statement:A.slow', 110)]
+
+
+def test_a_slow_statement_stops_calibrate_with_the_abbrev_remedy(env):
+    work = env.dir / 'carve_work'
+    work.mkdir(parents=True, exist_ok=True)
+    (work / 'plan.json').write_text(json.dumps(dict(_plan({'B0': 55}), stubs={'A.big': {}})))
+    (work / 'times.json').write_text(json.dumps({'bundle:B0': _t(20), 'statement:A.big': _t(176)}))
+    r = run(env, *ARGS, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}))
+    assert r.returncode == 1 and 'A.big' in r.stderr and 'abbrev' in r.stderr
+    assert json.load(open(env.dir / 'pipeline_state.json')).get('replans', 0) == 0

@@ -2039,6 +2039,38 @@ def test_simp_lists_naming_ite_true_also_name_if_true():
     assert O.core_rewrites(out) == out
 
 
+def test_simp_lists_naming_ite_false_also_name_if_false():
+    # oaiq-078: ~15 modules under `open scoped Classical`, `if False` left unsimplified
+    src = "  simp only [ite_false, hx]\n  simp only [ite_true, ite_false]\n  simp [dite_false]\n  rw [ite_false]\n"
+    out = O.core_rewrites(src)
+    assert "  simp only [ite_false, if_false, hx]\n" in out
+    assert "  simp only [ite_true, if_true, ite_false, if_false]\n" in out
+    assert "  simp [dite_false]\n  rw [ite_false]\n" in out
+    assert O.core_rewrites(out) == out
+
+
+def test_identifiers_that_full_mathlib_makes_tokens_are_escaped():
+    # oaiq-082 BinPacking: Std-only OpenAI modules, but our Compat imports Mathlib, whose `variables`
+    # command and `c[...]` cycle notation then swallow these identifiers
+    src = ("/-- the variables of a formula; `c[j]` in prose -/\n"
+           "structure Literal (variables : Nat) where\n  index : Fin variables\n"
+           "abbrev Clause (variables : Nat) := Vector (Literal variables) 3\n"
+           "structure Formula where\n  variables : Nat\n"
+           "inductive Slot | input | variables | counter\n"
+           "example (F : Formula) : F.variables = F.variables := rfl  -- change-of-variables\n"
+           "theorem t (c : Clause 3) (j : Fin 3) (hj : c[j].eval A = true) : afterHeaders_variables = c[j+1]! := by\n"
+           "  exact (c[1, 2] : Equiv.Perm (Fin 3))\n")
+    out = O.core_rewrites(src)
+    assert out.startswith("/-- the variables of a formula; `c[j]` in prose -/\n")
+    assert "structure Literal («variables» : Nat) where\n  index : Fin «variables»\n" in out
+    assert "(Literal «variables») 3" in out and "  «variables» : Nat\n" in out
+    assert "| input | «variables» | counter" in out
+    assert "F.variables = F.variables := rfl  -- change-of-variables\n" in out
+    assert "(hj : (c)[j].eval A = true) : afterHeaders_variables = (c)[j+1]! := by" in out
+    assert "exact (c[1, 2] : Equiv.Perm (Fin 3))" in out
+    assert O.core_rewrites(out) == out
+
+
 def test_finset_antidiagonal_is_the_class_one_unless_the_file_uses_hahn_series():
     src = ("  Fintype.ofFinset (Finset.antidiagonal n) (by intro p; exact Finset.mem_antidiagonal)\n")
     assert O.core_rewrites(src) == ("  Fintype.ofFinset (Finset.HasAntidiagonal.antidiagonal n) "
