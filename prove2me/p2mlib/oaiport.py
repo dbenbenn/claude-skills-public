@@ -903,6 +903,121 @@ def _convert_close_diamonds(text):
         return m.group(0) + pad + "all_goals try with_reducible_and_instances rfl\n"
     return sub(_CONVERT_BULLET, sub(_CONVERT, text))
 
+# `.restrict D` / `.neg` / `.mono_exponent _` of a MemLp fact is one
+_MEMLP_KEEPS = ('restrict', 'neg', 'mono_exponent')
+
+
+def _is_memlp(term, decl):
+    """Is the term textually certain to be a `MemLp` fact? Its head (through `( … )` and the fields
+    _MEMLP_KEEPS) is a name whose last component mentions memLp (`f.memLp_top`, `Lp.memLp u`,
+    `centeredSquared_memLp v i j`; an `…_iff` is not), or a bare hypothesis the declaration binds as
+    `MemLp …` (`(hf : MemLp f ∞ μ)`, `(hA : ∀ i k, MemLp (A i k) 2 μ)`, `have hm : MemLp …`)."""
+    t = _norm_term(term)
+    if t.startswith('('):
+        e = _balanced_end(t, 0)
+        if e is None:
+            return False
+        head, chain = t[:e], re.match(r"(?:\.[\w']+)*", t[e:]).group(0)
+        fields = [x for x in chain.split('.') if x]
+        if not fields:
+            return _is_memlp(head, decl)
+        if fields[-1] in _MEMLP_KEEPS:
+            return _is_memlp(head + ''.join('.' + x for x in fields[:-1]), decl)
+        return 'memLp' in fields[-1] and not fields[-1].endswith('_iff')
+    m = re.match(r"[^\W\d][\w.']*", t)
+    if not m:
+        return False
+    parts = m.group(0).split('.')
+    if parts[-1] in _MEMLP_KEEPS and len(parts) > 1:
+        return _is_memlp('.'.join(parts[:-1]), decl)
+    if 'memLp' in parts[-1] or parts[-1].startswith('MemLp'):
+        return not parts[-1].endswith('_iff')
+    if len(parts) == 1:
+        n = re.escape(parts[0])
+        return bool(re.search(r"[({][^(){}:]*(?<![\w'])%s(?![\w'])[^(){}:]*:[ \t]*(?:∀[^,]*,[ \t]*)?"
+                              r"(?:MeasureTheory\.)?MemLp\b" % n, decl) or
+                    re.search(r"\b(?:have|haveI)[ \t]+%s[ \t]*(?:\([^()]*\)[ \t]*)*:[ \t]*(?:MeasureTheory\.)?MemLp\b" % n,
+                              decl))
+    return False
+
+
+_MUL_HEAD_OK = re.compile(r"(?:[(⟨,\[]|:=|<\||=>|\bexact|\busing|\bfrom|\brefine|\bthen|\belse|\breturn)[ \t]*$")
+
+
+def _memlp_mul_swap(text):
+    """d13f23b's `MemLp.mul (hφ : MemLp φ p μ) (hf : MemLp f q μ) : MemLp (φ * f) r μ` takes the left factor
+    first; ours takes `hf` first (`MemLp.mul hf hφ : MemLp (φ * f)`), and d13f23b's `fun_mul` (and its
+    deprecated alias `mul'`) is our `mul'`, likewise swapped. The argument names agree in both (`hφ` the
+    left factor, `hf` the right), so `A.mul B` becomes `MeasureTheory.MemLp.mul (hφ := A) (hf := B)` (other
+    named arguments such as `(r := 2)` stay put; idempotent, unlike a swap), `A.fun_mul B` becomes `…mul'
+    (hφ := A) (hf := B)`, `MemLp.mul A B` becomes `MemLp.mul (hφ := A) (hf := B)` (HardSphere oaiq-054,
+    Conductivity oaiq-059: six sites of `exact (A).mul (r := 2) (B)`, CoulombAtom oaiq-071, SKGap oaiq-072). Only where it is textually certain: the receiver is a
+    MemLp fact (_is_memlp), the call stands at the head of its term (after `(`, `,`, `:=`, `exact`,
+    `using`, … or alone on a line after such a line), and it has exactly one positional argument."""
+    out, i = [], 0
+    for m in re.finditer(r"((?<![\w'.])MemLp\.(?:mul|fun_mul|mul')|(?<=[\w')])\.(?:mul|fun_mul|mul'))(?![\w'])", text):
+        if m.start() < i:
+            continue
+        name = m.group(1).rsplit('.', 1)[-1]
+        explicit = m.group(1).startswith('MemLp.')
+        if explicit:
+            if re.search(r"[\w.']$", text[:m.start()]):
+                continue
+            rs = m.start()
+        else:                                          # the receiver, back from the dot
+            k = m.start()
+            while True:
+                j = k
+                while j > 0 and re.match(r"[\w'.]", text[j - 1]):
+                    j -= 1
+                if j > 0 and text[j - 1] == ')' and (j == k or text[j] == '.'):
+                    depth, q = 0, j - 1
+                    while q >= 0:
+                        depth += (text[q] == ')') - (text[q] == '(')
+                        if depth == 0:
+                            break
+                        q -= 1
+                    if q < 0:
+                        break
+                    k = q
+                    continue
+                k = j
+                break
+            rs = k
+            if rs == m.start():
+                continue
+        before = text[:rs]
+        line_before = before[before.rfind('\n') + 1:]
+        if line_before.strip():
+            if not _MUL_HEAD_OK.search(line_before):
+                continue
+        else:
+            prev = before[:before.rfind('\n')].rstrip()
+            if not _MUL_HEAD_OK.search(prev[prev.rfind('\n') + 1:]) and not prev.endswith(('by', ':=', '=>')):
+                continue
+        decl = text[_decl_start(text, m.start()):m.start()]
+        args = _call_args(text, m.end())
+        pos = [a for a in args if not a[0]]
+        if explicit:
+            if len(pos) != 2 or not (_is_memlp(text[pos[0][1]:pos[0][2]], decl)
+                                     or _is_memlp(text[pos[1][1]:pos[1][2]], decl)):
+                continue
+            a, b = pos
+            out.append(text[i:m.start()] + ("MemLp.mul'" if name in ('fun_mul', "mul'") else 'MemLp.mul')
+                       + text[m.end():a[1]] + '(hφ := %s)' % text[a[1]:a[2]] + text[a[2]:b[1]]
+                       + '(hf := %s)' % text[b[1]:b[2]])
+            i = b[2]
+            continue
+        recv = text[rs:m.start()]
+        if len(pos) != 1 or not _is_memlp(recv, decl):
+            continue
+        _, q, e, w = pos[0]
+        out.append(text[i:rs] + 'MeasureTheory.MemLp.' + ("mul'" if name in ('fun_mul', "mul'") else 'mul')
+                   + ' (hφ := %s)' % recv + text[m.end():w] + text[w:q] + '(hf := %s)' % text[q:e])
+        i = e
+    return ''.join(out) + text[i:]
+
+
 def core_rewrites(text, compat_ns='OAI', known=None):
     """Lean core/Mathlib renames every port needs. OpenAI's `TensorProduct.inductionOn z tmul add`
     (Mathlib d13f23b) takes its zero case from `tmul 0 0`; ours has only `induction_on`, which
@@ -1012,6 +1127,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
     text = _total_map_rewrites(text, known)
+    text = _memlp_mul_swap(text)      # MemLp.mul's factors swapped (oaiq-054/059/071/072)
     # d13f23b's lambda-form `logDeriv_fun_mul` / `logDeriv_fun_prod` are our `logDeriv_mul` / `logDeriv_prod`
     # (NodalLength, 2026-10-26)
     text = re.sub(r"(?<![\w'])logDeriv_fun_(mul|prod)(?![\w'])", r"logDeriv_\1", text)

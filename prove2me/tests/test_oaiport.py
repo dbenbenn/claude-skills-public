@@ -1899,3 +1899,70 @@ def test_inferinstanceas_with_a_hole_takes_the_function_from_the_statement():
     out = O.core_rewrites(src)
     assert ("  exact (show IsProbabilityMeasure (P.map _) by " +
             _named_first("(apply Measurable.aemeasurable; apply measurable_path <;> assumption)")) in out
+
+
+# ---------------------------------------------------------------- MemLp.mul swapped its factors
+# d13f23b `MemLp.mul hφ hf : MemLp (φ * f)`; ours `MemLp.mul hf hφ : MemLp (φ * f)`; d13f23b's `fun_mul` (and the
+# deprecated `mul'`) is our `mul'`, likewise swapped; the argument names `hφ`/`hf` agree, so the port names them. Sites from HardSphere (oaiq-054), Conductivity (oaiq-059),
+# CoulombAtom (oaiq-071), SKGap (oaiq-072).
+
+def test_memlp_mul_swaps_where_the_receiver_is_certainly_memlp():
+    src = ("def apply (f : α → ℂ) (hf : MemLp f ∞ μ) (u : Lp ℂ 2 μ) : Lp ℂ 2 μ :=\n"
+           "  (hf.mul (Lp.memLp u)).toLp (f * u)\n"
+           "lemma clm_mul (f g : α → ℂ) (hf : MemLp f ∞ μ) (hg : MemLp g ∞ μ)\n"
+           "    (u : Lp ℂ 2 μ) : clm (f * g) (hf.mul hg) u = clm f hf (clm g hg u) := by\n"
+           "  sorry\n"
+           "def mul (f g : T) : T where\n"
+           "  smooth := f.smooth.mul g.smooth\n"
+           "  memLp_top := f.memLp_top.mul g.memLp_top\n"
+           "lemma x : True := by\n"
+           "    exact (f.memLp_top.mul (g.partial_memLp_top p)).add\n"
+           "      (g.memLp_top.mul (f.partial_memLp_top p))\n"
+           "lemma y (hf : MemLp f 2 volume) : True := by\n"
+           "  have hfm : MemLp (fun X ↦ f X*u (Fin.tail X)) 2 volume :=\n"
+           "    hf.mul (memLp_configurationTail (Lp.memLp u))\n"
+           "lemma z (hA : ∀ i k, MemLp (A i k) 2 μ) : True := by\n"
+           "    exact ((attachedCollarTensor_entry_memLp s ha i j).restrict D).mul (r := 2)\n"
+           "      (originalPiGradient_memLp hD hb v j)\n"
+           "  exact (hA i k).mul (r := 2) ((memLp_piLp_iff.mp hE) (k,j))\n"
+           "  have h4 : MemLp (fun x => a x * b x) 1 μ :=\n"
+           "    (centeredSquared_memLp v i j).mul (centeredSquared_memLp v j k)\n")
+    out = O.core_rewrites(src)
+    assert "  (MeasureTheory.MemLp.mul (hφ := hf) (hf := (Lp.memLp u))).toLp (f * u)\n" in out
+    assert "clm (f * g) (MeasureTheory.MemLp.mul (hφ := hf) (hf := hg)) u = clm f hf" in out
+    assert "  smooth := f.smooth.mul g.smooth\n  memLp_top := MeasureTheory.MemLp.mul (hφ := f.memLp_top) (hf := g.memLp_top)\n" in out
+    assert ("    exact (MeasureTheory.MemLp.mul (hφ := f.memLp_top) (hf := (g.partial_memLp_top p))).add\n"
+            "      (MeasureTheory.MemLp.mul (hφ := g.memLp_top) (hf := (f.partial_memLp_top p)))\n") in out
+    assert "    MeasureTheory.MemLp.mul (hφ := hf) (hf := (memLp_configurationTail (Lp.memLp u)))\n" in out
+    assert ("    exact MeasureTheory.MemLp.mul (hφ := ((attachedCollarTensor_entry_memLp s ha i j).restrict D)) (r := 2)\n"
+            "      (hf := (originalPiGradient_memLp hD hb v j))\n") in out
+    assert "  exact MeasureTheory.MemLp.mul (hφ := (hA i k)) (r := 2) (hf := ((memLp_piLp_iff.mp hE) (k,j)))\n" in out
+    assert "    MeasureTheory.MemLp.mul (hφ := (centeredSquared_memLp v i j)) (hf := (centeredSquared_memLp v j k))\n" in out
+    assert O.core_rewrites(out) == out
+
+
+def test_memlp_fun_mul_becomes_our_swapped_mul_prime():
+    src = ("lemma a (ht : MemLp t 2 μ) : True := by\n"
+           "  exact ht.fun_mul hf\n"
+           "  have := (hd.memLp.fun_mul (Lp.memLp (F.val none)))\n"
+           "  exact MemLp.mul (Lp.memLp u) ht\n"
+           "  exact MemLp.fun_mul ht (Lp.memLp u)\n")
+    out = O.core_rewrites(src)
+    assert "  exact MeasureTheory.MemLp.mul' (hφ := ht) (hf := hf)\n" in out
+    assert "  have := (MeasureTheory.MemLp.mul' (hφ := hd.memLp) (hf := (Lp.memLp (F.val none))))\n" in out
+    assert "  exact MemLp.mul (hφ := (Lp.memLp u)) (hf := ht)\n" in out
+    assert "  exact MemLp.mul' (hφ := ht) (hf := (Lp.memLp u))\n" in out
+    assert O.core_rewrites(out) == out
+
+
+def test_other_mul_calls_are_left_alone():
+    src = ("lemma a (hf : Continuous f) (hg : Integrable g μ) (hm : MemLp m 2 μ) : True := by\n"
+           "  exact hf.mul hg\n"
+           "  exact (hf.continuous).mul (hg.integrable)\n"
+           "  exact hm.integrable.mul hg\n"
+           "  exact foo (hm).mul hg\n"                        # an argument of foo: `foo ((hm).mul) hg`
+           "  exact (memLp_piLp_iff.mp hE).mul hg\n"         # an iff's direction: not certain
+           "  exact hm.mul hg x\n"                            # two positional arguments
+           "  exact (hasDerivAt_id x).mul (hasDerivAt_const x c)\n"
+           "  have := foo\n    hm.mul hg\n")                 # a continuation argument of foo
+    assert O.core_rewrites(src) == src
