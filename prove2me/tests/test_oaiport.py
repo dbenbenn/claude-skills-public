@@ -2203,3 +2203,27 @@ def test_temperate_growth_comp_and_sum_le_sum_of_injOn_go_to_their_compat_forms(
     block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
     for n in ('hasTemperateGrowth_exp_mul_I', 'sum_le_sum_of_injOn'):
         assert re.search(r'^theorem %s\b' % n, block, re.M), n
+
+
+def test_compat_has_compact_support_exists_bound_iteratedFDeriv():
+    # Mathlib d13f23b's `HasCompactSupport.exists_bound_iteratedFDeriv`; ours has none (oaiq-088, OAIHecke)
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem _root_.HasCompactSupport.exists_bound_iteratedFDeriv' in src
+
+
+def test_smoothness_order_simp_gets_le_top_fallback():
+    # `simp` no longer proves `(↑n : ℕ∞ω) ≤ ∞` (oaiq-088, Falconer all dimensions)
+    src = ("  rw [iteratedFDeriv_comp hg hf (by simp)]\n"
+           "  obtain ⟨U,hU,hx,hfU⟩ := hf.contDiffOn' (by simp : (k : ℕ∞ω) ≤ ∞) (by simp)\n"
+           "    ((contDiff_const.mul hk).of_le (by simp)).contDiffAt\n"
+           "  have h : 0 < x := by simp\n"
+           "  exact foo (by simp)\n")
+    out = O.core_rewrites(src)
+    fb = "first | simp | exact_mod_cast le_top"
+    assert "iteratedFDeriv_comp hg hf (by %s)]" % fb in out
+    assert "contDiffOn' (by %s : (k : ℕ∞ω) ≤ ∞) (by %s)" % (fb, fb) in out
+    assert "of_le (by %s)).contDiffAt" % fb in out
+    assert "have h : 0 < x := by simp\n" in out and "exact foo (by simp)\n" in out
+    assert O.core_rewrites(out) == out
