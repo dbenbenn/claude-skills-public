@@ -145,13 +145,14 @@ oaiq-068). -/
 theorem _root_.Transcendental.ne_zero {R A : Type*} [CommRing R] [Nontrivial R] [Ring A] [Algebra R A] {x : A}
     (h : Transcendental R x) : x ≠ 0 := fun hx => h (hx ▸ isAlgebraic_zero)
 section X
-variable {𝕜 E Eₗ F : Type*} [NontriviallyNormedField 𝕜] [AddCommGroup E] [Module 𝕜 E]
-  [NormedAddCommGroup Eₗ] [NormedSpace 𝕜 Eₗ] [NormedAddCommGroup F] [NormedSpace 𝕜 F] [CompleteSpace F]
+variable {𝕜 𝕜₂ E Eₗ F : Type*} [NontriviallyNormedField 𝕜] [NontriviallyNormedField 𝕜₂]
+  {σ : 𝕜 →+* 𝕜₂} [RingHomIsometric σ] [AddCommGroup E] [Module 𝕜 E]
+  [NormedAddCommGroup Eₗ] [NormedSpace 𝕜 Eₗ] [NormedAddCommGroup F] [NormedSpace 𝕜₂ F] [CompleteSpace F]
 
-/-- d13f23b's `LinearMap.extendOfIsometry`: a linear map into a complete space that agrees in norm
-with a dense-range map `e` extends along `e` to a linear isometry. -/
-noncomputable def _root_.LinearMap.extendOfIsometry (f : E →ₗ[𝕜] F) {e : E →ₗ[𝕜] Eₗ}
-    (h_dense : DenseRange e) (h_norm : ∀ x, ‖f x‖ = ‖e x‖) : Eₗ →ₗᵢ[𝕜] F :=
+/-- d13f23b's `LinearMap.extendOfIsometry`: a semilinear map into a complete space that agrees in norm
+with a dense-range map `e` extends along `e` to a semilinear isometry. -/
+noncomputable def _root_.LinearMap.extendOfIsometry (f : E →ₛₗ[σ] F) {e : E →ₗ[𝕜] Eₗ}
+    (h_dense : DenseRange e) (h_norm : ∀ x, ‖f x‖ = ‖e x‖) : Eₗ →ₛₗᵢ[σ] F :=
   { toLinearMap := (f.extendOfNorm e).toLinearMap
     norm_map' := by
       intro x
@@ -160,7 +161,8 @@ noncomputable def _root_.LinearMap.extendOfIsometry (f : E →ₗ[𝕜] F) {e : 
       have := LinearMap.extendOfNorm_eq (f := f) (e := e) h_dense ⟨1, by simp [h_norm]⟩ y
       simp only [ContinuousLinearMap.coe_coe, this, h_norm] }
 
-theorem _root_.LinearMap.extendOfIsometry_eq (f : E →ₗ[𝕜] F) {e : E →ₗ[𝕜] Eₗ}
+omit [RingHomIsometric σ] in
+theorem _root_.LinearMap.extendOfIsometry_eq (f : E →ₛₗ[σ] F) {e : E →ₗ[𝕜] Eₗ}
     (h_dense : DenseRange e) (h_norm : ∀ x, ‖f x‖ = ‖e x‖) (x : E) :
     f.extendOfIsometry h_dense h_norm (e x) = f x :=
   LinearMap.extendOfNorm_eq (f := f) (e := e) h_dense ⟨1, by simp [h_norm]⟩ x

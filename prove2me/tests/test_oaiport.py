@@ -1670,3 +1670,10 @@ def test_the_compat_block_declares_subtype_star_ordered_ring():
     block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
     assert re.search(r'^theorem _root_\.Subtype\.starOrderedRing\b', block, re.M)
     assert re.search(r'^instance vonNeumannAlgebraStarOrderedRing\b', block, re.M)
+
+
+def test_pow_antitone_takes_the_upper_bound_by_name():
+    # d13f23b's `CStarAlgebra.pow_antitone hb1 hb0 hnm`; ours has `ha₀ ha₁` (Kadison similarity, oaiq-075)
+    out = O.core_rewrites('simpa only [pow_zero] using CStarAlgebra.pow_antitone hb1 hb0 (Nat.zero_le n)\n')
+    assert 'CStarAlgebra.pow_antitone (ha₀ := hb0) (ha₁ := hb1) (Nat.zero_le n)' in out
+    assert O.core_rewrites(out) == out

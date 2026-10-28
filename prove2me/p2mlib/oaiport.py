@@ -861,6 +861,9 @@ def core_rewrites(text, compat_ns='OAI'):
     # and the proof as an autoParam, so the element becomes a named argument
     text = re.sub(r"(?<![\w.'])CStarAlgebra\.pow_nonneg ([\w']+) ([\w']+) ([\w.']+)",
                   r"CStarAlgebra.pow_nonneg (a := \1) \3 \2", text)
+    # d13f23b's `CStarAlgebra.pow_antitone ha₁ ha₀` takes the upper bound first; ours is `ha₀ ha₁`
+    text = re.sub(r"(?<![\w.'])CStarAlgebra\.pow_antitone ([\w']+) ([\w']+)",
+                  r"CStarAlgebra.pow_antitone (ha₀ := \2) (ha₁ := \1)", text)
     return split_partial_namespaces(text)
 
 
