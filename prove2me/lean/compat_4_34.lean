@@ -266,12 +266,19 @@ theorem _root_.Subtype.starOrderedRing {A : Type*} [CStarAlgebra A] [PartialOrde
       show (0 : A) ≤ star (t : A) * (t : A)
       exact star_mul_self_nonneg _
 
+/-- The underlying ⋆-subalgebra of a von Neumann algebra is norm closed, found by instance search in
+d13f23b (Kadison similarity, oaiq-075). -/
+instance vonNeumannToStarSubalgebraIsClosed {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
+    [CompleteSpace H] (P : VonNeumannAlgebra H) : IsClosed (P.toStarSubalgebra : Set (H →L[ℂ] H)) := by
+  have := Set.isClosed_centralizer (Set.centralizer (P.carrier))
+  rw [P.centralizer_centralizer'] at this
+  exact this
+/-- A closed ⋆-subalgebra of a C⋆-algebra is star ordered (d13f23b finds this by instance search). -/
+instance starSubalgebraStarOrderedRing {A : Type*} [CStarAlgebra A] [PartialOrder A]
+    [StarOrderedRing A] (S : StarSubalgebra ℂ A) [IsClosed (S : Set A)] : StarOrderedRing S :=
+  Subtype.starOrderedRing S
 instance vonNeumannAlgebraStarOrderedRing {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
     [CompleteSpace H] (P : VonNeumannAlgebra H) : StarOrderedRing P :=
-  haveI : IsClosed (P.toStarSubalgebra : Set (H →L[ℂ] H)) := by
-    have := Set.isClosed_centralizer (Set.centralizer (P.carrier))
-    rw [P.centralizer_centralizer'] at this
-    exact this
   Subtype.starOrderedRing P.toStarSubalgebra
 open scoped ComplexOrder in
 /-- A norm-one functional on a C⋆-algebra with `φ 1 = 1` is monotone; stands in for d13f23b's
