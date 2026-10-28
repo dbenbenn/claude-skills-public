@@ -399,7 +399,7 @@ def test_compat_dite_lemmas_are_rewritable():
     import os
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                             'compat_4_34.lean')).read()
-    assert 'dite p a b = a h := dif_pos h' in src and 'dite p a b = b h := dif_neg h' in src
+    assert 'dite c a b = a h := dif_pos h' in src and 'dite c a b = b h := dif_neg h' in src
     assert 'then a hp else b hp' not in src
 
 
@@ -2077,3 +2077,14 @@ def test_convert_funext_rfl_becomes_congr_deriv():
             '    exact (Real.sqrt_sq (norm_nonneg _)).symm\n'
             '  · ring\n')
     assert O.core_rewrites(src3) == src3
+
+
+def test_compat_ite_lemmas_name_the_proposition_c():
+    # OpenAI writes `ite_eq_right (c := d = 0) hd.ne'` (Lean core's binder is `c`): ours was `p`
+    # (oaiq-080, Boltzmann SheetGain)
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for n in ('ite_eq_left', 'ite_eq_right', 'dite_eq_left', 'dite_eq_right'):
+        i = src.index('theorem ' + n)
+        assert '{c : Prop}' in src[i:i + 120], n
