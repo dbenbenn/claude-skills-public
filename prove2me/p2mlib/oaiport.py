@@ -363,10 +363,134 @@ AEM_TAC = ("first | fun_prop | assumption | (apply Measurable.aemeasurable; solv
            "| (apply MeasureTheory.Measure.QuasiMeasurePreserving.aemeasurable; solve_by_elim) "
            "| exact (continuous_eval_const _).aemeasurable "
            "| (apply Measurable.aemeasurable; measurability) | measurability")
-_PM_FALLBACK = "first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s)" % AEM_TAC
+# `infer_instance` with its own synthesis budget. Port patches raise `synthInstance.maxHeartbeats` module-wide
+# (to 200000, a whole declaration's budget), and a failing search then used up the declaration before the next
+# alternative ran (HardSphere oaiq-054, SKGap oaiq-072); a search that runs out of its own budget fails like
+# any other, and `first` goes on.
+_BOUNDED_INFER = "(set_option synthInstance.maxHeartbeats 20000 in infer_instance)"
+
+
+def _aem_tac(named=()):
+    """AEM_TAC with the named measurability facts (_aem_named) tried first."""
+    return 'first | %s | %s' % (' | '.join(named), AEM_TAC[len('first | '):]) if named else AEM_TAC
+
+
+def _pm_fallback(named=()):
+    """The chain that proves `IsProbabilityMeasure (μ.map f)`: the named measurability facts the text shows for
+    `f` (_aem_named) first, then instance search on its own budget, then AEM_TAC (oaiq-054/061/071/072: the
+    chain timed out or hit maxRecDepth where a hypothesis `hφ : Measurable φ` or a lemma `foo_measurable`
+    closed the goal at once)."""
+    first = ('exact Measure.isProbabilityMeasure_map (by first | %s) | ' % ' | '.join(named)) if named else ''
+    return 'first | %s%s | exact Measure.isProbabilityMeasure_map (by %s)' % (first, _BOUNDED_INFER, AEM_TAC)
+
+
+_PM_FALLBACK = _pm_fallback()
 
 
 _PM_CONTEXT = re.compile(r"ProbabilityMeasure|\.map\b")
+# a function argument: a balanced group (three levels) or a name
+_ARG = r"(?:\((?:[^()]|\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\))*\)|[^\W\d][\w.']*)"
+_MAP_FN = re.compile(r"\.map[ \t\n]+(" + _ARG + ")")
+_DEF_HEAD = re.compile(r"(?m)^(?:@\[[^\n]*\][ \t]*\n?)?" + MODS + r"(?:def|abbrev)[ \t]+([^\s(:{\[]+)")
+_LEMMA_HEAD = re.compile(r"(?m)^[ \t]*(?:@\[[^\n]*\][ \t]*\n?[ \t]*)?" + MODS + r"(?:theorem|lemma)[ \t]+([^\s(:{\[]+)")
+_PRED = r"(Measurable|AEMeasurable|Continuous|LipschitzWith[ \t]+[\w.']+|MeasurePreserving)"
+_HYP_BINDER = re.compile(r"[({][ \t]*([\w'][\w' \t]*?)[ \t]*:[ \t]*" + _PRED + r"[ \t]+(" + _ARG + ")")
+_HYP_HAVE = re.compile(r"\b(?:have|haveI)[ \t]+([\w']+)[ \t]*:[ \t]*" + _PRED + r"[ \t]+(" + _ARG + ")")
+_HYP_FORALL = re.compile(r"[({][ \t]*([\w']+)[ \t]*:[ \t]*∀[ \t]*\(?([\w']+)(?:[ \t]*:[^,()]+)?\)?[ \t]*,[ \t]*"
+                         r"(Measurable|Continuous)[ \t]+\(([^\W\d][\w.']*)[ \t]+\2\)")
+_HYP_TERM = {'Measurable': '%s.aemeasurable', 'AEMeasurable': '%s', 'Continuous': '%s.measurable.aemeasurable',
+             'LipschitzWith': '%s.continuous.measurable.aemeasurable',
+             'MeasurePreserving': '%s.measurable.aemeasurable'}
+_LEMMA_TAC = {'M': '(apply Measurable.aemeasurable; apply %s <;> assumption)',
+              'C': '(apply Continuous.aemeasurable; apply %s <;> assumption)', 'A': '(apply %s <;> assumption)'}
+
+
+def declared_lemmas(texts):
+    """The theorem/lemma names the texts declare, as written and by last component (for _aem_named: in the
+    module route the measurability lemma of a map often sits in a sibling module)."""
+    out = set()
+    for t in texts:
+        for m in _LEMMA_HEAD.finditer(t):
+            n = m.group(1).replace('_root_.', '')
+            out.update((n, n.rsplit('.', 1)[-1]))
+    return frozenset(out)
+
+
+def _def_bodies(text):
+    """{last component of each def/abbrev name: its text up to the next unindented line}."""
+    out = {}
+    for m in _DEF_HEAD.finditer(text):
+        e = re.compile(r"\n(?=\S)").search(text, m.end())
+        out.setdefault(m.group(1).rsplit('.', 1)[-1], text[m.start():e.start() if e else len(text)][:4000])
+    return out
+
+
+def _decl_start(text, pos):
+    """Start of the declaration around pos: the nearest line above that starts in column 0."""
+    s = text.rfind('\n', 0, pos) + 1
+    while s > 0 and (text[s:s + 1] in (' ', '\t', '\n', '') or text.startswith(('--', '/-'), s)):
+        s = text.rfind('\n', 0, s - 1) + 1
+    return s
+
+
+def _norm_term(s):
+    s = re.sub(r"\s+", ' ', s.strip())
+    while s.startswith('(') and _balanced_end(s, 0) == len(s):
+        s = s[1:-1].strip()
+    return s
+
+
+def _lets(decl):
+    """{name: right-hand side} of the `let`s (and `set`s) in a declaration's text."""
+    out = {}
+    for m in re.finditer(r"(?m)^[ \t]*(?:let|set)[ \t]+([\w']+)(?:[ \t]*:[^\n=]*)?[ \t]*:=[ \t]*([^\n]+|\n[^\n]*)", decl):
+        out[m.group(1)] = m.group(2)
+    return out
+
+
+def _site_maps(window, decl, defs):
+    """The functions mapped in `window` (`….map F`), also through the `let`s of the declaration and the
+    module's defs whose names `window` mentions (`unfold midpointLaw`, `IsProbabilityMeasure ν'`)."""
+    fns = [m.group(1) for m in _MAP_FN.finditer(window)]
+    lets = _lets(decl)
+    for t in dict.fromkeys(re.findall(r"[^\W\d][\w.']*", window)):
+        body = lets.get(t)
+        if body is None:
+            body = defs.get(t.rsplit('.', 1)[-1])
+        if body:
+            fns += [m.group(1) for m in _MAP_FN.finditer(body)]
+    return [f for f in dict.fromkeys(fns) if not re.match(r"\(\s*[\w']+\s*:=", f)]
+
+
+def _aem_named(fns, decl, lemmas):
+    """Tactics that prove `AEMeasurable F _` for a mapped function F from a named fact, cheapest first:
+    a hypothesis of the declaration about F itself (`hφ : Measurable φ`, `(hf : LipschitzWith K f)`, `(hF : ∀ n,
+    Measurable (F n))` for `F n`), then a lemma the port declares for F's head (`foo_measurable`,
+    `measurable_foo`, `foo_continuous`, `continuous_foo`, `…aemeasurable`), applied so that its arguments
+    come from unification (oaiq-054, 061, 071, 072). At most six."""
+    alts = []
+    nf = [_norm_term(f) for f in fns]
+    for rx in (_HYP_BINDER, _HYP_HAVE):
+        for m in rx.finditer(decl):
+            if _norm_term(m.group(3)) in nf:
+                for n in m.group(1).split():
+                    alts.append('exact ' + _HYP_TERM[m.group(2).split()[0]] % n)
+    for m in _HYP_FORALL.finditer(decl):
+        for f in nf:
+            a = re.fullmatch(re.escape(m.group(4)) + r" (" + _ARG + ")", f)
+            if a:
+                alts.append('exact ' + _HYP_TERM[m.group(3)] % '(%s %s)' % (m.group(1), a.group(1)))
+    for f in nf:
+        h = re.match(r"[^\W\d][\w.']*", f)
+        if not h or h.group(0) in ('fun', 'λ'):
+            continue
+        pre, _, c = h.group(0).rpartition('.')
+        pre = pre + '.' if pre else ''
+        for name, kind in ((c + '_measurable', 'M'), ('measurable_' + c, 'M'), (c + '_continuous', 'C'),
+                           ('continuous_' + c, 'C'), (c + '_aemeasurable', 'A'), ('aemeasurable_' + c, 'A')):
+            if name in lemmas or pre + name in lemmas:
+                alts.append(_LEMMA_TAC[kind] % (pre + name))
+    return list(dict.fromkeys(alts))[:6]
 
 
 def _instance_context(text, pos):
@@ -395,37 +519,131 @@ def _instance_context(text, pos):
     return '\n'.join(out)
 
 
-def _total_map_rewrites(text):
+def _lines_before(text, pos, n=3):
+    """Up to n non-blank lines above pos's line with its indentation (the `unfold foo` before a lone
+    `infer_instance`)."""
+    ls = text[:text.rfind('\n', 0, pos) + 1].split('\n')[:-1]
+    cur = text[text.rfind('\n', 0, pos) + 1:pos]
+    ind = len(cur) - len(cur.lstrip(' \t'))
+    out = []
+    for l in reversed(ls):
+        if not l.strip():
+            continue
+        if len(l) - len(l.lstrip(' \t')) != ind or len(out) == n:
+            break
+        out.append(l)
+    return '\n'.join(reversed(out))
+
+
+_PM_BINDER = re.compile(r"[({][ \t]*([\w'][\w' \t]*?)[ \t]*:[ \t]*((?:[^(){}\n:]*→[ \t]*)?)"
+                        r"(?:MeasureTheory\.)?ProbabilityMeasure\b")
+_ATOM = r"(?:[\w.']+|\([^()\n]*\))"
+
+
+def _pm_dot_map(text, defs, lemmas):
+    """`μ.map F` (and `(μ n).map F`) where the declaration binds `(μ : ProbabilityMeasure X)` (resp. `(μ : ι →
+    ProbabilityMeasure X)`): d13f23b's `ProbabilityMeasure.map ν f` takes no proof, ours takes `(f_aemble :
+    AEMeasurable f ν)` with `f` implicit, so it becomes `μ.map (f := F) (by …)` (Perceptron oaiq-061: lemma
+    statements, `(μ n).map f = μ n`, a def body; IndependentSets oaiq-069). Only where the binder makes the type
+    certain; a `(μ : Measure X)` cast, a ProbabilityMeasure-valued application `(law K μ).map f`, or a name the
+    declaration rebinds (`fun μ`, `let μ`, `intro μ`) is left alone."""
+    bounds = [m.start() for m in re.finditer(r"(?m)^(?=\S)", text) if TOP.match(text[m.start():m.start() + 40])] + [len(text)]
+    out, i = [], 0
+    for a, b in zip(bounds, bounds[1:]):
+        seg = text[a:b]
+        names = []
+        for m in _PM_BINDER.finditer(seg):
+            for n in m.group(1).split():
+                names.append((n, bool(m.group(2).strip())))
+        if not names:
+            continue
+        new = seg
+        for n, applied in dict.fromkeys(names):
+            e = re.escape(n)
+            if re.search(r"(?:\b(?:fun|λ)(?:[ \t]+[\w']+)*[ \t]+|\b(?:let|intro|rintro|set)[ \t]+)%s(?![\w'])" % e, new):
+                continue
+            recv = r"\(%s(?:[ \t]+%s)+\)" % (e, _ATOM) if applied else r"(?<![\w.'])%s" % e
+            rx = re.compile(recv + r"\.map[ \t]+(" + _ARG + ")")
+
+            def rep(m):
+                f = m.group(1)
+                if re.match(r"\(\s*(?:[\w']+\s*:=|by\b)", f) or 'aemeasurable' in f.lower() or re.search(
+                        r"[({][^():]*(?<![\w'])%s(?![\w'])[^():]*:[ \t]*AEMeasurable\b" % re.escape(f), new):
+                    return m.group(0)       # already our form: the proof, a named `f`, or a `by`
+                tac = _aem_tac(_aem_named([f], new[:m.start()], lemmas))
+                return m.group(0)[:m.start(1) - m.start()] + '(f := %s) (by %s)' % (f, tac)
+            new = rx.sub(rep, new)
+        out.append(text[i:a] + new)
+        i = b
+    return ''.join(out) + text[i:]
+
+
+def _total_map_rewrites(text, known=None):
     """d13f23b's `Measure.map` is total, so `IsProbabilityMeasure (μ.map f)` is an instance for every `f`;
     ours needs `Measure.isProbabilityMeasure_map hf.aemeasurable`. Every place the source leans on the
-    instance gets a fallback chain (`_PM_FALLBACK`): `first | infer_instance | exact
+    instance gets a fallback chain (_pm_fallback): the named measurability facts the text shows for the
+    mapped function (_aem_named), instance search on its own budget, then `exact
     Measure.isProbabilityMeasure_map (by AEM_TAC)`, so an instance that exists still wins:
     * `have/let/haveI/letI … : IsProbabilityMeasure T := inferInstance` (or `by infer_instance`);
-    * a line that is just `infer_instance`, and `inferInstance` as an element of an anonymous constructor
+    * a line that is just `infer_instance`, a `… : IsProbabilityMeasure T := by unfold foo; infer_instance`
+      line, and `inferInstance` (or `by unfold foo; infer_instance`) as an element of an anonymous constructor
       whose context (_instance_context) mentions a probability measure or a map (CoordinateSweeps oaiq-056:
       in `⟨DensityProfile p l, inferInstance, …⟩` the slots were Fintype/Nonempty, and the chain timed out
       at whnf);
-    * `ProbabilityMeasure.map ν f` (explicit) and `… : ProbabilityMeasure X := ν.map f`, which take
-      the proof as an argument here: `(f := f) (by AEM_TAC)`."""
+    * `inferInstanceAs (IsProbabilityMeasure (… .map …))` becomes `(show IsProbabilityMeasure … by …)`
+      (oaiq-061, oaiq-072);
+    * `ProbabilityMeasure.map ν f` (explicit), `… : ProbabilityMeasure X := ν.map f`, and `μ.map f` for a
+      `ProbabilityMeasure` binder μ (_pm_dot_map), which take the proof as an argument here: `(f := f) (by
+      AEM_TAC)`, named facts first.
+    `known`: the lemma names declared anywhere in the port (declared_lemmas); default, this text's."""
+    defs = _def_bodies(text)
+    lemmas = declared_lemmas([text]) if known is None else known
+
+    def fb(s, pos, window):
+        decl = s[_decl_start(s, pos):pos]
+        return _pm_fallback(_aem_named(_site_maps(window, decl, defs), decl, lemmas))
+
     text = re.sub(r"(?m)^([ \t]*(?:have|let|haveI|letI)\b[^\n:]*:[ \t]*IsProbabilityMeasure\b[^\n]*?)[ \t]*:=[ \t]*"
-                  r"(?:inferInstance|by infer_instance)[ \t]*$", lambda m: m.group(1) + ' := by ' + _PM_FALLBACK, text)
+                  r"(?:inferInstance|by infer_instance)[ \t]*$",
+                  lambda m: m.group(1) + ' := by ' + fb(m.string, m.start(), m.group(1)), text)
+    text = re.sub(r"(?m)^([^\n]*\bIsProbabilityMeasure\b[^\n]*:=[ \t]*by[ \t]+[^\n]*;[ \t]*)infer_instance[ \t]*$",
+                  lambda m: m.group(1) + '(%s)' % fb(m.string, m.start(), m.group(1)), text)
+    text = re.sub(r"inferInstanceAs[ \t]*\((IsProbabilityMeasure[ \t]+(" + _ARG + r"))\)",
+                  lambda m: '(show %s by %s)' % (m.group(1), fb(m.string, m.start(), m.group(2) + '\n' +
+                                                                   _instance_context(m.string, m.start())))
+                  if '.map' in m.group(2) or 'Measure.map' in m.group(2) else m.group(0), text)
     if re.search(r"MeasureTheory|ProbabilityMeasure|Measure\.map", text):   # a lone instance elsewhere is no measure
-        text = re.sub(r"(?m)^([ \t]*)infer_instance[ \t]*$", lambda m: m.group(1) + _PM_FALLBACK, text)
+        text = re.sub(r"(?m)^([ \t]*)infer_instance[ \t]*$",
+                      lambda m: m.group(1) + fb(m.string, m.end(1), _instance_context(m.string, m.end(1)) + '\n'
+                                                + _lines_before(m.string, m.end(1))), text)
         text = re.sub(r"(?m)^([ \t]*)inferInstance(?=[ \t]*(?:[,⟩]|$))",
-                      lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK
+                      lambda m: m.group(1) + '(by %s)' % fb(m.string, m.end(1), _instance_context(m.string, m.end(1)))
                       if _PM_CONTEXT.search(_instance_context(m.string, m.end(1))) else m.group(0), text)
         text = re.sub(r"(?<=[⟨,])(\s*)(?:by infer_instance|inferInstance)(?=[ \t]*[,⟩])",
-                      lambda m: m.group(1) + '(by %s)' % _PM_FALLBACK
+                      lambda m: m.group(1) + '(by %s)' % fb(m.string, m.end(1), _instance_context(m.string, m.end(1)))
                       if _PM_CONTEXT.search(_instance_context(m.string, m.end(1))) else m.group(0), text)
+        text = re.sub(r"(?<=[⟨,])(\s*by[ \t]+(?:unfold|dsimp|delta)\b[^;,⟨⟩\n]*;[ \t]*)infer_instance(?=[ \t]*[,⟩])",
+                      lambda m: m.group(1) + '(%s)' % fb(m.string, m.end(1), _instance_context(m.string, m.end(1))
+                                                        + '\n' + m.group(1))
+                      if _PM_CONTEXT.search(_instance_context(m.string, m.end(1)) + m.group(1)) else m.group(0), text)
+
+    def pm_let(m):
+        if 'aemeasurable' in m.group(3):
+            return m.group(0)
+        decl = m.string[_decl_start(m.string, m.start()):m.start()]
+        return m.group(1) + '%s.map (f := %s) (by %s)' % (m.group(2), m.group(3),
+                                                          _aem_tac(_aem_named([m.group(3)], decl, lemmas)))
     text = re.sub(r"(?m)^([ \t]*(?:let|have)\b[^\n]*?:[ \t]*ProbabilityMeasure\b[^\n]*?:=[ \t]*)"
-                  r"(\w[\w.']*)\.map[ \t]+(\((?:[^()]|\([^()]*\))*\)|[\w.']+)[ \t]*$",
-                  lambda m: m.group(1) + '%s.map (f := %s) (by %s)' % (m.group(2), m.group(3), AEM_TAC)
-                  if 'aemeasurable' not in m.group(3) else m.group(0), text)
+                  r"(\w[\w.']*)\.map[ \t]+(\((?:[^()]|\([^()]*\))*\)|[\w.']+)[ \t]*$", pm_let, text)
+
+    def pm_explicit(m):
+        if 'aemeasurable' in m.group(2):
+            return m.group(0)
+        decl = m.string[_decl_start(m.string, m.start()):m.start()]
+        return '%s (f := %s) (by %s)' % (m.group(1), m.group(2), _aem_tac(_aem_named([m.group(2)], decl, lemmas)))
     text = re.sub(r"(?<![\w.'])((?:MeasureTheory\.)?ProbabilityMeasure\.map[ \t]+[\w.']+)[ \t]+"
-                  r"(\((?:[^()]|\([^()]*\))*\)|[\w.']+)(?=[ \t]*$)",
-                  lambda m: m.group(0) if 'aemeasurable' in m.group(2) else
-                  '%s (f := %s) (by %s)' % (m.group(1), m.group(2), AEM_TAC), text, flags=re.M)
-    return text
+                  r"(\((?:[^()]|\([^()]*\))*\)|[\w.']+)(?=[ \t]*$)", pm_explicit, text, flags=re.M)
+    return _pm_dot_map(text, defs, lemmas)
 
 
 def _arg_end(text, k):
@@ -685,7 +903,7 @@ def _convert_close_diamonds(text):
         return m.group(0) + pad + "all_goals try with_reducible_and_instances rfl\n"
     return sub(_CONVERT_BULLET, sub(_CONVERT, text))
 
-def core_rewrites(text, compat_ns='OAI'):
+def core_rewrites(text, compat_ns='OAI', known=None):
     """Lean core/Mathlib renames every port needs. OpenAI's `TensorProduct.inductionOn z tmul add`
     (Mathlib d13f23b) takes its zero case from `tmul 0 0`; ours has only `induction_on`, which
     wants a `zero` case too. Every use becomes the compat block's `tensorInductionOn`, which has
@@ -694,7 +912,8 @@ def core_rewrites(text, compat_ns='OAI'):
     `induction` line's indentation, not its alternatives': ComparatorModel, Boone–Higman
     2026-10-24.) Likewise `FreeGroup.induction_on`, whose first case d13f23b calls `one` and ours
     `C1`: every use becomes `freeGroupInductionOn`. `compat_ns` is the compat block's namespace
-    (None: root level)."""
+    (None: root level). `known`: the lemma names the whole port declares (declared_lemmas), for the
+    measurability facts of _total_map_rewrites; default, this text's."""
     pre = compat_ns + '.' if compat_ns else ''
     # Mathlib adds the global tokens `<m ≤m <i ≤i ≤s <r ≤r ≤c`; `1<m` with a variable `m` then fails
     # to parse. Space them unless written as the notation (` <m `).
@@ -792,7 +1011,7 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
-    text = _total_map_rewrites(text)
+    text = _total_map_rewrites(text, known)
     # d13f23b's lambda-form `logDeriv_fun_mul` / `logDeriv_fun_prod` are our `logDeriv_mul` / `logDeriv_prod`
     # (NodalLength, 2026-10-26)
     text = re.sub(r"(?<![\w'])logDeriv_fun_(mul|prod)(?![\w'])", r"logDeriv_\1", text)
@@ -1201,6 +1420,7 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
     block, rewrites = compat_block(compat_text, compat_ns)
     sources = inline_module_macros(sources)
     smode = stdsimplex_mode([x for _, x in sources.values()], stdsimplex)
+    known = declared_lemmas([x for _, x in sources.values()])
     files, missing = {}, set()
     for oai, (short, t) in sources.items():
         def rep(m):
@@ -1231,7 +1451,7 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
         ls = t.split('\n')
         k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
         t = '\n'.join(ls[:k] + [''] + (LINT + header).rstrip().split('\n') + ls[k:])
-        files[short + '.lean'] = guard_renames(apply_rewrites(core_rewrites(t, compat_ns), rewrites))
+        files[short + '.lean'] = guard_renames(apply_rewrites(core_rewrites(t, compat_ns, known), rewrites))
     if missing:
         raise PortError('imports of OpenAI modules that are not ported:\n  ' + '\n  '.join(sorted(missing)))
     return files

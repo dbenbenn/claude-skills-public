@@ -1014,7 +1014,7 @@ def test_is_local_min_on_renamed_to_localize():
 def test_unfold_infer_instance_falls_back_to_map_measurability():
     src = "open MeasureTheory\n  unfold gumbelLaw\n  infer_instance\n  unfold a\n  simp\n"
     out = O.core_rewrites(src)
-    assert "  unfold gumbelLaw\n  first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s)\n" % O.AEM_TAC in out
+    assert "  unfold gumbelLaw\n  %s\n" % O._PM_FALLBACK in out
     assert "unfold a\n  simp" in out
     assert O.core_rewrites(out) == out
 
@@ -1022,7 +1022,7 @@ def test_unfold_infer_instance_falls_back_to_map_measurability():
 def test_probability_measure_constructor_instance_falls_back():
     src = "open MeasureTheory\n  ⟨(μ.map f),\n    by infer_instance⟩\n  ⟨x.map g, inferInstance⟩\n"
     out = O.core_rewrites(src)
-    assert out.count("(by first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s))⟩" % O.AEM_TAC) == 2
+    assert out.count("(by %s)⟩" % O._PM_FALLBACK) == 2
     assert O.core_rewrites(out) == out
 
 
@@ -1077,7 +1077,8 @@ def test_is_mul_commutative_closure_rintro_drops_the_ne_binder():
 # needs AEMeasurable. Synthetic snippets shaped like the sites oaiq-005 (Brenier, SmoothObstruction,
 # CompactFactors) fixed by hand: 2026-10-26.
 
-FALLBACK = "first | infer_instance | exact Measure.isProbabilityMeasure_map (by %s)" % O.AEM_TAC
+FALLBACK = ("first | (set_option synthInstance.maxHeartbeats 20000 in infer_instance) | "
+            "exact Measure.isProbabilityMeasure_map (by %s)" % O.AEM_TAC)
 
 
 def test_aem_chain_tries_the_context_after_fun_prop():
@@ -1135,7 +1136,10 @@ def test_lone_infer_instance_lines_and_anonymous_constructors_get_the_fallback()
            "    inferInstance, ?_, ?_, ?_⟩\n")
     out = O.core_rewrites(src)
     assert "    %s\n" % FALLBACK in out
-    assert out.count("(by %s)" % FALLBACK) == 4
+    assert out.count("(by %s)" % FALLBACK) == 3
+    # the coupling's slot names the statement's measurability hypotheses first
+    assert ("refine ⟨(by first | exact Measure.isProbabilityMeasure_map (by first | exact hT.aemeasurable | "
+            "exact hS.aemeasurable) | (set_option synthInstance.maxHeartbeats 20000 in infer_instance) | ") in out
     assert "inferInstance" not in out
     assert O.core_rewrites(out) == out
 
@@ -1711,3 +1715,187 @@ def test_the_compat_block_declares_is_unital():
     block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
     assert re.search(r'^class IsUnital\b', block, re.M)
     assert re.search(r'^noncomputable def IsUnital\.toNormedRing\b', block, re.M)
+
+
+# ---------------------------------------------------------------- the map fallback names its measurability first
+# oaiq-054 (HardSphere), oaiq-061 (Perceptron), oaiq-071 (CoulombAtom), oaiq-072 (SKGap): the chain timed out or hit
+# maxRecDepth where a hypothesis or a lemma of the port proved the map measurable at once. Snippets from the sources.
+
+def _named_first(*alts):
+    return ("first | exact Measure.isProbabilityMeasure_map (by first | %s) | "
+            "(set_option synthInstance.maxHeartbeats 20000 in infer_instance) | " % ' | '.join(alts))
+
+
+def test_the_fallback_bounds_instance_search_and_tries_it_before_the_tactic_chain():
+    assert O._PM_FALLBACK.startswith("first | (set_option synthInstance.maxHeartbeats 20000 in infer_instance) | ")
+    assert O._PM_FALLBACK.endswith("exact Measure.isProbabilityMeasure_map (by %s)" % O.AEM_TAC)
+
+
+def test_a_let_bound_map_uses_the_measurability_hypothesis_in_scope():
+    # SKGap IntegrableResidualRecipeSq / RegeneratedNormalizedQuery (oaiq-072)
+    src = ("open MeasureTheory\n"
+           "theorem normalized_query {ν : Measure ℝ} [IsProbabilityMeasure ν] : True := by\n"
+           "  let φ := fun x => (x,residualRecipe u g c x/Real.sqrt s)\n"
+           "  let ν' := ν.map φ\n"
+           "  have hφ : Measurable φ := by\n"
+           "    apply measurable_id.prodMk\n"
+           "  let : IsProbabilityMeasure ν' := inferInstance\n")
+    out = O.core_rewrites(src)
+    assert "  let : IsProbabilityMeasure ν' := by " + _named_first("exact hφ.aemeasurable") in out
+    assert O.core_rewrites(out) == out
+
+
+def test_a_lipschitz_binder_of_the_mapped_function_is_used():
+    # SKGap ProdFst (oaiq-072): `(hf : LipschitzWith K f)` ... `have : IsProbabilityMeasure (ν.map f) := inferInstance`
+    src = ("open MeasureTheory\n"
+           "lemma ExponentialEmpiricalConcentration.lipschitz_secondMoment\n"
+           "    {ν : Measure E} [IsProbabilityMeasure ν] (f : E → ℝ) {K : ℝ≥0}\n"
+           "    (hf : LipschitzWith K f) (hg : Measurable g)\n"
+           "    (hi : Integrable (fun x => f x^2) ν) : True := by\n"
+           "  have : IsProbabilityMeasure (ν.map f) := inferInstance\n")
+    out = O.core_rewrites(src)
+    assert "  have : IsProbabilityMeasure (ν.map f) := by " + _named_first("exact hf.continuous.measurable.aemeasurable") in out
+    assert "hg.aemeasurable" not in out             # a hypothesis about another function is not named
+
+
+def test_no_named_fact_leaves_the_plain_fallback():
+    src = ("open MeasureTheory\n"
+           "lemma foo (hg : Measurable g) : True := by\n"
+           "  have : IsProbabilityMeasure (ν.map f) := inferInstance\n")
+    assert "  have : IsProbabilityMeasure (ν.map f) := by %s\n" % O._PM_FALLBACK in O.core_rewrites(src)
+
+
+def test_unfold_of_a_def_uses_the_lemma_declared_for_its_mapped_function():
+    # HardSphere BridgeReference (oaiq-054): the chain hit maxRecDepth; `midpointPoint_continuous t y z` closes it
+    src = ("open MeasureTheory\n"
+           "lemma midpointPoint_continuous (t : ℝ) (y z : Point) : Continuous (midpointPoint t y z) := by\n"
+           "  fun_prop\n"
+           "\n"
+           "def midpointLaw (t : ℝ) (y z : Point) : Measure Point := midpointNoise.map (midpointPoint t y z)\n"
+           "instance midpointLaw_probability (t : ℝ) (y z : Point) : IsProbabilityMeasure (midpointLaw t y z) := by\n"
+           "  unfold midpointLaw\n"
+           "  infer_instance\n")
+    out = O.core_rewrites(src)
+    assert ("  unfold midpointLaw\n  " +
+            _named_first("(apply Continuous.aemeasurable; apply midpointPoint_continuous <;> assumption)")) in out
+    assert O.core_rewrites(out) == out
+
+
+def test_a_one_line_unfold_then_infer_instance_gets_the_fallback():
+    # HardSphere Bridges/Index (oaiq-054): `by unfold wiener; infer_instance` was not rewritten at all
+    src = ("open MeasureTheory\n"
+           "lemma measurable_path : Measurable path := by\n"
+           "  fun_prop\n"
+           "\n"
+           "def wiener : Measure C(Time, ℝ) := law.map path\n"
+           "instance : IsProbabilityMeasure wiener := by unfold wiener; infer_instance\n"
+           "instance : IsProbabilityMeasure ν := by simp only [foo]; infer_instance\n"
+           "instance : Fintype X := by unfold X; infer_instance\n")
+    out = O.core_rewrites(src)
+    assert ("instance : IsProbabilityMeasure wiener := by unfold wiener; (" +
+            _named_first("(apply Measurable.aemeasurable; apply measurable_path <;> assumption)")) in out
+    assert "instance : IsProbabilityMeasure ν := by simp only [foo]; (%s)\n" % O._PM_FALLBACK in out
+    assert "instance : Fintype X := by unfold X; infer_instance\n" in out
+    assert O.core_rewrites(out) == out
+
+
+def test_a_constructor_slot_uses_a_lemma_declared_in_another_module():
+    # Perceptron CovarianceMatrix (oaiq-061): `gramCovariance_continuous` lives in SphericalField GaussianRows
+    src = ("open MeasureTheory\n"
+           "noncomputable def gramLaw {E : Type*} [MeasurableSpace E]\n"
+           "    (μ : Measure E) [IsProbabilityMeasure μ] (n : ℕ) : ProbabilityMeasure (CovarianceMatrix (Fin n)) :=\n"
+           "  ⟨(Measure.pi (fun _ : Fin n => μ)).map gramCovariance,\n"
+           "    inferInstance⟩\n")
+    known = O.declared_lemmas(["lemma gramCovariance_continuous {ι E : Type*} [Fintype ι] :\n    Continuous x := by\n"])
+    out = O.core_rewrites(src, known=known)
+    assert ("    (by " + _named_first("(apply Continuous.aemeasurable; apply gramCovariance_continuous <;> assumption)")) in out
+    assert "(by %s)⟩" % O._PM_FALLBACK in O.core_rewrites(src)        # not declared anywhere: plain
+
+
+def test_module_texts_pass_every_modules_lemmas():
+    srcs = {'OAI.A': ('A', "lemma gramCovariance_continuous : Continuous gramCovariance := by\n  fun_prop\n"),
+            'OAI.B': ('B', "import OAI.A\nopen MeasureTheory\nnoncomputable def g (μ : Measure E) [IsProbabilityMeasure μ] :\n"
+                           "    ProbabilityMeasure M :=\n  ⟨μ.map gramCovariance,\n    inferInstance⟩\n")}
+    files = O.module_texts(srcs, 'Solutions.X')
+    assert 'apply gramCovariance_continuous <;> assumption' in files['B.lean']
+
+
+def test_inferinstanceas_of_a_map_becomes_show_by_the_fallback():
+    # SKGap IndependentPathTail and GOE (oaiq-072), Perceptron (oaiq-061)
+    src = ("open MeasureTheory\n"
+           "lemma tail_law (hB : IsBrownian B) : IsProbabilityMeasure (P.map X) := by\n"
+           "  exact inferInstanceAs (IsProbabilityMeasure (P.map _))\n"
+           "lemma goe : True := by\n"
+           "  let : IsProbabilityMeasure (goeLaw (ι := ι) r) :=\n"
+           "    inferInstanceAs (IsProbabilityMeasure ((gaussianCoordinates (MatrixCoordinates ι)).map _))\n"
+           "  have := inferInstanceAs (IsProbabilityMeasure ((stdGaussian E).map (σ • ·)))\n"
+           "  have := inferInstanceAs (IsProbabilityMeasure μ)\n"
+           "  have := inferInstanceAs (Fintype (X.map f))\n")
+    out = O.core_rewrites(src)
+    assert "  exact (show IsProbabilityMeasure (P.map _) by %s)\n" % O._PM_FALLBACK in out
+    assert ("    (show IsProbabilityMeasure ((gaussianCoordinates (MatrixCoordinates ι)).map _) by %s)\n"
+            % O._PM_FALLBACK) in out
+    assert "  have := (show IsProbabilityMeasure ((stdGaussian E).map (σ • ·)) by %s)\n" % O._PM_FALLBACK in out
+    assert "  have := inferInstanceAs (IsProbabilityMeasure μ)\n" in out
+    assert "  have := inferInstanceAs (Fintype (X.map f))\n" in out
+    assert O.core_rewrites(out) == out
+
+
+def test_probabilitymeasure_binder_dot_map_gets_its_proof():
+    # Perceptron ProbabilityMaps (oaiq-061): a lemma statement and `(… : Measure X)` casts of `μ.map (F n)`
+    src = ("open MeasureTheory\n"
+           "lemma probabilityMap_tendsto_of_ae_tendsto {Ω X : Type*}\n"
+           "    (μ : ProbabilityMeasure Ω) (F : ℕ → Ω → X) (G : Ω → X)\n"
+           "    (hF : ∀ n, Measurable (F n)) (hG : Measurable G)\n"
+           "    (hlim : ∀ᵐ ω ∂(μ : Measure Ω), Tendsto (fun n => F n ω) atTop (𝓝 (G ω))) :\n"
+           "    Tendsto (fun n => μ.map (F n)) atTop (𝓝 (μ.map G)) := by\n"
+           "  have he n : (∫ x, f x ∂(μ.map (F n) : Measure X)) =\n"
+           "      ∫ ω, f (F n ω) ∂(μ : Measure Ω) :=\n"
+           "    integral_map (hF n).aemeasurable f.measurable.aestronglyMeasurable\n")
+    out = O.core_rewrites(src)
+    tac = lambda h: 'first | exact %s | ' % h + O.AEM_TAC[len('first | '):]
+    assert "Tendsto (fun n => μ.map (f := (F n)) (by %s)) atTop" % tac('(hF n).aemeasurable') in out
+    assert "(𝓝 (μ.map (f := G) (by %s)))" % tac('hG.aemeasurable') in out
+    assert "∂(μ.map (f := (F n)) (by %s) : Measure X)" % tac('(hF n).aemeasurable') in out
+    assert "∂(μ : Measure Ω)" in out
+    assert O.core_rewrites(out) == out
+
+
+def test_probabilitymeasure_dot_map_in_a_def_body_and_an_applied_family():
+    # IndependentSets PatternInvariant (oaiq-069), Perceptron `(μ n).map f = μ n` (oaiq-061)
+    src = ("lemma ListPattern.measurable_restrict {s d : ℕ} (e : X ↪o Y) :\n"
+           "    Measurable (ListPattern.restrict (s := s) (d := d) e) := by\n"
+           "  fun_prop\n"
+           "noncomputable def restrictionLaw {s d : ℕ} {X Y : Type*}\n"
+           "    [LinearOrder X] [LinearOrder Y] (e : X ↪o Y)\n"
+           "    (μ : ProbabilityMeasure (ListPattern s d Y)) : ProbabilityMeasure (ListPattern s d X) :=\n"
+           "  μ.map (ListPattern.restrict e)\n"
+           "lemma relabel (μ : ℕ → ProbabilityMeasure X) (hc : Continuous c) (n : ℕ) :\n"
+           "    (μ n).map c = μ n := by\n"
+           "  sorry\n")
+    out = O.core_rewrites(src)
+    assert ("  μ.map (f := (ListPattern.restrict e)) (by first | (apply Measurable.aemeasurable; apply "
+            "ListPattern.measurable_restrict <;> assumption) | fun_prop") in out
+    assert "    (μ n).map (f := c) (by first | exact hc.measurable.aemeasurable | fun_prop" in out
+    assert O.core_rewrites(out) == out
+
+
+def test_dot_map_is_left_alone_unless_a_binder_makes_mu_a_probability_measure():
+    src = ("lemma a (μ : Measure X) : μ.map f = 0 := sorry\n"
+           "lemma b (μ : ProbabilityMeasure X) : (μ : Measure X).map f = 0 := sorry\n"
+           "lemma c (P : ProbabilityMeasure X) : (law K P).map f = P := sorry\n"
+           "lemma d (μ : ProbabilityMeasure X) : ∀ ν, (fun μ => μ.map f) ν = ν := sorry\n"
+           "lemma e (μ : ProbabilityMeasure X) (hf : AEMeasurable f μ) : μ.map hf = μ := sorry\n"
+           "lemma f (μ : ProbabilityMeasure X) : μ.map (f := g) (by fun_prop) = μ := sorry\n")
+    assert O.core_rewrites(src) == src
+
+
+def test_inferinstanceas_with_a_hole_takes_the_function_from_the_statement():
+    # SKGap IndependentPathTail (oaiq-072): `(P.map _)`; without a name the chain's `measurability` hit maxRecDepth
+    src = ("open MeasureTheory\n"
+           "lemma measurable_path : Measurable path := by\n  fun_prop\n"
+           "lemma tail {P : Measure ℝ} [IsProbabilityMeasure P] : IsProbabilityMeasure (P.map path) := by\n"
+           "  exact inferInstanceAs (IsProbabilityMeasure (P.map _))\n")
+    out = O.core_rewrites(src)
+    assert ("  exact (show IsProbabilityMeasure (P.map _) by " +
+            _named_first("(apply Measurable.aemeasurable; apply measurable_path <;> assumption)")) in out
