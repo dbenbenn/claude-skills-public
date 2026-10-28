@@ -243,6 +243,34 @@ theorem _root_.LinearIsometry.completion_apply_coe {𝕜 E F : Type*} [Nontrivia
     [SeminormedAddCommGroup E] [NormedSpace 𝕜 E] [SeminormedAddCommGroup F] [NormedSpace 𝕜 F]
     (f : E →ₗᵢ[𝕜] F) (x : E) : f.completion (x : UniformSpace.Completion E) = (f x : UniformSpace.Completion F) :=
   ContinuousLinearMap.completion_apply_coe f.toContinuousLinearMap x
+/-- Mathlib d13f23b's `Subtype.starOrderedRing`: the order a closed ⋆-subalgebra of a C⋆-algebra inherits
+(Kadison similarity, oaiq-075). -/
+theorem _root_.Subtype.starOrderedRing {A : Type*} [CStarAlgebra A] [PartialOrder A]
+    [StarOrderedRing A] (S : StarSubalgebra ℂ A) [hS : IsClosed (S : Set A)] :
+    StarOrderedRing S := by
+  refine StarOrderedRing.of_nonneg_iff' (fun {a b} h c => ?_) (fun {s} => ?_)
+  · show ((c : A) + (a : A)) ≤ (c : A) + (b : A)
+    exact add_le_add le_rfl (show (a : A) ≤ (b : A) from h)
+  · constructor
+    · intro hs
+      have hs' : (0 : A) ≤ (s : A) := hs
+      have hmem : CFC.sqrt (s : A) ∈ S := by
+        rw [CFC.sqrt_eq_real_sqrt _ hs']
+        exact cfcₙ_mem (𝕜 := ℝ) (𝕜' := ℂ) (s := S) _ s.property
+      refine ⟨⟨CFC.sqrt (s : A), hmem⟩, Subtype.ext ?_⟩
+      show (s : A) = star (CFC.sqrt (s : A)) * CFC.sqrt (s : A)
+      rw [CFC.sqrt_nonneg _ |>.isSelfAdjoint.star_eq, CFC.sqrt_mul_sqrt_self _ hs']
+    · rintro ⟨t, rfl⟩
+      show (0 : A) ≤ star (t : A) * (t : A)
+      exact star_mul_self_nonneg _
+
+instance vonNeumannAlgebraStarOrderedRing {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
+    [CompleteSpace H] (P : VonNeumannAlgebra H) : StarOrderedRing P :=
+  haveI : IsClosed (P.toStarSubalgebra : Set (H →L[ℂ] H)) := by
+    have := Set.isClosed_centralizer (Set.centralizer (P.carrier))
+    rw [P.centralizer_centralizer'] at this
+    exact this
+  Subtype.starOrderedRing P.toStarSubalgebra
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod

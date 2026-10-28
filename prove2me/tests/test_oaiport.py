@@ -1662,3 +1662,11 @@ def test_cstar_algebra_lemmas_take_their_element_as_named_argument():
     out = O.core_rewrites(src)
     assert 'CStarAlgebra.pow_nonneg (a := b) hb0 n' in out
     assert 'CStarAlgebra.norm_or_neg_norm_mem_spectrum a.property with' in out
+
+
+def test_the_compat_block_declares_subtype_star_ordered_ring():
+    # d13f23b's `Subtype.starOrderedRing` and the instance on a von Neumann algebra (Kadison similarity,
+    # oaiq-075); ours has neither
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^theorem _root_\.Subtype\.starOrderedRing\b', block, re.M)
+    assert re.search(r'^instance vonNeumannAlgebraStarOrderedRing\b', block, re.M)
