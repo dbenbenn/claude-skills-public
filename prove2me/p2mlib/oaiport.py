@@ -1183,8 +1183,9 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top(?![\w'])", 3)
     # d13f23b's `eLpNorm_mono hf h` takes a measurability argument first; ours takes the bound only
     # (Boltzmann, oaiq-080: 14 sites, every first argument a `….aestronglyMeasurable`)
-    text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?eLpNorm_mono(?![\w'])", 1,
-                         only=lambda a: 'easurable' in a)
+    for _n in ('eLpNorm_mono', 'eLpNorm_mono_ae'):
+        text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?" + _n + r"(?![\w'])", 1,
+                             only=lambda a: 'easurable' in a or re.match(r"\(?h\w*m\b", a))
     # d13f23b's `eLpNorm_one_eq_lintegral_enorm hf` has a measurability argument; ours has none
     # (MemoryPrecision, 2026-10-25)
     text = _drop_positional_arg(text, 'eLpNorm_one_eq_lintegral_enorm')
