@@ -847,6 +847,16 @@ def core_rewrites(text, compat_ns='OAI'):
     # (same statements; SquareDifference ReflectionLaw 2026-10-25)
     text = re.sub(r"(?<![\w'])((?:Finset\.)?prod_le_prod_of_subset_of_(?:le_one|one_le))₀(?![\w'])",
                   r"\1", text)
+    # oaiq-068 (PiExponent 2026-10-28), d13f23b names vs ours: the presheaf-of-modules monoidal
+    # structure sits in `PresheafOfModules` here; going-up lemma, power-series order of a unit,
+    # the additive `sum_le_sum_of_subset_of_nonpos'` and the compactness lemma's namespace.
+    text = re.sub(r"(?<![\w'])PresheafOfModulesOfCommRing\.", 'PresheafOfModules.', text)
+    text = re.sub(r"(?<![\w.'])Ideal\.under_lt_under_of_integral_mem_sdiff(?![\w'])",
+                  'Ideal.comap_lt_comap_of_integral_mem_sdiff', text)
+    text = re.sub(r"(?<![\w.'])PowerSeries\.order_zero_of_isUnit(?![\w'])", 'PowerSeries.order_zero_of_unit', text)
+    text = re.sub(r"(?<![\w'])((?:Finset\.)?sum_le_sum_of_subset_of_nonpos)(?![\w'₀])", r"\1'", text)
+    text = re.sub(r"(?<![\w.'])IsCompactElement\.exists_finset_of_le_iSup(?![\w'])",
+                  'CompleteLattice.IsCompactElement.exists_finset_of_le_iSup', text)
     return split_partial_namespaces(text)
 
 

@@ -1606,3 +1606,22 @@ def test_elpnorm_le_nnreal_smul_ae_le_mul_drops_its_measurability_argument():
                                     "      (Eventually.of_forall fun point => by\n"
                                     "        exact_mod_cast foo point) 2\n"
                                     "  have := eLpNorm_le_nnreal_smul_eLpNorm_of_ae_le_mul' h p\n")
+
+
+# oaiq-068 (PiExponent, 2026-10-28): d13f23b names differ from ours (0df444a) in five spots.
+def test_pi_exponent_renames():
+    src = ('PresheafOfModulesOfCommRing.Monoidal.tensorObj (R := X.presheaf) M N\n'
+           'PresheafOfModulesOfCommRing.monoidalCategory\n'
+           'exact Ideal.under_lt_under_of_integral_mem_sdiff h x\n'
+           'PowerSeries.order_zero_of_isUnit (u.isUnit.map φ)\n'
+           'Finset.sum_le_sum_of_subset_of_nonpos (f := a) h g\n'
+           'IsCompactElement.exists_finset_of_le_iSup hN f h\n')
+    out = O.core_rewrites(src)
+    assert 'PresheafOfModules.Monoidal.tensorObj (R := X.presheaf)' in out
+    assert 'PresheafOfModules.monoidalCategory' in out and 'OfCommRing.' not in out
+    assert 'Ideal.comap_lt_comap_of_integral_mem_sdiff h x' in out
+    assert 'PowerSeries.order_zero_of_unit (u' in out
+    assert "Finset.sum_le_sum_of_subset_of_nonpos' (f := a)" in out
+    assert 'CompleteLattice.IsCompactElement.exists_finset_of_le_iSup hN' in out
+    # idempotent: already-qualified names are left alone
+    assert O.core_rewrites(out) == out
