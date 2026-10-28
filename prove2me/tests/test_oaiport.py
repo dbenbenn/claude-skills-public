@@ -2109,3 +2109,20 @@ def test_compat_has_lipschitz_comp_absolutely_continuous():
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                             'compat_4_34.lean')).read()
     assert 'theorem _root_.LipschitzOnWith.comp_absolutelyContinuousOnInterval' in src
+
+
+def test_compat_has_lipschitzwith_comp_absolutely_continuous():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem _root_.LipschitzWith.comp_absolutelyContinuousOnInterval' in src
+
+
+def test_elpnorm_mono_loses_its_measurability_argument():
+    # d13f23b: `eLpNorm_mono hf.aestronglyMeasurable hbound`; ours: `eLpNorm_mono hbound` (oaiq-080)
+    out = O.core_rewrites('  exact (eLpNorm_mono hf.aestronglyMeasurable hbound).trans h\n'
+                          '  apply eLpNorm_mono ((a.sub b)).aestronglyMeasurable\n'
+                          '  exact eLpNorm_mono hbound\n')
+    assert out == ('  exact (eLpNorm_mono hbound).trans h\n'
+                   '  apply eLpNorm_mono\n'
+                   '  exact eLpNorm_mono hbound\n')

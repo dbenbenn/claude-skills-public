@@ -40,6 +40,11 @@ theorem _root_.LipschitzOnWith.comp_absolutelyContinuousOnInterval {g f : ℝ �
     have := hg (hmaps _ hi'.left) (hmaps _ hi'.right)
     have h2 := ENNReal.toReal_mono (ENNReal.mul_ne_top ENNReal.coe_ne_top (edist_ne_top _ _)) this
     rwa [ENNReal.toReal_mul, ← dist_edist, ← dist_edist, ENNReal.coe_toReal] at h2
+/-- The `LipschitzWith` form of the previous lemma (JetSupersolutions, oaiq-080). -/
+theorem _root_.LipschitzWith.comp_absolutelyContinuousOnInterval {g f : ℝ → ℝ} {K : NNReal}
+    {a b : ℝ} (hg : LipschitzWith K g) (hf : AbsolutelyContinuousOnInterval f a b) :
+    AbsolutelyContinuousOnInterval (fun t => g (f t)) a b :=
+  (hg.lipschitzOnWith (s := Set.univ)).comp_absolutelyContinuousOnInterval (fun _ _ => Set.mem_univ _) hf
 /-- Mathlib d13f23b's `Finset.equivOfEq`: the equivalence between the subtypes of equal finsets
 (Coboundary CongruenceFrames, 2026-10-26). -/
 def _root_.Finset.equivOfEq {α : Type*} {s t : Finset α} (h : s = t) : s ≃ t :=

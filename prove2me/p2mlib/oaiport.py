@@ -751,15 +751,16 @@ def _call_args(text, j):
     return args
 
 
-def _drop_nth_arg(text, pattern, n):
+def _drop_nth_arg(text, pattern, n, only=None):
     """Drop the n-th positional argument (1-based; named arguments skipped) after each match of `pattern`, with
-    the whitespace before it. A call with fewer positional arguments is left alone."""
+    the whitespace before it. A call with fewer positional arguments is left alone; `only(arg_text)` limits
+    it to arguments it accepts."""
     out, i = [], 0
     for m in re.finditer(pattern, text):
         if m.start() < i:
             continue
         pos = [a for a in _call_args(text, m.end()) if not a[0]]
-        if len(pos) >= n:
+        if len(pos) >= n and (only is None or only(text[pos[n - 1][1]:pos[n - 1][2]])):
             _, _, e, w = pos[n - 1]
             out.append(text[i:w])
             i = e
@@ -1180,6 +1181,10 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # argument; ours has two (Elasticity Regularity, 2026-10-26)
     # (any shape: `hf.aestronglyMeasurable`, a bare `hm`, a multi-line group; CoulombAtom oaiq-071)
     text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top(?![\w'])", 3)
+    # d13f23b's `eLpNorm_mono hf h` takes a measurability argument first; ours takes the bound only
+    # (Boltzmann, oaiq-080: 14 sites, every first argument a `….aestronglyMeasurable`)
+    text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?eLpNorm_mono(?![\w'])", 1,
+                         only=lambda a: 'easurable' in a)
     # d13f23b's `eLpNorm_one_eq_lintegral_enorm hf` has a measurability argument; ours has none
     # (MemoryPrecision, 2026-10-25)
     text = _drop_positional_arg(text, 'eLpNorm_one_eq_lintegral_enorm')
