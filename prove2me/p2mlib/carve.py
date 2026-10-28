@@ -85,6 +85,20 @@ DIAGNOSTIC = {'check', 'eval', 'print', 'printAxioms', 'reduce', 'check_failure'
 OPENERS = {'namespace', 'section', 'noncomputableSection'}
 
 
+# a simp attribute entry (`simp`, `local simp`, `simp ←`; not `-simp`, `simps`)
+_SIMP_ATTR = re.compile(r'(?:(?:local|scoped)\s+)?simp(?![\w\-])')
+# a proof by `rfl`: `:= rfl`, `:= by rfl`, `:= by exact rfl`, `:= Eq.refl _`
+_RFL_VALUE = re.compile(r'\s*(?::=)?\s*(?:by\s+(?:exact\s+)?)?(?:rfl|Eq\.refl\b[^\n]*|\(rfl\))\s*$')
+# a tactic using the default simp set, and what follows it up to its lemma list or line end
+_SIMP_CALL = re.compile(r"(?<![\w.'])(?:simp|simpa|simp_all|dsimp|simp_arith|norm_num|field_simp|aesop)"
+                        r"[?!]*(?![\w'])([^\[\n]*)")
+
+
+def _default_simp_call(text):
+    """Does Lean source call simp with its default simp set (no `only`)?"""
+    return any(not re.search(r'\bonly\b', mt.group(1)) for mt in _SIMP_CALL.finditer(text))
+
+
 class CarveError(Exception):
     pass
 
@@ -877,9 +891,48 @@ class Graph:
                         if kinds is not None and used is not None and not kinds & used:
                             continue
                         self.nodes[key].ndeps |= refs - {key}
+        self._add_default_simp_deps()
         for k, nd in self.nodes.items():
             nd.deps = nd.term | nd.sdeps | nd.ndeps | nd.ideps
         self._build_scoped_deps()
+
+    def _add_default_simp_deps(self):
+        """A declaration whose proof calls the default simp set (`simp`, `simpa`, `simp_all`,
+        `dsimp`, `norm_num`, … without `only`) depends on its module's earlier `@[simp]` lemmas
+        proved by `rfl`: simp uses such a lemma by definitional rewriting, which leaves no constant
+        in the term (a lemma proved otherwise shows in the term when simp uses it). PeriodicLattice
+        oaiq-067: `@[simp] encode_int_ofNat : encode (n : ℤ) = 2 * n := rfl` (library constants
+        only, so no implicit_deps link either) and `simp [Nat.bodd]` proofs, carved into a bundle
+        that did not import the lemmas ("unsolved goals"). An over-estimate: every such lemma of
+        the module counts for every such call after it."""
+        for m, info in self.infos.items():
+            lemmas = []                  # (command index from which it is a simp lemma, node)
+            for c in info.commands:
+                k = self.cmd_node.get((m, c.index))
+                if c.short_kind == 'attribute':
+                    if any(_SIMP_ATTR.match(e) for e in attribute_entries(leanedit.text(info, c.index)) or ()):
+                        lemmas += [(c.index, o) for o in self._source_refs(info, c, m, None)
+                                   if self._rfl_theorem(o)]
+                    continue
+                if not k:
+                    continue
+                nd = self.nodes[k]
+                if any(_SIMP_ATTR.match(a) for a in c.attrs or ()) and self._rfl_theorem(k):
+                    lemmas.append((c.index, k))
+                if lemmas and _default_simp_call(strip(leanedit.text(info, c.index))):
+                    nd.sdeps |= {o for i, o in lemmas if i < c.index and o != k}
+
+    def _rfl_theorem(self, k):
+        """Is node k a theorem whose proof is `rfl` (simp then uses it as a dsimp lemma)?"""
+        nd = self.nodes.get(k)
+        if nd is None or not nd.theorem:
+            return False
+        info = self.infos[nd.module]
+        c = info.commands[nd.cmd]
+        if c.value_start is None:
+            return False
+        v = strip(info.text_bytes[c.value_start.byte:c.end.byte].decode('utf-8', 'replace'))
+        return bool(_RFL_VALUE.match(v))
 
     def _add_coercion_instances(self):
         """Record the uses of coercion instances that elaborate away. `↑p` with `CoeSort Pack Type`

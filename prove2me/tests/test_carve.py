@@ -2162,3 +2162,30 @@ def test_an_unseen_instance_on_an_abbrev_is_hidden_where_its_class_was_asked(g):
 def test_hidden_abbrev_instances_compile(g, tmp_path):
     _compile_in_publish_order(g, _opt_plan(), tmp_path)
 
+
+def _lcm_plan(g):
+    return C.make_plan(g, ['CD.uses_lcm23', 'CD.uses_lcm23_only'], budget=0.05, piece_size=10**6,
+                       bundle_budget=0.005, bundle_size=10**6,
+                       cost=C.size_costs(g, bytes_per_second=10000), bundle_prefix='SL')
+
+
+def test_a_default_simp_call_depends_on_its_modules_earlier_rfl_simp_lemmas(g):
+    # PeriodicLattice (oaiq-067): `@[simp] theorem encode_int_ofNat … := rfl` (library constants
+    # only) and later `simp [Nat.bodd]` proofs; simp used it by definitional rewriting, so nothing
+    # recorded the use, and the carved proofs' bundle did not import the lemmas ("unsolved goals").
+    # Here lcm23 and uses_lcm23 (`by simp`); `simp only [...]` uses no default lemma.
+    assert 'CD.lcm23' not in g.nodes['CD.uses_lcm23'].term
+    assert 'CD.lcm23' in g.nodes['CD.uses_lcm23'].deps
+    assert 'CD.lcm23' not in g.nodes['CD.uses_lcm23_only'].deps
+    assert 'CD.uses_lcm23' not in g.nodes['CD.lcm23'].deps
+    p = _lcm_plan(g)
+    assert C.check_plan(g, p) == []
+    pc = p['pieces']['CD.uses_lcm23']
+    # an attributed declaration of the bundle material: the piece imports its bundle
+    b = next(b['name'] for b in p['bundles'] if 'CD.lcm23' in b['nodes'])
+    assert b in pc['bundles'], pc
+
+
+@pytest.mark.lean
+def test_default_simp_lemmas_compile(g, tmp_path):
+    _compile_in_publish_order(g, _lcm_plan(g), tmp_path)
