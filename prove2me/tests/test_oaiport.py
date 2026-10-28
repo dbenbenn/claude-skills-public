@@ -2123,8 +2123,10 @@ def test_elpnorm_mono_loses_its_measurability_argument():
     out = O.core_rewrites('  exact (eLpNorm_mono hf.aestronglyMeasurable hbound).trans h\n'
                           '  apply eLpNorm_mono ((a.sub b)).aestronglyMeasurable\n'
                           '  exact eLpNorm_mono hbound\n'
-                          '  apply eLpNorm_mono_ae (hfm n)\n')
+                          '  apply eLpNorm_mono_ae (hfm n)\n'
+                          '  apply eLpNorm_mono_ae ((ham n).mul (hfm n))\n')
     assert out == ('  exact (eLpNorm_mono hbound).trans h\n'
                    '  apply eLpNorm_mono\n'
                    '  exact eLpNorm_mono hbound\n'
+                   '  apply eLpNorm_mono_ae\n'
                    '  apply eLpNorm_mono_ae\n')
