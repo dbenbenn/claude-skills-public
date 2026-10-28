@@ -801,7 +801,7 @@ def _mgf_gaussian_real_map_eq(text):
     HasLaw's `map_eq` field (oaiq-004, oaiq-036). `⟨hm, heq⟩` becomes `heq`, a HasLaw term `h` becomes
     `h.map_eq`; `(by …)` (simp proves either) and `_`/`?_` stay."""
     out, i = [], 0
-    for m in re.finditer(r"(?<![\w.'])(?:ProbabilityTheory\.)?mgf_gaussianReal(?![\w'])", text):
+    for m in re.finditer(r"(?<![\w.'])(?:ProbabilityTheory\.)?[mc]gf_gaussianReal(?![\w'])", text):
         if m.start() < i:
             continue
         pos = [a for a in _call_args(text, m.end()) if not a[0]]
@@ -902,6 +902,38 @@ def _convert_close_diamonds(text):
         pad = m.group(1) + ('  ' if bullet else '')
         return m.group(0) + pad + "all_goals try with_reducible_and_instances rfl\n"
     return sub(_CONVERT_BULLET, sub(_CONVERT, text))
+
+def _simp_lists_add_if_true(text):
+    """Lean 4.34's `ite_true` takes any `Decidable True` instance; 4.33's (ours) only the standard one, so
+    `simp only [ite_true]` stops firing on an `if True` whose instance came from elsewhere (oaiq-056,
+    BalancedRyser oaiq-063). Our `if_true` is the general lemma: every simp-family list that names
+    `ite_true` names `if_true` too (added, not renamed: ours is rfl, which `dsimp` and simp's dsimp steps
+    need; `rw` lists are left alone, where an unused `if_true` would fail)."""
+    out, i = [], 0
+    for m in re.finditer(r"(?<![\w.'])(?:simp|simpa|simp_all|simp_arith|field_simp)\b[?!]?[^\[\n]*?\[", text):
+        if m.start() < i:
+            continue
+        q = m.end() - 1
+        e = _balanced_end(text, q)
+        if e is None:
+            continue
+        lst = text[q:e]
+        if re.search(r"(?<![\w.'@])ite_true(?![\w'])", lst) and not re.search(r"(?<![\w.'])if_true(?![\w'])", lst):
+            lst = re.sub(r"(?<![\w.'@←])(ite_true)(?![\w'])", r"\1, if_true", lst, count=1)
+            out.append(text[i:q] + lst)
+            i = e
+    return ''.join(out) + text[i:]
+
+
+def _finset_antidiagonal(text):
+    """`Finset.antidiagonal n` / `Finset.mem_antidiagonal` resolve to the Hahn-series `Finset.antidiagonal hs ht
+    a` (the additive `mulAntidiagonal`) in our environment; the `HasAntidiagonal` ones are meant
+    (BalancedRyser oaiq-063), so they are named by the class. A file that uses the Hahn-series form (it
+    mentions `IsPWO`/`isPWO`/`HahnSeries`/`mulAntidiagonal`) is left alone."""
+    if re.search(r"isPWO|IsPWO|HahnSeries|mulAntidiagonal", text):
+        return text
+    return re.sub(r"(?<![\w.'])Finset\.(mem_)?antidiagonal(?![\w'])", r"Finset.HasAntidiagonal.\1antidiagonal", text)
+
 
 # `.restrict D` / `.neg` / `.mono_exponent _` of a MemLp fact is one
 _MEMLP_KEEPS = ('restrict', 'neg', 'mono_exponent')
@@ -1041,7 +1073,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
                   pre + 'freeGroupInductionOn', text)
     # d13f23b's `unifIntegrable_iff.mpr` (extended-real ε, δ) is the compat block's `unifIntegrable_of_enn`
     # (SLE IntegralLimits, oaiq-027); `.mp` and the primed form have no shim
-    text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?unifIntegrable_iff\.mpr(?![\w'])",
+    text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?unifIntegrable_iff\.(?:mpr|2)(?![\w'])",
                   pre + 'unifIntegrable_of_enn', text)
     # d13f23b's `PosSemidef.dotProduct_mulVec_zero_iff` has `x` implicit; ours explicit (CAT0Fillings, oaiq-029)
     text = re.sub(r"(?<![\w.'])(\([^()\n]*\)(?:\.[12])?|[\w']+)\.dotProduct_mulVec_zero_iff\.(mpr|mp|1|2)(?![\w'])",
@@ -1098,8 +1130,8 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     _a = r"(?:\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|[\w.']+)"
     # d13f23b's `eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top hp0 hptop hf` has a third, measurability
     # argument; ours has two (Elasticity Regularity, 2026-10-26)
-    text = re.sub(r"(?<![\w.'])(eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top\s+" + _a + r"\s+" + _a + r")\s+"
-                  r"[\w.']*\.aestronglyMeasurable(?![\w'])", r"\1", text)
+    # (any shape: `hf.aestronglyMeasurable`, a bare `hm`, a multi-line group; CoulombAtom oaiq-071)
+    text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top(?![\w'])", 3)
     # d13f23b's `eLpNorm_one_eq_lintegral_enorm hf` has a measurability argument; ours has none
     # (MemoryPrecision, 2026-10-25)
     text = _drop_positional_arg(text, 'eLpNorm_one_eq_lintegral_enorm')
@@ -1126,6 +1158,34 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
+    # oaiq-054..072 drift (signatures checked against both Mathlibs, 2026-10-28):
+    # d13f23b's `Submodule.isTopologicalAddGroup` is our `Submodule.topologicalAddGroup` (Conductivity oaiq-059)
+    text = re.sub(r"(?<![\w.'])Submodule\.isTopologicalAddGroup(?![\w'])", 'Submodule.topologicalAddGroup', text)
+    # d13f23b's `LinearMap.coe_ofClass` is our `LinearMap.coe_coe` (SimpleOvergroups oaiq-066)
+    text = re.sub(r"(?<![\w.'])LinearMap\.coe_ofClass(?![\w'])", 'LinearMap.coe_coe', text)
+    # d13f23b's `Ordinal.lt_wf` is a `WellFoundedLT` instance, so `.induction` is `WellFoundedLT.induction` (case
+    # `ind`); ours is a `WellFounded`, whose `.induction` names it `h` (TuringRigidity oaiq-064)
+    text = re.sub(r"(?<=using )Ordinal\.lt_wf\.induction(?![\w'])", 'WellFoundedLT.induction', text)
+    # d13f23b's `Measure.lintegral_bind_le f m (hμ : AEMeasurable μ m)` and `lintegral_map_le f (hg : AEMeasurable
+    # g μ)` take the measurability; ours take the kernel / the map: the compat block's forms (CoulombAtom oaiq-071)
+    text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?(?:Measure\.)?lintegral_bind_le(?![\w'])",
+                  pre + 'lintegral_bind_le_ae', text)
+    text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?lintegral_map_le(?![\w'])", pre + 'lintegral_map_le_ae', text)
+    # d13f23b's `FiniteMeasure.mass_map_le {f} {μ} (hf : AEMeasurable f μ)`; ours `mass_map_le (f) (μ)`, and
+    # `_ _` leaves `f` undetermined: the compat block's form (BalancedRyser oaiq-063)
+    text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?FiniteMeasure\.mass_map_le(?![\w'])",
+                  pre + 'finiteMeasure_mass_map_le', text)
+    # d13f23b's `Measure.isProbabilityMeasure_of_map (hf : AEMeasurable f μ)`; ours takes `f`, and `_` leaves the
+    # instance argument stuck: the compat block's `isProbabilityMeasure_of_map_ae` (HardSphere oaiq-054)
+    text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?Measure\.isProbabilityMeasure_of_map(?![\w'])",
+                  pre + 'isProbabilityMeasure_of_map_ae', text)
+    # d13f23b's `JoinedIn.map` takes `ContinuousOn f F`; ours takes `Continuous f`, the old one is
+    # `map_continuousOn` (HardSphere BathPhase oaiq-054)
+    text = re.sub(r"\.map(?=[ \t]+\(?[\w.']+\.continuousOn\b)", '.map_continuousOn', text)
+    # ours added `(hf : AEStronglyMeasurable f μ)` to `meas_ge_le_mul_pow_eLpNorm_enorm` (HardSphere oaiq-054)
+    text = _insert_named_arg(text, _pre + r"meas_ge_le_mul_pow_eLpNorm_enorm(?![\w'])", 'hf', 'by ' + AESM_TAC)
+    text = _simp_lists_add_if_true(text)
+    text = _finset_antidiagonal(text)
     text = _total_map_rewrites(text, known)
     text = _memlp_mul_swap(text)      # MemLp.mul's factors swapped (oaiq-054/059/071/072)
     # d13f23b's lambda-form `logDeriv_fun_mul` / `logDeriv_fun_prod` are our `logDeriv_mul` / `logDeriv_prod`

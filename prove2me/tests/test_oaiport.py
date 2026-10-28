@@ -1972,3 +1972,76 @@ def test_other_mul_calls_are_left_alone():
            "  exact (hasDerivAt_id x).mul (hasDerivAt_const x c)\n"
            "  have := foo\n    hm.mul hg\n")                 # a continuation argument of foo
     assert O.core_rewrites(src) == src
+
+
+# ---------------------------------------------------------------- oaiq-054..072 renames and argument changes
+# signatures checked against both Mathlibs (d13f23b vs 0df444a), 2026-10-28
+
+def test_oaiq_renames():
+    src = ("  exact (Submodule.isTopologicalAddGroup H10).toContinuousAdd\n"
+           "  simp only [LinearMap.coe_ofClass, map_mul]\n"
+           "  induction o using Ordinal.lt_wf.induction with\n  | ind o ih =>\n"
+           "  refine OAI.unifIntegrable_of_enn ?_\n  exact unifIntegrable_iff.2 h\n"
+           "  rw [he,cgf_gaussianReal hlaw]\n")
+    out = O.core_rewrites(src)
+    assert "(Submodule.topologicalAddGroup H10).toContinuousAdd" in out
+    assert "simp only [LinearMap.coe_coe, map_mul]" in out
+    assert "induction o using WellFoundedLT.induction with\n  | ind o ih =>" in out
+    assert "exact OAI.unifIntegrable_of_enn h" in out
+    assert "rw [he,cgf_gaussianReal hlaw.map_eq]" in out
+    # look-alikes stay
+    same = "  exact Ordinal.lt_wf.has_min s hs\n  exact InvImage.wf ZFSet.rank Ordinal.lt_wf\n  exact unifIntegrable_iff.mp h\n"
+    assert O.core_rewrites(same) == same
+
+
+def test_measurability_taking_lemmas_go_to_their_compat_forms():
+    src = ("  exact Measure.isProbabilityMeasure_of_map measurable_fst.aemeasurable\n"
+           "  · exact (FiniteMeasure.mass_map_le measurable_subtype_coe.aemeasurable).trans hν'\n"
+           "  exact (Measure.lintegral_bind_le _ _ hkernel).trans ?_\n"
+           "    _ ≤ _ := lintegral_map_le (fun pair => f pair)\n      measurable_prodMk_left.aemeasurable\n")
+    out = O.core_rewrites(src)
+    assert "  exact OAI.isProbabilityMeasure_of_map_ae measurable_fst.aemeasurable\n" in out
+    assert "(OAI.finiteMeasure_mass_map_le measurable_subtype_coe.aemeasurable).trans hν'" in out
+    assert "(OAI.lintegral_bind_le_ae _ _ hkernel).trans ?_" in out
+    assert "lintegral_map_le_ae (fun pair => f pair)\n      measurable_prodMk_left.aemeasurable" in out
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    for n in ('isProbabilityMeasure_of_map_ae', 'finiteMeasure_mass_map_le', 'lintegral_bind_le_ae',
+              'lintegral_map_le_ae'):
+        assert re.search(r'^theorem %s\b' % n, block, re.M), n
+
+
+def test_elpnorm_lt_top_iff_drops_a_bare_third_argument():
+    # CoulombAtom TensorLp (oaiq-071), DiskMaximal WeakLimits
+    src = ("  apply (eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top\n    (p := 2) (by norm_num) (by simp) hm).mpr\n"
+           "  rw [eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top (by norm_num : (2:ℝ≥0∞) ≠ 0) (by norm_num) hmax]\n")
+    out = O.core_rewrites(src)
+    assert "(p := 2) (by norm_num) (by simp)).mpr" in out
+    assert "(by norm_num : (2:ℝ≥0∞) ≠ 0) (by norm_num)]" in out
+
+
+def test_joinedin_map_of_a_continuous_on_and_meas_ge_hf():
+    src = ("  exact (hj.map hc.continuousOn).mono h\n  exact hj.map hc\n"
+           "  have := meas_ge_le_mul_pow_eLpNorm_enorm μ hp hp' (f := fun ω : Noise ↦ ω i)\n")
+    out = O.core_rewrites(src)
+    assert "(hj.map_continuousOn hc.continuousOn).mono h" in out and "exact hj.map hc\n" in out
+    assert "meas_ge_le_mul_pow_eLpNorm_enorm (hf := by %s) μ hp hp'" % O.AESM_TAC in out
+
+
+def test_simp_lists_naming_ite_true_also_name_if_true():
+    # oaiq-056, BalancedRyser oaiq-063: an `if True` with a non-standard Decidable instance
+    src = ("  · simp only [hr, ite_true]\n  simpa only [ite_true, foo] using h\n  rw [ite_true]\n"
+           "  dsimp only [ite_true]\n  simp only [ite_true, if_true]\n  simp [Finset.sum_ite, ite_true] at h\n")
+    out = O.core_rewrites(src)
+    assert "  · simp only [hr, ite_true, if_true]\n" in out
+    assert "  simpa only [ite_true, if_true, foo] using h\n" in out
+    assert "  rw [ite_true]\n  dsimp only [ite_true]\n  simp only [ite_true, if_true]\n" in out
+    assert "  simp [Finset.sum_ite, ite_true, if_true] at h\n" in out
+    assert O.core_rewrites(out) == out
+
+
+def test_finset_antidiagonal_is_the_class_one_unless_the_file_uses_hahn_series():
+    src = ("  Fintype.ofFinset (Finset.antidiagonal n) (by intro p; exact Finset.mem_antidiagonal)\n")
+    assert O.core_rewrites(src) == ("  Fintype.ofFinset (Finset.HasAntidiagonal.antidiagonal n) "
+                                    "(by intro p; exact Finset.HasAntidiagonal.mem_antidiagonal)\n")
+    hahn = "  rw [HahnSeries.coeff_mul]\n  simp [Finset.mem_antidiagonal, Finset.antidiagonal hs ht a]\n"
+    assert O.core_rewrites(hahn) == hahn

@@ -57,6 +57,30 @@ theorem unifIntegrable_of_enn {α β ι : Type*} {m : MeasurableSpace α} [Norme
   refine hb i s (hs.trans ?_)
   rw [ENNReal.ofReal_toReal hne]
   exact min_le_left _ _
+/-- Mathlib d13f23b's `Measure.isProbabilityMeasure_of_map`, which takes the map's measurability; ours takes
+the function `f`, and `_` there leaves the instance argument stuck (HardSphere, oaiq-054). -/
+theorem isProbabilityMeasure_of_map_ae {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+    {μ : MeasureTheory.Measure α} {f : α → β} [MeasureTheory.IsProbabilityMeasure (μ.map f)]
+    (_hf : AEMeasurable f μ) : MeasureTheory.IsProbabilityMeasure μ :=
+  MeasureTheory.Measure.isProbabilityMeasure_of_map f
+/-- Mathlib d13f23b's `FiniteMeasure.mass_map_le`, which takes the map's measurability; ours takes `f` and
+`μ`, and `_ _` there leaves `f` undetermined (BalancedRyser, oaiq-063). -/
+theorem finiteMeasure_mass_map_le {Ω Ω' : Type*} [MeasurableSpace Ω] [MeasurableSpace Ω']
+    {f : Ω → Ω'} {μ : MeasureTheory.FiniteMeasure Ω} (_hf : AEMeasurable f (μ : MeasureTheory.Measure Ω)) :
+    (μ.map f).mass ≤ μ.mass :=
+  MeasureTheory.FiniteMeasure.mass_map_le f μ
+/-- Mathlib d13f23b's `lintegral_map_le f (hg : AEMeasurable g μ)`; ours is `lintegral_map_le f g` (CoulombAtom,
+oaiq-071). -/
+theorem lintegral_map_le_ae {α β : Type*} [MeasurableSpace α] [MeasurableSpace β] {μ : MeasureTheory.Measure α}
+    (f : β → ENNReal) {g : α → β} (_hg : AEMeasurable g μ) :
+    ∫⁻ a, f a ∂MeasureTheory.Measure.map g μ ≤ ∫⁻ a, f (g a) ∂μ :=
+  MeasureTheory.lintegral_map_le f g
+/-- Mathlib d13f23b's `Measure.lintegral_bind_le f m (hμ : AEMeasurable μ m)`; ours is `lintegral_bind_le f m μ`
+(CoulombAtom, oaiq-071). -/
+theorem lintegral_bind_le_ae {α β : Type*} [MeasurableSpace α] [MeasurableSpace β] (f : β → ENNReal)
+    (m : MeasureTheory.Measure α) {μ : α → MeasureTheory.Measure β} (_hμ : AEMeasurable μ m) :
+    ∫⁻ x, f x ∂MeasureTheory.Measure.bind m μ ≤ ∫⁻ a, ∫⁻ x, f x ∂μ a ∂m :=
+  MeasureTheory.Measure.lintegral_bind_le f m μ
 /-- Mathlib's newer case names for `FreeGroup.induction_on` (`one`, where ours says `C1`). -/
 @[elab_as_elim]
 theorem freeGroupInductionOn {α : Type*} {C : FreeGroup α → Prop} (z : FreeGroup α) (one : C 1)
