@@ -2240,8 +2240,10 @@ def test_temperate_growth_comp_and_sum_le_sum_of_injOn_go_to_their_compat_forms(
            "  apply Complex.hasTemperateGrowth_ofReal.comp\n"
            "    Finset.sum_le_sum_of_injOn (fun i : Fin N => p i) hleft\n")
     out = O.core_rewrites(src)
-    assert "exact Function.HasTemperateGrowth.comp OAI.hasTemperateGrowth_exp_mul_I (by fun_prop)\n" in out
-    assert "apply Function.HasTemperateGrowth.comp Complex.hasTemperateGrowth_ofReal\n" in out
+    assert ("exact Function.HasTemperateGrowth.comp (g := fun t : ℝ => Complex.exp (t * Complex.I)) "
+            "OAI.hasTemperateGrowth_exp_mul_I (by fun_prop)\n") in out
+    assert "apply Function.HasTemperateGrowth.comp Function.Complex.hasTemperateGrowth_ofReal\n" not in out
+    assert "apply Function.Complex.hasTemperateGrowth_ofReal.comp\n" in out
     assert "    OAI.sum_le_sum_of_injOn (fun i : Fin N => p i) hleft\n" in out
     block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
     for n in ('hasTemperateGrowth_exp_mul_I', 'sum_le_sum_of_injOn'):
@@ -2270,3 +2272,11 @@ def test_smoothness_order_simp_gets_le_top_fallback():
     assert "of_le (by %s)).contDiffAt" % fb in out
     assert "have h : 0 < x := by simp\n" in out and "exact foo (by simp)\n" in out
     assert O.core_rewrites(out) == out
+
+
+def test_compat_narrow_imports_cover_the_compat_lemmas():
+    # Compat's AbsolutelyContinuousOnInterval, UnifIntegrable and FiniteMeasure lemmas failed to build on a
+    # narrow Compat (oaiq-092)
+    for m in ('Mathlib.MeasureTheory.Function.AbsolutelyContinuous', 'Mathlib.MeasureTheory.Function.UniformIntegrable',
+              'Mathlib.MeasureTheory.Measure.FiniteMeasure'):
+        assert m in O.COMPAT_NARROW_IMPORTS
