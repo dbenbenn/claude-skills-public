@@ -1267,6 +1267,13 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?(?:Measure\.)?lintegral_bind_le(?![\w'])",
                   pre + 'lintegral_bind_le_ae', text)
     text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?lintegral_map_le(?![\w'])", pre + 'lintegral_map_le_ae', text)
+    # LipschitzHilbert (oaiq-090): `Complex.hasTemperateGrowth_ofReal.comp` is not a field-notation head here, ours
+    # has no `Complex.hasTemperateGrowth_exp_mul_I` nor `Finset.sum_le_sum_of_injOn`: the compat block's forms
+    text = re.sub(r"(?<![\w.'])Complex\.hasTemperateGrowth_exp_mul_I\.comp(?![\w'])",
+                  'Function.HasTemperateGrowth.comp ' + pre + 'hasTemperateGrowth_exp_mul_I', text)
+    text = re.sub(r"(?<![\w.'])Complex\.hasTemperateGrowth_ofReal\.comp(?![\w'])",
+                  'Function.HasTemperateGrowth.comp Complex.hasTemperateGrowth_ofReal', text)
+    text = re.sub(r"(?<![\w.'])Finset\.sum_le_sum_of_injOn(?![\w'])", pre + 'sum_le_sum_of_injOn', text)
     # d13f23b's `FiniteMeasure.mass_map_le {f} {μ} (hf : AEMeasurable f μ)`; ours `mass_map_le (f) (μ)`, and
     # `_ _` leaves `f` undetermined: the compat block's form (BalancedRyser oaiq-063)
     text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?FiniteMeasure\.mass_map_le(?![\w'])",

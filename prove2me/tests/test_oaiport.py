@@ -2188,3 +2188,18 @@ def test_convert_using_n_then_tactic_closes_instance_diamond_first():
     assert 'convert hh using 1 <;> ' + pre + '(dsimp [N] <;> push_cast <;> ring)' in out3
     for o in (out, out2, out3):
         assert O.core_rewrites(o) == o
+
+
+def test_temperate_growth_comp_and_sum_le_sum_of_injOn_go_to_their_compat_forms():
+    # LipschitzHilbert (oaiq-090): our `Complex.hasTemperateGrowth_ofReal` is not a dot-notation head for `.comp`,
+    # `Complex.hasTemperateGrowth_exp_mul_I` and `Finset.sum_le_sum_of_injOn` are missing
+    src = ("  exact Complex.hasTemperateGrowth_exp_mul_I.comp (by fun_prop)\n"
+           "  apply Complex.hasTemperateGrowth_ofReal.comp\n"
+           "    Finset.sum_le_sum_of_injOn (fun i : Fin N => p i) hleft\n")
+    out = O.core_rewrites(src)
+    assert "exact Function.HasTemperateGrowth.comp OAI.hasTemperateGrowth_exp_mul_I (by fun_prop)\n" in out
+    assert "apply Function.HasTemperateGrowth.comp Complex.hasTemperateGrowth_ofReal\n" in out
+    assert "    OAI.sum_le_sum_of_injOn (fun i : Fin N => p i) hleft\n" in out
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    for n in ('hasTemperateGrowth_exp_mul_I', 'sum_le_sum_of_injOn'):
+        assert re.search(r'^theorem %s\b' % n, block, re.M), n

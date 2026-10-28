@@ -463,6 +463,37 @@ noncomputable instance starSubalgebraCommCStarAlgebra {B : Type*} [CStarAlgebra 
     [IsClosed (A : Set B)] [IsMulCommutative A] : CommCStarAlgebra A :=
   { StarSubalgebra.cstarAlgebra A with
     mul_comm := fun a b => IsMulCommutative.is_comm.comm a b }
+/-- Mathlib d13f23b's `Complex.hasTemperateGrowth_exp_mul_I`; ours has no such lemma (LipschitzHilbert, oaiq-090). -/
+theorem hasTemperateGrowth_exp_mul_I : (fun x : ℝ => Complex.exp (x * Complex.I)).HasTemperateGrowth := by
+  have hit : ∀ n : ℕ, iteratedDeriv n (fun x : ℝ => Complex.exp (Complex.I * (x:ℂ)))
+      = fun x : ℝ => Complex.I ^ n * Complex.exp (Complex.I * (x:ℂ)) := by
+    intro n
+    induction n with
+    | zero => simp
+    | succ n ih =>
+      rw [iteratedDeriv_succ, ih]
+      funext x
+      have h1 : HasDerivAt (fun x : ℝ => Complex.exp (Complex.I * (x:ℂ)))
+          (Complex.exp (Complex.I * (x:ℂ)) * Complex.I) x := by
+        have := ((hasDerivAt_id x).ofReal_comp.const_mul Complex.I).cexp
+        simpa using this
+      have h2 := h1.const_mul (Complex.I ^ n)
+      rw [h2.deriv]
+      ring
+  refine ⟨?_, fun n => ⟨0, 1, fun x => ?_⟩⟩
+  · exact Complex.contDiff_exp.comp (Complex.ofRealCLM.contDiff.mul contDiff_const)
+  · have h : (fun x : ℝ => Complex.exp (x * Complex.I)) = fun x : ℝ => Complex.exp (Complex.I * (x:ℂ)) := by
+      funext x; rw [mul_comm]
+    rw [h, norm_iteratedFDeriv_eq_norm_iteratedDeriv, hit]
+    simp [norm_pow, Complex.norm_exp]
+/-- Mathlib d13f23b's `Finset.sum_le_sum_of_injOn`; ours has no such lemma (LipschitzHilbert, oaiq-090). -/
+theorem sum_le_sum_of_injOn {ι κ M : Type*} [DecidableEq κ] [AddCommMonoid M] [PartialOrder M]
+    [IsOrderedAddMonoid M] {s : Finset ι} {t : Finset κ} {f : ι → M} {g : κ → M} (e : ι → κ)
+    (he : Set.InjOn e s) (hest : s.image e ⊆ t) (hf : ∀ i ∈ s, f i ≤ g (e i))
+    (hg : ∀ j ∈ t, j ∉ s.image e → 0 ≤ g j) : ∑ i ∈ s, f i ≤ ∑ j ∈ t, g j := by
+  calc ∑ i ∈ s, f i ≤ ∑ i ∈ s, g (e i) := Finset.sum_le_sum hf
+    _ = ∑ j ∈ s.image e, g j := (Finset.sum_image he).symm
+    _ ≤ ∑ j ∈ t, g j := Finset.sum_le_sum_of_subset_of_nonneg hest hg
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod
