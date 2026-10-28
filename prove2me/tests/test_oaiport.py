@@ -2139,3 +2139,14 @@ def test_list_sum_le_length_nsmul_renamed():
     assert O.core_rewrites(src) == "    have hs := List.sum_le_card_nsmul (l.map f) n h\n"
     keep = "exact List.sum_le_length_nsmul_foo\n"
     assert O.core_rewrites(keep) == keep
+
+
+def test_convert_using_one_field_simp_closes_instance_diamond_first():
+    # `convert h using 1 <;> field_simp` leaves `Real.instLE = Real.instPreorder.toLE`, which field_simp
+    # cannot see through ("made no progress"); try reducible-instances rfl first (oaiq-088: 3 sites)
+    src = '  have hh := foo\n  convert hh using 1 <;> field_simp\n'
+    out = O.core_rewrites(src)
+    assert 'convert hh using 1 <;> first | (with_reducible_and_instances rfl) | field_simp' in out
+    out2 = O.core_rewrites("      convert hh' using 1 <;> field_simp\n")
+    assert "convert hh' using 1 <;> first | (with_reducible_and_instances rfl) | field_simp" in out2
+    assert O.core_rewrites(out) == out

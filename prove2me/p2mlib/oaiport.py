@@ -1111,6 +1111,10 @@ def core_rewrites(text, compat_ns='OAI', known=None):
                              '(le_of_eq (by ring)))') % (m.group(1), m.group(2),
                              m.group(2) if re.fullmatch(r"[\w.']+", m.group(2)) else '(' + m.group(2) + ')'),
                   text)
+    # `convert h using 1 <;> field_simp` on an inequality leaves the same `instLE` diamond, which
+    # field_simp cannot see through (oaiq-088)
+    text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]*? using 1) <;> field_simp[ \t]*$",
+                  r"\1 <;> first | (with_reducible_and_instances rfl) | field_simp", text)
     # Mathlib adds the global tokens `<m ≤m <i ≤i ≤s <r ≤r ≤c`; `1<m` with a variable `m` then fails
     # to parse. Space them unless written as the notation (` <m `).
     text = re.sub(r"(?<=[^\s<≤])([<≤])([misrc])", r" \1 \2", text)
