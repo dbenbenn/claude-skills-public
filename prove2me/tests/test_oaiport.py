@@ -2113,6 +2113,23 @@ def test_convert_funext_rfl_becomes_congr_deriv():
     assert O.core_rewrites(src3) == src3
 
 
+def test_convert_rfl_rewrite_does_not_swallow_an_earlier_convert():
+    # the lazy `convert (.+?) using 1` ran across a convert that has no `· rfl` bullet and ended at a
+    # later one, mangling the proof between them (oaiq-091, EinsteinFour SineLogPolynomial)
+    src = ('theorem a : HasDerivAt f (g x) x := by\n'
+           '  convert h1 using 1\n'
+           '  all_goals first | rfl | ring\n'
+           '\n'
+           'theorem b : HasDerivAt f (g x) x := by\n'
+           '  convert h2 using 1\n'
+           '  · rfl\n'
+           '  · ring\n')
+    out = O.core_rewrites(src)
+    assert '  convert h1 using 1\n' in out and 'refine h1' not in out
+    assert 'all_goals first | rfl | ring' in out
+    assert 'refine h2.congr_deriv ?_\n  · ring\n' in out
+
+
 def test_compat_ite_lemmas_name_the_proposition_c():
     # OpenAI writes `ite_eq_right (c := d = 0) hd.ne'` (Lean core's binder is `c`): ours was `p`
     # (oaiq-080, Boltzmann SheetGain)

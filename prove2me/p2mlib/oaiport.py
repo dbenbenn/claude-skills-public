@@ -1082,7 +1082,7 @@ def _memlp_mul_swap(text):
 
 
 _CONVERT_RFL = re.compile(
-    r"(?m)^(?P<ind>[ \t]*)convert (?P<e>.+?) using 1\n"
+    r"(?m)^(?P<ind>[ \t]*)convert (?P<e>(?:(?! using \d)(?<!convert)(?!convert ).)+?) using 1\n"
     r"(?P=ind)· (?:funext \w+\n(?P=ind)  rfl|rfl)\n(?P=ind)· ", re.S)
 
 
