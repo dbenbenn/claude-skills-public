@@ -830,7 +830,7 @@ def core_rewrites(text, compat_ns='OAI'):
     text = _drop_positional_arg(text, 'compProd_map_condDistrib')
     # d13f23b's `CStarAlgebra.norm_mem_spectrum_of_nonneg a ha` has `a` explicit; ours implicit
     # (Kirchberg-Rordam 2026-10-25)
-    text = re.sub(r"(?<![\w.'])(CStarAlgebra\.norm_(?:or_neg_norm_)?mem_spectrum(?:_of_nonneg)?)[ \t]+[A-Za-z_][\w']*[ \t]+(?=[A-Za-z_(])",
+    text = re.sub(r"(?<![\w.'])(CStarAlgebra\.norm_(?:or_neg_norm_)?mem_spectrum(?:_of_nonneg)?)[ \t]+(?:[A-Za-z_][\w']*|\([\w']+ : [\w.']+\))[ \t]+(?=[A-Za-z_(])",
                   r"\1 ", text)
     # d13f23b's `CStarAlgebra.star_mul_le_algebraMap_norm_sq a` has `a` explicit; ours implicit
     # (FactorGeneration 2026-10-26). A named `(a := x)` use is fine in both.
@@ -857,6 +857,10 @@ def core_rewrites(text, compat_ns='OAI'):
     text = re.sub(r"(?<![\w'])((?:Finset\.)?sum_le_sum_of_subset_of_nonpos)(?![\w'₀])", r"\1'", text)
     text = re.sub(r"(?<![\w.'])IsCompactElement\.exists_finset_of_le_iSup(?![\w'])",
                   'CompleteLattice.IsCompactElement.exists_finset_of_le_iSup _', text)
+    # Kadison similarity (oaiq-075): d13f23b's C⋆ lemmas take the element explicitly; ours has it implicit
+    # and the proof as an autoParam, so the element becomes a named argument
+    text = re.sub(r"(?<![\w.'])CStarAlgebra\.pow_nonneg ([\w']+) ([\w']+) ([\w.']+)",
+                  r"CStarAlgebra.pow_nonneg (a := \1) \3 \2", text)
     return split_partial_namespaces(text)
 
 

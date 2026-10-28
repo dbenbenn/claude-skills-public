@@ -1651,3 +1651,14 @@ def test_the_compat_block_declares_c_star_order_and_completion_lemmas():
     assert re.search(r'^theorem _root_\.IsSelfAdjoint\.norm_le_max_of_le_of_le\b', block, re.M)
     assert re.search(r'^noncomputable def _root_\.LinearIsometry\.completion\b', block, re.M)
     assert re.search(r'^theorem _root_\.LinearIsometry\.completion_apply_coe\b', block, re.M)
+
+
+def test_cstar_algebra_lemmas_take_their_element_as_named_argument():
+    # d13f23b's `CStarAlgebra.pow_nonneg a n ha` and `norm_or_neg_norm_mem_spectrum a ha` take the element
+    # explicitly; ours has it implicit with the proof an autoParam (Kadison similarity, oaiq-075)
+    src = ('exact CStarAlgebra.pow_nonneg b n hb0\n'
+           'rcases CStarAlgebra.norm_or_neg_norm_mem_spectrum (a : M) a.property with ha|ha\n'
+           )
+    out = O.core_rewrites(src)
+    assert 'CStarAlgebra.pow_nonneg (a := b) hb0 n' in out
+    assert 'CStarAlgebra.norm_or_neg_norm_mem_spectrum a.property with' in out
