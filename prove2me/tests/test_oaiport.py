@@ -843,7 +843,9 @@ def test_convert_using_semicolon_ring_closes_all_goals():
     src = "    convert hBern using 1; ring\n  have x := 1\n    convert h using 2; ring_nf\n    convert h using 1; simp\n"
     out = O.core_rewrites(src)
     assert "convert hBern using 1 <;> first | rfl | ring\n" in out
-    assert "convert h using 2; ring_nf" in out and "convert h using 1; simp" in out
+    # other tactics are no longer left alone: they get the diamond-closing rfl first (oaiq-088)
+    assert "convert h using 2 <;> first | (with_reducible_and_instances rfl) | (ring_nf)" in out
+    assert "convert h using 1 <;> first | (with_reducible_and_instances rfl) | (simp)" in out
 
 
 def test_convert_using_semicolon_parenthesised_first_closes_all_goals():
@@ -2173,12 +2175,16 @@ def test_list_sum_le_length_nsmul_renamed():
     assert O.core_rewrites(keep) == keep
 
 
-def test_convert_using_one_field_simp_closes_instance_diamond_first():
-    # `convert h using 1 <;> field_simp` leaves `Real.instLE = Real.instPreorder.toLE`, which field_simp
-    # cannot see through ("made no progress"); try reducible-instances rfl first (oaiq-088: 3 sites)
-    src = '  have hh := foo\n  convert hh using 1 <;> field_simp\n'
-    out = O.core_rewrites(src)
-    assert 'convert hh using 1 <;> first | (with_reducible_and_instances rfl) | field_simp' in out
-    out2 = O.core_rewrites("      convert hh' using 1 <;> field_simp\n")
-    assert "convert hh' using 1 <;> first | (with_reducible_and_instances rfl) | field_simp" in out2
-    assert O.core_rewrites(out) == out
+def test_convert_using_n_then_tactic_closes_instance_diamond_first():
+    # `convert h using n; tac` / `<;> tac` leaves `Real.instLE = Real.instPreorder.toLE` as the first goal,
+    # which field_simp / ring_nf / dsimp cannot see through; close it with reducible-instances rfl first
+    # (oaiq-088: 8 sites in the Falconer all-dimensions port)
+    pre = 'first | (with_reducible_and_instances rfl) | '
+    out = O.core_rewrites('  have hh := foo\n  convert hh using 1 <;> field_simp\n')
+    assert 'convert hh using 1 <;> ' + pre + '(field_simp)' in out
+    out2 = O.core_rewrites("      convert hh' using 1; ring_nf\n")
+    assert "convert hh' using 1 <;> " + pre + '(ring_nf)' in out2
+    out3 = O.core_rewrites('    convert hh using 1 <;> dsimp [N] <;> push_cast <;> ring\n')
+    assert 'convert hh using 1 <;> ' + pre + '(dsimp [N] <;> push_cast <;> ring)' in out3
+    for o in (out, out2, out3):
+        assert O.core_rewrites(o) == o

@@ -1141,10 +1141,6 @@ def core_rewrites(text, compat_ns='OAI', known=None):
                              '(le_of_eq (by ring)))') % (m.group(1), m.group(2),
                              m.group(2) if re.fullmatch(r"[\w.']+", m.group(2)) else '(' + m.group(2) + ')'),
                   text)
-    # `convert h using 1 <;> field_simp` on an inequality leaves the same `instLE` diamond, which
-    # field_simp cannot see through (oaiq-088)
-    text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]*? using 1) <;> field_simp[ \t]*$",
-                  r"\1 <;> first | (with_reducible_and_instances rfl) | field_simp", text)
     # Mathlib adds the global tokens `<m ≤m <i ≤i ≤s <r ≤r ≤c`; `1<m` with a variable `m` then fails
     # to parse. Space them unless written as the notation (` <m `).
     text = re.sub(r"(?<=[^\s<≤])([<≤])([misrc])", r" \1 \2", text)
@@ -1248,6 +1244,16 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
+    # `convert h using n; tac` / `<;> tac` (field_simp, ring_nf, dsimp ...) on an inequality leaves an `instLE`
+    # diamond as the FIRST goal, which tac cannot see through ("made no progress"; oaiq-088: 8 sites).
+    # Close it with reducible-instances rfl first, run tac on what is left.
+    def _convert_tac(m):
+        tac = m.group('tac').strip()
+        if 'with_reducible_and_instances rfl' in tac or re.match(r"(\(?first\b|rfl\b|ring\b|<;>)", tac):
+            return m.group(0)
+        return '%s <;> first | (with_reducible_and_instances rfl) | (%s)' % (m.group('head'), tac)
+    text = re.sub(r"(?m)^(?P<head>[ \t]*(?:· )?convert [^\n;]*? using \d+)[ \t]*(?:;|<;>)[ \t]*(?P<tac>[^\n]+)$",
+                  _convert_tac, text)
     # oaiq-054..072 drift (signatures checked against both Mathlibs, 2026-10-28):
     # d13f23b's `Submodule.isTopologicalAddGroup` is our `Submodule.topologicalAddGroup` (Conductivity oaiq-059)
     text = re.sub(r"(?<![\w.'])Submodule\.isTopologicalAddGroup(?![\w'])", 'Submodule.topologicalAddGroup', text)
