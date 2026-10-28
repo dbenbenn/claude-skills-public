@@ -150,8 +150,9 @@ Problem336).** Fix each at the cause; none needs a macro.
   subtype `stdSimplex`, d13f23b's in the structure; structure mode renames `toTopHomeo` to `toTopHomeoD…` from the
   module `StdSimplexTopCompat` (a040fa7). `--stdsimplex subtype` is no way out for code that also uses the
   structure's fields. Many hand patches are easier to keep as a diff of the repaired modules against a copy of the
-  unpatched port turned into `patches.json` (oaiq-043/mkpatches.py: one line of context per hunk, never a line
-  the port itself rewrites).
+  unpatched port turned into `patches.json`: `scripts/mkpatches.py PRISTINE REPAIRED OUT.json` (PRISTINE is
+  the port run with patches `[]`; it grows each hunk's context until `old` is unique and not cut mid-identifier,
+  merges into an existing OUT.json, and checks the result reproduces the repair byte for byte; oaiq-043, -080).
 - *A `have` that states a hand-written `match`* (`have h : … (match vs with …) …; simp_rw [h]`) breaks when the
   function whose body has the same `match` comes from a bundle: Lean shares a matcher only within one module
   (oaiq-018). Patch the generated piece (config `patches`) with a defeq congruence instead of the rewrite.
@@ -449,6 +450,55 @@ back WA. The lessons:
     bundle already declares. Config `external_defs`, `statement_suffix`, `patches` (post-carve
     proof fixes) support a fresh split beside an abandoned one.
 
+## Slow or odd failures: what to try first (worker lessons, 2026-10-28)
+
+- **Calibrate's two outcomes for pieces.** When three or more pieces are over the plan by a similar factor (median
+  ≥ 2.5, spread ≤ 2×), the plan's cost model was off and calibrate re-plans at that ratio by itself (oaiq-073).
+  A lone slow piece, or a scatter, stops it with a profiling hint: re-planning has never shrunk one. In order:
+  1. `lean -o x.olean -Dprofiler=true FILE` (with `LEAN_PATH=<carve>/olean:$(lake env printenv LEAN_PATH)`).
+     If `.olean serialization` dominates while elaboration is fast (oaiq-075: 316 s of 328, `sorry` just as slow),
+     the statement's *type* is huge: print `Expr.sizeWithoutSharing` per binder (`forallTelescope` in a
+     `#eval show MetaM Unit`). Remedy: a patch that names the big term with a `def`/structure. Never `forced`:
+     the item is already one small proof.
+  2. `lean -Dtrace.profiler=true -Dtrace.profiler.threshold=20000 FILE` names the slow tactic with its position;
+     plain `-Dprofiler` gives only the cumulative "type checking" (oaiq-074: one `fun_prop` measurability goal
+     took 53 s; `Real.continuous_exp.aestronglyMeasurable` as a term fixed it).
+  3. No heavy declaration, just many small lemmas: force two or three mid-chain theorems (`forced`, chosen by
+     transitive-closure size at about 1/3, 1/2, 5/6 of the total; oaiq-031, oaiq-074).
+- **`(kernel) deterministic timeout` where the elaborator accepted every step** (oaiq-068): typically a goal
+  equating `f a i₁` with `f a i₂` for two proofs of a Prop-valued instance argument (a `letI … := h ▸
+  inferInstance` in two statements). State the irrelevance as a lemma, `@f … i₁ = @f … i₂ := by cases
+  Subsingleton.elim i₁ i₂; rfl`, and chain with `.trans`, so the kernel never compares the proof terms.
+  Bisect by `sorry`-ing the tail of the proof (about 40 s a trial; three variants in parallel).
+- **"maximum recursion depth" at a line that looks fine**: the position can belong to a later declaration;
+  bisect with `#exit` cuts (oaiq-080, where an `IsProbabilityMeasure` instance that is false here made
+  `infer_instance` loop).
+- **A tactic defined by `syntax` + `elab_rules`** (oaiq-076): the port builds but the carver and soundness
+  guard refuse the commands, so the bundle says "unknown tactic". Replace the tactic at its uses with a
+  combinator of existing lemmas, `iterate N (all_goals first | with_reducible exact l₁ _ | with_reducible
+  apply l₂ | … | with_reducible fun_prop | fun_prop)`, and delete the block with a patch. `with_reducible` on
+  each `apply` matters (an unrestricted `apply` unfolds projections and times out in `whnf`); test the fix in
+  the carved bundle's context (a scratch file importing `<carve>/olean`), since its `attribute [-instance]`
+  lines change what `fun_prop` finds.
+- **OpenAI lemmas that are false as ported** (oaiq-080). OpenAI's `eLpNorm f p μ` is `∞` for a
+  non-`AEStronglyMeasurable` `f`; ours is a lower integral. So `eLpNorm_add_le`,
+  `tendstoInMeasure_of_tendsto_eLpNorm`, `eLpNorm_mono` and lemmas built on them hold there without
+  measurability and fail here (`f n = 0`, `g = 1_A`, `A` non-measurable of inner measure 0). The repair is no
+  shim: each site needs a measurability fact of the limit, and lemmas that took arbitrary limits gain a
+  hypothesis their callers pass. Likewise `μ.map Φ` is a probability measure there for every `Φ`, here only
+  for an `AEMeasurable` one. `UniformIntegrable` has three components here, two there. Budget a module-route
+  port of an analysis development at about 12% of modules needing a hand repair, a third of them measurability.
+- **Foreign packages** (oaiq-083). OpenAI's lakefile requires about twenty packages (PrimeNumberTheoremAnd,
+  StrongPNT, RellichKondrachov, TauCeti, ClassFieldTheory, …) that the repo does not contain. `oai_fetch.py`
+  exits 1 naming any root the closure imports that is neither OpenAI's nor in our toolchain. Put its sources
+  beside `OAI/` in `src/lean` (the commit pinned in `lean/lake-manifest.json`, LeanArchitect annotations
+  stripped: `~/claude/p2m-standalone/openai-ports/oaiq-083/prep_upstream.py`; the `Erdos970` forks are in `prove2me_workspace/Solutions/OAIChowla`)
+  and resume; the port takes them as OpenAI's. Look for statements already published from them (the Chowla
+  split) to use as `external_theorems`.
+- **Unused imports of a definitions bundle are kept** (oaiq-075, 733702b). carve_measure reports them and fails
+  or cuts only false edges between statements: a later bundle's `attribute [-instance]` line can name an
+  instance it sees only through that import, and cutting it broke 17 items with "Unknown constant".
+
 ## After publishing: re-splitting, extending, overlapping carves
 
 From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
@@ -469,8 +519,10 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
 - **A later target of an already-carved family** (oaiq-057): extend it with the earlier carve's plan,
   bundles and lib as `frozen`; the planner takes the frozen plan's `external_defs` as its own (56fd083),
   so declarations the earlier carve took from a published bundle stay there. Not handled: a frozen bundle
-  that imports one of the old carve's statements (then use a fresh `statement_suffix`). Run the `split_run`
-  dry run before the calibrate hour: "REFUSES TO RUN: names live with different text" is the signal.
+  that imports one of the old carve's statements (then use a fresh `statement_suffix`). The pipeline's `names`
+  step, right after `gen`, looks every planned bundle and statement up (read-only, a few minutes) and stops on
+  one live with other text, before the hours of measuring (oaiq-068, -074): then a `statement_suffix` and
+  `--from plan`, or extend the earlier carve as here.
 - **Overlap with someone else's published work** (oaiq-067): `pipeline.json` `defs` replaces the list
   derived from the targets (keep the goal's own `Def_` in it); earlier published statements go in
   `config_set.external_theorems` (`{lean name: "Theorems.Thm_<name with _>"}`) after `fetch_theorems.py

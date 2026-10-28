@@ -46,6 +46,10 @@ usage:
       optional "lean_root"}). The goal and every `forced` node are skipped and listed as needing
       written prose. A file that exists and is not an unchanged template (prose front matter
       `template:`, sha1 in .template.json) is kept unless --force. Run check-text after.
+  carve_prep.py name-check CONFIG.json
+      right after `carve.py gen`: every planned bundle and statement name already live on prove2.me
+      with other text, looked up as split_run's dry run does (read-only); exits 1 listing them, so a
+      clash costs minutes, not the hours of measuring before publish (oaiq-068, oaiq-074).
   carve_prep.py check-text PUBLISH_DIR [--search FILE ...] [--allow NAME ...]
       explanation rules (p2mlib.explanation) for explanations/*.md; every Lean-looking name in
       backticks in prose/ and explanations/ must occur in out/, the --search files, Mathlib or Lean
@@ -540,6 +544,42 @@ def cmd_check_text(argv):
     sys.exit(1 if bad else 0)
 
 
+def name_check(cfg):
+    """(ok, message): the carve's planned bundles and statements against what is live under their
+    names, by splitrun's own reconcile (read-only, nothing written)."""
+    import tempfile
+    from p2mlib import splitrun as R
+    tmp = tempfile.mkdtemp(prefix='name-check-')
+    work = os.path.expanduser(cfg.get('work') or '')
+    run = {'plan': os.path.expanduser(cfg.get('plan') or os.path.join(work, 'plan.json')),
+           'out': os.path.expanduser(cfg['out']), 'prose': os.path.join(tmp, 'prose'),
+           'explanations': os.path.join(tmp, 'explanations'), 'state': os.path.join(tmp, 'state.json'),
+           'log': os.path.join(tmp, 'log')}
+    live = R.LiveApi()
+
+    class Names:   # names only: without live_proofs, reconcile skips the pieces (one lookup each, minutes)
+        def existing(self, kind, name):
+            return live.existing(kind, name)
+    api = R.ReadOnly(Names())
+    adopted, bad = R.Runner(run, api).reconcile(write=False)
+    if bad:
+        return False, ('%d planned name(s) are live on prove2.me with other text:\n%s\nFresh names: pipeline.json '
+                       'config_set {"statement_suffix": "_sNN"} then --from plan; or extend the earlier carve '
+                       '(frozen + external_theorems, references/openai-ports.md "After publishing")'
+                       % (len(bad), R.mismatch_message(bad)))
+    return True, 'names: %d live with our text (adopted at publish), no clash' % len(adopted)
+
+
+def cmd_name_check(argv):
+    pos = positional(argv, ())
+    if len(pos) != 1:
+        sys.exit(__doc__)
+    ok, msg = name_check(json.load(open(pos[0], encoding='utf-8')))
+    print(msg)
+    if not ok:
+        sys.exit(1)
+
+
 def cmd_prose_template(argv):
     from p2mlib import prosetemplate as T
     pos = positional(argv, ('--meta', '--lean-root'))
@@ -565,7 +605,7 @@ def cmd_prose_template(argv):
 
 CMDS = {'config': cmd_config, 'ext-defs': cmd_ext_defs, 'filter-patches': cmd_filter_patches,
         'publish-prep': lambda a: print(publish_prep(a[0], a[1], a[2].split(','))[1]) if len(a) == 3 else sys.exit(__doc__),
-        'bundle-prose': cmd_bundle_prose, 'prose-template': cmd_prose_template,
+        'bundle-prose': cmd_bundle_prose, 'prose-template': cmd_prose_template, 'name-check': cmd_name_check,
         'check-text': cmd_check_text}
 
 

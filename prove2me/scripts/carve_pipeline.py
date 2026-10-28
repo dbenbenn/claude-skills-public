@@ -28,7 +28,8 @@ DIR is the carve directory. The first run needs the parameters, which are stored
 
 Steps (STEPS in p2mlib.carvepipeline): fetch, inputs (the targets' published statements and their Def_
 bundles are fetched into the workspace when missing), filter_patches, port, build, wsbuild, config, graph,
-extdefs, plan, gen, order, measure, calibrate, publish_prep, prose, check_text, dryrun (split_run.py without
+extdefs, plan, gen, names (planned names already live with other text fail here, before measuring),
+order, measure, calibrate, publish_prep, prose, check_text, dryrun (split_run.py without
 --go: lookups only), and with --publish the real `split_run.py --go`. Each step is idempotent and
 resumable: its result is recorded in DIR/pipeline_state.json, its output in DIR/logs/STEP.log, and the
 first failure stops the run with the log's tail (re-run the same command to resume). --redo STEP

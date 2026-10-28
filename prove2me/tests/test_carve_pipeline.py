@@ -349,7 +349,7 @@ def test_a_measure_over_the_limit_raises_the_scale_and_replans_before_anything_i
     seq = tools_called(env)
     first = [i for i, t in enumerate(seq) if t == ('carve', 'plan')]
     assert len(first) == 2 and [t[0] for t in seq].count('carve_measure') == 2
-    assert seq[first[1]:first[1] + 5] == [('carve', 'plan'), ('carve', 'gen'), ('carve', 'order'),
+    assert seq[first[1]:first[1] + 6] == [('carve', 'plan'), ('carve', 'gen'), ('carve_prep', 'name-check'), ('carve', 'order'),
                                           ('carve_measure', 'config.json'), ('carve_prep', 'publish-prep')]
     cfg = json.load(open(env.dir / 'config.json'))
     assert cfg['time_scale'] == round(1.2 * 128 / 55, 1)
@@ -747,3 +747,80 @@ def test_publish_runs_again_whenever_publish_is_asked(env):
     assert ('split_run', 'publish/run.json') in tools_called(env)
     go = [c['argv'] for c in calls(env) if c.get('tool') == 'split_run']
     assert any('--go' in a for a in go)
+
+
+def _pieces_over(env, times):
+    work = env.dir / 'carve_work'
+    work.mkdir(parents=True, exist_ok=True)
+    plan = _plan({'B0': 55}, {'P%d' % i: 40 for i in range(len(times))})
+    (work / 'plan.json').write_text(json.dumps(plan))
+    t = {'bundle:B0': _t(20)}
+    t.update({'piece:P%d' % i: _t(s) for i, s in enumerate(times)})
+    (work / 'times.json').write_text(json.dumps(t))
+
+
+def test_pieces_uniformly_over_plan_replan_at_their_ratio(env, monkeypatch):
+    # oaiq-073 (VlasovMaxwell): 10 pieces at 151-203 s against plans of 32-52 s (ratio 3.5-4.3, heavy
+    # analysis, no kernel computation); calibrate stopped, and raising time_scale to ~4 by hand re-planned
+    # into 364 items that all fitted. Several pieces over by a similar large ratio: the model underestimates
+    # this port, so re-plan at the median ratio.
+    _pieces_over(env, [160, 170, 155])
+    (env.repo / 'prove2me' / 'scripts' / 'carve_measure.py').write_text(CALIBRATING_MEASURE)
+    git(env.repo, 'add', '-A')
+    git(env.repo, 'commit', '-qm', 'calibrating measure stub')
+    monkeypatch.setenv('STUB_TIMES_AFTER', json.dumps({'bundle:B0': _t(20), 'piece:P0': _t(40),
+                                                       'piece:P1': _t(45), 'piece:P2': _t(38)}))
+    r = run(env, *ARGS, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}), '--stop-after', 'calibrate')
+    assert r.returncode == 0, r.stderr
+    cfg = json.load(open(env.dir / 'config.json'))
+    assert cfg['time_scale'] == round(1.2 * 160 / 40, 1)
+    assert json.load(open(env.dir / 'pipeline_state.json'))['replans'] == 1
+
+
+def test_a_lone_or_scattered_slow_piece_still_stops_with_the_profiling_hint(env, monkeypatch):
+    # oaiq-031/075: one slow piece is something specific (kernel computation; or oaiq-075's statement whose
+    # .olean serialization took 316 s while elaboration took 4 s): profile it, don't re-plan
+    _pieces_over(env, [192])
+    r = run(env, *ARGS, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}))
+    assert r.returncode == 1 and 'olean' in r.stderr and 'profiler' in r.stderr
+    assert json.load(open(env.dir / 'pipeline_state.json')).get('replans', 0) == 0
+
+
+def test_names_are_checked_right_after_gen(env):
+    # oaiq-068, oaiq-074: names already live with other text stopped publish after ~6 h of porting and
+    # measuring; the same lookup split_run's dry run does now runs right after gen
+    run(env, *ARGS, '--stop-after', 'measure')
+    seq = tools_called(env)
+    i = seq.index(('carve', 'gen'))
+    assert seq[i + 1] == ('carve_prep', 'name-check')
+    assert seq.index(('carve_prep', 'name-check')) < [t[0] for t in seq].index('carve_measure')
+
+
+def test_name_check_builds_a_read_only_run_from_the_carve(tmp_path, monkeypatch):
+    sys.path.insert(0, SCRIPTS)
+    import carve_prep as CPR
+    from p2mlib import splitrun as R
+    work, out = tmp_path / 'work', tmp_path / 'out'
+    (out / 'lib').mkdir(parents=True)
+    work.mkdir()
+    (work / 'plan.json').write_text('{}')
+    seen = {}
+
+    class FakeRunner:
+        def __init__(self, cfg, api):
+            seen['cfg'] = cfg
+            seen['readonly'] = isinstance(api, R.ReadOnly)
+
+        def reconcile(self, write=True):
+            seen['write'] = write
+            return {'statement:A.t': 'id1'}, [{'item': 'bundle:B0', 'kind': 'bundle', 'name': 'B0', 'id': 'x',
+                                                'author': 'someone', 'file': str(out / 'lib' / 'Def_B0.lean'),
+                                                'diff': 'their text'}]
+    monkeypatch.setattr(R, 'Runner', FakeRunner)
+    monkeypatch.setattr(R, 'LiveApi', lambda: object())
+    cfg = {'plan': str(work / 'plan.json'), 'out': str(out), 'work': str(work)}
+    ok, msg = CPR.name_check(cfg)
+    assert not ok and 'B0' in msg and 'statement_suffix' in msg
+    assert seen['readonly'] and seen['write'] is False
+    assert seen['cfg']['plan'] == str(work / 'plan.json') and seen['cfg']['out'] == str(out)
+    assert not os.path.exists(seen['cfg']['state'])            # nothing written

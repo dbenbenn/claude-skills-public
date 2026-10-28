@@ -15,7 +15,7 @@ import time
 
 from . import runlock, snapshot, workspace as wslib
 
-STEPS = ['fetch', 'inputs', 'filter_patches', 'port', 'build', 'wsbuild', 'config', 'graph', 'extdefs', 'plan', 'gen',
+STEPS = ['fetch', 'inputs', 'filter_patches', 'port', 'build', 'wsbuild', 'config', 'graph', 'extdefs', 'plan', 'gen', 'names',
          'order', 'measure', 'calibrate', 'publish_prep', 'prose', 'check_text', 'dryrun', 'publish']
 DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
@@ -32,6 +32,7 @@ class StepFailed(Exception):
 
 
 ACCEPT_CAP = 200        # an accept_over item is excused only below this many seconds
+UNIFORM_MIN, UNIFORM_RATIO = 3, 2.5   # pieces over plan by a similar factor >= this: re-plan (oaiq-073)
 PIECE_CAP = 150         # a piece (resubmittable) is excused below this: dbenbenn's "submit at ~145 s";
                         # oaiq-031's 192 s piece timed out three times at the verifier's 300 s
 
@@ -440,6 +441,10 @@ class Pipeline:
             self.invalidate(frm)
         self.save()
 
+    def step_names(self):
+        # planned names already live with other text, checked before the hours of measuring (oaiq-068/074)
+        self.run_cmds('names', [self.tool('carve_prep', 'name-check', 'config.json')])
+
     def step_graph(self):
         self.run_cmds('graph', [self.tool('carve', 'graph', 'config.json')])
 
@@ -486,16 +491,30 @@ class Pipeline:
             open(log, 'a').write('\n'.join(lines + ['fits the model; time_scale %g kept' % cfg.get('time_scale', 1.5)]) + '\n')
             return None
         n = self.state.get('replans', 0)
-        if all(k.startswith('piece:') for k, _, _ in res['over']):
-            # re-planning raises time_scale, which re-splits bundles but never shrank an over-limit piece
-            # (KMedian 106 s through two re-plans, oaiq-031 192 s): stop now and say what works
+        pieces_only = all(k.startswith('piece:') for k, _, _ in res['over'])
+        ratios = sorted(secs / max(cost, 1.0) for _, secs, cost in res['over'])
+        uniform = (pieces_only and len(ratios) >= UNIFORM_MIN and ratios[len(ratios) // 2] >= UNIFORM_RATIO
+                   and ratios[-1] <= 2 * ratios[0])
+        if pieces_only and not uniform:
+            # one slow piece (or a scatter) is something specific, which re-planning has never shrunk
+            # (KMedian 106 s through two re-plans, oaiq-031 192 s): stop and say how to find it
             open(log, 'a').write('\n'.join(lines) + '\n')
             raise StepFailed(
                 "step 'calibrate': only pieces are over the limit, and re-planning does not shrink a piece:\n%s\n"
-                "Force the heavy lemmas the piece keeps into statements of their own: list them in pipeline.json "
-                "`forced` (a private one by its graph node name, `_private.<module>.0.<name>`), then --from config. "
-                "Kernel computation (`decide +kernel`, `native_decide`) is the usual cause: the cost model cannot "
-                "see it (oaiq-031: one 192 s piece became 20 pieces of ~11 s). Log %s" % ('\n'.join(lines[1:]), log))
+                "Find what is slow before splitting. (1) Compile the piece's check file with "
+                "`lean -o x.olean -Dprofiler=true`: if `.olean serialization` dominates while elaboration is fast, "
+                "the statement's type is huge (oaiq-075: 316 s of 341 s, a term re-embedded thousands of times); "
+                "name the big term with a def by a patch, do not split. (2) Else "
+                "`-Dtrace.profiler=true -Dtrace.profiler.threshold=20000` shows the slow declaration or tactic "
+                "(oaiq-074: one fun_prop goal, 53 s). (3) Kernel computation (`decide +kernel`, `native_decide`) or "
+                "plain bulk: force the heavy lemmas into statements, listing them in pipeline.json `forced` (a private "
+                "one by its graph node name, `_private.<module>.0.<name>`), then --from config (oaiq-031: one 192 s "
+                "piece became 20 pieces of ~11 s). Log %s" % ('\n'.join(lines[1:]), log))
+        if uniform:
+            # several pieces over plan by a similar large factor: the model underestimates this port, and a
+            # re-plan at that factor promotes lemmas to statements (oaiq-073: ratio 3.5-4.3, re-planned at 4,
+            # all 364 items fitted)
+            res['new_scale'] = round(min(MAX_SCALE, cfg.get('time_scale', 1.5) * ratios[len(ratios) // 2]), 1)
         if n >= MAX_REPLANS:
             open(log, 'a').write('\n'.join(lines) + '\n')
             raise StepFailed("step 'calibrate': %d re-plans did not fit the budget; items over the limit:\n%s\n"

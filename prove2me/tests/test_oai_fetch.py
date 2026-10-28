@@ -109,3 +109,27 @@ def test_default_clone_is_found(tmp_path, monkeypatch):
     monkeypatch.setenv('P2M_OAI_GIT', str(tmp_path / 'absent'))
     monkeypatch.setattr(F, 'CANDIDATES', ())
     assert F.default_git_repo() is None
+
+
+def test_a_foreign_package_in_the_closure_is_reported_until_it_is_placed(repo, tmp_path, monkeypatch, capsys):
+    # oaiq-083: 12 modules imported PrimeNumberTheoremAnd/StrongPNT, which openai/math does not contain;
+    # the build then failed on "unknown module prefix" and skipped ~1460 modules
+    r, sha = repo
+    # module-system forms count too, and `import all M` is M, not a package called `all`
+    (r / 'lean' / 'OAI' / 'Lib.lean').write_text('import Mathlib.Data.Nat.Basic\nimport all Mathlib.Foo\nimport Batteries\n'
+                                                 'public import StrongPNT.Main\nimport PrimeNumberTheoremAnd.Mathlib.X\n')
+    git(r, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'foreign')
+    sha2 = git(r, 'rev-parse', 'HEAD')
+    monkeypatch.setattr(F.urllib.request, 'urlopen', no_network)
+    dest = tmp_path / 'dest'
+    foreign = {}
+    F.fetch(str(dest), 'OAI.X.Main', sha2, git_repo=str(r), foreign=foreign)
+    assert F.missing_packages(foreign, str(dest)) == {'PrimeNumberTheoremAnd': ['OAI.Lib'], 'StrongPNT': ['OAI.Lib']}
+    with pytest.raises(SystemExit) as e:
+        F.main([str(dest), 'OAI.X.Main', '--commit', sha2, '--git', str(r)])
+    assert 'StrongPNT (imported by OAI.Lib)' in str(e.value) and 'beside OAI/' in str(e.value)
+    # placed beside OAI/ (as a directory or a root file): the fetch goes through
+    (dest / 'lean' / 'StrongPNT').mkdir()
+    (dest / 'lean' / 'PrimeNumberTheoremAnd.lean').write_text('-- placed\n')
+    F.main([str(dest), 'OAI.X.Main', '--commit', sha2, '--git', str(r)])
+    assert '4 modules' in capsys.readouterr().out

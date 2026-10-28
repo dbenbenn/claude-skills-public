@@ -14,7 +14,10 @@ usage: oai_fetch.py DEST ROOT_MODULE [--commit SHA] [--git REPO | --no-git] [EXT
               for up to about 20 minutes per file.
   --no-git    network only.
 
-Prints how many files came from DEST already, from the clone and from the network."""
+Prints how many files came from DEST already, from the clone and from the network. Exits 1 when the
+closure imports a package that is neither OpenAI's nor in our toolchain (PrimeNumberTheoremAnd,
+StrongPNT: oaiq-083) and DEST/lean lacks it: put its sources beside OAI/ (references/openai-ports.md,
+"Foreign packages") and run again; the port takes them as OpenAI's."""
 import collections
 import os
 import re
@@ -80,8 +83,22 @@ def raw_get(commit, rel):
         wait = min(wait * 2, 300)
 
 
-def fetch(dest, root, commit=COMMIT, extra=(), git_repo='default'):
-    """Fetch root's closure into dest; returns (modules, bytes, {source: files})."""
+# import roots our Mathlib workspace provides; any other non-OpenAI root is a foreign package
+TOOLCHAIN = {'Mathlib', 'Batteries', 'Aesop', 'Std', 'Lean', 'Init', 'Lake', 'Qq', 'Plausible', 'ProofWidgets',
+             'ImportGraph', 'LeanSearchClient'}
+OPENAI = ('OAI', 'ComparatorChallenges')
+
+
+def missing_packages(foreign, dest):
+    """{root: importing modules} of the foreign roots with neither DEST/lean/ROOT/ nor ROOT.lean."""
+    lean = os.path.join(dest, 'lean')
+    return {k: v for k, v in sorted(foreign.items())
+            if not os.path.isdir(os.path.join(lean, k)) and not os.path.exists(os.path.join(lean, k + '.lean'))}
+
+
+def fetch(dest, root, commit=COMMIT, extra=(), git_repo='default', foreign=None):
+    """Fetch root's closure into dest; returns (modules, bytes, {source: files}). `foreign`, a dict,
+    collects {import root: [modules importing it]} for roots neither OpenAI's nor in TOOLCHAIN."""
     if git_repo == 'default':
         git_repo = default_git_repo()
     gs = GitSource(git_repo, commit) if git_repo else None
@@ -111,9 +128,12 @@ def fetch(dest, root, commit=COMMIT, extra=(), git_repo='default'):
             seen.add(m)
             t = get(m.replace('.', '/') + '.lean')
             total += len(t.encode())
-            for imp in re.findall(r'^import\s+(\S+)', t, re.M):
-                if imp.split('.')[0] in ('OAI', 'ComparatorChallenges'):
+            for imp in re.findall(r'^(?:public\s+)?(?:meta\s+)?import\s+(?:all\s+)?(\S+)', t, re.M):
+                top = imp.split('.')[0]
+                if top in OPENAI:
                     todo.append(imp)
+                elif top not in TOOLCHAIN and foreign is not None:
+                    foreign.setdefault(top, []).append(m)
         for rel in extra:
             get(rel)
     finally:
@@ -138,8 +158,17 @@ def main(argv):
         repo = None
     if len(args) < 2:
         sys.exit(__doc__)
-    n, total, src = fetch(args[0], args[1], commit, args[2:], repo)
+    foreign = {}
+    n, total, src = fetch(args[0], args[1], commit, args[2:], repo, foreign)
     print('%d modules, %d bytes (%s)' % (n, total, ', '.join('%d %s' % (v, k) for k, v in sorted(src.items())) or 'none'))
+
+    missing = missing_packages(foreign, args[0])
+    if missing:
+        sys.exit('foreign packages in the closure, not in %s: %s. openai/math does not contain them: put their '
+                 'sources beside OAI/ there (the pinned upstream from its lake-manifest, LeanArchitect annotations '
+                 'stripped; references/openai-ports.md "Foreign packages") and run again (oaiq-083)'
+                 % (os.path.join(args[0], 'lean'), '; '.join('%s (imported by %s)' % (k, ', '.join(sorted(set(v))[:5]))
+                                                             for k, v in missing.items())))
 
 
 if __name__ == '__main__':
