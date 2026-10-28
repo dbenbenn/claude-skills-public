@@ -130,6 +130,11 @@ class Measure:
         if module:
             out = os.path.join(self.olean, *module.split('.'))
             os.makedirs(os.path.dirname(out), exist_ok=True)
+            # a failed compile must not leave an earlier plan's module of this name behind for later
+            # files to import (oaiq-065: a re-plan's Sa010 failed, the old Sa010 .olean stayed)
+            for ext in ('.olean', '.ilean'):
+                if os.path.exists(out + ext):
+                    os.remove(out + ext)
             sp = os.path.join(self.stage, *module.split('.')) + '.lean'
             os.makedirs(os.path.dirname(sp), exist_ok=True)
             shutil.copy(path, sp)

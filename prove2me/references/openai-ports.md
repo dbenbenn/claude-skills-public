@@ -446,9 +446,11 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
 - **Heartbeat timeouts on the server.** A bundle or piece that compiled in `measure` can still hit the
   verifier's `maxHeartbeats 200000` (oaiq-055: `rfl` lemmas, instance-heavy statements). split_run adds
   `set_option maxHeartbeats 1000000` after the imports and resends once; a second one waits for a person.
-- **A later target of an already-carved family** (oaiq-057): until the planner imports frozen bundles,
-  carve with a fresh `statement_suffix` (`_s2`) instead of extending; run the `split_run` dry run before the
-  calibrate hour, since "REFUSES TO RUN: names live with different text" is the signal.
+- **A later target of an already-carved family** (oaiq-057): extend it with the earlier carve's plan,
+  bundles and lib as `frozen`; the planner takes the frozen plan's `external_defs` as its own (56fd083),
+  so declarations the earlier carve took from a published bundle stay there. Not handled: a frozen bundle
+  that imports one of the old carve's statements (then use a fresh `statement_suffix`). Run the `split_run`
+  dry run before the calibrate hour: "REFUSES TO RUN: names live with different text" is the signal.
 - **Overlap with someone else's published work** (oaiq-067): `pipeline.json` `defs` replaces the list
   derived from the targets (keep the goal's own `Def_` in it); earlier published statements go in
   `config_set.external_theorems` (`{lean name: "Theorems.Thm_<name with _>"}`) after `fetch_theorems.py
@@ -458,3 +460,30 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   alone (`lake env lean FILE`, seconds), then turn the diff into patches whose `count` is taken over the
   unpatched port, never the patched workspace (oaiq-063, -071, -072). A patch `why` lands in the piece's
   explanation: write Lean names in it in backticks (oaiq-064: a hypothesis `he` failed the pronoun check).
+
+## Which local instances and lemmas a carved file brings back (carver rules, 2026-10-27/28)
+
+A carved file loses the context its module had, so the carver restores what its declarations used.
+Lean's records (LeanInfo `insts`, `inst_keys`, `declares`) name most uses, but some leave no trace, so
+these rules over-approximate on purpose; each comes from a worker carve that failed without it:
+- a local instance used by a kept command comes back, reactivated (`attribute [local instance P] N`,
+  with its source priority) when an imported bundle declares it, else emitted again under a file-unique
+  name after the earlier local instances its own elaboration used (oaiq-032, oaiq-031);
+- with it come its siblings: other classes on the same carrier type (a `Module` and its `IsScalarTower`
+  partner, oaiq-031) and the same class (three `DecidableEq` instances, oaiq-060), in source order so the
+  instance that won in the port still wins; a sibling that a later kept instance of its class would lose
+  to stays out;
+- a local instance whose type mentions a project declaration the kept command uses comes back even with
+  no recorded use (a `CoeFun` used as `w 3`, `Primcodable`, oaiq-066/043);
+- a global instance the module never saw is hidden (`attribute [-instance]`) also when the declaration
+  solved a problem of its class whose heads include the instance's; a project `abbrev` head matches
+  anything, since instance search sees through it (oaiq-071);
+- a call to the default simp set (`simp`, `simpa`, `simp_all`, `dsimp`, `norm_num`, `field_simp`, `aesop`
+  without `only`) depends on the module's earlier `@[simp]` lemmas proved by `rfl` (only those: any other
+  simp lemma leaves a constant in the term; oaiq-067);
+- an attribute that declares constants (`reassoc`, `elementwise`, `simps`, `to_additive`, `mk_iff`,
+  `ext`, ...) is applied only in the file that declares its target, when that target is the module's own
+  (oaiq-065: a re-applied `reassoc` declared `_assoc` twice).
+`carve_measure` deletes a module's old `.olean`/`.ilean` before compiling it, so a failed file never
+leaves an earlier plan's module of the same name for later files to import (oaiq-065's "Unknown
+constant" and "Unknown identifier" after a re-plan).

@@ -451,3 +451,25 @@ def test_stdsimplex_shim_compiles_and_covers_openai_names(tmp_path):
 def test_text_check_skips_auto_named_instances():
     md = 'Uses `Ns.Specht.instFintypeTabloid` and `Ns.instDecidableEqSwitchIndex`.\n'
     assert CP.missing_names(md, 'noncomputable instance : Fintype (Tabloid m) := x', lambda n: False) == []
+
+
+def test_measure_never_leaves_an_old_olean_behind_a_failed_compile(tmp_path, monkeypatch):
+    # oaiq-065: after a re-plan, Def_OAIQ65Sa010 failed to compile, and the previous plan's .olean of that
+    # name stayed in D/olean; with --keep-going later bundles compiled against that different bundle
+    # ("Unknown constant", "Unknown identifier"). The outputs go before each compile.
+    import carve_measure as M
+    m = object.__new__(M.Measure)
+    m.olean, m.stage, m.lean_ws = str(tmp_path / 'olean'), str(tmp_path / 'stage'), str(tmp_path)
+    old = tmp_path / 'olean' / 'Definitions' / 'Def_B010'
+    old.parent.mkdir(parents=True)
+    for ext in ('.olean', '.ilean'):
+        (old.parent / ('Def_B010' + ext)).write_text('the previous plan')
+    src = tmp_path / 'Def_B010.lean'
+    src.write_text('broken')
+
+    class R:
+        returncode, stdout, stderr = 1, 'Def_B010.lean:1:0: error: oops', ''
+    monkeypatch.setattr(M.subprocess, 'run', lambda *a, **k: R())
+    res, _ = m.run(str(src), 'Definitions.Def_B010', {})
+    assert not res['ok']
+    assert not (old.parent / 'Def_B010.olean').exists() and not (old.parent / 'Def_B010.ilean').exists()
