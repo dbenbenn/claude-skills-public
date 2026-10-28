@@ -78,7 +78,7 @@ def env(tmp_path, monkeypatch):
     (ws / 'Definitions' / 'Def_A.lean').write_text('def A := 1\n')
     d = tmp_path / 'carve'
     (d / 'src' / 'lean' / 'OAI' / 'Pre').mkdir(parents=True)
-    (d / 'oai_meta.json').write_text('{"title": "T", "date": "d", "family": "1", "prefixes": ["OAI.Pre"]}')
+    (d / 'oai_meta.json').write_text('{"title": "T", "date": "d", "family": "1", "commit": "%s", "prefixes": ["OAI.Pre"]}' % ('a' * 40))
     bin = tmp_path / 'bin'
     bin.mkdir()
     lake = bin / 'lake'
@@ -191,11 +191,12 @@ def test_live_edit_during_a_run_does_not_reach_the_run(env, monkeypatch):
     assert r.returncode == 0, r.stdout + r.stderr
 
 
-def test_dirty_skill_tree_is_refused_unless_allowed(env):
+def test_a_dirty_skill_tree_runs_from_head_with_a_warning(env):
     (env.repo / 'prove2me' / 'scripts' / 'carve.py').write_text('# edited\n')
-    r = run(env, *ARGS)
-    assert r.returncode != 0 and 'dirty' in (r.stderr + r.stdout).lower()
-    assert not (env.dir / 'pipeline_state.json').exists()
+    r = run(env, *ARGS, '--stop-after', 'config')
+    assert r.returncode == 0, r.stderr
+    assert 'not in this snapshot' in r.stderr
+    assert {c['version'] for c in calls(env)} == {'v1'}            # the committed tools ran
 
 
 def test_stop_after_and_from_and_redo(env):
@@ -418,8 +419,9 @@ def test_missing_meta_fails_at_config(env):
 
 
 def test_meta_without_prefixes_or_with_foreign_prefixes_fails_at_config(env):
-    for meta in ('{"title": "T", "date": "d", "family": "1"}',
-                 '{"title": "T", "date": "d", "family": "1", "prefixes": ["OAI.Other"]}'):
+    c = '"commit": "%s"' % ('a' * 40)
+    for meta in ('{"title": "T", "date": "d", "family": "1", %s}' % c,
+                 '{"title": "T", "date": "d", "family": "1", %s, "prefixes": ["OAI.Other"]}' % c):
         (env.dir / 'oai_meta.json').write_text(meta)
         env.log.write_text('')
         r = run(env, *ARGS, '--stop-after', 'config')
@@ -645,10 +647,11 @@ def test_meta_prefixes_must_be_the_ports(tmp_path):
     lean = tmp_path / 'lean'
     (lean / 'OAI' / 'Algebra' / 'AuslanderReiten').mkdir(parents=True)
     meta = tmp_path / 'oai_meta.json'
-    meta.write_text(json.dumps({'prefixes': ['OAI.Algebra.AuslanderReiten']}))
+    base = {'title': 'T', 'date': 'd', 'family': '1', 'commit': 'a' * 40}
+    meta.write_text(json.dumps(dict(base, prefixes=['OAI.Algebra.AuslanderReiten'])))
     why = CP.check_meta(str(meta), str(lean), 'OAI.Algebra.AuslanderReiten.All')
     assert why and 'OAI.Algebra' in why and 'port' in why
-    meta.write_text(json.dumps({'prefixes': ['OAI.Algebra']}))
+    meta.write_text(json.dumps(dict(base, prefixes=['OAI.Algebra'])))
     assert CP.check_meta(str(meta), str(lean), 'OAI.Algebra.AuslanderReiten.All') is None
 
 
@@ -697,3 +700,32 @@ def test_a_replan_sets_aside_the_repairs_of_the_old_bundle_numbering(env, monkey
     assert r.returncode == 0, r.stdout + r.stderr
     assert not (env.dir / 'carve_work' / 'repairs.json').exists()
     assert (env.dir / 'carve_work' / 'repairs.before-replan-1.json').exists()
+
+
+
+def test_meta_needs_the_prose_keys_at_config(tmp_path):
+    # oaiq-066: a meta without `family` passed config and crashed publish_prep with a KeyError after the
+    # hour of measuring; the prose template's own check came later still
+    lean = tmp_path / 'lean'
+    (lean / 'OAI' / 'Pre').mkdir(parents=True)
+    meta = tmp_path / 'oai_meta.json'
+    good = {'title': 'T', 'date': 'd', 'family': '250', 'commit': 'a' * 40, 'prefixes': ['OAI.Pre']}
+    meta.write_text(json.dumps(good))
+    assert CP.check_meta(str(meta), str(lean), 'OAI.Pre.Main') is None
+    for k in ('title', 'date', 'family', 'commit'):
+        meta.write_text(json.dumps({x: v for x, v in good.items() if x != k}))
+        why = CP.check_meta(str(meta), str(lean), 'OAI.Pre.Main')
+        assert why and repr(k) in why, k
+    meta.write_text(json.dumps(dict(good, commit='adc7f12')))
+    assert '40' in CP.check_meta(str(meta), str(lean), 'OAI.Pre.Main')
+
+
+def test_publish_runs_again_whenever_publish_is_asked(env):
+    # oaiq-065/071: after a re-split, `--publish` said "pipeline ok" in 2 s because the publish step
+    # was recorded done; split_run resumes from its run state, so running it again is always safe
+    assert run(env, *ARGS, '--publish').returncode == 0
+    env.log.write_text('')
+    assert run(env, '--publish').returncode == 0
+    assert ('split_run', 'publish/run.json') in tools_called(env)
+    go = [c['argv'] for c in calls(env) if c.get('tool') == 'split_run']
+    assert any('--go' in a for a in go)

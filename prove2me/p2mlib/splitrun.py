@@ -25,6 +25,7 @@ as "name taken"), `submit_definition(body) -> job`,
 -> submission`, `verdict(submission) -> record`; `LiveApi` is the real one, tests pass a fake.
 Erdős 3 v1 (2026-10-08..16) is why: per-mission loops retried one piece 740 times and re-carved
 published bundles."""
+import hashlib
 import json
 import os
 import time
@@ -36,6 +37,7 @@ from .mission import front_matter
 
 FINAL_JOB = {'PUBLISHED', 'FAILED', 'ERROR'}
 TERMINAL = {'split', 'stop', 'give_up', 'raise_heartbeats'}
+RAISED_HEARTBEATS = 1000000
 BATCH = 10
 
 
@@ -89,6 +91,21 @@ class Runner:
         self.kinds = set(cfg.get('kinds') or ('bundle', 'statement', 'piece'))
         self.max_items = cfg.get('max_items')
         self.sent = 0
+        self._restart_changed()
+
+    def file_sha(self, item):
+        p = self.info(item)['file']
+        return hashlib.sha1(open(p, 'rb').read()).hexdigest() if os.path.exists(p) else None
+
+    def _restart_changed(self):
+        """A terminal item (it waits for a person) whose file changed since it was sent starts over:
+        that change is the person's answer, e.g. a re-split after verifier timeouts (oaiq-065, oaiq-071
+        edited run_state.json by hand). States from before `sha` was recorded are left alone."""
+        for x, st in list(self.state.items()):
+            if x in self.items and st.get('state') in TERMINAL and st.get('sha') and st['sha'] != self.file_sha(x):
+                was = st['state']
+                self.state.pop(x)
+                self.log(x, 'restart', 'text changed since it stopped (%s): sending it again' % was)
 
     # ------------------------------------------------------------------ items and their files
     def info(self, item):
@@ -243,6 +260,13 @@ class Runner:
             st['state'] = 'live'
             st['id'] = rec.get('theorem_id') or rec.get('definition_id') or rec.get('submission_id') or st.get('id')
             self.log(item, action, '%s %s' % (rec.get('status'), st['id']))
+        elif dec == 'raise_heartbeats' and self._raise_heartbeats(item):
+            # the person's fix every time (oaiq-055: four Lech bundles), done once; a second heartbeat
+            # timeout waits for a person as before
+            st['state'] = 'todo'
+            st['last'] = (rec.get('error_message') or rec.get('error') or '')[:500]
+            self.log(item, action, '%s heartbeat timeout: raised maxHeartbeats to %d, sending again' % (
+                rec.get('status'), RAISED_HEARTBEATS))
         else:
             st['state'] = 'todo' if dec == 'retry' else dec
             st['last'] = (rec.get('error_message') or rec.get('error') or '')[:500]
@@ -254,6 +278,23 @@ class Runner:
                    'raise_heartbeats': 'NEEDS A PERSON: heartbeat timeout'}.get(dec, dec)
             self.log(item, action, '%s %s  -> %s' % (rec.get('status'), st['last'][:200], why))
         self.save()
+
+    def _raise_heartbeats(self, item):
+        """Add `set_option maxHeartbeats N` after a bundle's or piece's imports, unless it already sets
+        it; True when the file changed. Statements are left alone (their text is split into preamble
+        and formal statement on the platform)."""
+        f = self.info(item)
+        if f['kind'] == 'statement' or not os.path.exists(f['file']):
+            return False
+        text = open(f['file'], encoding='utf-8').read()
+        if 'set_option maxHeartbeats' in text:
+            return False
+        lines = text.split('\n')
+        last = max((i for i, l in enumerate(lines) if l.startswith('import ')), default=-1)
+        lines[last + 1:last + 1] = ['', 'set_option maxHeartbeats %d' % RAISED_HEARTBEATS]
+        with open(f['file'], 'w', encoding='utf-8') as out:
+            out.write('\n'.join(lines))
+        return True
 
     def poll(self):
         for x in self.items:
@@ -325,7 +366,7 @@ class Runner:
                 'definition': open(f['file'], encoding='utf-8').read(),
                 'natural_language_statement': body, 'source': source,
                 'tags': self.cfg.get('tags', [])})
-            st.update(state='inflight', job=job)
+            st.update(state='inflight', job=job, sha=self.file_sha(x))
             self.log(x, 'submit-definition', 'job %s' % job)
             self.save()
         elif f['kind'] == 'statement':
@@ -338,7 +379,7 @@ class Runner:
                 self.blocked[x] = 'no theorem id for ' + f['name']
                 return
             sid = self.api.verify(tid, f['file'], open(f['text'], encoding='utf-8').read())
-            st.update(state='inflight', sid=sid)
+            st.update(state='inflight', sid=sid, sha=self.file_sha(x))
             self.log(x, 'submit piece (try %d)' % (sum(st['history'].values()) + 1), sid)
             self.save()
 
@@ -355,7 +396,7 @@ class Runner:
                           'tags': self.cfg.get('tags', [])})
         jobs = self.api.submit_problems(probs)
         for x, job in zip(batch, jobs):
-            self.st(x).update(state='inflight', job=job)
+            self.st(x).update(state='inflight', job=job, sha=self.file_sha(x))
             self.log(x, 'submit-problem', 'job %s' % job)
         self.save()
 

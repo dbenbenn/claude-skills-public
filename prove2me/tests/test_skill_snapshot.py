@@ -59,10 +59,16 @@ def test_a_later_commit_gets_its_own_snapshot_and_the_old_one_is_unchanged(repo,
     assert open(os.path.join(p2, 'prove2me/scripts/tool.py')).read() == 'print("v2")\n'
 
 
-def test_dirty_tree_is_refused_unless_allowed(repo, cache):
+def test_dirty_tree_snapshots_head_with_a_warning_unless_allowed(repo, cache, capsys):
+    # 2026-10-28 (oaiq-055): agents share one checkout, so it is dirty most of the time with someone
+    # else's work in progress; refusing blocked every new carve, and the way out (--allow-dirty)
+    # snapshotted that half-done code. Without --allow-dirty the snapshot is HEAD, with a warning.
     (repo / 'prove2me' / 'scripts' / 'tool.py').write_text('print("dirty")\n')
-    with pytest.raises(snapshot.DirtyTree):
-        snapshot.snapshot(str(repo), cache=str(cache))
+    head = snapshot.snapshot(str(repo), cache=str(cache))
+    assert '-dirty-' not in os.path.basename(head)
+    assert open(os.path.join(head, 'prove2me/scripts/tool.py')).read() == 'print("v1")\n'
+    err = capsys.readouterr().err
+    assert 'uncommitted' in err and 'tool.py' in err and 'not in this snapshot' in err
     p = snapshot.snapshot(str(repo), cache=str(cache), allow_dirty=True)
     assert '-dirty-' in os.path.basename(p)
     assert open(os.path.join(p, 'prove2me/scripts/tool.py')).read() == 'print("dirty")\n'
@@ -117,7 +123,8 @@ def test_cli_prints_the_path(repo, cache):
     (repo / 'prove2me' / 'scripts' / 'tool.py').write_text('print("d")\n')
     r = subprocess.run([sys.executable, os.path.join(SCRIPTS, 'skill_snapshot.py'), '--repo', str(repo),
                         '--cache', str(cache)], capture_output=True, text=True)
-    assert r.returncode != 0 and 'dirty' in r.stderr.lower()
+    assert r.returncode == 0 and r.stdout.strip() == os.path.join(str(cache), git(repo, 'rev-parse', 'HEAD'))
+    assert 'prove2me/scripts/tool.py' in r.stderr and 'not in this snapshot' in r.stderr
     r = subprocess.run([sys.executable, os.path.join(SCRIPTS, 'skill_snapshot.py'), '--repo', str(repo),
                         '--cache', str(cache), '--allow-dirty'], capture_output=True, text=True)
     assert r.returncode == 0 and '-dirty-' in r.stdout

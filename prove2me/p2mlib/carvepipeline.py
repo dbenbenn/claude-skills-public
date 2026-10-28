@@ -141,6 +141,13 @@ def check_meta(path, lean_src, root_module):
         m = json.load(open(path))
     except ValueError as e:
         return '%s is not valid JSON: %s' % (path, e)
+    # what publish_prep and the prose templates read (oaiq-066: no `family` crashed publish_prep with a
+    # KeyError after the hour of measuring)
+    for k in ('title', 'date', 'family', 'commit'):
+        if not m.get(k):
+            return '%s has no %r (needed by publish_prep and the prose templates)' % (path, k)
+    if not re.fullmatch(r'[0-9a-f]{40}', str(m['commit'])):
+        return '%s: commit must be the full 40-hex openai/math commit (links pin it)' % path
     pre = m.get('prefixes')
     if not pre or not isinstance(pre, list):
         return '%s has no "prefixes" (the OpenAI module prefixes, e.g. ["OAI.Geometry.Foo"])' % path
@@ -550,7 +557,10 @@ class Pipeline:
                 self.invalidate(st[0])
                 self.save()
             rec = self.state['steps'].get(s)
-            if rec and rec['status'] in ('done', 'skipped') and s not in only_redo:
+            # --publish always re-enters split_run (it resumes from its run state): after a re-split the
+            # recorded `publish` made --publish a 2 s no-op (oaiq-065, oaiq-071)
+            again = s == 'publish' and self.p.get('go')
+            if rec and rec['status'] in ('done', 'skipped') and s not in only_redo and not again:
                 if s == stop_after:
                     break
                 continue

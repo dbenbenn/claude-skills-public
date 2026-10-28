@@ -3,10 +3,12 @@
 A carve is dozens of separate tool processes (carve.py, carve_measure.py, ...). A skill fix pushed
 mid-run made one carve use old and new code together (2026-10-25). `snapshot()` extracts the skill
 with `git archive` into CACHE/<sha>/ (CACHE defaults to ~/.cache/p2m/skill), makes it read-only and
-reuses it; a dirty working tree is refused unless `allow_dirty`, which snapshots the tracked and
-untracked-but-not-ignored files under CACHE/<sha>-dirty-<content hash>/."""
+reuses it; with a dirty working tree it snapshots HEAD and prints which uncommitted files it left out,
+unless `allow_dirty`, which snapshots the tracked and untracked-but-not-ignored files under
+CACHE/<sha>-dirty-<content hash>/."""
 import hashlib
 import os
+import sys
 import shutil
 import subprocess
 import tarfile
@@ -84,10 +86,17 @@ def snapshot(repo=None, rev=None, cache=None, allow_dirty=False):
     repo = os.path.abspath(os.path.expanduser(repo or os.environ.get('P2M_SKILL_REPO') or default_repo()))
     cache = cache_dir(cache)
     if rev is None:
-        dirty = _git(repo, 'status', '--porcelain', '--untracked-files=normal').strip()
-        if dirty:
-            if not allow_dirty:
-                raise DirtyTree('skills tree %s is dirty (commit it, or pass --allow-dirty):\n%s' % (repo, dirty))
+        status = _git(repo, 'status', '--porcelain', '--untracked-files=normal')
+        dirty = status.strip()
+        if dirty and not allow_dirty:
+            # agents share one checkout, so it is often dirty with someone else's work in progress:
+            # snapshot the committed HEAD and say what is left out (refusing blocked every carve, and
+            # --allow-dirty then snapshotted half-done code; oaiq-055, 2026-10-28)
+            sys.stderr.write('note: uncommitted changes in %s are not in this snapshot (HEAD): %s. Commit them '
+                             'to use them, or pass --allow-dirty to snapshot the working tree.\n'
+                             % (repo, ', '.join(l[3:] for l in status.splitlines()[:8] if l.strip())
+                                + (' ...' if len(dirty.splitlines()) > 8 else '')))
+        elif dirty:
             files = _dirty_files(repo)
             h = hashlib.sha256()
             for f in files:

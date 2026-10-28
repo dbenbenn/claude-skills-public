@@ -234,3 +234,12 @@ def test_names_finds_a_bundle_by_name(tmp_path, monkeypatch):
     monkeypatch.setattr(F.sys, 'argv', ['fetch_theorems.py', '--names', 'B0', '--out', str(tmp_path)])
     F.main()
     assert (tmp_path / 'Definitions' / 'Def_B0.lean').read_text().endswith('def N.k := 1\n')
+
+
+def test_names_accepts_the_module_form_of_a_bundle():
+    # oaiq-065: `--names Definitions.Def_OAIQ65Sa000` said "not published"; the platform knows the
+    # bundle as OAIQ65Sa000, which is what `import Definitions.Def_OAIQ65Sa000` names
+    assert F.platform_name('Definitions.Def_OAIQ65Sa000') == 'OAIQ65Sa000'
+    assert F.platform_name('Def_OAIQ65Sa000') == 'OAIQ65Sa000'
+    assert F.platform_name('OAIQ65Sa000') == 'OAIQ65Sa000'
+    assert F.platform_name('OAI.SimpleAmenable.main') == 'OAI.SimpleAmenable.main'

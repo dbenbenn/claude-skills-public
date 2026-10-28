@@ -426,3 +426,47 @@ def test_a_file_the_soundness_guard_refuses_blocks_the_item_before_any_post(spli
     r, summary = run(cfg, api)
     assert ('def', 'XB001') not in api.posted
     assert 'bundle:XB001' in summary['blocked'] and 'prelude' in summary['blocked']['bundle:XB001']
+
+
+def test_a_stopped_item_whose_text_changed_is_sent_again(split):
+    # oaiq-065/071: after a re-split, the bundle/piece stayed in its terminal state (`split`) and was
+    # never resubmitted; workers edited run_state.json by hand. The text sent is recorded, and a
+    # terminal item whose file changed since starts over.
+    d, cfg = split
+    own = ('FAILED', 'Compilation timed out after 300s')
+    first = FakeApi(script={'XB001': [own, own, own]})
+    run(cfg, first)
+    assert json.loads((d / 'run_state.json').read_text())['bundle:XB001']['state'] == 'split'
+    api = FakeApi(published=dict(first.published))           # the platform remembers what went live
+    run(cfg, api)
+    assert ('def', 'XB001') not in api.posted                # unchanged: still waits for a person
+    f = d / 'out' / 'lib' / 'Def_XB001.lean'
+    f.write_text(f.read_text() + '\n-- re-split\n')
+    api = FakeApi(published=dict(first.published))
+    r, summary = run(cfg, api)
+    assert ('def', 'XB001') in api.posted and not summary['stopped']
+    assert 'changed since it stopped' in (d / 'PROGRESS.log').read_text()
+
+
+def test_a_heartbeat_timeout_raises_the_limit_once_and_resends(split):
+    # oaiq-055 (Lech): four bundles compiled in measure but the server answered "(deterministic)
+    # timeout at whnf, maximum number of heartbeats (200000)"; each was parked for a person, whose fix
+    # was always `set_option maxHeartbeats 1000000` after the imports and a resend
+    d, cfg = split
+    hb = ('FAILED', 'definition does not compile: (deterministic) timeout at `whnf`, maximum number of heartbeats (200000)')
+    api = FakeApi(script={'XB001': [hb]})
+    r, summary = run(cfg, api)
+    assert api.posted.count(('def', 'XB001')) == 2 and not summary['stopped']
+    text = (d / 'out' / 'lib' / 'Def_XB001.lean').read_text()
+    assert 'set_option maxHeartbeats 1000000' in text
+    assert text.index('set_option maxHeartbeats') > text.rindex('import ')
+    assert 'raised maxHeartbeats' in (d / 'PROGRESS.log').read_text()
+
+
+def test_a_second_heartbeat_timeout_waits_for_a_person(split):
+    d, cfg = split
+    hb = ('FAILED', '(deterministic) timeout at `whnf`, maximum number of heartbeats (200000)')
+    api = FakeApi(script={'XB001': [hb, hb]})
+    r, summary = run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['bundle:XB001']['state'] == 'raise_heartbeats' and api.posted.count(('def', 'XB001')) == 2

@@ -428,3 +428,33 @@ back WA. The lessons:
     avoid tokens full Mathlib adds (`Δ_[1]^[n]` → `Δ_[1] ^[n]`), and drop a theorem a published
     bundle already declares. Config `external_defs`, `statement_suffix`, `patches` (post-carve
     proof fixes) support a fresh split beside an abandoned one.
+
+## After publishing: re-splitting, extending, overlapping carves
+
+From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
+
+- **Re-split one item after real verifier timeouts** (two or more on a bundle or piece). Keep everything
+  live as it is: in `pipeline.json` `config_set`, set `frozen` = {`plan`: a copy of the published
+  plan.json, `bundles`: every live bundle, `lib`: `publish/out/lib`} and `forced` = the live intermediate
+  statements plus the new ones you want (without the live ones the planner re-chooses intermediates by
+  cost, dropping live statements and inventing new ones: oaiq-071). The config_set change applies on the
+  next resume. Then `--publish --detach`: `--publish` always re-enters split_run, and an item stopped for
+  a person whose file changed since is sent again by itself (both since 2026-10-28). `gen` needs each
+  frozen bundle in `Definitions/`: `fetch_theorems.py --names Definitions.Def_X` (or the bare `X`) fetches
+  it. `prose-template` skips `forced` nodes ("needs written prose"); for a mechanical split, generate the
+  prose on a scratch copy with `forced` emptied and copy the files back.
+- **Heartbeat timeouts on the server.** A bundle or piece that compiled in `measure` can still hit the
+  verifier's `maxHeartbeats 200000` (oaiq-055: `rfl` lemmas, instance-heavy statements). split_run adds
+  `set_option maxHeartbeats 1000000` after the imports and resends once; a second one waits for a person.
+- **A later target of an already-carved family** (oaiq-057): until the planner imports frozen bundles,
+  carve with a fresh `statement_suffix` (`_s2`) instead of extending; run the `split_run` dry run before the
+  calibrate hour, since "REFUSES TO RUN: names live with different text" is the signal.
+- **Overlap with someone else's published work** (oaiq-067): `pipeline.json` `defs` replaces the list
+  derived from the targets (keep the goal's own `Def_` in it); earlier published statements go in
+  `config_set.external_theorems` (`{lean name: "Theorems.Thm_<name with _>"}`) after `fetch_theorems.py
+  --names`; a bundle of another author that declares the same names as the goal's own bundle cannot be
+  combined with it, so take a `statement_suffix`.
+- **Iterating on drift fixes:** edit the ported file in `prove2me_workspace/Solutions/FOLDER` and compile it
+  alone (`lake env lean FILE`, seconds), then turn the diff into patches whose `count` is taken over the
+  unpatched port, never the patched workspace (oaiq-063, -071, -072). A patch `why` lands in the piece's
+  explanation: write Lean names in it in backticks (oaiq-064: a hypothesis `he` failed the pronoun check).

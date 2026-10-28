@@ -49,6 +49,15 @@ def lookup_bundle(name):
     return hit[0].get('definition_id') if hit else None
 
 
+def platform_name(n):
+    """The platform's name for N: a bundle's module form `Definitions.Def_X` (or `Def_X`) is `X`
+    (oaiq-065: `--names Definitions.Def_X` answered "not published")."""
+    for pre in ('Definitions.Def_', 'Def_'):
+        if n.startswith(pre):
+            return n[len(pre):]
+    return n
+
+
 def main():
     args = sys.argv[1:]
     out_dir, build = None, '--no-build' not in args
@@ -71,6 +80,7 @@ def main():
         for n in wanted:
             # lookup_bundle tries the theorem lookup first, then finds a bundle by name
             # (`--names OAIQWKAP000` wrote nothing before, 2026-10-25)
+            n = platform_name(n)
             tid = lookup_bundle(n)
             if tid:
                 ids.append(tid)
