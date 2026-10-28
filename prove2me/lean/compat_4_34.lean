@@ -144,6 +144,38 @@ def nonUnitalStarRingHomOfClass {F R S : Type*} [NonUnitalSemiring R] [NonUnital
 oaiq-068). -/
 theorem _root_.Transcendental.ne_zero {R A : Type*} [CommRing R] [Nontrivial R] [Ring A] [Algebra R A] {x : A}
     (h : Transcendental R x) : x ≠ 0 := fun hx => h (hx ▸ isAlgebraic_zero)
+section X
+variable {𝕜 E Eₗ F : Type*} [NontriviallyNormedField 𝕜] [AddCommGroup E] [Module 𝕜 E]
+  [NormedAddCommGroup Eₗ] [NormedSpace 𝕜 Eₗ] [NormedAddCommGroup F] [NormedSpace 𝕜 F] [CompleteSpace F]
+
+/-- d13f23b's `LinearMap.extendOfIsometry`: a linear map into a complete space that agrees in norm
+with a dense-range map `e` extends along `e` to a linear isometry. -/
+noncomputable def _root_.LinearMap.extendOfIsometry (f : E →ₗ[𝕜] F) {e : E →ₗ[𝕜] Eₗ}
+    (h_dense : DenseRange e) (h_norm : ∀ x, ‖f x‖ = ‖e x‖) : Eₗ →ₗᵢ[𝕜] F :=
+  { toLinearMap := (f.extendOfNorm e).toLinearMap
+    norm_map' := by
+      intro x
+      refine h_dense.induction_on x (isClosed_eq (by fun_prop) continuous_norm) ?_
+      intro y
+      have := LinearMap.extendOfNorm_eq (f := f) (e := e) h_dense ⟨1, by simp [h_norm]⟩ y
+      simp only [ContinuousLinearMap.coe_coe, this, h_norm] }
+
+theorem _root_.LinearMap.extendOfIsometry_eq (f : E →ₗ[𝕜] F) {e : E →ₗ[𝕜] Eₗ}
+    (h_dense : DenseRange e) (h_norm : ∀ x, ‖f x‖ = ‖e x‖) (x : E) :
+    f.extendOfIsometry h_dense h_norm (e x) = f x :=
+  LinearMap.extendOfNorm_eq (f := f) (e := e) h_dense ⟨1, by simp [h_norm]⟩ x
+end X
+section Y
+instance closedSubmoduleNormedAddCommGroup {𝕜 E : Type*} [RCLike 𝕜] [NormedAddCommGroup E] [NormedSpace 𝕜 E]
+    (K : ClosedSubmodule 𝕜 E) : NormedAddCommGroup K :=
+  inferInstanceAs (NormedAddCommGroup K.toSubmodule)
+instance closedSubmoduleNormedSpace {𝕜 E : Type*} [RCLike 𝕜] [NormedAddCommGroup E] [NormedSpace 𝕜 E]
+    (K : ClosedSubmodule 𝕜 E) : NormedSpace 𝕜 K :=
+  inferInstanceAs (NormedSpace 𝕜 K.toSubmodule)
+instance closedSubmoduleInner {𝕜 E : Type*} [RCLike 𝕜] [NormedAddCommGroup E] [InnerProductSpace 𝕜 E]
+    (K : ClosedSubmodule 𝕜 E) : InnerProductSpace 𝕜 K :=
+  inferInstanceAs (InnerProductSpace 𝕜 K.toSubmodule)
+end Y
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod

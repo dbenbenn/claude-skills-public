@@ -1631,3 +1631,13 @@ def test_the_compat_block_declares_transcendental_ne_zero():
     # d13f23b's `Transcendental.ne_zero` (PiExponent CurveZeroPole, oaiq-068); ours has none
     block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
     assert re.search(r'^theorem _root_\.Transcendental\.ne_zero\b', block, re.M)
+
+
+def test_the_compat_block_declares_extend_of_isometry_and_closed_submodule_norms():
+    # d13f23b's `LinearMap.extendOfIsometry` and the normed-space instances on `ClosedSubmodule`
+    # (Kadison similarity, oaiq-075); ours has neither
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^noncomputable def _root_\.LinearMap\.extendOfIsometry\b', block, re.M)
+    assert re.search(r'^theorem _root_\.LinearMap\.extendOfIsometry_eq\b', block, re.M)
+    assert re.search(r'^instance closedSubmoduleNormedAddCommGroup\b', block, re.M)
+    assert re.search(r'^instance closedSubmoduleInner\b', block, re.M)
