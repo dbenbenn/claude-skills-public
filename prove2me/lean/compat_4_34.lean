@@ -273,6 +273,113 @@ instance vonNeumannAlgebraStarOrderedRing {H : Type*} [NormedAddCommGroup H] [In
     rw [P.centralizer_centralizer'] at this
     exact this
   Subtype.starOrderedRing P.toStarSubalgebra
+open scoped ComplexOrder in
+/-- A norm-one functional on a C⋆-algebra with `φ 1 = 1` is monotone; stands in for d13f23b's
+`ContinuousLinearMap.monotone_iff_opNorm_eq_map_one` (Kadison similarity, oaiq-075). -/
+theorem monotone_of_opNorm_eq_one_of_apply_one {A : Type*} [CStarAlgebra A] [PartialOrder A]
+    [StarOrderedRing A] [Nontrivial A] (φ : A →L[ℂ] ℂ) (hn : ‖φ‖ = 1) (h1 : φ 1 = 1) :
+    Monotone φ := by
+  have hle : ∀ z : A, ‖φ z‖ ≤ ‖z‖ := fun z => by
+    simpa [hn] using φ.le_opNorm z
+  -- selfadjoint elements have real values
+  have him : ∀ h : A, IsSelfAdjoint h → (φ h).im = 0 := by
+    intro h hh
+    by_contra hy
+    set y := (φ h).im with hy_def
+    set x := (φ h).re with hx_def
+    set C : ℝ := x ^ 2 + y ^ 2 - ‖h‖ ^ 2 with hC
+    have hD : 0 < |C| + 1 := by positivity
+    set t : ℝ := -y / (|C| + 1) with ht
+    set z : A := (1 : A) + ((t : ℂ) * Complex.I) • h with hz
+    have hzz : star z * z = (1 : A) + ((t ^ 2 : ℝ) : ℂ) • (h * h) := by
+      have hs : star ((t : ℂ) * Complex.I) = -((t : ℂ) * Complex.I) := by
+        simp [Complex.conj_ofReal]
+      have ht2 : ((t ^ 2 : ℝ) : ℂ) = -(((t : ℂ) * Complex.I) * ((t : ℂ) * Complex.I)) := by
+        push_cast; ring_nf; simp [Complex.I_sq]
+      rw [ht2]
+      simp only [hz, star_add, star_one, star_smul, hh.star_eq, hs, add_mul, mul_add, one_mul, mul_one,
+        smul_mul_assoc, mul_smul_comm, smul_smul, neg_smul, smul_neg, neg_mul, smul_add]
+      module
+    have hnz : ‖z‖ ^ 2 ≤ 1 + t ^ 2 * ‖h‖ ^ 2 := by
+      have h0 : ‖z‖ * ‖z‖ = ‖star z * z‖ := (CStarRing.norm_star_mul_self).symm
+      rw [sq, h0, hzz]
+      calc ‖(1 : A) + ((t ^ 2 : ℝ) : ℂ) • (h * h)‖ ≤ ‖(1 : A)‖ + ‖((t ^ 2 : ℝ) : ℂ) • (h * h)‖ := norm_add_le _ _
+        _ ≤ 1 + t ^ 2 * (‖h‖ * ‖h‖) := by
+          rw [norm_one, norm_smul, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg (sq_nonneg t)]
+          gcongr
+          exact norm_mul_le _ _
+        _ = 1 + t ^ 2 * ‖h‖ ^ 2 := by ring
+    have hphiz : φ z = (1 - t * y : ℝ) + (t * x : ℝ) * Complex.I := by
+      have hh' : φ h = (x : ℂ) + (y : ℂ) * Complex.I := (Complex.re_add_im (φ h)).symm
+      rw [hz, map_add, map_smul, h1, smul_eq_mul, hh']
+      apply Complex.ext <;> simp <;> ring
+    have hphin : ‖φ z‖ ^ 2 = (1 - t * y) ^ 2 + (t * x) ^ 2 := by
+      rw [hphiz, Complex.sq_norm, Complex.normSq_apply]
+      simp; ring
+    have hineq : (1 - t * y) ^ 2 + (t * x) ^ 2 ≤ 1 + t ^ 2 * ‖h‖ ^ 2 := by
+      rw [← hphin]
+      exact (pow_le_pow_left₀ (norm_nonneg _) (hle z) 2).trans hnz
+    have hkey : y ^ 2 * (C + 2 * (|C| + 1)) ≤ 0 := by
+      have e1 : t * (|C| + 1) = -y := by rw [ht]; field_simp
+      have : t ^ 2 * C - 2 * t * y ≤ 0 := by rw [hC]; nlinarith [hineq]
+      have h3 : (t * (|C| + 1)) ^ 2 * C - 2 * (t * (|C| + 1)) * y * (|C| + 1) ≤ 0 := by
+        have := mul_nonneg (le_of_lt (pow_pos hD 2)) (neg_nonneg.mpr this)
+        nlinarith [this]
+      rw [e1] at h3
+      nlinarith [h3]
+    have hCpos : 0 < C + 2 * (|C| + 1) := by
+      have := neg_abs_le C
+      linarith
+    have hy2 : y ^ 2 ≤ 0 := by
+      by_contra hcon
+      push Not at hcon
+      nlinarith [mul_pos hcon hCpos]
+    exact hy (by nlinarith [sq_nonneg y])
+  -- nonnegative elements have nonnegative values
+  have hpos : ∀ c : A, 0 ≤ c → 0 ≤ φ c := by
+    intro c hc
+    have hsa : IsSelfAdjoint c := IsSelfAdjoint.of_nonneg hc
+    have hre := him c hsa
+    set r : ℝ := ‖c‖ with hr
+    have hcr : c ≤ algebraMap ℝ A r := hsa.le_algebraMap_norm_self
+    have hnn : 0 ≤ algebraMap ℝ A r - c := sub_nonneg.mpr hcr
+    have hle2 : algebraMap ℝ A r - c ≤ algebraMap ℝ A r := sub_le_self _ hc
+    have hnorm : ‖algebraMap ℝ A r - c‖ ≤ r := by
+      refine (CStarAlgebra.norm_le_norm_of_nonneg_of_le hnn hle2).trans ?_
+      rw [Algebra.algebraMap_eq_smul_one, norm_smul, norm_one, mul_one, Real.norm_eq_abs, hr]
+      exact le_of_eq (abs_of_nonneg (norm_nonneg _))
+    have hphi : φ (algebraMap ℝ A r - c) = (r : ℂ) - φ c := by
+      rw [map_sub, Algebra.algebraMap_eq_smul_one, ← Complex.coe_smul, map_smul, h1]
+      simp
+    have hb := (hle _).trans hnorm
+    rw [hphi] at hb
+    have hx : φ c = ((φ c).re : ℂ) := by
+      apply Complex.ext <;> simp [hre]
+    rw [hx] at hb
+    have : ‖(r : ℂ) - ((φ c).re : ℂ)‖ = |r - (φ c).re| := by
+      rw [← Complex.ofReal_sub, Complex.norm_real, Real.norm_eq_abs]
+    rw [this] at hb
+    have := (abs_le.mp hb).2
+    rw [Complex.nonneg_iff]
+    exact ⟨by linarith, by simp [hre]⟩
+  intro a b hab
+  have := hpos (b - a) (sub_nonneg.mpr hab)
+  rw [map_sub] at this
+  exact sub_nonneg.mp this
+open scoped ComplexOrder in
+/-- d13f23b's `PositiveLinearMap.norm_map_star_mul_sq_le`: Cauchy–Schwarz for a positive functional
+(Kadison similarity, oaiq-075). -/
+theorem _root_.PositiveLinearMap.norm_map_star_mul_sq_le {A : Type*} [CStarAlgebra A] [PartialOrder A]
+    [StarOrderedRing A] (ψ : A →ₚ[ℂ] ℂ) (a b : A) :
+    ‖ψ (star a * b)‖ ^ 2 ≤ ‖ψ (star a * a)‖ * ‖ψ (star b * b)‖ := by
+  have h := norm_inner_le_norm (𝕜 := ℂ) (ψ.toPreGNS a) (ψ.toPreGNS b)
+  rw [PositiveLinearMap.preGNS_inner_def] at h
+  have ha := ψ.preGNS_norm_sq (ψ.toPreGNS a)
+  have hb := ψ.preGNS_norm_sq (ψ.toPreGNS b)
+  simp only [PositiveLinearMap.ofPreGNS_toPreGNS] at h ha hb
+  have h2 := mul_self_le_mul_self (norm_nonneg _) h
+  rw [← ha, ← hb]
+  simpa [sq, mul_mul_mul_comm] using h2
 alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod

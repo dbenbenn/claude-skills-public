@@ -1677,3 +1677,11 @@ def test_pow_antitone_takes_the_upper_bound_by_name():
     out = O.core_rewrites('simpa only [pow_zero] using CStarAlgebra.pow_antitone hb1 hb0 (Nat.zero_le n)\n')
     assert 'CStarAlgebra.pow_antitone (ha₀ := hb0) (ha₁ := hb1) (Nat.zero_le n)' in out
     assert O.core_rewrites(out) == out
+
+
+def test_the_compat_block_declares_state_monotone_and_cauchy_schwarz():
+    # a norm-one functional with `φ 1 = 1` is monotone, and Cauchy–Schwarz for positive functionals
+    # (d13f23b's `monotone_iff_opNorm_eq_map_one`, `PositiveLinearMap.norm_map_star_mul_sq_le`; oaiq-075)
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^theorem monotone_of_opNorm_eq_one_of_apply_one\b', block, re.M)
+    assert re.search(r'^theorem _root_\.PositiveLinearMap\.norm_map_star_mul_sq_le\b', block, re.M)
