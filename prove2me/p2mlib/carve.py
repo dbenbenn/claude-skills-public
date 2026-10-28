@@ -2069,9 +2069,33 @@ def check_plan(g, plan):
 def _could_match(g, k, i):
     """Could instance i answer an instance problem of declaration k? Its type mentions a project
     declaration k uses, or only library types (a coarse test: types are compared by the project
-    declarations they mention)."""
+    declarations they mention), or instance search solved, in k, a problem of i's class whose
+    argument heads include i's (LeanInfo `inst_keys`, `declares`): CoulombAtom oaiq-071, the
+    instance `MeasurableSpace SpatialRotation` (an abbrev of a subtype, heads `Subtype`) and
+    radialAverage_integrable, which mentions no project declaration of its type but solved
+    `MeasurableSpace (Subtype …)` problems (SpatialRotation sits inside radialAverage's
+    definition); not hidden, the proof found it instead of `Subtype.instMeasurableSpace`."""
     td = g.nodes[i].tdeps - {i}
-    return not td or bool(td & (g.nodes[k].deps | g.nodes[k].sig))
+    if not td or td & (g.nodes[k].deps | g.nodes[k].sig):
+        return True
+    ci = g.instance_class(i)
+    asked = g.inst_problems(k) if ci else None
+    if not asked:
+        return False
+    # a head that is a project abbreviation may show unfolded in the problem (`Subtype`), as it does
+    # to instance search: it matches anything
+    hs = {h for h in ci[1] or () if not _reducible_decl(g, h)}
+    return any(cls == ci[0] and hs <= heads for cls, heads in asked)
+
+
+def _reducible_decl(g, n):
+    """Is n a project `abbrev` or `@[reducible]` declaration (instance search sees through it)?"""
+    k = g.owner.get(n)
+    if k is None or k not in g.nodes:
+        return False
+    nd = g.nodes[k]
+    c = g.infos[nd.module].commands[nd.cmd]
+    return c.decl_kind == 'abbrev' or any(a.split()[-1] == 'reducible' for a in c.attrs or ())
 
 
 # classes an instance of the key also answers problems of, through a parent projection

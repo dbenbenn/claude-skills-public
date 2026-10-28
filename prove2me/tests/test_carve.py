@@ -2128,3 +2128,37 @@ def test_a_local_instance_on_a_type_a_declaration_uses_comes_back_though_nothing
     sec = _section(C.Carver(g).carve(keep, have), 'CarveDev.LocalCtx')
     assert re.search(r'^attribute \[local instance\] CD\.LC\.instCoeFunWcFnForallNat$', sec, re.M), sec
 
+
+def _opt_plan():
+    p = _leak_plan()
+    p['bundles'][0]['nodes'] += ['CD.LI.NatOpt', 'CD.LI.natOptInhabited']
+    for t in ('CD.LI.late_default',):            # the unhidable leak (test_hidden_instances_compile)
+        p['nodes'].remove(t)
+        del p['stubs'][t], p['pieces'][t]
+    t = 'CD.LI.opt_default'
+    p['nodes'].append(t)
+    p['stubs'][t] = {'bundles': ['L0']}
+    p['pieces'][t] = {'keep': [t], 'imports': [], 'bundles': ['L0']}
+    return p
+
+
+def test_an_unseen_instance_on_an_abbrev_is_hidden_where_its_class_was_asked(g):
+    # CoulombAtom (oaiq-071): `spatialRotationMeasurable : MeasurableSpace SpatialRotation` reached
+    # radialAverage_integrable's module through a bundle; the lemma mentions no project declaration
+    # of the instance's type (SpatialRotation sits inside radialAverage's definition), so it was not
+    # hidden, and the proof took it over `Subtype.instMeasurableSpace`. It solved `MeasurableSpace
+    # (Subtype …)` problems (inst_keys), and an abbrev head matches anything. Here InstLate's
+    # natOptInhabited on `abbrev NatOpt := Option Nat` and InstBase's opt_default.
+    assert C._could_match(g, 'CD.LI.opt_default', 'CD.LI.natOptInhabited')
+    assert not C._could_match(g, 'CD.LI.box_get', 'CD.LI.natOptInhabited')     # no Inhabited problem
+    p = _opt_plan()
+    for txt in (C.gen_piece(g, p, 'CD.LI.opt_default'), C.gen_stub(g, p, 'CD.LI.opt_default')):
+        m = re.search(r'^attribute \[-instance\] (.*)$', txt, re.M)
+        assert m and '_root_.CD.LI.natOptInhabited' in m.group(1).split(), txt
+    assert 'natOptInhabited' not in C.gen_piece(g, p, 'CD.LI.box_get')
+
+
+@pytest.mark.lean
+def test_hidden_abbrev_instances_compile(g, tmp_path):
+    _compile_in_publish_order(g, _opt_plan(), tmp_path)
+
