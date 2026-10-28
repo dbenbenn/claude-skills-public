@@ -8,6 +8,8 @@ usage: carve.py graph CONFIG.json                  # DeclGraph + LeanInfo of eve
        carve.py order CONFIG.json                  # the publish DAG, as concurrent waves
        carve.py split CONFIG.json TIMES.json [--limit 60]   # cut only the bundles measured over
                                                    # LIMIT s local (-j1); the rest stay as they are
+       carve.py fold  CONFIG.json NODE ...         # NODEs stop being statements: their pieces go into
+                                                   # every importer's piece (plan in place, config `folded`)
 
 Use it when a port's closure is far over prove2.me's 1 MiB cap or 300 s verifier (Erdős 3: 4136
 modules, 52 MB). It replaces the five per-mission carvers of 2026-10-07/08 (Kaplansky,
@@ -57,6 +59,9 @@ CONFIG.json (paths may use ~):
    "measured": {"plan": "work/plan_measured.json", "bundle_times": "work/bundle_times.json",
                 "overhead": 5.0},                # local -j1 times of that plan's bundles: costs
                                                  # rescaled to them, so a re-plan splits the heavy
+   "folded": ["OAI.X.lemma"],                 # statements merged into their importers' pieces after
+                                              # planning (carve.fold_statements; e.g. a polymorphic
+                                              # statement the verifier's CoeT fallback rejects)
    "repaired": {"OAI.Erdos3.x": ["OAI.Erdos3.y"]},  # stubbed sorry a patch replaces: name -> what the patched proof uses (or a plain list)
                                               # (generation refuses a file still containing sorry)
    "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
@@ -282,6 +287,8 @@ def main(argv):
                         chunker=cfg.get('chunker', 'bands'),
                         pinned=cfg.get('pinned'),
                         bundles_import_statements=cfg.get('bundles_import_statements', True))
+        if cfg.get('folded'):
+            P = C.fold_statements(P, cfg['folded'])
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)
         json.dump(P, open(out, 'w'), indent=1, sort_keys=True)
         worst = sorted(((p['cost'], n) for n, p in P['pieces'].items()), reverse=True)[:5]
@@ -295,6 +302,22 @@ def main(argv):
             print('PROBLEM', p)
         if probs:
             sys.exit(1)
+    elif cmd == 'fold':
+        if not rest:
+            sys.exit('fold: name the statements to fold')
+        g, P = load_graph(cfg), json.load(open(plan_path(cfg)))
+        Q = C.fold_statements(P, rest)
+        probs = C.check_plan(g, Q)
+        if probs:
+            sys.exit('folded plan inconsistent:\n' + '\n'.join(probs[:20]))
+        json.dump(P, open(plan_path(cfg)[:-5] + '.pre_fold.json', 'w'), indent=1, sort_keys=True)
+        json.dump(Q, open(plan_path(cfg), 'w'), indent=1, sort_keys=True)
+        raw = json.load(open(argv[2]))
+        raw['folded'] = sorted(set(raw.get('folded', [])) | set(rest))
+        json.dump(raw, open(argv[2], 'w'), indent=1)
+        changed = sorted(n for n, p in Q['pieces'].items() if p != P['pieces'].get(n))
+        print('folded %s; pieces that change (resubmit them, --replaces their live proofs): %s' % (
+            ' '.join(rest), ' '.join(changed)))
     elif cmd == 'check':
         probs = C.check_plan(load_graph(cfg), json.load(open(plan_path(cfg))))
         print('\n'.join(probs) or 'plan OK')

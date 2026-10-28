@@ -12,7 +12,13 @@ compiled locally.
   the verifier checks it: both import sets first, then the solution, the published statement and
   `theorem _check : type_of% @target := @solution`. The solution itself must not mention the
   target (the verifier compiles it without the target in scope) and must name its own copy
-  `<target>_oai`.
+  `<target>_oai`. For a universe-polymorphic target it then runs the verifier's coercion fallback
+  (COE_CHECK): on prove2.me such a target is compared with `solution` through a `CoeT solType x
+  targetType` search, which can time out on a large type even though `_check` compiles (oaiq-039,
+  2026-10-28: 13 pieces got WA "failed to synthesize CoeT ... (deterministic) timeout at
+  `typeclass`"; this search failed for exactly those 13 of the carve's 246 polymorphic statements).
+  Such a statement can never be proved there: fold it into its importers (carve.py fold) or state it
+  monomorphically.
 """
 import hashlib
 import os
@@ -33,9 +39,28 @@ def content_key(solution, lib_dir, version='1'):
     return h.hexdigest()
 
 
+COE_FAILURE = 'the verifier rejects this universe-polymorphic statement: its CoeT fallback'
+
+COE_CHECK = """
+open Lean Meta in
+run_meta do
+  let tgt := `%s
+  unless (← getConstInfo tgt).levelParams.isEmpty do
+    let s ← inferType (← mkConstWithFreshMVarLevels `solution)
+    let t ← inferType (← mkConstWithFreshMVarLevels tgt)
+    unless ← isDefEq s t do
+      throwError "the type of solution is not the target's"
+    withLocalDeclD `x s fun x => do
+      let coe := mkAppN (mkConst ``CoeT [← getLevel s, ← getLevel t]) #[s, x, t]
+      let ok ← try pure (← synthInstance? coe).isSome catch _ => pure false
+      unless ok do
+        throwError "%s (CoeT solType x targetType) fails or times out; fold the statement into its importers (carve.py fold) or state it monomorphically (oaiq-039)"
+"""
+
+
 def server_check_text(solution, preamble, formal_statement, target):
     body = solution.rstrip('\n') + '\n\n' + formal_statement.rstrip('\n') + '\n\n' + \
-        'theorem _check : type_of%% @%s := @solution\n' % target
-    imps = list(dict.fromkeys(IMPORT.findall(solution) + IMPORT.findall(preamble or '')))
+        'theorem _check : type_of%% @%s := @solution\n' % target + COE_CHECK % (target, COE_FAILURE)
+    imps = list(dict.fromkeys(IMPORT.findall(solution) + IMPORT.findall(preamble or '') + ['Lean']))
     rest = IMPORT.sub('', body).lstrip('\n')
     return ''.join('import %s\n' % i for i in imps) + '\n' + rest

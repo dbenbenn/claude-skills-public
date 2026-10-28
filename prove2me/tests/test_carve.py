@@ -2213,3 +2213,65 @@ def test_declaring_attributes_compile(g, tmp_path):
                     bundle_prefix='GA', chunker='schedule', pinned=[['CD.Co.Pt']])
     assert any('CD.Co.Pt' in b['nodes'] for b in p['bundles'])
     _compile_in_publish_order(g, p, tmp_path)
+
+
+# ---------------------------------------------------------------- folding statements into their importers
+
+def test_fold_statements_merges_a_statement_into_every_importer(g, plan):
+    # oaiq-039 (2026-10-28): 13 universe-polymorphic statements could never be proved on prove2.me (the
+    # verifier's CoeT fallback timed out on their types). Folding each into the pieces that import it
+    # leaves the importers' live statements as they are and makes their new pieces self-contained.
+    f = C.fold_statements(plan, ['CD.double_succ'])
+    assert 'CD.double_succ' not in f['nodes'] and 'CD.double_succ' not in f['pieces']
+    assert 'CD.double_succ' not in f['stubs'] and f['folded'] == ['CD.double_succ']
+    main = f['pieces']['CD.main']
+    assert set(plan['pieces']['CD.double_succ']['keep']) <= set(main['keep'])
+    assert main['imports'] == ['CD.size_via_coord']
+    assert main['bundles'] == ['CDB001', 'CDB002']          # CDB000 comes in through CDB002
+    assert plan['pieces']['CD.main']['imports'] == ['CD.double_succ', 'CD.size_via_coord']   # input untouched
+    assert C.check_plan(g, f) == []
+    txt = C.gen_piece(g, f, 'CD.main')
+    assert 'Thm_CD_double_succ' not in txt and re.search(r'^theorem double_succ\b', txt, re.M)
+    # the other pieces are generated exactly as before
+    assert C.gen_piece(g, f, 'CD.top_aux') == C.gen_piece(g, plan, 'CD.top_aux')
+    assert 'statement:CD.double_succ' not in [x for w in C.publish_order(f)['waves'] for x in w]
+
+
+def test_fold_statements_refuses_a_target_or_an_unknown_node(plan):
+    with pytest.raises(C.CarveError):
+        C.fold_statements(plan, ['CD.main'])
+    with pytest.raises(C.CarveError):
+        C.fold_statements(plan, ['CD.no_such_statement'])
+
+
+def test_folded_config_key_is_applied_by_plan_and_the_fold_command(tmp_path):
+    # a re-plan keeps a fold: `carve.py plan` applies config `folded` after planning, and
+    # `carve.py fold CONFIG NODE...` folds the current plan in place and records the nodes in the config
+    import shutil
+    import subprocess
+    import sys
+    work = tmp_path / 'work'
+    work.mkdir()
+    shutil.copy(os.path.join(FIX, 'decl_graph.jsonl'), work / 'decl_graph.jsonl')
+    cfg = tmp_path / 'carve.json'
+    base = {'src': FIX, 'prefix': 'CarveDev', 'roots': ['CarveDev.Top'], 'targets': TARGETS,
+            'work': str(work), 'out': str(tmp_path / 'out'), 'bundle_prefix': 'CDB',
+            'budget': 0.05, 'bundle_budget': 0.005, 'bytes_per_second': 10000}
+    script = os.path.join(os.path.dirname(HERE), 'scripts', 'carve.py')
+
+    def run(*a):
+        r = subprocess.run([sys.executable, script] + list(a), capture_output=True, text=True)
+        assert r.returncode == 0, r.stdout + r.stderr
+        return r.stdout
+    cfg.write_text(json.dumps(dict(base, folded=['CD.double_succ'])))
+    run('plan', str(cfg))
+    P = json.loads((work / 'plan.json').read_text())
+    assert 'CD.double_succ' not in P['nodes'] and P['folded'] == ['CD.double_succ']
+    cfg.write_text(json.dumps(base))
+    run('plan', str(cfg))
+    assert 'CD.double_succ' in json.loads((work / 'plan.json').read_text())['nodes']
+    out = run('fold', str(cfg), 'CD.double_succ')
+    assert 'CD.main' in out                                   # the importers whose pieces change
+    assert 'CD.double_succ' not in json.loads((work / 'plan.json').read_text())['nodes']
+    assert json.loads(cfg.read_text())['folded'] == ['CD.double_succ']
+    assert 'plan OK' in run('check', str(cfg))

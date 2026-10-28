@@ -17,9 +17,10 @@ def test_server_check_text_merges_imports_and_appends_the_check():
     t = L.server_check_text(SOL, PRE, FS, 'foo')
     head = [l for l in t.split('\n') if l.startswith('import ')]
     assert head == ['import Mathlib', 'import Definitions.Def_B1', 'import Theorems.Thm_Other',
-                    'import Definitions.Def_B0']
+                    'import Definitions.Def_B0', 'import Lean']
     assert t.index('theorem foo_oai') < t.index('theorem foo :') < t.index('theorem _check')
-    assert t.rstrip().endswith('theorem _check : type_of% @foo := @solution')
+    assert 'theorem _check : type_of% @foo := @solution\n' in t
+    assert t.index('theorem _check') < t.index('run_meta')     # then the coercion fallback
     # every import comes before any other text
     first_non_import = next(i for i, l in enumerate(t.split('\n')) if l and not l.startswith('import '))
     assert all(not l.startswith('import ') for l in t.split('\n')[first_non_import:])
@@ -34,3 +35,17 @@ def test_content_key_follows_imported_lib_files(tmp_path):
     (lib / 'Def_B1.lean').write_text('def b := 2\n')
     assert L.content_key(str(sol), str(lib)) != k1
     assert L.content_key(str(sol), str(lib), version='2') != L.content_key(str(sol), str(lib))
+
+
+def test_server_check_text_runs_the_verifiers_coercion_fallback_for_a_polymorphic_target():
+    # oaiq-039 (2026-10-28): on prove2.me a universe-polymorphic target is compared with `solution`
+    # through a `CoeT solType x targetType` search, and 13 pieces whose search timed out got WA "failed to
+    # synthesize CoeT ... (deterministic) timeout at `typeclass`" although `_check` compiles. Run the
+    # same search in the local check: exactly those 13 of 246 polymorphic statements failed it.
+    t = L.server_check_text(SOL, PRE, FS, 'foo')
+    assert 'import Lean' in [l for l in t.split('\n') if l.startswith('import ')]
+    tail = t[t.index('theorem _check'):]
+    assert 'run_meta' in tail and '``CoeT' in tail and '`foo' in tail
+    assert 'mkConstWithFreshMVarLevels `solution' in tail and 'synthInstance?' in tail
+    assert 'levelParams.isEmpty' in tail          # a monomorphic target is compared directly
+    assert L.COE_FAILURE in tail                  # the message carve_measure reports

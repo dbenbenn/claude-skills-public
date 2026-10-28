@@ -1983,6 +1983,54 @@ def _bundle_closure(bimp, ks):
     return out
 
 
+def fold_statements(plan, nodes):
+    """A copy of `plan` in which each of `nodes` is no longer a statement: its piece's declarations,
+    statement imports and bundles go into every piece that imported it (transitively, when a folded
+    statement imports another), and it leaves `nodes`, `pieces` and `stubs`; `plan['folded']` lists
+    every folded node. The importers' statements stay as they are, so a published carve can drop a
+    statement nothing can prove and re-prove its importers with self-contained pieces.
+
+    oaiq-039 (2026-10-28): 13 universe-polymorphic statements got WA "failed to synthesize CoeT ...
+    (deterministic) timeout at `typeclass`" for every proof. The verifier falls back to a `CoeT`
+    search when it compares a polymorphic statement with `solution`, and that search timed out on
+    their types (p2mlib.localcheck reproduces it). Refuses a target, an external statement, a node
+    that is not a statement of the plan, and one a bundle imports."""
+    import copy
+    plan = copy.deepcopy(plan)
+    fold = set(nodes)
+    for n in sorted(fold):
+        if n not in plan['pieces']:
+            raise CarveError('%s is not a statement of this plan' % n)
+        if n in plan.get('targets', ()) or n in plan.get('external', ()):
+            raise CarveError('%s is a target: it cannot be folded into another piece' % n)
+        users = [b['name'] for b in plan['bundles'] if n in b.get('statements', ())]
+        if users:
+            raise CarveError('%s is imported by bundle(s) %s: it cannot be folded' % (n, ', '.join(users)))
+    pos, bimp, _ = _plan_index(plan)
+    names = [b['name'] for b in plan['bundles']]
+    changed = True
+    while changed:
+        changed = False
+        for p in plan['pieces'].values():
+            for c in sorted(set(p['imports']) & fold):
+                q = plan['pieces'][c]
+                p['keep'] = sorted(set(p['keep']) | set(q['keep']))
+                p['imports'] = sorted((set(p['imports']) - {c}) | set(q['imports']))
+                bks = _reduce(bimp, {pos[b] for b in p['bundles'] + q['bundles']})
+                p['bundles'] = [names[i] for i in sorted(bks)]
+                p['cost'] = round(p.get('cost', 0) + q.get('cost', 0), 2)
+                if 'size' in p or 'size' in q:
+                    p['size'] = p.get('size', 0) + q.get('size', 0)
+                changed = True
+    for n in fold:
+        del plan['pieces'][n]
+        plan['stubs'].pop(n, None)
+    plan['nodes'] = [n for n in plan['nodes'] if n not in fold]
+    plan['over'] = [n for n in plan.get('over', []) if n not in fold]
+    plan['folded'] = sorted(set(plan.get('folded', [])) | fold)
+    return plan
+
+
 def _plan_index(plan):
     pos = {b['name']: i for i, b in enumerate(plan['bundles'])}
     bimp = [[pos[x] for x in b['imports'] if x in pos] for b in plan['bundles']]
