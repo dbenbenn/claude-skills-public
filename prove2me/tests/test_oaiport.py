@@ -2045,3 +2045,35 @@ def test_finset_antidiagonal_is_the_class_one_unless_the_file_uses_hahn_series()
                                     "(by intro p; exact Finset.HasAntidiagonal.mem_antidiagonal)\n")
     hahn = "  rw [HahnSeries.coeff_mul]\n  simp [Finset.mem_antidiagonal, Finset.antidiagonal hs ht a]\n"
     assert O.core_rewrites(hahn) == hahn
+
+
+# ---------------------------------------------------------------- HasDerivAt pi-form vs lambda-form
+
+def test_convert_funext_rfl_becomes_congr_deriv():
+    # OpenAI's `HasDerivAt.add/sub/mul…` conclude lambdas, ours Pi-form sums; `convert h using 1` then
+    # leaves a function goal `funext x; rfl` (and instance diamonds that `funext` cannot touch).
+    # The function equality is definitional, so only the derivative value needs proving
+    # (oaiq-080: Boltzmann, 14 sites).
+    src = ('theorem foo : HasDerivAt f (g x) x := by\n'
+           '  have h := (hasDerivAt_id x).add_const 1\n'
+           '  convert h using 1\n'
+           '  · funext y\n'
+           '    rfl\n'
+           '  · ring\n')
+    out = O.core_rewrites(src)
+    assert 'refine h.congr_deriv ?_\n  · ring\n' in out
+    assert 'funext' not in out
+    # the first-bullet-only form, and a multi-line term
+    src2 = ('theorem foo : HasFDerivAt f f\' x := by\n'
+            '  convert (a.sub\n      b) using 1\n'
+            '  · rfl\n'
+            '  · ext v\n    simp\n')
+    out2 = O.core_rewrites(src2)
+    assert 'refine (a.sub\n      b).congr_fderiv ?_\n  · ext v\n    simp\n' in out2
+    # a function bullet that does real work is left alone
+    src3 = ('theorem foo : HasDerivAt f (g x) x := by\n'
+            '  convert h using 1\n'
+            '  · funext y\n'
+            '    exact (Real.sqrt_sq (norm_nonneg _)).symm\n'
+            '  · ring\n')
+    assert O.core_rewrites(src3) == src3

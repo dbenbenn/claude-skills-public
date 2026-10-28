@@ -1050,6 +1050,47 @@ def _memlp_mul_swap(text):
     return ''.join(out) + text[i:]
 
 
+_CONVERT_RFL = re.compile(
+    r"(?m)^(?P<ind>[ \t]*)convert (?P<e>.+?) using 1\n"
+    r"(?P=ind)· (?:funext \w+\n(?P=ind)  rfl|rfl)\n(?P=ind)· ", re.S)
+
+
+def convert_funext_rfl_to_congr_deriv(text):
+    """OpenAI's `HasDerivAt.add/sub/mul/…` conclude lambdas, ours Pi-form sums (and instance diamonds
+    on `EuclideanSpace`), so `convert h using 1` leaves a function goal that only `funext x; rfl`
+    (or `rfl`) closes and sometimes `funext` cannot even apply. The function equality is
+    definitional: `refine h.congr_deriv ?_` (`congr_fderiv` for `HasFDerivAt`) leaves just the
+    derivative-value goal, whose bullet is kept. The conclusion's kind is read from the nearest
+    preceding `theorem`/`lemma`/`have` header; an unknown kind or a `…Within…` goal is left alone
+    (oaiq-080, Boltzmann: 14 sites)."""
+    def kind(pos, ind):
+        # the enclosing header: nearest preceding theorem/lemma/have indented less than the `convert`
+        for m in reversed(list(re.finditer(r"(?m)^([ \t]*)(?:theorem|lemma|have)\b", text[:pos]))):
+            if len(m.group(1).expandtabs()) >= len(ind.expandtabs()):
+                continue
+            head = text[m.start():pos].split(':= by')[0]
+            ks = re.findall(r"Has(F?)Deriv(Within)?At", head)
+            if not ks or ks[-1][1]:
+                return None
+            return 'congr_fderiv' if ks[-1][0] else 'congr_deriv'
+        return None
+
+    def sub(m):
+        k = kind(m.start(), m.group('ind'))
+        if not k:
+            return m.group(0)
+        e = m.group('e')
+        depth, whole = 0, e.startswith('(')
+        for i, c in enumerate(e):
+            depth += (c == '(') - (c == ')')
+            if depth == 0 and i < len(e) - 1:
+                whole = False
+                break
+        e = e if whole or re.fullmatch(r"[\w.']+", e) else '(' + e + ')'
+        return '%srefine %s.%s ?_\n%s· ' % (m.group('ind'), e, k, m.group('ind'))
+    return _CONVERT_RFL.sub(sub, text)
+
+
 def core_rewrites(text, compat_ns='OAI', known=None):
     """Lean core/Mathlib renames every port needs. OpenAI's `TensorProduct.inductionOn z tmul add`
     (Mathlib d13f23b) takes its zero case from `tmul 0 0`; ours has only `induction_on`, which
@@ -1062,6 +1103,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     (None: root level). `known`: the lemma names the whole port declares (declared_lemmas), for the
     measurability facts of _total_map_rewrites; default, this text's."""
     pre = compat_ns + '.' if compat_ns else ''
+    text = convert_funext_rfl_to_congr_deriv(text)
     # Mathlib adds the global tokens `<m ≤m <i ≤i ≤s <r ≤r ≤c`; `1<m` with a variable `m` then fails
     # to parse. Space them unless written as the notation (` <m `).
     text = re.sub(r"(?<=[^\s<≤])([<≤])([misrc])", r" \1 \2", text)
