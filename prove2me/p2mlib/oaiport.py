@@ -1175,6 +1175,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # (NullMeasurableSet, every use) is our `eLpNorm_indicator_const₀` (ours wants a MeasurableSet)
     text = re.sub(r"(?<![\w'])eventuallyEqSet_univ(?![\w'])", 'eventuallyEq_univ', text)
     text = re.sub(r"(?<![\w'])eLpNorm_indicator_const(?![\w'])", 'eLpNorm_indicator_const₀', text)
+    text = re.sub(r"(?<![\w'])List\.sum_le_length_nsmul(?![\w'])", 'List.sum_le_card_nsmul', text)
     text = _mgf_gaussian_real_map_eq(text)    # HasLaw argument -> its map_eq (oaiq-004, oaiq-036)
     _a = r"(?:\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|[\w.']+)"
     # d13f23b's `eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top hp0 hptop hf` has a third, measurability

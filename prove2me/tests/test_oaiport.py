@@ -2130,3 +2130,12 @@ def test_elpnorm_mono_loses_its_measurability_argument():
                    '  exact eLpNorm_mono hbound\n'
                    '  apply eLpNorm_mono_ae\n'
                    '  apply eLpNorm_mono_ae\n')
+
+
+# d13f23b's `List.sum_le_length_nsmul` is our `List.sum_le_card_nsmul` (oaiq-085, DirectedFeedback MachineProductField).
+
+def test_list_sum_le_length_nsmul_renamed():
+    src = "    have hs := List.sum_le_length_nsmul (l.map f) n h\n"
+    assert O.core_rewrites(src) == "    have hs := List.sum_le_card_nsmul (l.map f) n h\n"
+    keep = "exact List.sum_le_length_nsmul_foo\n"
+    assert O.core_rewrites(keep) == keep
