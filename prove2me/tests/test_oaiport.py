@@ -2130,13 +2130,13 @@ def test_convert_funext_rfl_becomes_congr_deriv():
             '  · ext v\n    simp\n')
     out2 = O.core_rewrites(src2)
     assert 'refine (a.sub\n      b).congr_fderiv ?_\n  · ext v\n    simp\n' in out2
-    # a function bullet that does real work is left alone
+    # a function bullet that does real work is not the rfl rule's (the ext rule keeps its body)
     src3 = ('theorem foo : HasDerivAt f (g x) x := by\n'
             '  convert h using 1\n'
             '  · funext y\n'
             '    exact (Real.sqrt_sq (norm_nonneg _)).symm\n'
             '  · ring\n')
-    assert O.core_rewrites(src3) == src3
+    assert 'congr_deriv' not in O.convert_funext_rfl_to_congr_deriv(src3)
 
 
 def test_convert_rfl_rewrite_does_not_swallow_an_earlier_convert():
@@ -2154,6 +2154,30 @@ def test_convert_rfl_rewrite_does_not_swallow_an_earlier_convert():
     assert '  convert h1 using 1\n' in out and 'refine h1' not in out
     assert 'all_goals first | rfl | ring' in out
     assert 'refine h2.congr_deriv ?_\n  · ring\n' in out
+
+
+def test_convert_ext_bullet_becomes_congr_of_eventuallyEq():
+    # `convert h using 1` + `· ext x; <body>` + `· <deriv>` on a HasDerivAt goal: ours leaves instance-diamond
+    # goals (`unfold kappa` fails in `x + x✝ = x + x✝`); the function bullet is a pointwise equality
+    # (oaiq-091: EinsteinFour WeylEstimates00 kappa_first/second, Energy, Variance)
+    src = ('theorem foo (v b : ℝ) :\n'
+           '    HasDerivAt (fun x => kappa x b) (kappaV v b) v := by\n'
+           '  have h := (hasDerivAt_id v).sub_const 1\n'
+           '  convert h using 1\n'
+           '  · ext x\n'
+           '    unfold kappa\n'
+           '    ring\n'
+           '  · unfold kappaV\n'
+           '    ring\n')
+    out = O.core_rewrites(src)
+    assert ('  refine (h.congr_of_eventuallyEq (Filter.Eventually.of_forall fun x => ?_)).congr_deriv ?_\n'
+            '  · beta_reduce\n'
+            '    unfold kappa\n'
+            '    ring\n'
+            '  · unfold kappaV\n') in out
+    # an fderiv goal is left alone
+    src2 = src.replace('HasDerivAt', 'HasFDerivAt')
+    assert O.core_rewrites(src2) == src2
 
 
 def test_compat_ite_lemmas_name_the_proposition_c():

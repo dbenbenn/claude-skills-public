@@ -1122,6 +1122,44 @@ def convert_funext_rfl_to_congr_deriv(text):
     return _CONVERT_RFL.sub(sub, text)
 
 
+_CONVERT_EXT = re.compile(
+    r"(?m)^(?P<ind>[ \t]*)convert (?P<e>(?:(?! using \d)(?<!convert)(?!convert ).)+?) using 1\n"
+    r"(?P=ind)· (?:ext|funext) (?P<v>\w+)\n(?P<body>(?:(?P=ind)  \S.*\n|(?P=ind)   .*\n)+)(?P=ind)· ", re.S)
+
+
+def convert_ext_to_congr_of_eventually_eq(text):
+    """`convert h using 1` + `· ext x; BODY` + `· DERIV` on a `HasDerivAt` goal: ours leaves instance-diamond
+    goals the function bullet cannot touch (`unfold F` fails in `x + x✝ = x + x✝`, oaiq-091). The function
+    bullet is a pointwise equality, so it becomes
+    `refine (h.congr_of_eventuallyEq (Filter.Eventually.of_forall fun x => ?_)).congr_deriv ?_`, the body
+    kept under `beta_reduce`. Only `HasDerivAt` conclusions (read as in the rfl rule)."""
+    def kind(pos, ind):
+        for m in reversed(list(re.finditer(r"(?m)^([ \t]*)(?:theorem|lemma|have)\b", text[:pos]))):
+            if len(m.group(1).expandtabs()) >= len(ind.expandtabs()):
+                continue
+            head = text[m.start():pos].split(':= by')[0]
+            ks = re.findall(r"Has(F?)Deriv(Within)?At", head)
+            return bool(ks) and not ks[-1][0] and not ks[-1][1]
+        return False
+
+    def sub(m):
+        ind = m.group('ind')
+        if not kind(m.start(), ind):
+            return m.group(0)
+        e = m.group('e')
+        depth, whole = 0, e.startswith('(')
+        for i, c in enumerate(e):
+            depth += (c == '(') - (c == ')')
+            if depth == 0 and i < len(e) - 1:
+                whole = False
+                break
+        e = e if whole or re.fullmatch(r"[\w.']+", e) else '(' + e + ')'
+        body = m.group('body')
+        return ('%srefine (%s.congr_of_eventuallyEq (Filter.Eventually.of_forall fun %s => ?_)).congr_deriv ?_\n'
+                '%s· beta_reduce\n%s%s· ') % (ind, e, m.group('v'), ind, body, ind)
+    return _CONVERT_EXT.sub(sub, text)
+
+
 def core_rewrites(text, compat_ns='OAI', known=None):
     """Lean core/Mathlib renames every port needs. OpenAI's `TensorProduct.inductionOn z tmul add`
     (Mathlib d13f23b) takes its zero case from `tmul 0 0`; ours has only `induction_on`, which
@@ -1135,6 +1173,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     measurability facts of _total_map_rewrites; default, this text's."""
     pre = compat_ns + '.' if compat_ns else ''
     text = convert_funext_rfl_to_congr_deriv(text)
+    text = convert_ext_to_congr_of_eventually_eq(text)
     # `convert h using 1 <;> ring` on an inequality leaves an `instLE` diamond ring cannot see through
     text = re.sub(r"(?m)^([ \t]*)convert ([^\n]+?) using 1 <;> ring[ \t]*$",
                   lambda m: ('%sfirst | (convert %s using 1 <;> ring) | exact (le_of_eq (by ring)).trans (%s.trans '
