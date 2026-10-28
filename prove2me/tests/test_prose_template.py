@@ -379,3 +379,15 @@ def test_missing_names_accepts_collision_renamed_instance():
     md = 'It holds `OAI.Foo.concreteRing`.'
     local = 'local instance concreteRing_p2 (s : Nat) : CommRing Nat := inferInstance'
     assert CP.missing_names(md, local, lambda n: False) == []
+
+
+def test_template_forced_gives_a_cost_forced_node_template_prose(tmp_path):
+    # a node forced only to split a heavy piece is not a named result: config `template_forced` templates it
+    d, _ = make_carve(tmp_path)
+    cfg = json.loads((d / 'config.json').read_text())
+    cfg['template_forced'] = ['OAI.Fam.named']
+    (d / 'config.json').write_text(json.dumps(cfg))
+    rep = run(d)
+    assert rep['needs_written'] == ['explanation OAI.main (goal)']
+    assert 'prose/OAI_Fam_named.md' in rep['written']
+    assert 'explanations/OAI_Fam_named.md' in rep['written']

@@ -118,6 +118,8 @@ class Context:
         self.ext = set(self.plan.get('external', ()))
         self.targets = list(self.plan.get('targets') or self.cfg.get('targets') or sorted(self.ext))
         self.forced = set(self.plan.get('forced') or ()) | set(self.cfg.get('forced') or ())
+        # forced only to split a heavy piece (not a named result of the paper): template prose is enough
+        self.forced -= set(self.cfg.get('template_forced') or ())
         self.bundle_of = {n: b['name'] for b in self.plan['bundles'] for n in b['nodes']}
         self.ext_defs = dict(self.plan.get('external_defs') or self.cfg.get('external_defs') or {})
         self.lib = os.path.join(self.P, 'out', 'lib')
