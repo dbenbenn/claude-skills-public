@@ -1104,6 +1104,12 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     measurability facts of _total_map_rewrites; default, this text's."""
     pre = compat_ns + '.' if compat_ns else ''
     text = convert_funext_rfl_to_congr_deriv(text)
+    # `convert h using 1 <;> ring` on an inequality leaves an `instLE` diamond ring cannot see through
+    text = re.sub(r"(?m)^([ \t]*)convert ([^\n]+?) using 1 <;> ring[ \t]*$",
+                  lambda m: ('%sfirst | (convert %s using 1 <;> ring) | exact (le_of_eq (by ring)).trans (%s.trans '
+                             '(le_of_eq (by ring)))') % (m.group(1), m.group(2),
+                             m.group(2) if re.fullmatch(r"[\w.']+", m.group(2)) else '(' + m.group(2) + ')'),
+                  text)
     # Mathlib adds the global tokens `<m ≤m <i ≤i ≤s <r ≤r ≤c`; `1<m` with a variable `m` then fails
     # to parse. Space them unless written as the notation (` <m `).
     text = re.sub(r"(?<=[^\s<≤])([<≤])([misrc])", r" \1 \2", text)

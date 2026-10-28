@@ -2088,3 +2088,16 @@ def test_compat_ite_lemmas_name_the_proposition_c():
     for n in ('ite_eq_left', 'ite_eq_right', 'dite_eq_left', 'dite_eq_right'):
         i = src.index('theorem ' + n)
         assert '{c : Prop}' in src[i:i + 120], n
+
+
+def test_convert_using_one_ring_gets_an_inequality_fallback():
+    # `convert h using 1 <;> ring` on a `≤` goal leaves `Real.instLE = Real.instPreorder.toLE` (ring_nf
+    # "made no progress"); the fallback chains `le_of_eq` on both sides (oaiq-080: 4 sites)
+    src = '  have hdiv := foo\n  convert hdiv using 1 <;> ring\n'
+    out = O.core_rewrites(src)
+    assert ('first | (convert hdiv using 1 <;> ring) | exact (le_of_eq (by ring)).trans '
+            '(hdiv.trans (le_of_eq (by ring)))') in out
+    out2 = O.core_rewrites('    convert neg_le_neg hD using 1 <;> ring\n')
+    assert '(convert neg_le_neg hD using 1 <;> ring) | exact (le_of_eq (by ring)).trans ((neg_le_neg hD).trans' in out2
+    # idempotent
+    assert O.core_rewrites(out) == out
