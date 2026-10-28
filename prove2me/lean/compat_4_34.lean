@@ -509,9 +509,9 @@ theorem _root_.HasCompactSupport.exists_bound_iteratedFDeriv {𝕜 : Type*} [Non
   refine ⟨max 0 ((Finset.range (m + 1)).sup' ⟨0, by simp⟩ A), le_max_left _ _, fun i hi y ↦ ?_⟩
   grw [hA i y, ← le_max_right]
   exact Finset.le_sup' A (by grind)
+open scoped Matrix in
 /-- Mathlib d13f23b's `Matrix.posSemidef_is_closed` (real matrices): positive semidefinite matrices are
 closed (EinsteinFour JacobiCompressionLimit, oaiq-091). -/
-open scoped Matrix in
 theorem _root_.Matrix.posSemidef_is_closed {n : Type*} [Fintype n] :
     IsClosed {M : Matrix n n ℝ | M.PosSemidef} := by
   have h : {M : Matrix n n ℝ | M.PosSemidef} =

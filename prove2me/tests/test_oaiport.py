@@ -447,6 +447,8 @@ def test_compat_has_matrix_posSemidef_is_closed():
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                             'compat_4_34.lean')).read()
     assert 'theorem _root_.Matrix.posSemidef_is_closed' in src
+    # `open … in` must precede the docstring (a docstring before it is a parse error)
+    assert 'open scoped Matrix in\n/-- Mathlib d13f23b\'s `Matrix.posSemidef_is_closed`' in src
 
 
 # Our `Measure.map f μ` is 0 for a non-AEMeasurable `f` (d13f23b: a Dirac mass), so d13f23b's
