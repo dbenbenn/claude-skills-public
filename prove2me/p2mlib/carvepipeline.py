@@ -491,6 +491,11 @@ class Pipeline:
         cfg['time_scale'] = res['new_scale']
         json.dump(cfg, open(os.path.join(self.d, 'config.json'), 'w'), indent=1)
         self.state['replans'] = n + 1
+        # work/repairs.json keys its cuts by file name, and a re-plan renumbers the bundles: the old
+        # cuts would be re-applied to other files (oaiq-039: bundle 30 lost two imports it needs)
+        rp = os.path.join(self.d, cfg.get('work') or 'work', 'repairs.json')
+        if os.path.exists(rp):
+            os.replace(rp, rp.replace('repairs.json', 'repairs.before-replan-%d.json' % (n + 1)))
         self.invalidate('plan')
         self.restart = True
         print('calibrate: %s' % lines[-1], file=sys.stderr, flush=True)

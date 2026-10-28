@@ -686,3 +686,14 @@ def test_measure_keeps_going_past_a_failed_file(env):
     run(env, *ARGS, '--stop-after', 'measure')
     m = [c for c in calls(env) if c.get('tool') == 'carve_measure'][0]
     assert '--keep-going' in m['argv']
+
+
+def test_a_replan_sets_aside_the_repairs_of_the_old_bundle_numbering(env, monkeypatch):
+    # work/repairs.json keys cuts by file name (Def_X030.lean); a re-plan renumbers the bundles, so
+    # the old cuts would be re-applied to different files (oaiq-039: C030 lost two needed imports)
+    _calibration_setup(env, monkeypatch, {'bundle:B0': _t(30), 'bundle:B1': _t(50)})
+    (env.dir / 'carve_work' / 'repairs.json').write_text(json.dumps({'Def_X030.lean': ['import Definitions.Def_X007']}))
+    r = run(env, *ARGS, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not (env.dir / 'carve_work' / 'repairs.json').exists()
+    assert (env.dir / 'carve_work' / 'repairs.before-replan-1.json').exists()
