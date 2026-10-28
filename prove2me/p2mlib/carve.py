@@ -2031,6 +2031,12 @@ def fold_statements(plan, nodes):
     return plan
 
 
+def fold_problems(g, before, after):
+    """check_plan's reports on the folded plan `after` that the plan `before` did not already have."""
+    old = set(check_plan(g, before))
+    return [p for p in check_plan(g, after) if p not in old]
+
+
 def _plan_index(plan):
     pos = {b['name']: i for i, b in enumerate(plan['bundles'])}
     bimp = [[pos[x] for x in b['imports'] if x in pos] for b in plan['bundles']]

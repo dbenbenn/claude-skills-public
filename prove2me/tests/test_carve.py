@@ -2275,3 +2275,17 @@ def test_folded_config_key_is_applied_by_plan_and_the_fold_command(tmp_path):
     assert 'CD.double_succ' not in json.loads((work / 'plan.json').read_text())['nodes']
     assert json.loads(cfg.read_text())['folded'] == ['CD.double_succ']
     assert 'plan OK' in run('check', str(cfg))
+
+
+def test_fold_problems_are_only_the_ones_the_fold_adds(g, plan):
+    # oaiq-039's published plan already carried 37 check_plan reports (source-text dependencies the
+    # bundles never needed); `carve.py fold` must refuse a fold for what it breaks, not for those
+    bad = json.loads(json.dumps(plan))
+    for b in bad['bundles']:
+        if 'CD.Space' in b['nodes']:
+            b['nodes'].remove('CD.Space')
+    assert C.check_plan(g, bad)
+    assert C.fold_problems(g, bad, C.fold_statements(bad, ['CD.double_succ'])) == []
+    broken = C.fold_statements(plan, ['CD.double_succ'])
+    broken['pieces']['CD.main']['bundles'] = []
+    assert C.fold_problems(g, plan, broken)

@@ -307,7 +307,7 @@ def main(argv):
             sys.exit('fold: name the statements to fold')
         g, P = load_graph(cfg), json.load(open(plan_path(cfg)))
         Q = C.fold_statements(P, rest)
-        probs = C.check_plan(g, Q)
+        probs = C.fold_problems(g, P, Q)
         if probs:
             sys.exit('folded plan inconsistent:\n' + '\n'.join(probs[:20]))
         json.dump(P, open(plan_path(cfg)[:-5] + '.pre_fold.json', 'w'), indent=1, sort_keys=True)
