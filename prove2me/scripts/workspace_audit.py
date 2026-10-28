@@ -94,6 +94,10 @@ class Index:
             url = git(repo, 'remote', 'get-url', 'origin').decode().strip()
             if not url or not backed(url):
                 continue
+            # a partial clone (the blobless openai/math one) would fetch every missing blob, one by one,
+            # in rev-list --objects: sync_workspace hung (2026-10-28); none of ours is partial
+            if git(repo, 'config', '--get', 'remote.origin.promisor').strip() == b'true':
+                continue
             refs = git(repo, 'for-each-ref', '--format=%(objectname) %(refname)', 'refs/remotes').decode().split('\n')
             refs = sorted(r for r in refs if r and not r.endswith('/HEAD'))
             if not refs:

@@ -149,3 +149,11 @@ def test_summary_line_counts_kinds(world):
     write(os.path.join(world['ws'], 'Solutions', 'New.lean'), 'theorem brand_new_result : True := by\n  trivial\n')
     s = WA.summary(list(audit(world).values()))
     assert 'backed 1' in s and 'unbacked 1' in s
+
+
+def test_partial_clones_are_skipped(world):
+    # 2026-10-28: the blobless openai/math clone under ~/claude made `rev-list --objects` fetch every
+    # missing blob from GitHub, one by one: sync_workspace hung with no output
+    WA.git(world['repo'], 'config', 'remote.origin.promisor', 'true')
+    idx = WA.Index.build([world['repo']], backed=lambda url: True, cache_dir=None)
+    assert idx.repos == [] and idx.blobs == set()
