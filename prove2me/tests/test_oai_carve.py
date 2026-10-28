@@ -111,6 +111,15 @@ def test_external_defs_map_children_to_graph_owners():
     assert CP.graph_external_defs(names, owner, {'OAI.G.Hom': 1}) == {'OAI.G.Hom': 'D'}
 
 
+def test_external_defs_map_private_nodes_to_published_names():
+    # a `private def delta` is the graph node `_private.<module>.0.<name>`; the published bundle
+    # (the carver drops `private`) declares plain `<name>`; without this the carve redeclared it
+    # (oaiq-067: OAI.DilutedSpinGlass.FiniteLaw.delta)
+    names = {'OAI.G.delta': 'D', 'OAI.G.other': 'D'}
+    nodes = {'_private.Solutions.F.M.0.OAI.G.delta': 1, '_private.Solutions.F.M.0.OAI.G.mine': 1}
+    assert CP.graph_external_defs(names, {}, nodes) == {'_private.Solutions.F.M.0.OAI.G.delta': 'D'}
+
+
 def test_filter_patches_keeps_exact_counts():
     keep, drop = CP.filter_patches([{'old': 'x', 'new': 'y', 'count': 2}, {'old': 'z', 'new': 'w'}],
                                    ['x\n', 'x z z\n'])

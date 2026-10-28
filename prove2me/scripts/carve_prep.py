@@ -224,6 +224,12 @@ def graph_external_defs(names, owner, nodes):
         k = owner.get(n, n)
         if k in nodes:
             ext[k] = m
+    for k in nodes:
+        # a `private` declaration is the node `_private.<module>.<n>.<name>`; the published bundle
+        # (the carver drops `private`) declares plain `<name>`
+        mm = re.match(r'_private\.(?:\w+\.)+?\d+\.(.+)$', k) if k.startswith('_private.') else None
+        if mm and mm.group(1) in names and k not in ext:
+            ext[k] = names[mm.group(1)]
     return dict(sorted(ext.items()))
 
 
