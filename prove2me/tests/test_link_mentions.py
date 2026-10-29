@@ -8,9 +8,10 @@ URL = 'https://prove2.me/theorems/'
 
 class Fake:
     def __init__(self):
-        self.thm = {'N.a': 'ida', 'N.b': 'idb', 'N.goal': 'idg'}
+        self.thm = {'N.a': 'ida', 'N.b': 'idb', 'N.goal': 'idg', 'N': 'idN', 'Other': 'idO'}
         self.nls = {'ida': 'Uses `N.b` and itself `N.a`, and `Garrido.BinaryTreeAut`.',
-                    'idb': 'See `N.goal`.', 'idg': 'The goal; no mentions.'}
+                    'idb': 'See `N.goal`.', 'idg': 'The goal, by `N.a`.',
+                    'idN': 'The bundle; `N.b` fails as printed.', 'idO': 'Not ours: `N.a`.'}
         self.desc = 'Targets `N.a`; already [`N.b`](%sidb); a definition `Defn.X`.' % URL
         self.ms = [{'id': 'm1', 'title': 'T1', 'theorem': {'id': 'ida'}, 'milestone_description': 'Quote. Route via `N.b`.'},
                    {'id': 'm2', 'title': 'T2', 'theorem': {'id': 'idb'}, 'milestone_description': 'No mentions.'}]
@@ -18,7 +19,14 @@ class Fake:
 
     def call(self, m, p, b=None):
         if m == 'GET' and p.startswith('/missions?'):
-            return {'missions': [{'id': 'M', 'description': self.desc, 'main_theorem': {'id': 'idg'}}]}
+            # the live API names the goal by theorem_id (2026-10-30), not id
+            return {'missions': [{'id': 'M', 'description': self.desc,
+                                  'main_theorem': {'theorem_id': 'idg', 'theorem_name': 'N.goal'}}]}
+        if m == 'GET' and p == '/mission-proposals/P':
+            return {'id': 'P', 'mission_id': 'M', 'items': [
+                {'kind': 'reference', 'status': 'Definition', 'theorem_name': 'N', 'theorem_id': 'idN'},
+                {'kind': 'reference', 'status': 'Definition', 'theorem_name': 'Other', 'theorem_id': 'idO'},
+                {'kind': 'reference', 'status': 'Open', 'theorem_name': 'N.a', 'theorem_id': 'ida'}]}
         if m == 'GET' and p.startswith('/missions/M/milestones'):
             off = int(p.split('offset=')[1]) if 'offset=' in p else 0
             return {'milestones': [dict(x) for x in self.ms][off:]}
@@ -61,7 +69,8 @@ def test_dry_run_patches_nothing(monkeypatch, capsys):
 def test_go_patches_each_changed_text_once_and_reads_back(monkeypatch):
     f = Fake()
     L.run('M', go=True, call=f.call)
-    assert sorted(f.patched) == [('desc', 'M'), ('ms', 'm1'), ('thm', 'ida'), ('thm', 'idb')]
+    assert sorted(f.patched) == [('desc', 'M'), ('ms', 'm1'), ('thm', 'ida'), ('thm', 'idb'), ('thm', 'idg')]
+    assert f.nls['idg'] == 'The goal, by [`N.a`](%sida).' % URL
     assert f.desc.startswith('Targets [`N.a`](%sida)' % URL) and '`Defn.X`' in f.desc
     assert f.nls['ida'] == 'Uses [`N.b`](%sidb) and itself `N.a`, and `Garrido.BinaryTreeAut`.' % URL
     assert f.nls['idb'] == 'See [`N.goal`](%sidg).' % URL
@@ -82,3 +91,16 @@ def test_repo_files_get_the_same_links(tmp_path):
     assert (tmp_path / 'prose' / 'a.md').read_text() == (
         '---\ntitle: A\n---\n\nUses [`N.b`](%sidb) and `N.a`.\n\n## Milestone\nRoute via [`N.b`](%sidb).\n' % (URL, URL))
     assert (tmp_path / 'description.md').read_text() == 'Targets [`N.a`](%sida).\n' % URL
+
+
+def test_our_definition_bundles_notes_are_linked_with_a_repo(tmp_path):
+    # Tao 2026-10-30: TaoBR's bundle note named two printed-fails lemmas; the repo copy was
+    # linked but the live note never was. A bundle is ours when the repo holds its prose file.
+    f = Fake()
+    (tmp_path / 'prose').mkdir()
+    (tmp_path / 'prose' / 'N.md').write_text('---\ntitle: N\n---\nThe bundle; `N.b` fails as printed.\n')
+    (tmp_path / 'mission.py').write_text("NAMESPACE='N'\nDEFINITIONS={'N': dict(page='1')}\nTHEOREMS=[]\n")
+    (tmp_path / 'proposal.json').write_text('{"id": "P"}')
+    L.run('M', go=True, call=f.call, repo=str(tmp_path))
+    assert ('thm', 'idN') in f.patched and ('thm', 'idO') not in f.patched
+    assert f.nls['idN'] == 'The bundle; [`N.b`](%sidb) fails as printed.' % URL

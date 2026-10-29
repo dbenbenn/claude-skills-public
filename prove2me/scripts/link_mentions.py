@@ -70,7 +70,25 @@ def _milestones(call, mission):
 
 
 def _tid(x):
-    return (x.get('id') if isinstance(x, dict) else x) if x else None
+    # the live API names a mission's goal by theorem_id (2026-10-30); a milestone's theorem by id
+    return ((x.get('id') or x.get('theorem_id')) if isinstance(x, dict) else x) if x else None
+
+
+def _bundle_ids(call, repo):
+    """Theorem ids of the mission's own definitions bundles, from the repo's proposal.json: the
+    proposal's Definition items whose prose file the repo holds (a referenced bundle of another
+    mission is not ours to patch). Tao 2026-10-30: TaoBR's note named two printed-fails lemmas, and
+    the repo copy got its links while the live note did not."""
+    import json
+    p = os.path.join(repo, 'proposal.json')
+    if not os.path.exists(p):
+        print('NOTE no proposal.json in %s: definitions bundles are not linked' % repo)
+        return []
+    pid = json.load(open(p, encoding='utf-8')).get('id')
+    items = (call('GET', '/mission-proposals/' + pid) or {}).get('items') or []
+    return [it['theorem_id'] for it in items
+            if it.get('status') == 'Definition' and it.get('theorem_id')
+            and os.path.exists(os.path.join(repo, 'prose', '%s.md' % it.get('theorem_name')))]
 
 
 def _theorem(call, tid):
@@ -139,8 +157,10 @@ def run(mission, go=False, call=None, repo=None):
         todo.append(('desc', mid, 'description', new, got))
     milestones = _milestones(call, mid)
     tids = [_tid(mrec.get('main_theorem'))] + [_tid(m.get('theorem')) or m.get('theorem_id') for m in milestones]
+    if repo:
+        tids += _bundle_ids(call, repo)
     names = {}
-    for tid in [t for t in tids if t]:
+    for tid in dict.fromkeys(t for t in tids if t):
         t = _theorem(call, tid)
         names[tid] = t.get('theorem_name')
         new, got = link_text(t.get('natural_language_statement'), resolve, names[tid])
