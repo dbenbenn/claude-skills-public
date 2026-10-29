@@ -628,6 +628,38 @@ def goal_unquoted(M, items):
                      '(the goal has no milestone, so that is the only place it can appear)')]
 
 
+def declared_name_mismatch(items):
+    """[(item, why)] for a theorem item whose Lean declares a name other than its `theorem_name`.
+
+    check_server_shape compiles each statement but never asks what it is called; the platform
+    does, at Submit, and nothing before it. Juschenko-Monod (2026-10-29): four statement modules
+    using no bundle name were written without `namespace JuschenkoMonod`, declared their theorems
+    at the root, and Submit failed on the first with "Unknown constant JuschenkoMonod.<name>"."""
+    out = []
+    for k, it in items.items():
+        if it.get('kind') != 'theorem':
+            continue
+        # the namespace line may sit in either field (extract_payloads keeps it in the statement)
+        ns, name = [], None
+        for line in ((it.get('preamble') or '') + '\n' + (it.get('formal_statement') or '')).split('\n'):
+            m = re.match(r'\s*theorem\s+(\S+)', line)
+            if m:
+                name = m.group(1)
+                break
+            m = re.match(r'\s*namespace\s+(\S+)', line)
+            if m:
+                ns.append(m.group(1))
+            m = re.match(r'\s*end\s+(\S+)\s*$', line)
+            if m and ns and ns[-1] == m.group(1):
+                ns.pop()
+        if not name:
+            continue
+        declared = '.'.join(ns + [name])
+        if declared != it.get('theorem_name'):
+            out.append((k, 'declares %s, but the item is %s' % (declared, it.get('theorem_name'))))
+    return out
+
+
 def main():
     if len(sys.argv) < 3 or sys.argv[2] not in ('verify', 'upload', 'prune'):
         sys.exit(__doc__)
@@ -645,6 +677,7 @@ def main():
         its, mls, _, _ = desired(M, mdir)
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
+        bad += declared_name_mismatch(its)
         bad += title_mismatch(its, mls)
         bad += short_bundle_names(M, mdir)
         bad += author_pronouns(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())

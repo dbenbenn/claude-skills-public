@@ -133,6 +133,20 @@ def test_title_mismatch_and_goal_quote(mdir):
     assert D.goal_unquoted(M, items)
 
 
+def test_declared_name_mismatch():
+    # Juschenko-Monod, 2026-10-29: a statement module without `namespace JuschenkoMonod` declared
+    # its theorem at the root, and Submit failed with "Unknown constant JuschenkoMonod.<name>"
+    ok = {'kind': 'theorem', 'theorem_name': 'NS.foo',
+          'preamble': 'import Mathlib\n\nnamespace NS\n', 'formal_statement': 'theorem foo : True := by\n  sorry\n\nend NS\n'}
+    root = dict(ok, preamble='import Mathlib\n', formal_statement='theorem foo : True := by\n  sorry\n')
+    qualified = dict(root, formal_statement='theorem NS.foo : True := by\n  sorry\n')
+    nested = dict(ok, preamble='import Mathlib\nnamespace NS\nnamespace Sub\nend Sub\n')
+    in_statement = dict(root, formal_statement='namespace NS\n\ntheorem foo : True := by\n  sorry\n\nend NS')
+    items = {'ok': ok, 'root': root, 'qualified': qualified, 'nested': nested, 'in_statement': in_statement,
+             'def': {'kind': 'definition'}, 'ref': {'kind': 'reference'}}
+    assert [w for w, _ in D.declared_name_mismatch(items)] == ['root']
+
+
 def test_short_bundle_name_bound_as_variable_flagged_but_not_K_ascription(mdir):
     (mdir / 'lib' / 'Def_Mini.lean').write_text('def s : Nat := 1\ndef K : Set Nat := ∅\ndef Kfull : Nat := 2\n')
     M = D.load(str(mdir))
