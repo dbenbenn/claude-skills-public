@@ -210,7 +210,11 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   $g_n^{-1}$?). `draft.py verify` flags such quotes (`extraction_math`). The IET Draft shipped 55
   of them, and the first independent recheck missed them, because its brief called transcriptions
   "cosmetic" (dbenbenn caught one in review, 2026-10-06). A quote recheck brief asks for the
-  mathematics too.
+  mathematics too. The same holds for a *statement* and for a Route's account of a proof:
+  pdftotext silently drops absolute-value bars. On Juschenko–Monod (2026-10-29) it turned
+  Lemma 2.7's $|B(u)| \le 4|g|_{\rm w}^2$ into $B(u) \le 4|g|_{\rm w}^2$ (caught before writing the
+  statement), and a Route then "corrected" a printed proof for bounding only $B(u)$, when the page
+  bounds $|B(u)|$ (caught by the quote recheck).
 - **Recheck all the quotes, as the platform holds them.** Every quotation in every field — milestone
   descriptions, natural-language statements, `source`, the mission description — read from the
   live Draft and compared word for word, punctuation included, with the rendered page. Do it
