@@ -336,6 +336,15 @@ def run(path, parse_only=False, ws=None, use_cache=True, timeout=3000, candidate
     return parse(data, text)
 
 
+def is_cached(path, parse_only=False, ws=None, candidates=(), idents=False, module=None, no_decls=False,
+              options=()):
+    """Would run(path, ...) with these arguments be served from the cache?"""
+    path = os.path.abspath(path)
+    ws = ws or workspace()
+    key = _key(path, parse_only, ws, list(candidates), idents, module, no_decls, options)
+    return os.path.exists(os.path.join(CACHE, key + '.json'))
+
+
 BUILD_OPTIONS = ('autoImplicit=false',)   # what the verifier and `lean -DautoImplicit=false` use
 
 

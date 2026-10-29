@@ -337,3 +337,17 @@ def test_build_module_pins_one_thread_for_its_timing(monkeypatch, tmp_path):
     monkeypatch.setattr(LI.subprocess, 'run', fake)
     LI.build_module(str(f), 'P.M', str(tmp_path / 'M.olean'), str(tmp_path / 'M.ilean'), ws=ws)
     assert seen['env'] is not None and seen['env']['LEAN_NUM_THREADS'] == '1'
+
+
+def test_is_cached_uses_the_key_run_reads(tmp_path, monkeypatch):
+    from p2mlib import leaninfo as L
+    monkeypatch.setattr(L, 'CACHE', str(tmp_path / 'cache'))
+    f = tmp_path / 'M.lean'
+    f.write_text('theorem t : True := trivial\n')
+    kw = dict(idents=True, module='M', no_decls=True, options=L.BUILD_OPTIONS)
+    assert not L.is_cached(str(f), ws=str(tmp_path), **kw)
+    os.makedirs(L.CACHE)
+    key = L._key(str(f), False, str(tmp_path), [], True, 'M', True, L.BUILD_OPTIONS)
+    open(os.path.join(L.CACHE, key + '.json'), 'w').write('{}')
+    assert L.is_cached(str(f), ws=str(tmp_path), **kw)
+    assert not L.is_cached(str(f), ws=str(tmp_path), idents=True, module='M')     # other arguments, other key

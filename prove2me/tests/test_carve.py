@@ -2322,3 +2322,34 @@ def test_frozen_bundle_members_get_no_implicit_dependencies(g):
     new = {k: b for b in p['bundles'] for k in b['nodes']}
     assert new['CD.Space.size_eq']['imports'] == ['F0']
     assert C.check_plan(g, p) == []
+
+
+def test_graph_load_warns_and_counts_the_modules_leaninfo_must_elaborate(tmp_path, monkeypatch, capsys):
+    # oaiq-047: after an upgrade across a LeanInfo.lean change, `plan` loaded the graph and re-ran
+    # LeanInfo on 1259 modules one at a time for ~3 h with no output
+    import shutil
+    src = tmp_path / 'carve'
+    shutil.copytree(FIX, src)
+    recs = sorted(str(p) for p in src.rglob('*.info.json'))
+    gone = recs[:2]
+    saved = {p: json.load(open(p)) for p in gone}
+    for p in gone:
+        os.remove(p)
+    by_module = {}
+    for p in gone:
+        rel = os.path.relpath(p, src)[:-len('.info.json')]
+        by_module[rel.replace(os.sep, '.')] = saved[p]
+
+    def fake_info(src_root, m, ws=None, use_cache=True):
+        from p2mlib import leaninfo
+        return leaninfo.parse(by_module[m], open(C.module_path(src_root, m), 'rb').read())
+    monkeypatch.setattr(C, 'module_info', fake_info)
+    monkeypatch.setattr(C, 'module_info_cached', lambda src_root, m, ws=None: False)
+    g = C.Graph.load(str(src / 'decl_graph.jsonl'), str(src))
+    err = capsys.readouterr().err
+    assert g.nodes and '2 of' in err and 'not in the LeanInfo cache' in err
+    assert 'LeanInfo 1/2' in err and 'LeanInfo 2/2' in err
+    # all cached: silent
+    monkeypatch.setattr(C, 'module_info_cached', lambda src_root, m, ws=None: True)
+    C.Graph.load(str(src / 'decl_graph.jsonl'), str(src))
+    assert 'LeanInfo' not in capsys.readouterr().err

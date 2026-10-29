@@ -30,6 +30,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, field
 
 from . import leanedit, leaninfo
@@ -167,6 +168,12 @@ def module_info(src_root, m, ws=None, use_cache=True):
     same options, so the module is not elaborated twice)."""
     return leaninfo.run(module_path(src_root, m), idents=True, module=m, no_decls=True, ws=ws,
                         use_cache=use_cache, options=leaninfo.BUILD_OPTIONS)
+
+
+def module_info_cached(src_root, m, ws=None):
+    """Is module_info(src_root, m) in the LeanInfo cache?"""
+    return leaninfo.is_cached(module_path(src_root, m), idents=True, module=m, no_decls=True, ws=ws,
+                              options=leaninfo.BUILD_OPTIONS)
 
 
 def compile_file(path, module, olean_dir, ws=None, timeout=3000):
@@ -475,6 +482,15 @@ class Graph:
     def load(cls, decl_graph, src_root, ws=None):
         consts, imports, ext = load_decl_graph(decl_graph)
         infos = {}
+        todo = [m for m in imports if not os.path.exists(module_path(src_root, m)[:-5] + '.info.json')]
+        # oaiq-047: after LeanInfo.lean changed (the cache is keyed by it), loading the graph re-ran
+        # LeanInfo on 1259 modules one at a time, ~3 h with no output: say so, and count
+        miss = {m for m in todo if not module_info_cached(src_root, m, ws)}
+        if miss:
+            print('%d of %d modules are not in the LeanInfo cache (LeanInfo.lean changed, or their imports were '
+                  'rebuilt): elaborating them one at a time, about their build time each (`carve.py graph` '
+                  'does it in parallel)' % (len(miss), len(imports)), file=sys.stderr, flush=True)
+        done = 0
         for m in imports:
             rec = module_path(src_root, m)[:-5] + '.info.json'
             if os.path.exists(rec):
@@ -482,6 +498,9 @@ class Graph:
                                           open(module_path(src_root, m), 'rb').read())
             else:
                 infos[m] = module_info(src_root, m, ws)
+                if m in miss:
+                    done += 1
+                    print('LeanInfo %d/%d %s' % (done, len(miss), m), file=sys.stderr, flush=True)
         return cls(consts, imports, ext, infos)
 
     # ---------------------------------------------------------- modules
