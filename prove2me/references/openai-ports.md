@@ -228,15 +228,33 @@ and new `carve.py` inside one carve. So:
   carve: stop that one or wait for it (oaiq-084; 1a4f175).
 - **What re-runs by itself after `--upgrade`** (2026-10-29, oaiq-047/-085/-092). `port` and `filter_patches`
   record the port rules and options they ran with, so a skill fix to a port rewrite re-ports without `--redo
-  port`; a re-port that changes no module's text rebuilds nothing. Once publishing has started (publish ran or
-  `publish/run_state.json` exists) a rule change keeps the port: `--redo port` only deliberately. A carve that
-  has planned and measured should take new tools with `--upgrade --keep-port`: it records the current rules as
-  the port's, so a changed rule does not re-port (oaiq-081: the new compat rules changed port_patches.json and
-  most modules, which would have rebuilt and re-planned 1,586 measured items). A change to
+  port`; a re-port that changes no module's text rebuilds nothing. Once publishing has started a rule change keeps
+  the port: `--redo port` only deliberately. "Started" is a state fact (`pipeline_state.json` `publishing_started`,
+  since 2026-10-29), set the first time publish or publish_early runs or `publish/run_state.json` or config `frozen`
+  is seen, and kept: a frozen re-plan drops publish_early's record, and with no run state written yet a rule change
+  had counted as safe to re-port. After it a changed input from outside (an edited patches file, a port folder
+  rewritten under the carve) stops the run until you `--redo` that step. A carve that has planned and measured
+  should take new tools with `--upgrade --keep-port`: the port stays as it is across rule changes, on that run
+  and every later one, until `--redo port` or `--redo filter_patches` (`pipeline_state.json` `keep_port`; before
+  2026-10-29 it held only until the next skill commit). oaiq-081: the new compat rules changed port_patches.json
+  and most modules, which would have rebuilt and re-planned 1,586 measured items. filter_patches' rule input is
+  carve_prep.py's filter-patches code only, no longer the whole file. A change to
   `LeanInfo.lean` re-runs `graph`, with a warning giving the module count, while a step that loads the graph is
   still to run; a `config.json` that `--redo config` changed re-runs from `extdefs`. A rebuild keeps the replayed
   modules' times in `build_elab.log`: carves built before 2026-10-29 can have a log missing most modules (oaiq-047:
   37 of 1,259), which costs each at a default 2 s, so run `--redo build` once before planning such a carve again.
+- **The port folder has an owner; rehearse on a copy only with its own workspace** (2026-10-29). The port writes
+  `WORKSPACE/Solutions/FOLDER`, outside the carve dir, and a `cp -a` copy of oaiq-081 still on the shared
+  workspace re-ported and rewrote 228 files of the live carve's folder (its config.json also named the original's
+  `out/` and `work/`). Now `Solutions/FOLDER/.carve_owner.json` names the owning carve directory, and the driver
+  refuses before any step when the folder belongs to another carve, config `out`/`work` lie in another carve, or
+  config `src` is not the run's workspace.
+  A folder from before has no owner file: the carve whose recorded port hash it holds, and whose `logs/port.log`
+  names no other carve, adopts it on its next run; otherwise `--claim-folder` (also to take a folder over on
+  purpose, e.g. an extension carve on its parent's port). A moved carve keeps its folder. To rehearse: copy the
+  carve, point every absolute path in the copy's `pipeline.json` and `config.json` (`out`, `work`, `meta`,
+  `patches`; `src` at the new workspace) at the copy, and run it with `P2M_WORKSPACE` set to a workspace of its own holding the folder (and
+  its `.lake` build) as copies; never on `~/claude/prove2me_workspace`.
 - **Missing prose stops `check_text`**: the "needs written prose" lines name the files to write (forced and goal
   items), and check-text and the dry run fail (MISSING / CANNOT BE SENT) until they exist, in any wave, not only
   the first (oaiq-047: twelve forced statements passed both, then blocked the live run; eafc6da).
@@ -321,7 +339,9 @@ and new `carve.py` inside one carve. So:
     add `"overlap": true` to `pipeline.json`, then `carve_pipeline.py DIR --upgrade --keep-port --publish --detach`.
     A finished `measure` stands (one that failed re-runs for bundles and statements, all cached), the plan is
     kept, and the run goes on from the phase-1 `calibrate`; `measure_pieces` finds the pieces cached. Rehearsed on a
-    copy of oaiq-081: HEAD's `gen` writes its 1,617 files byte for byte, and only unmeasured items compiled.
+    copy of oaiq-081: HEAD's `gen` writes its 1,617 files byte for byte, and only unmeasured items compiled. If the
+    classic driver got past `publish_prep` (from a skill before overlap mode: no `publish/run_early.json`), add
+    `--redo publish_prep`; `publish_early` refuses without that file rather than start a publisher that dies.
 - To change a tool: change the skill (tests first), commit, push; new runs pick it up, running ones do not.
   A tool fix a running carve needs: `--upgrade --redo STEP` (from any snapshot, the carve's old one
   included, since 1dbb8c1). Any remaining shell script in the skill has

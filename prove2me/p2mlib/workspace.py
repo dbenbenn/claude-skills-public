@@ -31,6 +31,9 @@ def statement_text(preamble, formal_statement):
 
 
 DRAFTS = os.path.join('Theorems', '.drafts.json')
+# Solutions/FOLDER/CARVE_OWNER names the carve directory whose port owns FOLDER (p2mlib.carvepipeline):
+# a copy of a carve on the same workspace re-ported a live carve's folder (oaiq-081, 2026-10-29)
+CARVE_OWNER = '.carve_owner.json'
 
 
 def drafts(ws=None):

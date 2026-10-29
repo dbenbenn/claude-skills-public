@@ -4,6 +4,7 @@ Replaces the per-job bash drivers (plain_carve.sh, plain_pipeline*.sh, ext_publi
 tracked implementation, every step idempotent and logged, state in DIR/pipeline_state.json, every
 sub-tool called from one skill snapshot (p2mlib.snapshot) so editing or pushing the live skill
 cannot reach a running carve."""
+import ast
 import fcntl
 import hashlib
 import json
@@ -14,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 
 from . import leantext, runlock, snapshot, workspace as wslib
 
@@ -306,8 +308,13 @@ def _now():
 # across a LeanInfo.lean change left `graph` done, and `plan` re-elaborated 1259 modules one at a time
 # (the LeanInfo cache is keyed by LeanInfo.lean) for ~3 h with no output.
 _COMPAT = ['lean/compat_4_34.lean', 'lean/StdSimplexCompat.lean', 'lean/StdSimplexTopCompat.lean']
+# what of carve_prep.py `filter-patches` runs: its rule input was the whole file, which changes almost daily
+# for other subcommands, so every skill commit made a planned carve's port stale (oaiq-081, 2026-10-29)
+FILTER_PATCHES_CODE = ('cmd_filter_patches', 'port_filter_patches', 'filter_patches', 'cut_identifier', '_IDENT',
+                       'COMPAT', 'positional', 'opt')
 SNAPSHOT_RULES = {
-    'filter_patches': ('port rules', ['scripts/carve_prep.py', 'p2mlib/oaiport.py'] + _COMPAT),
+    'filter_patches': ('filter rules', ['scripts/carve_prep.py::' + ','.join(FILTER_PATCHES_CODE),
+                                        'p2mlib/oaiport.py'] + _COMPAT),
     'port': ('port rules', ['scripts/oai_port_modules.py', 'p2mlib/oaiport.py'] + _COMPAT),
     'graph': ('LeanInfo tool', ['lean/LeanInfo.lean', 'lean/DeclGraph.lean']),
 }
@@ -315,15 +322,54 @@ GRAPH_READERS = ('extdefs', 'plan', 'gen')     # the steps that load the graph (
 GRAPH_CONFIG_KEYS = ('src', 'roots', 'prefix', 'work', 'external_theorems')   # what `carve.py graph` reads
 
 
+def python_defs(text, names):
+    """The source of the top-level definitions and assignments `names` of a Python file, as one string
+    (a missing one as `NAME=<missing>`); the whole text if it does not parse."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return text
+    got = {}
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            ns = [node.name]
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            ts = node.targets if isinstance(node, ast.Assign) else [node.target]
+            ns = [t.id for t in ts if isinstance(t, ast.Name)]
+        else:
+            continue
+        for n in ns:
+            if n in names:
+                got[n] = ast.get_source_segment(text, node)
+    return '\0'.join('%s=%s' % (n, got.get(n, '<missing>')) for n in names)
+
+
 def rules_hash(snap, rels):
-    """sha1 over the files `rels` (relative to SNAP/prove2me) that exist, or None if none does."""
+    """sha1 over the files `rels` (relative to SNAP/prove2me) that exist, or None if none does. An entry
+    `FILE.py::a,b` takes only those top-level definitions of FILE.py (python_defs)."""
     h, seen = hashlib.sha1(), False
     for r in rels:
-        f = os.path.join(snap, 'prove2me', r)
+        rel, _, names = r.partition('::')
+        f = os.path.join(snap, 'prove2me', rel)
         if os.path.exists(f):
             seen = True
-            h.update(r.encode() + b'\0' + open(f, 'rb').read() + b'\0')
+            data = open(f, 'rb').read()
+            if names:
+                data = python_defs(data.decode('utf-8', 'replace'), names.split(',')).encode()
+            h.update(r.encode() + b'\0' + data + b'\0')
     return h.hexdigest() if seen else None
+
+
+def carve_of(path):
+    """The nearest directory at or above `path` that holds a pipeline.json (a carve directory), or None."""
+    p = os.path.abspath(os.path.expanduser(path))
+    while True:
+        if os.path.isfile(os.path.join(p, 'pipeline.json')):
+            return p
+        q = os.path.dirname(p)
+        if q == p:
+            return None
+        p = q
 
 
 def logged_snapshot(log):
@@ -350,6 +396,7 @@ class Pipeline:
         self.lean_src = os.path.abspath(os.path.expanduser(params.get('lean_src') or os.path.join(self.d, 'src', 'lean')))
         self.meta = os.path.abspath(os.path.expanduser(params.get('meta') or os.path.join(self.d, 'oai_meta.json')))
         self._kept_rules = set()
+        self.ran_now = set()
 
     # -- state ------------------------------------------------------------------------------
     def save(self):
@@ -409,13 +456,17 @@ class Pipeline:
                         return s, rule[0]
         return None
 
+    PORT_STEPS = ('filter_patches', 'port')
+
     def keep_port(self):
-        """--keep-port: record the running snapshot's port rules (and options) as the ones filter_patches
-        and port ran with, so an --upgrade across a change to them keeps the port, now and on every
-        later resume. oaiq-081: planned and measured (1,586 items) on an old snapshot, the new rules
-        changed port_patches.json and would have re-ported, rebuilt and re-planned the whole carve."""
+        """--keep-port: keep the port as it is across changes to the skill's port rules, from now until an
+        explicit `--redo port` or `--redo filter_patches` (or a --from at or before them): pipeline_state.json
+        `keep_port`. oaiq-081: planned and measured (1,586 items) on an old snapshot, the new rules changed
+        port_patches.json and would have re-ported, rebuilt and re-planned the whole carve; recording the
+        current rules once held only until the next skill commit changed them again. The current rules and
+        options are recorded as well, so a later change of the port options is still seen."""
         kept = []
-        for s in ('filter_patches', 'port'):
+        for s in self.PORT_STEPS:
             rec = self.state['steps'].get(s)
             if not rec or rec['status'] != 'done':
                 continue
@@ -424,14 +475,27 @@ class Pipeline:
                 if k in now and had.get(k) != now[k]:
                     had[k] = now[k]
                     kept.append(s)
-        if kept:
-            print('== --keep-port: %s keep the port as it is; the current port rules are recorded as theirs '
-                  '(`--redo port` re-ports deliberately)' % ' and '.join(sorted(set(kept))), flush=True)
+        if not self.state.get('keep_port'):
+            self.state['keep_port'] = {'since': _now(), 'skill': os.path.basename(self.snap)}
+        print('== --keep-port: keep the port as it is across port-rule changes until `--redo port` (or '
+              '`--redo filter_patches`)%s' % (
+                  '; the current rules are recorded for %s' % ' and '.join(sorted(set(kept))) if kept else ''),
+              flush=True)
         self.save()
+
+    def clear_keep_port(self, why):
+        if self.state.pop('keep_port', None):
+            print('== %s: --keep-port ends; the port follows the skill\'s port rules again' % why, flush=True)
 
     def _rule_matters(self, s):
         if s == 'graph':
             return any(self.state['steps'].get(x, {}).get('status') not in ('done', 'skipped') for x in GRAPH_READERS)
+        if s in self.PORT_STEPS and self.state.get('keep_port'):
+            if s not in self._kept_rules:
+                self._kept_rules.add(s)
+                print('== note: the skill\'s port rules changed since %s ran; kept by --keep-port (since %s; '
+                      '`--redo port` re-ports)' % (s, self.state['keep_port'].get('since')), flush=True)
+            return False
         if self.publishing_started():
             # live items froze their text: never re-port under them by ourselves
             if s not in self._kept_rules:
@@ -441,9 +505,154 @@ class Pipeline:
             return False
         return True
 
+    def publishing_evidence(self):
+        """Why this carve has visibly begun publishing, or None: a publish or publish_early step record, a
+        split_run run state, or the frozen published part (auto_config `frozen`, set by publish_early)."""
+        steps = self.state['steps']
+        if 'publish' in steps:
+            return 'step publish ran'
+        if 'publish_early' in steps:
+            return 'step publish_early ran'
+        if os.path.exists(os.path.join(self.d, 'publish', 'run_state.json')):
+            return 'publish/run_state.json exists'
+        if (self.state.get('auto_config') or {}).get('frozen'):
+            return 'publish_early froze the published part (auto_config frozen)'
+        return None
+
+    def mark_publishing(self, why):
+        if not self.state.get('publishing_started'):
+            self.state['publishing_started'] = {'at': _now(), 'why': why}
+
     def publishing_started(self):
-        return 'publish' in self.state['steps'] or 'publish_early' in self.state['steps'] or \
-            os.path.exists(os.path.join(self.d, 'publish', 'run_state.json'))
+        """Has publishing begun? A state fact (pipeline_state.json `publishing_started`), set the first time
+        any evidence is seen and kept: a frozen re-plan drops publish_early from the step records, and
+        publish/run_state.json need not exist yet, so the evidence alone came and went (2026-10-29)."""
+        if self.state.get('publishing_started'):
+            return True
+        why = self.publishing_evidence()
+        if why:
+            self.mark_publishing(why)
+            return True
+        return False
+
+    def forget_publishing(self):
+        """--forget-publishing: the explicit reset, refused while any evidence remains."""
+        why = self.publishing_evidence()
+        if why:
+            raise StepFailed('--forget-publishing: refused, publishing has visibly begun (%s)' % why)
+        if self.state.pop('publishing_started', None):
+            print('== --forget-publishing: this carve counts as not publishing again', flush=True)
+
+    # -- the port folder's owner ------------------------------------------------------------
+    def owner_path(self):
+        return os.path.join(self.folder_dir(), wslib.CARVE_OWNER)
+
+    def read_owner(self):
+        try:
+            return json.load(open(self.owner_path()))
+        except (OSError, ValueError):
+            return None
+
+    def write_owner(self, how):
+        if not os.path.isdir(self.folder_dir()):
+            return
+        if not self.state.get('carve_id'):
+            self.state['carve_id'] = uuid.uuid4().hex
+        rec = {'carve': os.path.realpath(self.d), 'carve_id': self.state['carve_id'], 'since': _now(), 'how': how}
+        tmp = self.owner_path() + '.tmp'
+        json.dump(rec, open(tmp, 'w'), indent=1)
+        os.replace(tmp, self.owner_path())
+        print('== Solutions/%s now belongs to this carve (%s)' % (self.p['folder'], how), flush=True)
+
+    def port_log_carves(self):
+        """The carve directories named by the last port command in logs/port.log (its sources, its
+        port_patches.json), or None when this carve's log records no port."""
+        log = os.path.join(self.d, 'logs', 'port.log')
+        if not os.path.exists(log):
+            return None
+        cmds = [l[2:].split() for l in open(log, errors='replace') if l.startswith('$ ') and 'oai_port_modules' in l]
+        if not cmds:
+            return None
+        out = set()
+        for t in cmds[-1][2:]:                     # past the interpreter and the (snapshot's) script
+            if t.startswith('/'):
+                c = carve_of(t)
+                if c:
+                    out.add(os.path.realpath(c))
+        return out
+
+    def ever_ported(self):
+        return 'port' in self.state['steps'] or self.port_log_carves() is not None
+
+    def recorded_port_hashes(self):
+        """The hashes of the port folder this carve recorded: what build and config read, what port wrote."""
+        st = self.state['steps']
+        hs = {((st.get(s) or {}).get('in') or {}).get('port') for s in ('build', 'config')}
+        hs.add(((st.get('port') or {}).get('out') or {}).get('port'))
+        return hs - {None}
+
+    BELONGS = ('Solutions/%s belongs to carve %s; a copy must use its own workspace (P2M_WORKSPACE) or another '
+               'folder. If this carve is to own it now (the other was abandoned), `--claim-folder`')
+
+    def check_ownership(self, claim=False):
+        """Before any step: the port writes WORKSPACE/Solutions/FOLDER, outside the carve dir, and gen and
+        measure write config `out` and `work`. Refuse when the folder belongs to another carve directory
+        (its owner file), or config.json points `out`/`work` into another carve or `src` at another workspace. A folder without an
+        owner file (a carve from before 2026-10-29) is adopted by the carve whose port log names no other
+        carve and whose recorded port hash is its current hash (or that recorded none: ported, not yet
+        built), claimed by a carve that never ported, and else waits for `--claim-folder`. A carve moved to
+        another directory (same carve_id, the old directory gone) takes its folder along. 2026-10-29: a
+        `cp -a` rehearsal copy of oaiq-081 on the shared workspace re-ported and rewrote 228 files of the
+        live carve's Solutions/OAIQ081_SAT (its config.json also named the original's out/ and work/)."""
+        here, folder, f = os.path.realpath(self.d), self.folder_dir(), self.p['folder']
+        problems, how = [], None
+        cfg = self.read_config() or {}
+        for k in ('out', 'work'):
+            v = cfg.get(k)
+            c = carve_of(v) if isinstance(v, str) and v else None
+            if c and os.path.realpath(c) != here:
+                problems.append('config.json `%s` (%s) lies in carve %s, which gen and measure would write: '
+                                'a copy must point `out` and `work` at its own directory' % (k, v, c))
+        src = cfg.get('src')
+        if isinstance(src, str) and src and os.path.realpath(os.path.expanduser(src)) != os.path.realpath(self.ws):
+            problems.append('config.json `src` (%s) is not this run\'s workspace %s (P2M_WORKSPACE): graph, plan and '
+                            'measure would read and compile there' % (src, self.ws))
+        owner = self.read_owner()
+        if owner:
+            them = owner.get('carve')
+            if them != here:
+                moved = (owner.get('carve_id') and owner['carve_id'] == self.state.get('carve_id')
+                         and not os.path.exists(os.path.join(them or '', 'pipeline_state.json')))
+                if claim:
+                    how = '--claim-folder, from %s' % them
+                elif moved:
+                    how = 'the carve moved from %s' % them
+                else:
+                    problems.append(self.BELONGS % (f, them))
+        elif os.path.isdir(folder) and any(x.endswith('.lean') for _, _, fs in os.walk(folder) for x in fs):
+            named = self.port_log_carves()
+            others = sorted(c for c in named or () if c != here)
+            if claim:
+                how = '--claim-folder'
+            elif others:
+                problems.append(self.BELONGS % (f, others[0]) + ' (no owner file; this carve\'s port log names '
+                                'that carve: a copy of it?)')
+            elif hash_paths([folder], ('.lean',)) in self.recorded_port_hashes():
+                how = 'adopted: its modules are the port this carve recorded'
+            elif not self.ever_ported():
+                how = 'first port'
+            elif not self.recorded_port_hashes():
+                # ported (by its own log), never built: no hash to compare
+                how = 'adopted: this carve\'s port log names no other carve and no hash was recorded since'
+            else:
+                problems.append('Solutions/%s has no owner file and its modules are not the port this carve recorded '
+                                '(changed since by hand, or by another carve). If it is this carve\'s, '
+                                '`--claim-folder` (the changed modules then rebuild as stale)' % f)
+        if problems:
+            raise StepFailed('refused, nothing was run:\n  ' + '\n  '.join(problems))
+        if how:
+            self.write_owner(how)
+            self.save()
 
     def overlap(self):
         return bool(self.p.get('overlap'))
@@ -565,6 +774,11 @@ class Pipeline:
         if self.p.get('patches'):
             a += ['--patches', self.port_patches()]
         self.run_cmds('port', [self.tool('oai_port_modules', *a, *self.compat_args())])
+        rec = self.state['steps'].get('port')
+        if rec is not None:
+            rec['out'] = {'port': hash_paths([self.folder_dir()], ('.lean',))}
+        if not self.read_owner():
+            self.write_owner('first port')
 
     def step_build(self):
         self.run_cmds('build', [self.tool('oai_build_modules', self.p['folder'], self.root(), '--log', 'build.log',
@@ -1007,6 +1221,8 @@ class Pipeline:
     def step_publish(self):
         if not self.p.get('go'):
             return 'skipped'
+        self.mark_publishing('step publish started')
+        self.save()
         if self.overlap():
             # every piece measured, calibrated and checked (pieces_prep): release them for this plan; a
             # background publisher still running on it sends them, and the final run below resumes it
@@ -1054,6 +1270,11 @@ class Pipeline:
             print('== a publisher already runs on this carve; it goes on (new items wait for the final publish)',
                   flush=True)
             return None
+        if not os.path.exists(os.path.join(self.d, 'publish', 'run_early.json')):
+            # publish_prep ran from a skill before overlap mode (a classic carve switched after it): the
+            # background publisher would die at once on the missing file
+            raise StepFailed("step 'publish_early': no publish/run_early.json (publish_prep ran from a skill before "
+                             "overlap mode); run again with `--redo publish_prep` (nothing is published yet)")
         self.freeze_published()
         self.start_publisher()
 
@@ -1072,6 +1293,7 @@ class Pipeline:
         ext = set(plan.get('external') or ())
         stubs = {n for n in plan.get('stubs') or {} if n not in ext}
         named = set(self.p.get('forced') or ()) | set((self.p.get('config_set') or {}).get('forced') or ())
+        self.mark_publishing('publish_early froze the published part')
         a = self.state.setdefault('auto_config', {})
         a['frozen'] = {'plan': os.path.join(dst, 'plan.json'), 'bundles': [b['name'] for b in plan.get('bundles') or ()],
                        'lib': os.path.join(dst, 'lib')}
@@ -1120,9 +1342,13 @@ class Pipeline:
             self.tool('split_run', 'publish/run.json')])
 
     # -- driver -----------------------------------------------------------------------------
-    def run(self, stop_after=None, only_redo=()):
+    def run(self, stop_after=None, only_redo=(), claim_folder=False):
+        self.check_ownership(claim_folder)
+        self.publishing_started()                 # record evidence seen now as a state fact
+        self.save()
         self.sync_config_set()
         redo = set(only_redo)
+        self.ran_now = set()
         while True:
             self.restart = False
             self._run_once(stop_after, redo)
@@ -1130,12 +1356,24 @@ class Pipeline:
                 return self.state
             redo = set()               # a re-plan invalidated what follows the plan: run it again
 
+    STALE_AFTER_PUBLISHING = (
+        "step '%s': its input \"%s\" changed since it ran, but publishing has started: re-running it would re-port, "
+        "rebuild and re-plan under live items, so nothing was run. Undo the change, or run `--redo %s` to do it "
+        "deliberately (an overlap carve keeps its published part frozen; a classic one needs config `frozen` and "
+        "`forced`, references/openai-ports.md \"After publishing\").")
+
     def _run_once(self, stop_after, only_redo):
         for s in self.steps():
             while True:
                 st = self.stale_step()
                 if not st or STEPS.index(st[0]) > STEPS.index(s):
                     break
+                # after publishing, only what this run did deliberately (a --redo, or a step it ran before)
+                # may make a step stale; a change from outside (an edited patches file, a port folder
+                # rewritten under the carve) stops for a person
+                if (st[1] not in self.RULE_KEYS and self.publishing_started() and st[0] not in only_redo
+                        and not any(STEPS.index(x) < STEPS.index(st[0]) for x in self.ran_now)):
+                    raise StepFailed(self.STALE_AFTER_PUBLISHING % (st[0], st[1], st[0]))
                 print(self.stale_message(*st), flush=True)
                 if st[1] in self.RULE_KEYS:
                     self.state['steps'].pop(st[0])        # like --redo: its consumers check its output
@@ -1170,6 +1408,7 @@ class Pipeline:
                 self.save()
                 raise
             rec.update(status=res or 'done', finished=_now())
+            self.ran_now.add(s)
             if cfg_before is not None:
                 self.config_consumers(cfg_before)
             self.save()

@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-from p2mlib.workspace import workspace, DRAFTS  # noqa: E402
+from p2mlib.workspace import workspace, DRAFTS, CARVE_OWNER  # noqa: E402
 
 CACHE = os.path.expanduser('~/.cache/p2m/workspace_audit')
 ROOTS = ('~/claude', '~')
@@ -151,7 +151,8 @@ class Record:
 
 def untracked(ws):
     out = git(ws, 'status', '--porcelain=v1', '-z', '-uall').decode('utf-8', 'surrogateescape')
-    return [e[3:] for e in out.split('\0') if e.startswith('?? ') and e[3:] not in TOOLING]
+    return [e[3:] for e in out.split('\0') if e.startswith('?? ') and e[3:] not in TOOLING
+            and os.path.basename(e[3:]) != CARVE_OWNER]
 
 
 def audit(ws, idx, min_age_days=2, near=0.9, now=None):

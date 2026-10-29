@@ -51,6 +51,7 @@ STUB = textwrap.dedent('''
         if os.path.isdir(os.path.join(d, 'out', 'lib')):
             for f in os.listdir(os.path.join(d, 'out', 'lib')):
                 shutil.copy(os.path.join(d, 'out', 'lib', f), os.path.join(d, 'publish', 'out', 'lib', f))
+        open(os.path.join(d, 'publish', 'run_early.json'), 'w').write('{}')
     # a test scripts a tool's behaviour: STUB_HOOK_<tool>_<first argument, . and - as _>
     exec(os.environ.get('STUB_HOOK_' + NAME + '_' + (sys.argv[1] if len(sys.argv) > 1 else '').replace('.', '_').replace('-', '_'), ''))
 ''')
@@ -928,7 +929,7 @@ def _forget_rule_hashes(env):
     st = json.load(open(env.dir / 'pipeline_state.json'))
     for rec in st['steps'].values():
         for k in list(rec.get('in') or {}):
-            if k in ('port rules', 'port options', 'LeanInfo tool'):
+            if k in ('port rules', 'filter rules', 'port options', 'LeanInfo tool'):
                 del rec['in'][k]
     json.dump(st, open(env.dir / 'pipeline_state.json', 'w'))
 
@@ -1362,8 +1363,8 @@ def test_publish_waits_for_the_background_publisher(env, tmp_path):
 def test_keep_port_takes_new_tools_without_re_porting_a_planned_carve(env):
     # oaiq-081 (2026-10-29): 1,586 items planned and mostly measured on an old snapshot; the skill's port
     # rules changed since, so `--upgrade` re-ran filter_patches, whose output changed, and that would have
-    # re-ported, rebuilt and re-planned the whole carve. --keep-port records the current rules as the
-    # ones the port ran with, once, so this and every later resume keep the port
+    # re-ported, rebuilt and re-planned the whole carve. --keep-port keeps the port, on this and every
+    # later resume (test_keep_port_survives_later_upgrades_until_an_explicit_redo_port)
     (env.tmp / 'patches.json').write_text('[]')
     assert run(env, *ARGS, '--patches', str(env.tmp / 'patches.json'), '--stop-after', 'measure').returncode == 0
     _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# a new rewrite\n')
@@ -1373,7 +1374,7 @@ def test_keep_port_takes_new_tools_without_re_porting_a_planned_carve(env):
     assert not _ported(env) and ('carve_prep', 'filter-patches') not in tools_called(env)
     assert '--keep-port' in r.stdout and 'keep the port' in r.stdout
     st = json.load(open(env.dir / 'pipeline_state.json'))
-    assert 'port rules' in st['steps']['port']['in'] and 'port rules' in st['steps']['filter_patches']['in']
+    assert 'port rules' in st['steps']['port']['in'] and 'filter rules' in st['steps']['filter_patches']['in']
     r = run(env, '--stop-after', 'measure')                                # later resumes: still kept
     assert r.returncode == 0 and not _ported(env) and 'stale' not in r.stdout
 
@@ -1394,3 +1395,202 @@ def test_a_classic_carve_switched_to_overlap_keeps_its_plan_and_measurements(env
     assert measures == [['config.json', '--keep-going', '--kinds', 'piece']]   # the classic measure stands
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert st['steps']['calibrate_pieces']['status'] == 'done' and st.get('replans', 0) == 0
+
+
+# ---------------------------------------------------------------- 2026-10-29: a rehearsal copy of oaiq-081
+# (`cp -a` of the carve dir, its config still on the shared workspace) re-ported and rewrote 228 files of the
+# live carve's Solutions/OAIQ081_SAT. The port folder now has an owner, publishing-started is a state fact,
+# and --keep-port holds until an explicit --redo port.
+
+def run_in(d, *extra):
+    live = os.environ['P2M_SKILL_REPO'] + '/prove2me/scripts/carve_pipeline.py'
+    return subprocess.run([sys.executable, live, str(d), *extra], capture_output=True, text=True)
+
+
+def _folder(env):
+    f = env.ws / 'Solutions' / 'F'
+    return {p.name: p.read_bytes() for p in sorted(f.iterdir())}
+
+
+OWNER = '.carve_owner.json'
+
+
+def test_a_copied_carve_refuses_the_port_folder_of_its_original_and_writes_nothing(env):
+    assert run(env, *ARGS).returncode == 0
+    marker = json.load(open(env.ws / 'Solutions' / 'F' / OWNER))
+    assert marker['carve'] == os.path.realpath(env.dir)
+    copy = env.tmp / 'copy'
+    shutil.copytree(env.dir, copy, symlinks=True)
+    before = _folder(env)
+    env.log.write_text('')
+    for extra in (['--upgrade', '--redo', 'port'], ['--from', 'port'], []):
+        r = run_in(copy, *extra)
+        assert r.returncode != 0, r.stdout + r.stderr
+        assert 'Solutions/F belongs to carve %s' % os.path.realpath(env.dir) in r.stderr and 'P2M_WORKSPACE' in r.stderr
+        assert tools_called(env) == [] and _folder(env) == before
+    # the owner goes on
+    r = run(env, '--redo', 'port')
+    assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
+
+
+def test_a_legacy_folder_is_adopted_by_the_carve_whose_port_it_holds(env):
+    # running carves have no owner file: the carve whose recorded port hash is the folder's adopts it,
+    # a copy (its port log names the original carve) does not
+    assert run(env, *ARGS).returncode == 0
+    (env.ws / 'Solutions' / 'F' / OWNER).unlink()
+    copy = env.tmp / 'copy'
+    shutil.copytree(env.dir, copy, symlinks=True)
+    env.log.write_text('')
+    r = run_in(copy, '--redo', 'port')
+    assert r.returncode != 0 and tools_called(env) == [], r.stdout + r.stderr
+    assert not (env.ws / 'Solutions' / 'F' / OWNER).exists()
+    r = run(env, '--redo', 'port')
+    assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
+    assert json.load(open(env.ws / 'Solutions' / 'F' / OWNER))['carve'] == os.path.realpath(env.dir)
+
+
+def test_a_legacy_folder_that_changed_since_the_port_needs_claim_folder(env):
+    assert run(env, *ARGS).returncode == 0
+    (env.ws / 'Solutions' / 'F' / OWNER).unlink()
+    (env.ws / 'Solutions' / 'F' / 'Pre_Main.lean').write_text('-- rewritten by someone\n')
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode != 0 and '--claim-folder' in r.stderr and tools_called(env) == [], r.stdout + r.stderr
+    r = run(env, '--claim-folder')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert json.load(open(env.ws / 'Solutions' / 'F' / OWNER))['carve'] == os.path.realpath(env.dir)
+
+
+def test_a_moved_carve_keeps_its_folder(env):
+    assert run(env, *ARGS).returncode == 0
+    moved = env.tmp / 'moved'
+    shutil.move(str(env.dir), str(moved))
+    r = run_in(moved, '--redo', 'port')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert json.load(open(env.ws / 'Solutions' / 'F' / OWNER))['carve'] == os.path.realpath(moved)
+
+
+def test_config_paths_into_another_carve_are_refused(env):
+    # a copy's config.json still names the original's out/ and work/, which gen and measure write
+    assert run(env, *ARGS).returncode == 0
+    other = env.tmp / 'other'
+    other.mkdir()
+    (other / 'pipeline.json').write_text('{}')
+    cfg = json.load(open(env.dir / 'config.json'))
+    cfg['out'] = str(other / 'out')
+    json.dump(cfg, open(env.dir / 'config.json', 'w'))
+    env.log.write_text('')
+    r = run(env, '--redo', 'gen')
+    assert r.returncode != 0 and 'out' in r.stderr and str(other) in r.stderr and tools_called(env) == []
+
+
+def test_a_frozen_replan_without_a_run_state_still_counts_as_publishing(env, monkeypatch):
+    # a frozen re-plan drops publish_early from the step records; with no publish/run_state.json yet
+    # (no publisher had written one), a port-rule change was taken as safe to re-port
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)}, seq=[{}, {}, {}, {'piece:P0': _t(40)}])
+    monkeypatch.setenv('STUB_HOOK_carve_gen', textwrap.dedent('''
+        if open(os.environ['STUB_LOG']).read().count('"gen"') > 1:
+            sys.exit(1)
+    '''))
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1 and "step 'gen'" in r.stderr, r.stdout + r.stderr
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert 'publish_early' not in st['steps'] and st['publishing_started']
+    assert not (env.dir / 'publish' / 'run_state.json').exists()
+    monkeypatch.delenv('STUB_HOOK_carve_gen')
+    _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# a new rewrite\n')
+    env.log.write_text('')
+    monkeypatch.setenv('STUB_TIMES_SEQ', json.dumps([{}, {'piece:P0': _t(40)}]))   # the split piece fits
+    r = run(env, '--upgrade')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not _ported(env) and 'publishing has started' in r.stdout
+    prep = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_prep' and c['argv'][0] == 'publish-prep']
+    assert prep and all(a[-1] == '--sync' for a in prep)           # publish/ is synced, never rebuilt
+
+
+def test_after_publishing_a_changed_patches_file_waits_for_an_explicit_redo(env):
+    extra = _patches_setup(env)
+    assert run(env, *ARGS, *extra, '--publish').returncode == 0
+    (env.tmp / 'patches.json').write_text('[{"old": "a", "new": "b"}]')
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode != 0 and '--redo filter_patches' in r.stderr and tools_called(env) == [], r.stdout + r.stderr
+    (env.dir / 'port_patches.json').write_text('[{"old": "a", "new": "b"}]')    # what the redo writes
+    r = run(env, '--redo', 'filter_patches', '--stop-after', 'config')
+    assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
+
+
+def test_keep_port_survives_later_upgrades_until_an_explicit_redo_port(env):
+    (env.tmp / 'patches.json').write_text('[]')
+    assert run(env, *ARGS, '--patches', str(env.tmp / 'patches.json'), '--stop-after', 'measure').returncode == 0
+    _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# a new rewrite\n')
+    assert run(env, '--upgrade', '--keep-port', '--stop-after', 'measure').returncode == 0
+    assert json.load(open(env.dir / 'pipeline_state.json'))['keep_port']
+    # the next skill commits change carve_prep.py and the port rules again
+    _commit(env, 'scripts/carve_prep.py', (env.repo / 'prove2me' / 'scripts' / 'carve_prep.py').read_text() + '\n# fix\n')
+    _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# another rewrite\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not _ported(env) and ('carve_prep', 'filter-patches') not in tools_called(env)
+    assert 'stale' not in r.stdout and 'keep-port' in r.stdout
+    # --redo port ends it: the port is redone now, and a later rule change re-ports by itself again
+    r = run(env, '--redo', 'port', '--stop-after', 'measure')
+    assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
+    assert 'keep_port' not in json.load(open(env.dir / 'pipeline_state.json'))
+    _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# a third\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade', '--stop-after', 'measure')
+    assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
+
+
+def test_filter_patches_is_stale_only_when_its_own_code_changes(env):
+    # filter_patches' rule inputs were all of carve_prep.py, which changes almost daily for other reasons
+    stub = env.repo / 'prove2me' / 'scripts' / 'carve_prep.py'
+    _commit(env, 'scripts/carve_prep.py', stub.read_text() + '\ndef filter_patches(p, t):\n    return p\n')
+    extra = _patches_setup(env)
+    assert run(env, *ARGS, *extra, '--stop-after', 'measure').returncode == 0
+    _commit(env, 'scripts/carve_prep.py', stub.read_text() + '\ndef publish_prep():\n    pass\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade', '--stop-after', 'measure')
+    assert r.returncode == 0 and ('carve_prep', 'filter-patches') not in tools_called(env), r.stdout + r.stderr
+    _commit(env, 'scripts/carve_prep.py', stub.read_text().replace('return p', 'return p[:1]'))
+    env.log.write_text('')
+    r = run(env, '--upgrade', '--stop-after', 'measure')
+    assert r.returncode == 0 and ('carve_prep', 'filter-patches') in tools_called(env), r.stdout + r.stderr
+
+
+def test_publish_early_refuses_a_publish_dir_without_run_early(env, monkeypatch):
+    # a classic publish_prep from a snapshot before overlap mode wrote no run_early.json: the background
+    # publisher would die at once and the pieces' gate would never open early
+    _overlap_carve(env, monkeypatch)
+    monkeypatch.setenv('STUB_HOOK_carve_prep_publish_prep', "os.remove(os.path.join(sys.argv[2], 'publish', 'run_early.json'))")
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1 and 'run_early.json' in r.stderr and '--redo publish_prep' in r.stderr, r.stdout + r.stderr
+    assert not any(l.startswith('systemd-run') for l in _raw(env))
+    assert 'auto_config' not in json.load(open(env.dir / 'pipeline_state.json'))
+
+
+def test_a_legacy_folder_ported_but_not_yet_built_is_adopted_by_its_porter_only(env):
+    assert run(env, *ARGS, '--stop-after', 'port').returncode == 0
+    (env.ws / 'Solutions' / 'F' / OWNER).unlink()
+    copy = env.tmp / 'copy'
+    shutil.copytree(env.dir, copy, symlinks=True)
+    assert run_in(copy).returncode != 0 and not (env.ws / 'Solutions' / 'F' / OWNER).exists()
+    r = run(env, '--stop-after', 'build')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert json.load(open(env.ws / 'Solutions' / 'F' / OWNER))['carve'] == os.path.realpath(env.dir)
+
+
+def test_a_config_on_another_workspace_is_refused(env):
+    # a copy run with its own P2M_WORKSPACE whose config.json still reads (and measures in) the old one
+    assert run(env, *ARGS).returncode == 0
+    cfg = json.load(open(env.dir / 'config.json'))
+    cfg['src'] = str(env.tmp / 'other_ws')
+    json.dump(cfg, open(env.dir / 'config.json', 'w'))
+    env.log.write_text('')
+    r = run(env, '--redo', 'gen')
+    assert r.returncode != 0 and 'src' in r.stderr and 'other_ws' in r.stderr and tools_called(env) == []
+    cfg['src'] = str(env.ws)
+    json.dump(cfg, open(env.dir / 'config.json', 'w'))
+    assert run(env, '--redo', 'gen').returncode == 0

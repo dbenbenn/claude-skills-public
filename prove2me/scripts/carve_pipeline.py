@@ -3,7 +3,7 @@
 
 usage: carve_pipeline.py DIR [parameters] [--stop-after STEP] [--from STEP] [--redo STEP ...]
                          [--publish] [--upgrade | --snapshot REV] [--allow-dirty] [--list] [--detach]
-                         [--overlap | --no-overlap] [--keep-port]
+                         [--overlap | --no-overlap] [--keep-port] [--claim-folder] [--forget-publishing]
        carve_pipeline.py DIR --wait [MINUTES]
 
 DIR is the carve directory. The first run needs the parameters, which are stored in DIR/pipeline.json
@@ -44,8 +44,9 @@ sources -> filter_patches; port_patches.json and sources -> port; the ported mod
 A resume that finds one changed prints `== stale: STEP ...` and re-runs that step and all later ones, so
 editing the patches and running `--redo filter_patches` (or just resuming) re-ports; a --redo whose output
 is unchanged leaves the later steps alone. Steps also record the skill rules they ran with (the port
-rules: oai_port_modules.py, oaiport.py and the compat sources, and the port options, for filter_patches and
-port; LeanInfo.lean and DeclGraph.lean for graph): after --upgrade across a change to them, that step alone
+rules: oai_port_modules.py, oaiport.py and the compat sources, and the port options, for port; for
+filter_patches the same with carve_prep.py's filter-patches code only, not the whole file; LeanInfo.lean
+and DeclGraph.lean for graph): after --upgrade across a change to them, that step alone
 runs again, like --redo, and its consumers follow only if its output changed (graph only while a step
 that loads the graph is still to run: it re-warms the LeanInfo cache, which is keyed by LeanInfo.lean, with
 a warning naming the module count). A re-run `config` that changes config.json re-runs from extdefs
@@ -87,10 +88,30 @@ so re-arm it.
 The driver re-executes itself from a read-only snapshot of the skill (p2mlib.snapshot) and calls
 every sub-tool from that snapshot, so editing or pushing the live skill never affects a running
 carve. The snapshot sha is recorded in the state file; a resume reuses it. --upgrade moves a resumed
-carve to the current HEAD (with --keep-port: keeping its port even if the port rules changed, which
-otherwise re-ports and, when the ported text changes, rebuilds and re-plans the carve); --snapshot REV picks a revision; --allow-dirty snapshots an uncommitted
+carve to the current HEAD; --snapshot REV picks a revision; --allow-dirty snapshots an uncommitted
 skills tree. Exit 3: another driver already runs this carve. Never write a job-dir driver script:
-to change a tool, change the skill (tests first), push, and new runs pick it up."""
+to change a tool, change the skill (tests first), push, and new runs pick it up.
+
+--keep-port keeps the port as it is across changes to the skill's port rules (which otherwise re-port and,
+when the ported text changes, rebuild and re-plan the carve), on this and every later run, until an explicit
+`--redo port`, `--redo filter_patches` or a --from at or before port (pipeline_state.json `keep_port`).
+
+Publishing began (pipeline_state.json `publishing_started`, set the first time publish or publish_early runs
+or publish/run_state.json or config `frozen` is seen, and kept: a frozen re-plan drops publish_early's
+record): from then on a port-rule change keeps the port, publish_prep syncs publish/ instead of rebuilding
+it, calibrate never re-plans globally, and a changed input from outside (an edited patches file, a port
+folder rewritten under the carve) stops the run until an explicit --redo of that step.
+--forget-publishing clears it, refused while any of that evidence remains.
+
+The port folder WORKSPACE/Solutions/FOLDER lies outside the carve dir, so it has an owner: its file
+.carve_owner.json names the carve directory (and its pipeline_state.json `carve_id`). A run whose folder
+belongs to another carve directory, or whose config.json `out`/`work` lie in another carve or `src` is not
+the run's workspace, is refused
+before any step (2026-10-29: a `cp -a` rehearsal copy of oaiq-081 on the shared workspace re-ported the live
+carve's folder): a copy needs its own workspace (P2M_WORKSPACE) or another folder. A folder without an owner
+file is adopted by the carve whose recorded port hash it holds (and whose port log names no other carve),
+claimed by a carve that never ported, and else waits for --claim-folder, which also takes a folder over
+from another carve deliberately. A carve moved to another directory keeps its folder."""
 import argparse
 import hashlib
 import json
@@ -134,6 +155,8 @@ def parse(argv):
     ap.add_argument('--publish', action='store_true')
     ap.add_argument('--upgrade', action='store_true')
     ap.add_argument('--keep-port', action='store_true')
+    ap.add_argument('--claim-folder', action='store_true')
+    ap.add_argument('--forget-publishing', action='store_true')
     ap.add_argument('--snapshot')
     ap.add_argument('--allow-dirty', action='store_true')
     ap.add_argument('--list', action='store_true')
@@ -354,13 +377,23 @@ def main(argv=None):
     C.lock(a.dir)
     p = C.Pipeline(a.dir, dict(params, go=a.publish), snap)
     p.state['snapshot'] = {'sha': os.path.basename(snap), 'path': snap}
-    if a.keep_port:
-        p.keep_port()
-    if a.frm:
-        p.invalidate(a.frm)
-    p.save()
+    redo_port = [s for s in a.redo if s in C.Pipeline.PORT_STEPS]
+    if a.frm and C.STEPS.index(a.frm) <= C.STEPS.index('port'):
+        redo_port.append('--from ' + a.frm)
+    if a.keep_port and redo_port:
+        sys.exit('--keep-port with %s: keep the port or redo it, not both' % ', '.join(redo_port))
     try:
-        p.run(stop_after=a.stop_after, only_redo=set(a.redo))
+        p.check_ownership(a.claim_folder)          # before any state changes: a refused copy keeps its state
+        if a.forget_publishing:
+            p.forget_publishing()
+        if a.keep_port:
+            p.keep_port()
+        if redo_port:
+            p.clear_keep_port(', '.join(('--redo ' + x if not x.startswith('--') else x) for x in redo_port))
+        if a.frm:
+            p.invalidate(a.frm)
+        p.save()
+        p.run(stop_after=a.stop_after, only_redo=set(a.redo), claim_folder=a.claim_folder)
     except C.StepFailed as e:
         print(e, file=sys.stderr)
         if p.overlap():

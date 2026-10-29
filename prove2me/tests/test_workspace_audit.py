@@ -108,6 +108,11 @@ def test_mirror_and_draft_stub(world):
     assert 'Theorems/.drafts.json' not in rs          # tooling state, not work
 
 
+def test_a_carve_owner_file_is_tooling_state(world):
+    write(os.path.join(world['ws'], 'Solutions', 'OAIQ1_X', '.carve_owner.json'), '{"carve": "/x"}')
+    assert 'Solutions/OAIQ1_X/.carve_owner.json' not in audit(world)
+
+
 def test_tracked_files_are_ignored(world):
     assert 'Solutions/.gitkeep' not in audit(world)
 
