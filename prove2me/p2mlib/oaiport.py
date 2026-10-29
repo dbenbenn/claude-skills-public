@@ -1184,13 +1184,13 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # `iteratedFDeriv_right`, `contDiffOn'`, ...): fall back on `exact_mod_cast le_top` (oaiq-088: 17 sites)
     def _smooth_simp(m):
         text_, line = m.string, m.group(0)
-        line = re.sub(r"(\(show (?:[^()\n]|\([^()\n]*\))*≤ ∞) by simp\)", r"\1 by first | (simp; done) | exact_mod_cast le_top)", line)
+        line = re.sub(r"(\(show (?:[^()\n]|\([^()\n]*\))*≤ ∞) by simp\)", r"\1 by first | (simp; done) | exact_mod_cast le_top | exact WithTop.coe_le_coe.2 le_top)", line)
         # the keyword may sit on one of the three lines before (a long application broken across lines)
         before = '\n'.join(text_[:m.start()].split('\n')[-4:-1])
         if not re.search(r"iteratedFDeriv|iteratedDeriv|ContDiff|contDiff|of_le|ContinuousAt|≤ ∞", before + '\n' + line):
             return line
         return re.sub(r"\(by simp( : [^()\n]*(?:\([^()\n]*\)[^()\n]*)*)?\)",
-                      lambda k: '(by first | (simp; done) | exact_mod_cast le_top%s)' % (k.group(1) or ''), line)
+                      lambda k: '(by first | (simp; done) | exact_mod_cast le_top | exact WithTop.coe_le_coe.2 le_top%s)' % (k.group(1) or ''), line)
     text = re.sub(r"(?m)^[^\n]*(?:\(by simp(?: : [^\n]*)?\)|≤ ∞ by simp\))[^\n]*$", _smooth_simp, text)
     # Mathlib adds the global tokens `<m ≤m <i ≤i ≤s <r ≤r ≤c`; `1<m` with a variable `m` then fails
     # to parse. Space them unless written as the notation (` <m `).
