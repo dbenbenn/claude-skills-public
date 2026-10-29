@@ -2324,13 +2324,13 @@ def test_smoothness_order_simp_gets_le_top_fallback():
            "  have h4 : 0 < w := by simp\n"
            "  exact foo (by simp)\n")
     out = O.core_rewrites(src)
-    fb = "first | simp | exact_mod_cast le_top"
+    fb = "first | (simp; done) | exact_mod_cast le_top"
     assert "iteratedFDeriv_comp hg hf (by %s)]" % fb in out
     assert "contDiffOn' (by %s : (k : ℕ∞ω) ≤ ∞) (by %s)" % (fb, fb) in out
     assert "of_le (by %s)).contDiffAt" % fb in out
     assert "have h : 0 < x := by simp\n" in out and "exact foo (by simp)\n" in out
     out_show = O.core_rewrites("      (show (i : ℕ∞ω) ≤ ∞ by simp)\n    have hn := T.norm_iteratedFDeriv_comp_left h\n")
-    assert "(show (i : ℕ∞ω) ≤ ∞ by first | simp | exact_mod_cast le_top)" in out_show
+    assert "(show (i : ℕ∞ω) ≤ ∞ by first | (simp; done) | exact_mod_cast le_top)" in out_show
     assert O.core_rewrites(out) == out
 
 
@@ -2354,8 +2354,8 @@ def test_compat_narrow_imports_build_the_whole_compat_block():
 def test_smoothness_order_simp_keyword_on_a_earlier_line():
     # the smoothness keyword may sit up to three lines before the `(by simp)` (oaiq-088: 4 more sites)
     far = O.core_rewrites("  have := (hf.iteratedFDeriv_right\n    (hg x)\n    foo\n    (by simp)).continuous\n")
-    assert "(by first | simp | exact_mod_cast le_top)).continuous" in far
+    assert "(by first | (simp; done) | exact_mod_cast le_top)).continuous" in far
     near = O.core_rewrites("  have := foo\n  bar\n  baz\n  qux\n  exact g (by simp)\n")
     assert "exact g (by simp)\n" in near
     typed = O.core_rewrites("  foo\n    (by simp : (k : ℕ∞ω) ≤ ∞)\n")
-    assert "(by first | simp | exact_mod_cast le_top : (k : ℕ∞ω) ≤ ∞)" in typed
+    assert "(by first | (simp; done) | exact_mod_cast le_top : (k : ℕ∞ω) ≤ ∞)" in typed
