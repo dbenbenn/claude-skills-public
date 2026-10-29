@@ -76,7 +76,8 @@ function quotaChart(id, col, spanSecs, title){
            {stroke: css('--text-muted'), grid: {stroke: css('--grid'), width: 1}, ticks: {show: false}, font: '11px system-ui', size: 46, values: (u, v) => v.map(x => x + '%')}],
     series: [{value: (u, v, si, idx) => idx == null ? 'latest' : fmtAt(v)},
              {label: title, stroke: css('--series-1'), fill: css('--series-1') + '22', width: 2, paths: uPlot.paths.stepped({align: 1}),
-              value: (u, v) => v == null ? '—' : v.toFixed(1) + '%'}],
+              // not hovering: the latest sample, as the other charts show
+              value: (u, v, si, idx) => { const r = idx == null ? u.data[1][lastIdx(u)] : v; return r == null ? '—' : r.toFixed(1) + '%'; }}],
     hooks: {draw: [u => {         // reset markers: solid for past resets, dashed for the coming one
       const c = u.ctx; c.save(); c.lineWidth = 1; c.strokeStyle = css('--text-muted'); c.fillStyle = css('--text-muted'); c.font = '11px system-ui';
       for (const t of resets) { const x = Math.round(u.valToPos(t, 'x', true)); if (x < u.bbox.left || x > u.bbox.left + u.bbox.width) continue;
