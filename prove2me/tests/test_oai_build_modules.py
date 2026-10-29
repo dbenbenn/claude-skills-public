@@ -101,3 +101,82 @@ def test_build_keeps_going_past_a_failed_module(monkeypatch, tmp_path, capsys):
     assert any('Skipped Solutions.F.B' in l and 'Solutions.F.A' in l for l in lines)
     assert any('Skipped Solutions.F.Main' in l for l in lines)
     assert '2 modules failed' in out
+
+
+# ---- a rebuild keeps the times of the modules it replays (2026-10-29) ------------------------------
+# The pipeline's build step writes --elab-log build_elab.log, which carve_prep config reads for the cost
+# model; a replayed module has no time, and a module missing from the log is costed at a default 2 s.
+# oaiq-047's build_elab.log held 37 modules after a resumed build had replayed 1222 (oaiq-091: 0 of 419),
+# so most of the plan was costed at the default.
+
+def _run_main(monkeypatch, tmp_path, ws, fake, *extra):
+    from p2mlib import leaninfo
+    monkeypatch.setenv('P2M_LOCK_DIR', str(tmp_path / 'locks'))
+    monkeypatch.setattr(leaninfo, 'build_module', fake)
+    log, elab = str(tmp_path / 'build.log'), str(tmp_path / 'build_elab.log')
+    try:
+        B.main(['F', 'Main', '--ws', ws, '--log', log, '--elab-log', elab, '--overhead', '1', *extra])
+    except SystemExit as e:
+        return e.code, log, elab
+    return 0, log, elab
+
+
+def _fake_build(secs, fail=()):
+    def fake(path, module, olean, ilean, ws=None, **k):
+        m = module.rsplit('.', 1)[-1]
+        if m in fail:
+            return False, 1.0, ['%s:1:0: error: drift' % path]
+        open(olean, 'w').close()
+        return True, secs[m], []
+    return fake
+
+
+def _times(path):
+    import re
+    return {m: float(t) for m, t in re.findall(r'Built (\S+) \(([\d.]+)s\)', open(path).read())}
+
+
+def test_a_rebuild_keeps_the_replayed_modules_times(monkeypatch, tmp_path):
+    ws = _port(tmp_path)
+    code, log, elab = _run_main(monkeypatch, tmp_path, ws, _fake_build({'A': 11.0, 'Main': 5.0}))
+    assert code == 0 and _times(elab) == {'Solutions.F.A': 10.0, 'Solutions.F.Main': 4.0}
+    main = os.path.join(ws, 'Solutions', 'F', 'Main.lean')
+    os.utime(main, (os.path.getmtime(main) + 100,) * 2)           # the port rewrote Main only
+    code, log, elab = _run_main(monkeypatch, tmp_path, ws, _fake_build({'A': 99.0, 'Main': 7.0}))
+    assert code == 0 and 'Replayed Solutions.F.A' in open(log).read()
+    assert _times(elab) == {'Solutions.F.A': 10.0, 'Solutions.F.Main': 6.0}
+
+
+def test_failed_rounds_keep_the_times_for_the_round_that_succeeds(monkeypatch, tmp_path):
+    # repair rounds: each fails on another module and replays what the earlier ones built
+    ws = _port(tmp_path)
+    for _ in range(2):
+        code, log, elab = _run_main(monkeypatch, tmp_path, ws, _fake_build({'A': 11.0, 'Main': 5.0}, fail=('Main',)))
+        assert code == 1
+    code, log, elab = _run_main(monkeypatch, tmp_path, ws, _fake_build({'A': 99.0, 'Main': 5.0}))
+    assert code == 0 and _times(elab) == {'Solutions.F.A': 10.0, 'Solutions.F.Main': 4.0}
+    # and an elab log from before this was kept (no build.log of a failed round) still serves
+    os.remove(log)
+    main = os.path.join(ws, 'Solutions', 'F', 'Main.lean')
+    os.utime(main, (os.path.getmtime(main) + 100,) * 2)
+    code, log, elab = _run_main(monkeypatch, tmp_path, ws, _fake_build({'A': 99.0, 'Main': 3.0}))
+    assert _times(elab) == {'Solutions.F.A': 10.0, 'Solutions.F.Main': 2.0}
+
+
+def test_a_replayed_module_without_a_logged_time_takes_it_from_the_leaninfo_cache(monkeypatch, tmp_path):
+    # the carves whose build_elab.log was already cut short: the compile cached LeanInfo's build_ms
+    # beside the reading, so `--redo build` recovers every time
+    from p2mlib import leaninfo
+    monkeypatch.setattr(leaninfo, 'CACHE', str(tmp_path / 'cache'))
+    ws = _port(tmp_path)
+    code, log, elab = _run_main(monkeypatch, tmp_path, ws, _fake_build({'A': 11.0, 'Main': 5.0}))
+    os.remove(log)
+    os.remove(elab)
+    src = os.path.join(ws, 'Solutions', 'F', 'A.lean')
+    key = leaninfo._key(src, False, ws, (), True, 'Solutions.F.A', True, leaninfo.BUILD_OPTIONS)
+    os.makedirs(leaninfo.CACHE)
+    open(os.path.join(leaninfo.CACHE, key + '.json'), 'w').write('{"build_ms": 8000}')
+    main = os.path.join(ws, 'Solutions', 'F', 'Main.lean')
+    os.utime(main, (os.path.getmtime(main) + 100,) * 2)
+    code, log, elab = _run_main(monkeypatch, tmp_path, ws, _fake_build({'A': 99.0, 'Main': 3.0}))
+    assert code == 0 and _times(elab) == {'Solutions.F.A': 7.0, 'Solutions.F.Main': 2.0}

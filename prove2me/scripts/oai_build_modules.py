@@ -14,8 +14,10 @@ usage: oai_build_modules.py FOLDER ROOT [--force] [--log BUILD.log] [--elab-log 
   --log       also write the build lines to this file (what --elab-log reads)
   --elab-log  the build lines with OVERHEAD seconds (the Mathlib import, about 3 s here) taken off
               each module (floor 0.1 s), for config `build_logs` (module_costs adds a fixed 0.5 s);
-              replayed modules have no time, so keep the earlier logs too (carve_prep.py config
-              reads every build_elab*.log, later ones winning) or pass --force
+              a replayed module keeps its time from the previous --elab-log or --log, else from the
+              LeanInfo cache entry its compile wrote (so `--redo build` restores a log an older
+              version cut short); carve_prep.py config reads every
+              build_elab*.log, later ones winning
 
 One Lean process at a time (the box cap is shared). A failed module's outputs are removed and its
 first errors printed; the build goes on with every module that does not import a failed one (those
@@ -27,6 +29,7 @@ same elaboration writes the .olean/.ilean and caches the reading `carve.py graph
 before cost a second elaboration of every module. The logged seconds are LeanInfo's build_ms (its
 import, elaboration and output writing; about `lean`'s CPU time plus 0.4-1 s). Without the compiled
 tool it falls back to `lean -o`."""
+import json
 import os
 import re
 import resource
@@ -81,6 +84,57 @@ def elab_lines(build_log, overhead=3.0):
         m = re.search(r'Built (\S+) \(([\d.]+)s\)', l)
         if m:
             out.append('✔ Built %s (%.2fs)' % (m.group(1), max(float(m.group(2)) - overhead, 0.1)))
+    return '\n'.join(out) + '\n'
+
+
+BUILT = re.compile(r'Built (\S+) \(([\d.]+)s\)')
+
+
+def previous_times(log, elab_log, overhead=3.0):
+    """{module: seconds, overhead off} from an earlier run's elab log and build log (a failed run
+    writes only the build log; it is the newer one when both exist)."""
+    t = {}
+    for f, raw in ((elab_log, False), (log, True)):
+        if f and os.path.exists(f):
+            text = open(f, encoding='utf-8').read()
+            for m, secs in BUILT.findall(elab_lines(text, overhead) if raw else text):
+                t[m] = float(secs)
+    return t
+
+
+def cached_build_secs(ws, folder):
+    """mod -> the build seconds LeanInfo recorded when it compiled the module (its cache entry,
+    p2mlib.leaninfo.build_module), or None."""
+    def f(mod):
+        src = os.path.join(ws, *mod.split('.')) + '.lean'
+        try:
+            key = leaninfo._key(src, False, ws, (), True, mod, True, leaninfo.BUILD_OPTIONS)
+            ms = json.load(open(os.path.join(leaninfo.CACHE, key + '.json'))).get('build_ms')
+        except (OSError, ValueError):
+            return None
+        return ms / 1000.0 if ms else None
+    return f
+
+
+def merged_elab_lines(lines, previous, overhead=3.0, cached=None):
+    """elab_lines of this run, with a replayed module's time from `previous`, else from `cached`
+    (2026-10-29: a resumed build wrote only what it rebuilt, and config costed every other module at
+    the default 2 s)."""
+    out = []
+    for l in lines:
+        m = BUILT.search(l)
+        if m:
+            out.append('✔ Built %s (%.2fs)' % (m.group(1), max(float(m.group(2)) - overhead, 0.1)))
+            continue
+        m = re.search(r'Replayed (\S+)', l)
+        if not m:
+            continue
+        if m.group(1) in previous:
+            out.append('✔ Built %s (%.2fs)' % (m.group(1), previous[m.group(1)]))
+            continue
+        secs = cached(m.group(1)) if cached else None
+        if secs:
+            out.append('✔ Built %s (%.2fs)' % (m.group(1), max(secs - overhead, 0.1)))
     return '\n'.join(out) + '\n'
 
 
@@ -169,10 +223,12 @@ def main(argv):
     from p2mlib import runlock
     ws = opt(argv, '--ws') or workspace()
     runlock.hold(runlock.build_key(ws, pos[0]), 'oai_build_modules.py ' + ' '.join(argv))
+    prev = previous_times(opt(argv, '--log'), opt(argv, '--elab-log'), oh)
     ok, lines = build(ws, pos[0], pos[1], '--force' in argv,
                       opt(argv, '--log'))
-    if ok and '--elab-log' in argv:
-        open(opt(argv, '--elab-log'), 'w', encoding='utf-8').write(elab_lines('\n'.join(lines), oh))
+    if '--elab-log' in argv:          # a failed round too: the next one replays what this one built
+        open(opt(argv, '--elab-log'), 'w', encoding='utf-8').write(
+            merged_elab_lines(lines, prev, oh, cached_build_secs(ws, pos[0])))
     sys.exit(0 if ok else 1)
 
 
