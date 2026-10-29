@@ -111,8 +111,26 @@ Problem336).** Fix each at the cause; none needs a macro.
   a `rw [foo a b]` that left the removed argument as a side goal, an `AESM_TAC` site where nothing fixes the
   function yet (`simpa … using eLpNorm_sum_le (…)` with no `(f := …)`).
 - *Smaller drift seen once or twice, patched per site:* `A ≤ᵐ[μ] B ∪ ⋃ …` with sets of sets fails to
-  synthesize `Union (Set E → Prop)`: ascribe `(B ∪ … : Set (Set E))`; after `filter_upwards`, a `simp` on
-  `(X ∩ B) ω` needs `show ω ∈ X ∩ B` first (oaiq-078); `MemLp g p μ` is a pair (a bare `lt_top` proof needs
+  synthesize `Union (Set E → Prop)`: ascribe `(B ∪ … : Set (Set E))`; after `filter_upwards` on `=ᵐ` of sets the
+  goal is applied sets (`E x = F x`), not `x ∈ E`, so `rw`, `simp only [mem_inter_iff]` and `simp only [mem_iUnion]`
+  fail: `change (x ∈ E ∩ U) = (x ∈ G ∩ U)` / `show x ∈ …` first, `refine hx.trans ?_` for `rw [hx]`,
+  `exact iff_of_true … (mem_univ x)` (oaiq-078, -079, -092); a root name Mathlib added since collides with
+  OpenAI's under an `open`: `harmonic` with `open Harmonic` (oaiq-086, ~30 sites), `rotation` with `open
+  TraceHessian` (oaiq-091): qualify it; a `local instance` whose explicit arguments typeclass synthesis cannot
+  infer is now an error: make it a `theorem` (it never fired; oaiq-091, -092); `simpa [..] using X` reporting
+  `(f ∘ g) / (f * g)` against a lambda: `exact X` (defeq; ~25 sites in oaiq-091's Sobolev modules);
+  `fin_cases … <;> norm_num [defs]` leaving `![a, b, c] 2` or `¬0 = 2 : Fin 4`: compat now has rfl simp lemmas
+  for 3/4-element vector lookups and Fin literal disequalities (07634a4, c92a80b), and where that is not
+  enough `fin_cases … <;> simp [defs, Fin.ext_iff] <;> norm_num` (`~/claude/p2m-standalone/openai-ports/oaiq-092/cc/nn_fin_cases.py` rewrites a
+  file; ~35 modules there); `Finset.sum_le_sum_of_injOn` is gone (`sum_image` + `sum_le_sum_of_subset_of_nonneg`);
+  `decide (G.Reachable …)` under `omit [Fintype V] in` needs `@decide _ (Classical.propDecidable _)` (oaiq-089);
+  `liminf_le_liminf (hu := …) (hv := …)` has the two names swapped; `MemLp.smul` takes the function first;
+  `toReal_eLpNorm` and `summable_norm_of_tsum_eLpNorm_ne_top` gained a measurability argument;
+  `List.Pairwise.rel_getElem_of_lt h …` is `List.pairwise_iff_getElem.1 h _ _ hi hj hij`;
+  `Nodup.eq_of_getElem_eq` is `(Nodup.getElem_inj_iff …).1`; `exists_contDiff_support_eq_eq_one_iff` is
+  `exists_contMDiff_support_eq_eq_one_iff (I := modelWithCornersSelf ℝ E)` with `contMDiff_iff_contDiff`;
+  `mem_closedBall_zero_iff` on a submodule subtype needs `(E := ↥S)` (oaiq-092); `ModelWithCorners.MfldCat` is
+  missing (oaiq-091 patched in a local structure for its one model); `MemLp g p μ` is a pair (a bare `lt_top` proof needs
   `⟨hg.aestronglyMeasurable, _⟩`), `MemLp.mul` swapped its factors; `norm_num [table defs]` leaves `vecCons`
   lookups or `Int.toNat 205` unevaluated where `simp [same]` evaluates them (oaiq-033/038); `rw
   [AddMonoidAlgebra.coeff_zero]` on an `MvPolynomial.coeff` goal is `MvPolynomial.coeff_zero` (and `coeff_add`);
@@ -162,6 +180,20 @@ Problem336).** Fix each at the cause; none needs a macro.
 - *A `have` that states a hand-written `match`* (`have h : … (match vs with …) …; simp_rw [h]`) breaks when the
   function whose body has the same `match` comes from a bundle: Lean shares a matcher only within one module
   (oaiq-018). Patch the generated piece (config `patches`) with a defeq congruence instead of the rewrite.
+  Same cause for a `simp only [hb]` whose `hb` mentions a `match` lambda (oaiq-087): close with `change`/`exact`/
+  `refine Eq.trans (congrArg …) ?_`, which unify up to defeq.
+- *Failures only in the carved bundle or piece*, never in the module build of the port (oaiq-085, -086, -087).
+  Besides matcher sharing: two global instances on one carrier that no OpenAI module saw together become
+  visible together ("synthesized type class instance is not definitionally equal"): compare the two names in the
+  message and give the one the original module order preferred `priority := high` by patch (oaiq-086; making the
+  other local broke its users); `Finset.filter` goals differing in `DecidablePred` instances: `congr!`; a
+  `Subsingleton.elim` rewrite of a `Fintype` instance whose direction flips between the two contexts: `first |
+  exact hh | (convert hh; all_goals first | rfl | exact Subsingleton.elim _ _)`; `Function.update` with
+  `FunLike.toDecidableEq` vs `Classical.propDecidable`: `convert` where `exact` fails. The patch must keep the
+  port's module compiling too. Test it on the stage file before another re-port and re-measure (about 15
+  minutes): `lake env env LEAN_PATH=<carve>/olean:$(lake env printenv LEAN_PATH) lean <stage file>` from the
+  workspace (a plain `LEAN_PATH=… lake env` is overridden by lake). A line patch whose `old` is also the tail of a
+  more-indented line double-counts: anchor it with a leading `\n` (oaiq-086).
 - *`import all`.* OpenAI reaches Mathlib's *private* declarations (`import all …IsGaussianProcess` for
   `Finset.orderEmbOfFinWithBot`) with `import all`, which a non-`module` file cannot use. Copy the private declarations
   into the module (root names; the private ones are mangled, so nothing clashes).
@@ -482,7 +514,11 @@ back WA. The lessons:
      transitive-closure size at about 1/3, 1/2, 5/6 of the total; oaiq-031, oaiq-074). Verifier data
      (oaiq-078): pieces at 118-126 s local CPU timed out three times; 93.7, 99.6 and 102.7 s passed first time,
      so the real limit is about 100-110 s, below `PIECE_CAP` (150 s, kept so that a piece is tried before it is
-     split).
+     split). Chains of `decide +kernel` theorems are worse: pieces at 97-130 s (oaiq-084) and 147-186 s
+     (oaiq-047) timed out three times each; forcing every kernel theorem the piece keeps (or a fraction of them,
+     evenly spaced: `~/claude/p2m-standalone/openai-ports/oaiq-047/resplit_prep.py`) brought them to 85-97 s and all passed first time. In a
+     kernel-heavy carve, force them at the first plan rather than after the verifier's timeouts. Big carves take
+     time: a 1,300-module carve took about 20 driver restarts and two days at load 15-22 (oaiq-050).
 - **`(kernel) deterministic timeout` where the elaborator accepted every step** (oaiq-068): typically a goal
   equating `f a i₁` with `f a i₂` for two proofs of a Prop-valued instance argument (a `letI … := h ▸
   inferInstance` in two statements). State the irrelevance as a lemma, `@f … i₁ = @f … i₂ := by cases
@@ -567,7 +603,12 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   and resume `--publish`: a "Different" piece is sent with that reason, a "Same" one is settled unsent.
 - **Iterating on drift fixes:** edit the ported file in `prove2me_workspace/Solutions/FOLDER` and compile it
   alone (`lake env lean FILE`, seconds), or the whole closure with in-place edits (`lake build ROOT` keeps going
-  past failures and caches, so a round is minutes; oaiq-075), then turn the diff into patches whose `count` is taken over the
+  past failures and caches, so a round is minutes; oaiq-075; for oaiq-092's 2102 modules a round was 10-30 min
+  in place against 1 h through the pipeline's `build`). Three habits that save rounds: after the first failure of
+  a kind, `rg` the whole port for the same pattern and patch every site before rebuilding (oaiq-089: five
+  2.5 h rounds); batch compat changes before the first full build, since a compat change rebuilds everything
+  (oaiq-091); and run the pipeline's `build` step once before the final in-place rounds, since an in-place build
+  does not write the LeanInfo cache and `graph` then elaborates every module itself (oaiq-092: about 6 h). Then turn the diff into patches whose `count` is taken over the
   unpatched port, never the patched workspace (oaiq-063, -071, -072). A patch `why` lands in the piece's
   explanation: write Lean names in it in backticks (oaiq-064: a hypothesis `he` failed the pronoun check).
 
