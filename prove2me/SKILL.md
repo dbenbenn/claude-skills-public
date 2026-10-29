@@ -141,6 +141,11 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   `scripts/check_server_shape.py MISSION_DIR`: it compiles each statement alone, and a statements
   file compiled as a whole hides a file-level `open` that no extracted statement carries (Lodha–Moore,
   2026-10-01: bare `op`/`unop` failed in three statements, found only by a read-back).
+- "Smooth" is `ContDiff ℝ (⊤ : ℕ∞)` (or `∞` under `open scoped ContDiff`), never `ContDiff ℝ ⊤`:
+  in current Mathlib the bare `⊤` is `ω`, real-analytic, and a compactly supported analytic
+  function on `ℝⁿ` is zero, so every "smooth bump ψ" hypothesis written with `⊤` makes its statement
+  vacuous (Tao 1999 draft, 2026-10-29: four statements, caught by a read-back). Grep the mission for
+  `ContDiff\w* ℝ ⊤` before staging read-backs. `open scoped ContDiff` also reserves `ω` as a token.
 - Names are accurate labels (Mathlib style, `_of_` for hypotheses in binder order), ASCII, and a
   name that would need a caution is the wrong name.
 - **A published statement carries no docstring.** It is the only prose on the platform that both

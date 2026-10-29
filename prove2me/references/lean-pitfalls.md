@@ -336,3 +336,15 @@ Renamed `lt_or_ge` (with `le_or_lt` → `le_or_gt`) at `0df444a`.
 - A.s. stabilisation becomes ℓ¹-Cauchy laws, with the changes bounded by Green-function terms.
 - Transience comes from a variational inequality, f(o)² ≤ C·E_μ(f), together with
   E_μ(u_N) ≤ 2u_N(o) for the truncated Green function.
+
+## `ContDiff ℝ ⊤` is analytic, not smooth
+
+**Symptom:** a read-back renders a "smooth" hypothesis as "real-analytic", or a statement about a
+smooth compactly supported bump turns out to be vacuous.
+
+In current Mathlib `ContDiff 𝕜 n f` takes `n : WithTop ℕ∞`, and the bare `⊤` there is `ω`
+(analytic). Smooth is `((⊤ : ℕ∞) : WithTop ℕ∞)`, written `ContDiff ℝ (⊤ : ℕ∞) f`, or `∞` after
+`open scoped ContDiff` (which also makes `ω` a reserved token, so a variable named `ω` stops
+parsing). A compactly supported analytic function on `ℝⁿ` is identically zero, so "smooth and
+compactly supported" written with `⊤` admits only `0`. Check with
+`example : ContDiff ℝ (⊤ : ℕ∞) f ↔ ∀ n : ℕ, ContDiff ℝ n f := contDiff_infty`.
