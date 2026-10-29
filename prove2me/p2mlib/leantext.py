@@ -196,6 +196,15 @@ def inline_tactic_macros(text):
     return inline_macro_uses(text, macros), list(macros)
 
 
+IMPORT_RE = re.compile(r"^(?:public[ \t]+)?(?:meta[ \t]+)?import[ \t]+(?:all[ \t]+)?(\S+)", re.M)
+
+
+def import_names(text):
+    """The modules `text` imports, in order, module-system forms included (`public import`, `meta import`,
+    `import all M` is M)."""
+    return IMPORT_RE.findall(text)
+
+
 def code_only(text):
     """`text` with every comment and literal (string, char, raw string, «name») blanked to spaces,
     newlines kept, so offsets and line numbers still match the source."""

@@ -30,6 +30,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from p2m import call
 from prune_solution import parse
+sys.path.insert(0, os.path.dirname(HERE))
+from p2mlib.leantext import import_names  # noqa: E402
 
 
 def published(name):
@@ -105,7 +107,7 @@ def closure(repo, pkg, module, dirs):
         if path in seen:
             return
         seen.add(path)
-        for m in re.findall(r'^import\s+(\S+)', open(path, encoding='utf-8').read(), re.M):
+        for m in import_names(open(path, encoding='utf-8').read()):
             if not m.startswith(pkg + '.'):
                 continue
             p = os.path.join(repo, *m.split('.')) + '.lean'

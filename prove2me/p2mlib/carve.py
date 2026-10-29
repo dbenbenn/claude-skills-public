@@ -34,6 +34,7 @@ import sys
 from dataclasses import dataclass, field
 
 from . import leanedit, leaninfo
+from .leantext import import_names
 from . import repair as RP
 from .leantext import guard_message, guard_problems, strip
 
@@ -222,7 +223,7 @@ def record_fixture(src_root, prefix, roots, olean_dir, out_dir, ws=None):
         if m in seen:
             return
         seen.add(m)
-        for imp in re.findall(r'^import\s+(\S+)', open(module_path(src_root, m)).read(), re.M):
+        for imp in import_names(open(module_path(src_root, m)).read()):
             if imp.split('.')[0] == prefix.split('.')[0] and os.path.exists(module_path(src_root, imp)):
                 visit(imp)
         mods.append(m)
