@@ -25,6 +25,11 @@ CASES = [
               'or proof into smaller lemmas or definitions and checking each piece separately before retrying.', 'transient'),
     ('FAILED', 'Compilation timed out after 300s', 'own_timeout'),
     ('FAILED', 'definition does not compile: Import parser timed out after 5s', 'transient'),
+    # oaiq-089: the platform's lexer timing out on small statements under load; a reset republished all nine
+    ('FAILED', 'formal statement does not compile: could not lex the submitted code: Token scanner timed out after 10s',
+     'transient'),
+    # a lex failure that is not a timeout is the file's
+    ('FAILED', 'formal statement does not compile: could not lex the submitted code: unterminated comment', 'compile_error'),
     ('FAILED', "definition does not compile: DB error looking up import 'Definitions.Def_OAIErdos3B133': "
                '<ConnectionTerminated error_code:0>', 'transient'),
     ('FAILED', 'definition does not compile: line 3001: (deterministic) timeout at `whnf`, maximum number of '

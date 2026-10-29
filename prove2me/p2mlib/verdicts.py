@@ -5,7 +5,9 @@
   transient      the platform, not the item: cold workers loading imported bundles ("Failed to
                  materialize the target's dependencies", publish-side "Internal error while
                  publishing: Module compilation timed out"), database drops ("DB error ...
-                 ConnectionTerminated"), "Import parser timed out", network errors. Retry.
+                 ConnectionTerminated"), "Import parser timed out", the lexer's "Token scanner timed out"
+                 on small statements under load (oaiq-089: a reset republished all nine), network
+                 errors. Retry.
   own_timeout    the item's own compile is too slow ("Verification timed out", "Failed to compile
                  solution module: Module compilation timed out", publish FAILED "Compilation timed
                  out"). Retrying is a lottery (an 84 s piece passed after 129 tries); split instead.
@@ -31,7 +33,7 @@ TRANSIENT_CAP = 30       # transient failures before giving up for this run (col
 _TRANSIENT = re.compile(
     r"Failed to materialize the target's dependencies|Failed to resolve platform imports|"
     r"Internal error while publishing|DB error looking up import|ConnectionTerminated|"
-    r"Import parser timed out|urlopen error|Connection(?:Reset|Refused)?Error|Temporary failure|"
+    r"Import parser timed out|Token scanner timed out|urlopen error|Connection(?:Reset|Refused)?Error|Temporary failure|"
     r"Network is unreachable|No route to host")
 _OWN = re.compile(r"Verification timed out|Failed to compile solution module|^Compilation timed out")
 _DEP_OOM = re.compile(r"Failed to compile modules .*exited with code 137", re.S)
