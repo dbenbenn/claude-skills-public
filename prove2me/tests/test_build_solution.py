@@ -115,3 +115,13 @@ def test_module_body_keeps_doc_lines_that_start_with_import():
     assert 'import Mathlib' not in body and 'L3E_MainP' not in body
     assert 'import the stub of a7e19a77 nor of the E6 draft. -/' in body
     assert body.lstrip().startswith('/-! # L3E_DevP')
+
+
+def test_wrapped_module_keeps_its_imports_for_merge():
+    # 2026-10-29 (oaiq-111): the wrapped copies were written without their import header, so
+    # merge.py's parse check (13b5bf0) read them without `import Mathlib` and refused every merge
+    import merge
+    text = 'import Mathlib\nimport Solutions.TaoBR111.CubeA\n\nopen Real\n\ntheorem a : True := trivial\n'
+    w = BS.wrap_module(text)
+    assert merge.header([w]) == 'import Mathlib\n'
+    assert 'section\nopen Real\n\ntheorem a : True := trivial\n\nend\n' in w

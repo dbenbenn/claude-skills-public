@@ -168,6 +168,15 @@ def module_body(text):
     return text[header_end(text):]
 
 
+def wrap_module(text):
+    """A module's copy for merge.py: its import header kept (merge.py takes the merged file's imports
+    from the modules' headers and parses the modules with them; without `import Mathlib` the parse
+    fails and the merge is refused), its body wrapped in `section ... end`."""
+    from p2mlib.leantext import header_end
+    k = header_end(text)
+    return text[:k].rstrip('\n') + '\n\nsection\n' + text[k:].strip() + '\n\nend\n'
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('target'); ap.add_argument('module'); ap.add_argument('out')
@@ -193,9 +202,8 @@ def main():
     mods = closure(a.root, a.package, a.module, a.merge_dir)
     wrapped = []
     for i, p in enumerate(mods):
-        body = module_body(open(p, encoding='utf-8').read())
         w = os.path.join(work, '%02d_%s' % (i, os.path.basename(p)))
-        open(w, 'w', encoding='utf-8').write('section\n' + body.strip() + '\n\nend\n')
+        open(w, 'w', encoding='utf-8').write(wrap_module(open(p, encoding='utf-8').read()))
         wrapped.append(w)
     print('merging %d module(s): %s' % (len(mods), ' '.join(os.path.relpath(m, a.root) for m in mods)))
 
