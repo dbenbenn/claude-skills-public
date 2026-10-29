@@ -3,7 +3,7 @@
 there are reused). Only the closure: never copy a whole tree into DEST (oaiq-038/040: a 1.4 GB
 `lean/OAI` under src made the port step port all 121,736 OpenAI modules).
 
-usage: oai_fetch.py DEST ROOT_MODULE [--commit SHA] [--git REPO | --no-git] [EXTRA_PATH ...]
+usage: oai_fetch.py DEST ROOT_MODULE [--commit SHA] [--git REPO | --no-git] [--foreign DIR ...] [EXTRA_PATH ...]
   EXTRA_PATH is relative to lean/. Default commit: adc7f1241b42e322a6451854ab7e4b4c146bf78a (the
   release the published OAI goals were generated from).
   --git REPO  a local clone of openai/math (default: $P2M_OAI_GIT, else ~/claude/openai-math); each
@@ -13,6 +13,13 @@ usage: oai_fetch.py DEST ROOT_MODULE [--commit SHA] [--git REPO | --no-git] [EXT
               (eleven worker lessons, oaiq-032..049): those reads back off, honouring Retry-After,
               for up to about 20 minutes per file.
   --no-git    network only.
+  --foreign DIR  (repeatable) a local checkout of a foreign package, at the commit openai/math pins
+              (lean/lakefile, lake-manifest): DIR/<Root>/ or DIR/<Root>.lean. The foreign modules the
+              closure imports and their import closure inside the checkout's roots are copied into
+              DEST/lean verbatim (the port makes module-system files plain: oaiport.demodule); a file
+              already there is kept. A module the checkout lacks is named, not fatal (oaiq-093: OpenAI's
+              GromovGrowthBridge imports a Gromov.PolynomialGrowth absent at the pin: patch the import).
+              LeanArchitect annotations are not stripped: an `import Architect` shows as a missing root.
 
 Prints how many files came from DEST already, from the clone and from the network. Exits 1 when the
 closure imports a package that is neither OpenAI's nor in our toolchain (PrimeNumberTheoremAnd,
@@ -96,9 +103,10 @@ def missing_packages(foreign, dest):
             if not os.path.isdir(os.path.join(lean, k)) and not os.path.exists(os.path.join(lean, k + '.lean'))}
 
 
-def fetch(dest, root, commit=COMMIT, extra=(), git_repo='default', foreign=None):
+def fetch(dest, root, commit=COMMIT, extra=(), git_repo='default', foreign=None, foreign_mods=None):
     """Fetch root's closure into dest; returns (modules, bytes, {source: files}). `foreign`, a dict,
-    collects {import root: [modules importing it]} for roots neither OpenAI's nor in TOOLCHAIN."""
+    collects {import root: [modules importing it]} for roots neither OpenAI's nor in TOOLCHAIN;
+    `foreign_mods`, a dict, likewise {imported module: [modules importing it]}."""
     if git_repo == 'default':
         git_repo = default_git_repo()
     gs = GitSource(git_repo, commit) if git_repo else None
@@ -132,14 +140,62 @@ def fetch(dest, root, commit=COMMIT, extra=(), git_repo='default', foreign=None)
                 top = imp.split('.')[0]
                 if top in OPENAI:
                     todo.append(imp)
-                elif top not in TOOLCHAIN and foreign is not None:
-                    foreign.setdefault(top, []).append(m)
+                elif top not in TOOLCHAIN:
+                    if foreign is not None:
+                        foreign.setdefault(top, []).append(m)
+                    if foreign_mods is not None:
+                        foreign_mods.setdefault(imp, []).append(m)
         for rel in extra:
             get(rel)
     finally:
         if gs:
             gs.close()
     return len(seen), total, dict(src)
+
+
+IMPORT = re.compile(r'^(?:public\s+)?(?:meta\s+)?import\s+(?:all\s+)?(\S+)', re.M)
+
+
+def copy_foreign(dest, mods, dirs):
+    """Copy the foreign modules `mods` ({module: [importers]}) and their import closure inside the roots
+    the checkouts `dirs` hold into DEST/lean, verbatim; files already there are kept (prep_rk.py oaiq-091,
+    prep_gromov.py oaiq-093). Returns ({dir: files copied}, {root: [importers]} of roots no checkout
+    holds, {module: [importers]} a holding checkout lacks)."""
+    def holder(root):
+        for d in dirs:
+            if os.path.isdir(os.path.join(d, root)) or os.path.exists(os.path.join(d, root + '.lean')):
+                return d
+        return None
+    copied, unheld, absent = collections.Counter(), {}, {}
+    todo = [(m, imp) for m, imps in sorted(mods.items()) for imp in imps]
+    seen = set()
+    while todo:
+        m, by = todo.pop()
+        top = m.split('.')[0]
+        if top in TOOLCHAIN or top in OPENAI:
+            continue
+        d = holder(top)
+        if d is None:
+            unheld.setdefault(top, []).append(by)
+            continue
+        if m in seen:
+            continue
+        seen.add(m)
+        rel = os.path.join(*m.split('.')) + '.lean'
+        dst = os.path.join(dest, 'lean', rel)
+        if os.path.exists(dst):
+            t = open(dst, encoding='utf-8').read()
+        elif os.path.exists(os.path.join(d, rel)):
+            t = open(os.path.join(d, rel), encoding='utf-8').read()
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with open(dst, 'w', encoding='utf-8') as f:
+                f.write(t)
+            copied[d] += 1
+        else:
+            absent.setdefault(m, []).append(by)
+            continue
+        todo += [(i, m) for i in IMPORT.findall(t)]
+    return dict(copied), unheld, absent
 
 
 def main(argv):
@@ -153,14 +209,27 @@ def main(argv):
         i = args.index('--git')
         repo = os.path.expanduser(args[i + 1])
         del args[i:i + 2]
+    dirs = []
+    while '--foreign' in args:
+        i = args.index('--foreign')
+        dirs.append(os.path.abspath(os.path.expanduser(args[i + 1])))
+        del args[i:i + 2]
     if '--no-git' in args:
         args.remove('--no-git')
         repo = None
     if len(args) < 2:
         sys.exit(__doc__)
-    foreign = {}
-    n, total, src = fetch(args[0], args[1], commit, args[2:], repo, foreign)
+    foreign, foreign_mods = {}, {}
+    n, total, src = fetch(args[0], args[1], commit, args[2:], repo, foreign, foreign_mods)
     print('%d modules, %d bytes (%s)' % (n, total, ', '.join('%d %s' % (v, k) for k, v in sorted(src.items())) or 'none'))
+    if dirs:
+        copied, unheld, absent = copy_foreign(args[0], foreign_mods, dirs)
+        for d in dirs:
+            print('%d foreign modules from %s' % (copied.get(d, 0), d))
+        for m, by in sorted(absent.items()):
+            print('not in its checkout: %s (imported by %s): patch the import away' % (m, ', '.join(sorted(set(by)))))
+        for k, v in unheld.items():
+            foreign.setdefault(k, []).extend(v)
 
     missing = missing_packages(foreign, args[0])
     if missing:

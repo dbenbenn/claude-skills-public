@@ -133,3 +133,39 @@ def test_a_foreign_package_in_the_closure_is_reported_until_it_is_placed(repo, t
     (dest / 'lean' / 'PrimeNumberTheoremAnd.lean').write_text('-- placed\n')
     F.main([str(dest), 'OAI.X.Main', '--commit', sha2, '--git', str(r)])
     assert '4 modules' in capsys.readouterr().out
+
+
+def test_foreign_closures_are_copied_from_a_local_checkout(repo, tmp_path, monkeypatch, capsys):
+    # oaiq-091 (RellichKondrachov, prep_rk.py) and oaiq-093 (Gromov, prep_gromov.py): each job wrote a script copying
+    # the foreign package's import closure into src/lean. `--foreign DIR` does it: only the closure, verbatim (the port
+    # makes module-system files plain), files already in DEST kept; a root no checkout holds is still reported, and a
+    # module the checkout lacks (Gromov.PolynomialGrowth at the pinned commit) is named
+    r, sha = repo
+    (r / 'lean' / 'OAI' / 'Lib.lean').write_text('public import StrongPNT.Main\nimport StrongPNT.Gone\n'
+                                                 'import PrimeNumberTheoremAnd.X\n')
+    git(r, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'foreign')
+    sha2 = git(r, 'rev-parse', 'HEAD')
+    monkeypatch.setattr(F.urllib.request, 'urlopen', no_network)
+    monkeypatch.setattr(F.time, 'sleep', no_network)          # an unknown option fetched as a path would retry
+    ext = tmp_path / 'ext' / 'spnt'
+    (ext / 'StrongPNT').mkdir(parents=True)
+    main = 'module\n\npublic import Mathlib.A\npublic import StrongPNT.Aux\n\n@[expose] public section\n'
+    (ext / 'StrongPNT' / 'Main.lean').write_text(main)
+    (ext / 'StrongPNT' / 'Aux.lean').write_text('import Architect\nimport StrongPNT.Kept\n')
+    (ext / 'StrongPNT' / 'Kept.lean').write_text('-- upstream\n')
+    (ext / 'StrongPNT' / 'Unused.lean').write_text('-- not in the closure\n')
+    dest = tmp_path / 'dest'
+    (dest / 'lean' / 'StrongPNT').mkdir(parents=True)
+    (dest / 'lean' / 'StrongPNT' / 'Kept.lean').write_text('-- edited by hand\n')
+    with pytest.raises(SystemExit) as e:
+        F.main([str(dest), 'OAI.X.Main', '--commit', sha2, '--git', str(r), '--foreign', str(ext)])
+    msg = str(e.value)
+    assert 'PrimeNumberTheoremAnd (imported by OAI.Lib)' in msg and 'Architect (imported by StrongPNT.Aux)' in msg
+    assert 'StrongPNT (' not in msg
+    out = capsys.readouterr().out
+    assert '2 foreign modules from %s' % ext in out and 'StrongPNT.Gone (imported by OAI.Lib)' in out
+    got = sorted(os.path.relpath(os.path.join(d, f), dest / 'lean' / 'StrongPNT')
+                 for d, _, fs in os.walk(dest / 'lean' / 'StrongPNT') for f in fs)
+    assert got == ['Aux.lean', 'Kept.lean', 'Main.lean']
+    assert (dest / 'lean' / 'StrongPNT' / 'Main.lean').read_text() == main
+    assert (dest / 'lean' / 'StrongPNT' / 'Kept.lean').read_text() == '-- edited by hand\n'
