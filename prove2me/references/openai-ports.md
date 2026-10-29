@@ -259,7 +259,7 @@ and new `carve.py` inside one carve. So:
   cost), re-plans, re-generates and re-measures (unchanged files are cached), at most twice, and stops with
   the offenders listed (then `carve.py split` or a manual `time_scale`). Never publish before it passes. It
   only raises the scale: a small sample cannot calibrate it down, since the per-item error is 0.3–1.4× even
-  at a fitted scale. A piece measured under 150 s never counts: it is a proof, resubmittable, so submit
+  at a fitted scale. A piece measured under 120 s (`PIECE_CAP`, 150 s before 2026-10-29) never counts: it is a proof, resubmittable, so submit
   it as is and split only after two real verifier timeouts; bundles and statements freeze at publish and
   keep the strict limit (oaiq-035/037: a 106 s piece cost two hour-long re-plans; oaiq-031: a 192 s piece
   timed out three times at the verifier's 300 s, so the cap is 150, not 200). When only pieces are over,
@@ -527,7 +527,7 @@ back WA. The lessons:
   3. No heavy declaration, just many small lemmas: force two or three mid-chain theorems (`forced`, chosen by
      transitive-closure size at about 1/3, 1/2, 5/6 of the total; oaiq-031, oaiq-074). Verifier data
      (oaiq-078): pieces at 118-126 s local CPU timed out three times; 93.7, 99.6 and 102.7 s passed first time,
-     so the real limit is about 100-110 s, below `PIECE_CAP` (150 s, kept so that a piece is tried before it is
+     so the real limit is about 100-110 s, below `PIECE_CAP` (120 s since 2026-10-29, above the limit on purpose so that a borderline piece is tried before it is
      split). Chains of `decide +kernel` theorems are worse: pieces at 97-130 s (oaiq-084) and 147-186 s
      (oaiq-047) timed out three times each; forcing every kernel theorem the piece keeps (or a fraction of them,
      evenly spaced: `~/claude/p2m-standalone/openai-ports/oaiq-047/resplit_prep.py`) brought them to 85-97 s and all passed first time. In a

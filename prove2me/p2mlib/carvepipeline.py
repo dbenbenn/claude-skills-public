@@ -33,8 +33,10 @@ class StepFailed(Exception):
 
 ACCEPT_CAP = 200        # an accept_over item is excused only below this many seconds
 UNIFORM_MIN, UNIFORM_RATIO = 3, 2.5   # pieces over plan by a similar factor >= this: re-plan (oaiq-073)
-PIECE_CAP = 150         # a piece (resubmittable) is excused below this: dbenbenn's "submit at ~145 s";
-                        # oaiq-031's 192 s piece timed out three times at the verifier's 300 s
+PIECE_CAP = 120         # a piece (resubmittable) is excused below this; dbenbenn 2026-10-29 (was 150): a slow
+                        # submit costs only wall-clock, a needless re-plan hours; verifier data: 94-103 s passed,
+                        # 118-126 s timed out 3x (oaiq-078), 125 s and 162 s passed on a retry (oaiq-047, -085),
+                        # 192 s timed out 3x (oaiq-031)
 
 
 def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR, accepted=()):

@@ -596,9 +596,14 @@ def test_a_piece_under_the_cap_never_forces_a_replan():
     r = CP.calibration(_plan({'B0': 55}, {'P': 46}), {'bundle:B0': _t(250), 'piece:P': _t(250)}, 8, 55)
     assert [x[0] for x in r['over']] == ['bundle:B0', 'piece:P']
     # oaiq-031: a 192 s piece timed out three times at the verifier's 300 s; pieces are excused only
-    # up to 150 s (dbenbenn's rule: submit as is at ~145 s)
+    # up to 120 s (dbenbenn 2026-10-29, lowered from 150: 118-126 s timed out 3x in oaiq-078, but 125 s and
+    # 162 s passed on a retry; a slow submit costs only wall-clock, a needless re-plan costs hours)
     r = CP.calibration(_plan({'B0': 55}, {'P': 10}), {'bundle:B0': _t(20), 'piece:P': _t(192)}, 8, 55)
     assert [x[0] for x in r['over']] == ['piece:P']
+    r = CP.calibration(_plan({'B0': 55}, {'P': 10}), {'bundle:B0': _t(20), 'piece:P': _t(135)}, 8, 55)
+    assert [x[0] for x in r['over']] == ['piece:P']
+    r = CP.calibration(_plan({'B0': 55}, {'P': 10}), {'bundle:B0': _t(20), 'piece:P': _t(118)}, 8, 55)
+    assert r['over'] == []
     r = CP.calibration(_plan({'B0': 55}), {'bundle:B0': _t(106)}, 8, 55)
     assert [x[0] for x in r['over']] == ['bundle:B0']
 
