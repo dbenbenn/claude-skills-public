@@ -1067,3 +1067,14 @@ def test_once_publishing_started_a_port_rule_change_keeps_the_port_and_says_so(e
     env.log.write_text('')
     r = run(env, '--upgrade')
     assert r.returncode == 0 and not _ported(env), r.stdout + r.stderr
+
+
+def test_closure_follows_module_system_imports(tmp_path):
+    # `public import`, `meta import` and `import all M` are imports too (leantext.import_names)
+    lean = tmp_path / 'lean' / 'OAI' / 'Pre'
+    lean.mkdir(parents=True)
+    (lean / 'Main.lean').write_text('module\npublic import OAI.Pre.A\nmeta import OAI.Pre.B\nimport all OAI.Pre.C\n')
+    for m in 'ABC':
+        (lean / (m + '.lean')).write_text('module\n')
+    (lean / 'Other.lean').write_text('')
+    assert CP.outside_closure(str(tmp_path / 'lean'), 'OAI.Pre.Main') == (1, 4)

@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-from . import runlock, snapshot, workspace as wslib
+from . import leantext, runlock, snapshot, workspace as wslib
 
 STEPS = ['fetch', 'inputs', 'filter_patches', 'port', 'build', 'wsbuild', 'config', 'graph', 'extdefs', 'plan', 'gen', 'names',
          'order', 'measure', 'calibrate', 'publish_prep', 'prose', 'check_text', 'dryrun', 'publish']
@@ -212,7 +212,7 @@ def outside_closure(lean_src, root_module):
         if not os.path.exists(f):
             continue
         seen.add(m)
-        todo += [i for i in re.findall(r'^import\s+(\S+)', open(f, encoding='utf-8').read(), re.M)
+        todo += [i for i in leantext.import_names(open(f, encoding='utf-8').read())
                  if i.split('.')[0] in ('OAI', 'ComparatorChallenges')]
     out = 0
     for d, _, fs in os.walk(os.path.join(lean_src, 'OAI')):
