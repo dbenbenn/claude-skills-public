@@ -63,7 +63,7 @@ usage:
       no comment (the platform refuses one, and a statement's text freezes); with PUBLISH_DIR/run.json,
       every item still to send must have its prose/<slug>.md or explanations/<slug>.md (MISSING:
       the goal's and forced items' are written by hand). --kinds limits the check to those items
-      (without `piece`, explanations/ is not read). Exit 1 on a problem.
+      (without `piece`, explanations/ is not read; with only `piece`, prose/ is not). Exit 1 on a problem.
 """
 import glob
 import json
@@ -640,7 +640,8 @@ def cmd_check_text(argv):
         return seen[name]
     bad, name_cache = 0, {}
     expl = glob.glob(P + '/explanations/*.md') if kinds is None or 'piece' in kinds else []
-    for f in sorted(glob.glob(P + '/prose/*.md') + expl):
+    prose = glob.glob(P + '/prose/*.md') if kinds is None or {'bundle', 'statement'} & set(kinds) else []
+    for f in sorted(prose + expl):
         t = open(f, encoding='utf-8').read()
         if '/explanations/' in f:
             for pr in E.problems(t):

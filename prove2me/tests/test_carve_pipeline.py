@@ -1176,7 +1176,7 @@ def test_overlap_measures_and_checks_bundles_and_statements_before_the_pieces(en
     after = [(t, a) for t, a in seq[j + 1:]]
     assert [x[0] for x in after] == ['carve_prep', 'carve_prep', 'carve_prep', 'split_run']
     assert after[0][1][0] == 'publish-prep' and after[0][1][-1] == '--sync'
-    assert after[2][1][0] == 'check-text' and '--kinds' not in after[2][1]
+    assert after[2][1][0] == 'check-text' and after[2][1][-2:] == ['--kinds', 'piece']   # prose checked before
     assert after[3][1] == ['publish/run.json']                                # the full dry run
     # without --publish nothing is published, and nothing started in the background
     assert not any(l.startswith('systemd-run') for l in _raw(env))

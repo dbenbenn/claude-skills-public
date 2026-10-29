@@ -465,3 +465,22 @@ def test_check_text_kinds_scopes_the_check_to_bundles_and_statements(tmp_path, c
     with pytest.raises(SystemExit) as e:
         CP.cmd_check_text([str(P), '--ws', str(ws), '--kinds', 'bundle,statement'])
     assert e.value.code == 1 and 'MISSING statement:OAI.Fam.named' in capsys.readouterr().out
+
+
+def test_check_text_kinds_piece_checks_only_the_explanations(tmp_path, capsys, monkeypatch):
+    # overlap mode's pieces_prep: the prose was checked before the bundles and statements published
+    # (oaiq-047: check-text over 1,279 statements took 50 min); only explanations are new
+    d, ws = make_carve(tmp_path)
+    run(d)
+    P = d / 'publish'
+    (P / 'run.json').write_text(json.dumps({
+        'plan': str(P / 'plan.json'), 'out': str(P / 'out'), 'prose': str(P / 'prose'),
+        'explanations': str(P / 'explanations'), 'state': str(P / 'run_state.json'), 'log': str(P / 'log')}))
+    read = []
+    real = CP.missing_names
+    monkeypatch.setattr(CP, 'missing_names', lambda t, *a, **k: read.append(t) or real(t, *a, **k))
+    with pytest.raises(SystemExit) as e:
+        CP.cmd_check_text([str(P), '--ws', str(ws), '--kinds', 'piece'])
+    out = capsys.readouterr().out
+    assert e.value.code == 1 and 'MISSING piece:OAI.main' in out and 'MISSING statement' not in out, out
+    assert read and not any(t.startswith('---') for t in read)          # no prose file was read

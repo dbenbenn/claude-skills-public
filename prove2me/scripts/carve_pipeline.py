@@ -65,7 +65,7 @@ bundles and statements only; publish_early (with --publish) freezes them (DIR/pu
 `forced`, `template_forced`, kept in pipeline_state.json `auto_config`) and publishes them from a background
 publisher, the systemd user unit carve-pub-<hash> running `split_run.py publish/run_early.json --go` (log
 logs/publish_early.log), while measure_pieces, calibrate_pieces and pieces_prep (publish-prep --sync,
-prose-template, the full check-text and dry run) deal with the pieces; publish releases them
+prose-template, check-text of the explanations, the full dry run) deal with the pieces; publish releases them
 (publish/release.json, for this plan), waits for the background publisher and runs the final split_run. A
 failure after publish_early stops the driver at once and leaves the publisher running (--wait says so); a
 resumed driver waits for it before its final publish. Slow items: a statement stops, as ever; bundles over the

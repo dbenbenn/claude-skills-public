@@ -229,7 +229,10 @@ and new `carve.py` inside one carve. So:
 - **What re-runs by itself after `--upgrade`** (2026-10-29, oaiq-047/-085/-092). `port` and `filter_patches`
   record the port rules and options they ran with, so a skill fix to a port rewrite re-ports without `--redo
   port`; a re-port that changes no module's text rebuilds nothing. Once publishing has started (publish ran or
-  `publish/run_state.json` exists) a rule change keeps the port: `--redo port` only deliberately. A change to
+  `publish/run_state.json` exists) a rule change keeps the port: `--redo port` only deliberately. A carve that
+  has planned and measured should take new tools with `--upgrade --keep-port`: it records the current rules as
+  the port's, so a changed rule does not re-port (oaiq-081: the new compat rules changed port_patches.json and
+  most modules, which would have rebuilt and re-planned 1,586 measured items). A change to
   `LeanInfo.lean` re-runs `graph`, with a warning giving the module count, while a step that loads the graph is
   still to run; a `config.json` that `--redo config` changed re-runs from `extdefs`. A rebuild keeps the replayed
   modules' times in `build_elab.log`: carves built before 2026-10-29 can have a log missing most modules (oaiq-047:
@@ -281,7 +284,7 @@ and new `carve.py` inside one carve. So:
   `measure` (`--kinds bundle,statement`), `calibrate` (those only), `publish_prep`, `prose`, `check_text`
   (`--kinds bundle,statement`: written prose for forced *statements* is needed now, explanations later), `dryrun`
   (`publish/run_early.json`), `publish_early`, `measure_pieces`, `calibrate_pieces`, `pieces_prep` (publish-prep
-  `--sync`, prose-template, the full check-text and dry run), `publish`.
+  `--sync`, prose-template, check-text of the explanations, the full dry run), `publish`.
   - `publish_early` (only with `--publish`) first freezes what it publishes: `DIR/published/` keeps the plan and the
     lib files, and config `frozen` (that plan, all its bundles, `published/lib`), `forced` (its statements) and
     `template_forced` (those not named in `forced` by you) are set, recorded in `pipeline_state.json`
@@ -314,6 +317,11 @@ and new `carve.py` inside one carve. So:
     type is the cost: `abbrev`s cannot be added to a live statement; `theorem _root_.solution` halves the
     serialization), or the rounds are used up. Remedies then: `accept_over` (`piece:NAME`, under 200 s), or forced
     lemmas in `pipeline.json` `forced` plus `config_set.template_forced` and `--from config --publish`.
+  - **Switching a classic carve** that has not published (oaiq-081, 2026-10-29): wait for its driver to end (`--wait`),
+    add `"overlap": true` to `pipeline.json`, then `carve_pipeline.py DIR --upgrade --keep-port --publish --detach`.
+    A finished `measure` stands (one that failed re-runs for bundles and statements, all cached), the plan is
+    kept, and the run goes on from the phase-1 `calibrate`; `measure_pieces` finds the pieces cached. Rehearsed on a
+    copy of oaiq-081: HEAD's `gen` writes its 1,617 files byte for byte, and only unmeasured items compiled.
 - To change a tool: change the skill (tests first), commit, push; new runs pick it up, running ones do not.
   A tool fix a running carve needs: `--upgrade --redo STEP` (from any snapshot, the carve's old one
   included, since 1dbb8c1). Any remaining shell script in the skill has

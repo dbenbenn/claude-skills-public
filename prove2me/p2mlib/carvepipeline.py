@@ -1108,12 +1108,15 @@ class Pipeline:
     def step_pieces_prep(self):
         """Overlap mode: the pieces' gates, after calibrate_pieces. publish-prep --sync brings the measured
         pieces (and any new statements) into publish/ without touching what is published (it refuses
-        if a published file would change), then prose-template, check-text and a dry run over every item."""
+        if a published file would change), then prose-template, check-text of the explanations and a dry
+        run over every item."""
         meta = ['--meta', self.meta, '--lean-root', self.lean_src]
         self.run_cmds('pieces_prep', [
             self.tool('carve_prep', 'publish-prep', self.d, self.source_line(), self.p.get('tags') or 'openai-math', '--sync'),
             self.tool('carve_prep', 'prose-template', self.d, *meta),
-            self.tool('carve_prep', 'check-text', os.path.join(self.d, 'publish')),
+            # the prose was checked in check_text (which re-runs after any re-plan): the explanations only
+            # (oaiq-047: check-text over 1,279 statements took 50 min)
+            self.tool('carve_prep', 'check-text', os.path.join(self.d, 'publish'), '--kinds', 'piece'),
             self.tool('split_run', 'publish/run.json')])
 
     # -- driver -----------------------------------------------------------------------------
