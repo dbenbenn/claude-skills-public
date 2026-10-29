@@ -214,7 +214,11 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   pdftotext silently drops absolute-value bars. On Juschenko–Monod (2026-10-29) it turned
   Lemma 2.7's $|B(u)| \le 4|g|_{\rm w}^2$ into $B(u) \le 4|g|_{\rm w}^2$ (caught before writing the
   statement), and a Route then "corrected" a printed proof for bounding only $B(u)$, when the page
-  bounds $|B(u)|$ (caught by the quote recheck).
+  bounds $|B(u)|$ (caught by the quote recheck). It also loses where a radical ends: on Viterbo
+  (2026-10-30) the page's $l = \sqrt{c_{\rm EHZ}(K \times T)}/2$ came out as
+  "l = √ cEHZ(K × T)/2", and a Route "corrected" the printed $\sqrt{c/2}$ to $\sqrt c/2$, a typo the
+  paper never made (caught by the caveat audit). **Before calling anything in the source a misprint,
+  look at the page image.**
 - **Recheck all the quotes, as the platform holds them.** Every quotation in every field — milestone
   descriptions, natural-language statements, `source`, the mission description — read from the
   live Draft and compared word for word, punctuation included, with the rendered page. Do it
