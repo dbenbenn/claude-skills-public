@@ -157,6 +157,34 @@ def test_recorded_cuts_already_applied_by_gen_are_not_stale():
     assert M.reapply('import Mathlib\nopen Foo Bar\n', ['open Foo'])[1] == ['open Foo']
 
 
+def test_measure_kinds_measures_only_those_items_in_publish_order(tmp_path, monkeypatch, capsys):
+    # carve_pipeline overlap mode measures bundles and statements first (they freeze at publish),
+    # then the pieces; the first phase reports no orphaned statements (no piece has been read yet)
+    import carve_measure as M
+    plan = {'bundles': [{'name': 'B0', 'imports': [], 'nodes': ['x']}],
+            'stubs': {'A.t': {'bundles': ['B0']}}, 'pieces': {'A.t': {'bundles': ['B0'], 'imports': []},
+                                                             'A.main': {'bundles': ['B0'], 'imports': ['A.t']}},
+            'targets': ['A.main'], 'external': ['A.main'], 'statement_suffix': ''}
+    m = M.Measure.__new__(M.Measure)
+    m.cfg, m.ws, m.olean, m.plan, m.ext = {'work': str(tmp_path)}, '', '', plan, {'A.main'}
+    m.times, m.times_path, m.edges, m.allow_false = {}, str(tmp_path / 'times.json'), {}, False
+    seen = []
+    monkeypatch.setattr(M, 'copy_published', lambda *a: None)
+    monkeypatch.setattr(m, 'env', lambda: {})
+    monkeypatch.setattr(m, 'measure', lambda item, *a: seen.append(item) or {'secs': 1.0, 'ok': True, 'errors': []})
+
+    def edge(item, *a):
+        m.edges[item] = {'file': item, 'false': [], 'imports': {}, 'restore': {}}
+        return m.edges[item]
+    monkeypatch.setattr(m, 'edge_check', edge)
+    assert m.run_all(kinds=('bundle', 'statement'))
+    assert seen == ['bundle:B0', 'statement:A.t']
+    assert 'ORPHANED' not in capsys.readouterr().out
+    assert m.run_all(kinds=('piece',))
+    assert sorted(seen[2:]) == ['piece:A.main', 'piece:A.t']
+    assert set(m.times) == {'bundle:B0', 'statement:A.t', 'piece:A.t', 'piece:A.main'}
+
+
 # ------------------------------------------------------------- with Lean
 
 @pytest.mark.lean

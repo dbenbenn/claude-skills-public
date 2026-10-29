@@ -4,6 +4,7 @@ a time, -j1, in publish order (p2mlib.carve.publish_order), and record CPU secon
 
 usage: carve_measure.py CONFIG.json [--force] [--keep-going] [--dir D] [--no-repair]
                          [--no-edge-check] [--drop-false-edges] [--allow-false-edges]
+                         [--kinds bundle,statement|piece]
   -> <work>/times.json, the input of `carve.py split CONFIG.json TIMES.json`,
      <work>/edges.json and <work>/false_edges.json (the edge check)
 
@@ -41,6 +42,10 @@ import (`import Theorems.*`, a theorem-graph edge) fails the run unless --allow-
 definitions import is reported and kept (cutting one broke dependants, oaiq-039/075).
 --drop-false-edges cuts each false theorem import that needs no replacement, records the cut in <work>/repairs.json (re-applied after every `carve.py gen`, like
 the context-command repairs) and re-measures the file.
+
+--kinds measures only those items (carve_pipeline's overlap mode: bundles and statements first, which
+freeze at publish, then the pieces against their .olean files from the first run in D/olean). Without
+pieces, no statement is reported orphaned (nothing that imports one has been read yet).
 """
 import hashlib
 import importlib.util
@@ -298,7 +303,7 @@ class Measure:
         self.record(src, applied)
         return True
 
-    def run_all(self, force=False, keep_going=False, repair=True, edges=True, drop=False):
+    def run_all(self, force=False, keep_going=False, repair=True, edges=True, drop=False, kinds=None):
         copy_published(self.ws, self.olean, imported_modules(self.cfg, self.plan))
         env = self.env()
         ok = True
@@ -306,6 +311,8 @@ class Measure:
             for item in wave:
                 kind, n = item.split(':', 1)
                 if kind == 'statement' and n in self.ext:
+                    continue
+                if kinds and kind not in kinds:
                     continue
                 for attempt in range(2):
                     r = self.measure(item, env, force, repair)
@@ -329,6 +336,8 @@ class Measure:
                         return False
         if edges:
             rep = edge_report(self.plan, {i: e for i, e in self.edges.items() if i in self.times})
+            if kinds and 'piece' not in kinds:
+                rep['orphaned_statements'] = []
             json.dump(rep, open(os.path.join(self.cfg['work'], 'false_edges.json'), 'w'), indent=1)
             print_edge_report(rep)
             if failing_false_edges(rep) and not self.allow_false:
@@ -404,15 +413,16 @@ def print_edge_report(rep):
 
 
 def main(argv):
-    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] != '--dir')]
+    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] not in ('--dir', '--kinds'))]
     if len(pos) != 1:
         sys.exit(__doc__)
     from p2mlib import runlock
     runlock.hold(runlock.dir_key('measure', pos[0]), 'carve_measure.py ' + ' '.join(argv))
     m = Measure(pos[0], opt(argv, '--dir'))
     m.allow_false = '--allow-false-edges' in argv
+    kinds = [k for k in (opt(argv, '--kinds') or '').split(',') if k] or None
     ok = m.run_all('--force' in argv, '--keep-going' in argv, '--no-repair' not in argv,
-                   '--no-edge-check' not in argv, '--drop-false-edges' in argv)
+                   '--no-edge-check' not in argv, '--drop-false-edges' in argv, kinds)
     print('done' if ok else 'FAILED')
     sys.exit(0 if ok else 1)
 

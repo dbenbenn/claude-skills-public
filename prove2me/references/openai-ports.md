@@ -272,6 +272,48 @@ and new `carve.py` inside one carve. So:
   (`bundle:NAME`) under a 200 s cap. Outside the pipeline the
   manual rule is the same: measure everything, and if any bundle or statement is over ~90 s, multiply
   `time_scale` by the worst measured/planned ratio and plan again.
+- **Overlap mode: bundles and statements publish while the pieces are measured** (dbenbenn 2026-10-29: "a slow
+  proof really shouldn't need to block submitting definition bundles"; oaiq-081 had all 194 bundles and 696
+  statements fine after ~1.5 h of measuring, then ~4 h of pieces and five slow ones before anything could go).
+  On for every carve created since then (`pipeline.json` `"overlap": true`, written at the first run; `--no-overlap`
+  to opt out); a `pipeline.json` without the key is a classic carve and stays one, `--upgrade` included; add the key
+  by hand to switch a carve that has not published. The steps:
+  `measure` (`--kinds bundle,statement`), `calibrate` (those only), `publish_prep`, `prose`, `check_text`
+  (`--kinds bundle,statement`: written prose for forced *statements* is needed now, explanations later), `dryrun`
+  (`publish/run_early.json`), `publish_early`, `measure_pieces`, `calibrate_pieces`, `pieces_prep` (publish-prep
+  `--sync`, prose-template, the full check-text and dry run), `publish`.
+  - `publish_early` (only with `--publish`) first freezes what it publishes: `DIR/published/` keeps the plan and the
+    lib files, and config `frozen` (that plan, all its bundles, `published/lib`), `forced` (its statements) and
+    `template_forced` (those not named in `forced` by you) are set, recorded in `pipeline_state.json`
+    `auto_config` and re-applied whenever config.json is rewritten. Then it starts the background publisher,
+    `split_run.py publish/run_early.json --go`, as its own systemd user unit `carve-pub-<hash>` (output
+    `logs/publish_early.log`, progress `publish/PROGRESS.log`). Pieces are held by the gate
+    (`publish/release.json`, see p2mlib.splitrun) until `publish` releases them for exactly this plan; the
+    publisher ends once nothing but held pieces is left. `split_run --go` now holds a lock per `publish/`, so a
+    second publisher (the final one, or one started by hand) exits 3 while the background one runs.
+  - A failure after `publish_early` (a piece that does not compile, a missing explanation, a slow piece) stops the
+    driver at once, and the publisher goes on; `--wait` and the failure message say so. Fix and resume as usual;
+    steps that write `publish/` sync it (atomic file replacement), never rebuild it, and stop if a published
+    bundle or statement file would change (`gen` checks the same right away). `publish` writes the release, waits
+    for the background publisher to end (it sends the pieces itself if it is still running), then runs the
+    final `split_run publish/run.json --go`, which resumes.
+  - Pieces publish as one final wave once every piece fits, not one by one: calibrate judges the pieces as a set,
+    a remedy re-plan changes piece files and their imports, and a piece cannot go before its statement is live
+    anyway, which phase-1 publishing usually outlasts.
+  - **A slow bundle** in `calibrate`: if at least three bundles and a quarter of the measured ones are over the limit
+    (a systematic cost-model error, batch 3) and nothing is published (no publishing started, no config `frozen`),
+    the global re-plan at a larger `time_scale` as before; otherwise each slow bundle is split alone
+    (`carve.py split CONFIG TIMES --limit BUDGET --only NAMES`, up to three rounds): every other bundle keeps its
+    declarations, name and imports, so only the files importing the split one change and are measured again.
+  - **A slow piece** in `calibrate_pieces`, nothing published: as before (a uniform overrun re-plans at the ratio, a
+    lone one stops with the profiling hint). Once published, nothing is re-planned globally: each slow piece gets
+    one frozen re-plan in which only its own declarations (`keep` in the plan) cost its measured / planned ratio
+    (config `cost_factors`, `pipeline_state.json` `auto_split`), so the planner promotes lemmas inside it to new
+    statements (template prose) and nowhere else; at most two such rounds. It stops for a person, naming the
+    piece and why, when a piece is still over after its split, or its statement alone takes half its time (the
+    type is the cost: `abbrev`s cannot be added to a live statement; `theorem _root_.solution` halves the
+    serialization), or the rounds are used up. Remedies then: `accept_over` (`piece:NAME`, under 200 s), or forced
+    lemmas in `pipeline.json` `forced` plus `config_set.template_forced` and `--from config --publish`.
 - To change a tool: change the skill (tests first), commit, push; new runs pick it up, running ones do not.
   A tool fix a running carve needs: `--upgrade --redo STEP` (from any snapshot, the carve's old one
   included, since 1dbb8c1). Any remaining shell script in the skill has
@@ -505,7 +547,9 @@ back WA. The lessons:
 
 ## Slow or odd failures: what to try first (worker lessons, 2026-10-28)
 
-- **Calibrate's two outcomes for pieces.** When three or more pieces are over the plan by a similar factor (median
+- **Calibrate's two outcomes for pieces** (classic carves, and overlap carves before anything is published; once
+  published, an overlap carve splits each slow piece by a frozen re-plan by itself, "Overlap mode" above, and stops
+  with this list only for what that cannot fix). When three or more pieces are over the plan by a similar factor (median
   ≥ 2.5, spread ≤ 2×), the plan's cost model was off and calibrate re-plans at that ratio by itself (oaiq-073).
   A lone slow piece, or a scatter, stops it with a profiling hint: re-planning has never shrunk one. In order:
   1. `lean -o x.olean -Dprofiler=true FILE` (with `LEAN_PATH=<carve>/olean:$(lake env printenv LEAN_PATH)`).
@@ -600,6 +644,10 @@ back WA. The lessons:
 
 From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
 
+- **Overlap-mode carves freeze themselves** (2026-10-29): once `publish_early` ran, config `frozen` and `forced`
+  already hold the published plan, bundles and statements (`pipeline_state.json` `auto_config`), and a slow piece
+  gets its frozen re-plan automatically (previous section). The recipe below is what that automates; it is still
+  the way for classic carves, for a piece the automation hands back, and for real verifier timeouts.
 - **Re-split one item after real verifier timeouts** (two or more on a bundle or piece). Keep everything
   live as it is: in `pipeline.json` `config_set`, set `frozen` = {`plan`: a copy of the published
   plan.json, `bundles`: every live bundle, `lib`: `publish/out/lib`} and `forced` = the live intermediate

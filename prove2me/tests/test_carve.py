@@ -2369,3 +2369,62 @@ def test_graph_load_warns_and_counts_the_modules_leaninfo_must_elaborate(tmp_pat
     monkeypatch.setattr(C, 'module_info_cached', lambda src_root, m, ws=None: True)
     C.Graph.load(str(src / 'decl_graph.jsonl'), str(src))
     assert 'LeanInfo' not in capsys.readouterr().err
+
+
+def _carve_script():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        'carve_cli_t', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts', 'carve.py'))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def test_cost_factors_scale_the_declarations_a_slow_piece_kept(g):
+    # carve_pipeline overlap mode: a piece measured far over its plan after its statements were
+    # published is split by a frozen re-plan in which only that piece's declarations cost more
+    # (its measured / planned ratio), so the planner promotes lemmas inside it and nowhere else
+    cli = _carve_script()
+    base = cli.costs({}, g)
+    k = sorted(base)[0]
+    scaled = cli.costs({'cost_factors': {k: 4.0, 'not.a.node': 9.0}}, g)
+    assert scaled[k] == pytest.approx(base[k] * 4.0)
+    assert all(scaled[x] == base[x] for x in base if x != k)
+
+
+def test_split_only_names_the_bundles_to_cut():
+    # a late slow bundle is split alone (carve_pipeline): the target is the budget, but only the
+    # bundles calibrate named are cut, not every bundle measured over the budget
+    cli = _carve_script()
+    bundles = [{'name': 'X0', 'nodes': []}, {'name': 'X1', 'nodes': []}, {'name': 'X2', 'nodes': []}]
+    times = {'bundle:X0': {'secs': 70.0, 'ok': True}, 'bundle:X1': {'secs': 150.0, 'ok': True},
+             'bundle:X2': {'secs': 20.0, 'ok': True}}
+    assert cli.bundles_to_split(bundles, times, 55.0, None) == ['X0', 'X1']
+    assert cli.bundles_to_split(bundles, times, 55.0, ['X1']) == ['X1']
+
+
+def test_splitting_one_bundle_leaves_every_file_that_does_not_import_it_unchanged(g):
+    # carve_pipeline (dbenbenn 2026-10-29): a late slow bundle is split alone; every other bundle keeps
+    # its declarations, name and imports, so gen writes it byte for byte and its measured time stays
+    # valid; only the bundles, statements and pieces importing it change
+    cost = C.size_costs(g, bytes_per_second=10000)
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.05, bundle_size=10**6,
+                    cost=cost, bundle_prefix='S', chunker='schedule')
+    big = max(p['bundles'], key=lambda b: len(b['nodes']))
+    times = {'bundle:' + b['name']: {'secs': 100.0 if b is big else 10.0, 'ok': True} for b in p['bundles']}
+    q = C.split_bundles(g, p, [big['name']], C.calibrate_costs(cost, p['bundles'], times, 1.5, 5.0), 60.0, 'S')
+    old = {b['name']: b for b in p['bundles']}
+    new = {b['name']: b for b in q['bundles']}
+    assert len(q['bundles']) > len(p['bundles'])
+
+    def reaches(names, seen=()):
+        return any(i == big['name'] or (i not in seen and reaches(old[i]['imports'], seen + (i,))) for i in names)
+    kept = [n for n in old if n != big['name'] and not reaches(old[n]['imports'])]
+    importers = [n for n in old if n != big['name'] and reaches(old[n]['imports'])]
+    assert kept and importers
+    assert all(new[n]['imports'] == old[n]['imports'] and new[n]['nodes'] == old[n]['nodes'] for n in kept)
+    for kind in ('pieces', 'stubs'):
+        for n, x in p[kind].items():
+            if big['name'] not in x['bundles'] and not reaches(x['bundles']):
+                assert q[kind][n]['bundles'] == x['bundles']
+    assert C.check_plan(g, q) == []

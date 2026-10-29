@@ -520,3 +520,49 @@ def test_config_fills_missing_times_from_the_leaninfo_cache(tmp_path, monkeypatc
     CP.make_config(str(d), 'F', 'Main', 'OAI.Fam.main', [], 'FAM', [], 40, 0.0, str(ws), None)
     adj = (d / 'build_adj.log').read_text()
     assert 'Solutions.F.M0 (1.0s)' in adj and 'Solutions.F.M5 (5.0s)' in adj and 'M29' not in adj
+
+
+def _prep_dir(tmp_path):
+    for x in ('out/lib', 'out/solutions', 'work'):
+        (tmp_path / x).mkdir(parents=True)
+    (tmp_path / 'out/lib/Def_A.lean').write_text('a')
+    (tmp_path / 'out/lib/Thm_S.lean').write_text('s')
+    (tmp_path / 'out/solutions/Sol_S.lean').write_text('p')
+    plan = {'bundles': [{'name': 'A', 'imports': [], 'nodes': ['x']}], 'stubs': {'S': {'bundles': ['A']}},
+            'pieces': {'S': {'bundles': ['A'], 'imports': []}}, 'external': []}
+    (tmp_path / 'work' / 'plan.json').write_text(json.dumps(plan))
+    (tmp_path / 'work' / 'times.json').write_text('{}')
+    return tmp_path / 'publish'
+
+
+def test_publish_prep_writes_the_gated_run_and_clears_a_release(tmp_path):
+    P = _prep_dir(tmp_path)
+    P.mkdir()
+    (P / 'release.json').write_text('{"plan_sha": "x", "pieces": "all"}')
+    CP.publish_prep(str(tmp_path), 'src', ['t'])
+    early = json.load(open(P / 'run_early.json'))
+    assert early['release'] == str(P / 'release.json') and early['state'] == str(P / 'run_state.json')
+    assert not (P / 'release.json').exists()
+
+
+def test_publish_prep_sync_updates_pieces_and_adds_items_but_never_changes_a_published_file(tmp_path):
+    # overlap mode: a publisher may be reading publish/ while pieces are re-measured or a remedy
+    # re-plans; a sync copies new and changed files in place (each atomically) and refuses, writing
+    # nothing, when a bundle or statement file already in publish/out/lib would change
+    P = _prep_dir(tmp_path)
+    CP.publish_prep(str(tmp_path), 'src', ['t'])
+    (tmp_path / 'out/solutions/Sol_S.lean').write_text('p2')
+    (tmp_path / 'out/lib/Thm_T.lean').write_text('t')
+    (P / 'release.json').write_text('{}')
+    CP.publish_prep(str(tmp_path), 'src', ['t'], sync=True)
+    assert (P / 'out/solutions/Sol_S.lean').read_text() == 'p2'
+    assert (P / 'out/lib/Thm_T.lean').read_text() == 't'
+    assert not (P / 'release.json').exists()
+    assert 'out/lib/Thm_T.lean' in (P / 'MANIFEST.sha1').read_text()
+    (tmp_path / 'out/lib/Def_A.lean').write_text('a changed')
+    (tmp_path / 'out/solutions/Sol_S.lean').write_text('p3')
+    with pytest.raises(SystemExit, match='Def_A.lean'):
+        CP.publish_prep(str(tmp_path), 'src', ['t'], sync=True)
+    assert (P / 'out/lib/Def_A.lean').read_text() == 'a'
+    assert (P / 'out/solutions/Sol_S.lean').read_text() == 'p2'
+    assert CP.published_drift(str(tmp_path / 'out' / 'lib'), str(P / 'out' / 'lib')) == ['Def_A.lean']

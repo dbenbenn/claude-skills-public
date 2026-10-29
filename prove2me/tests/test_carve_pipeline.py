@@ -42,6 +42,17 @@ STUB = textwrap.dedent('''
                 open(os.path.join(ws, 'Definitions', 'Def_' + n + '.lean'), 'w').write('def X := 1\\n')
     if NAME == 'carve_prep' and sys.argv[1] == 'prose-template':
         print('needs written prose: goal (goal)')
+    if NAME == 'carve_prep' and sys.argv[1] == 'publish-prep':
+        import shutil
+        d = sys.argv[2]
+        os.makedirs(os.path.join(d, 'publish', 'out', 'lib'), exist_ok=True)
+        if os.path.exists(os.path.join(d, 'carve_work', 'plan.json')):
+            shutil.copy(os.path.join(d, 'carve_work', 'plan.json'), os.path.join(d, 'publish', 'plan.json'))
+        if os.path.isdir(os.path.join(d, 'out', 'lib')):
+            for f in os.listdir(os.path.join(d, 'out', 'lib')):
+                shutil.copy(os.path.join(d, 'out', 'lib', f), os.path.join(d, 'publish', 'out', 'lib', f))
+    # a test scripts a tool's behaviour: STUB_HOOK_<tool>_<first argument, . and - as _>
+    exec(os.environ.get('STUB_HOOK_' + NAME + '_' + (sys.argv[1] if len(sys.argv) > 1 else '').replace('.', '_').replace('-', '_'), ''))
 ''')
 TOOLS = ['fetch_theorems', 'oai_fetch', 'oai_port_modules', 'oai_build_modules', 'carve_prep', 'carve', 'carve_measure', 'split_run']
 
@@ -98,7 +109,8 @@ def env(tmp_path, monkeypatch):
     return type('E', (), dict(repo=repo, ws=ws, dir=d, log=log, tmp=tmp_path))
 
 
-ARGS = ['--folder', 'F', '--root-module', 'OAI.Pre.Main', '--target', 'OAI.X.main', '--bundle-prefix', 'B']
+ARGS = ['--folder', 'F', '--root-module', 'OAI.Pre.Main', '--target', 'OAI.X.main', '--bundle-prefix', 'B', '--no-overlap']
+ARGS_NEW = ARGS[:-1]                    # a carve created now: overlap mode by default
 
 
 def run(env, *extra, dir=True):
@@ -1083,3 +1095,265 @@ def test_closure_follows_module_system_imports(tmp_path):
         (lean / (m + '.lean')).write_text('module\n')
     (lean / 'Other.lean').write_text('')
     assert CP.outside_closure(str(tmp_path / 'lean'), 'OAI.Pre.Main') == (1, 4)
+
+
+# ---------------------------------------------------------------- overlap mode (2026-10-29)
+# dbenbenn: "a slow proof really shouldn't need to block submitting definition bundles". Bundles and
+# statements are measured, calibrated and checked first and published from a background publisher
+# while the pieces are measured (oaiq-081: 194 bundles and 696 statements fine after ~1.5 h of
+# measuring, then ~4 h more of pieces, five of them slow, before anything could publish).
+
+MEASURE_HOOK = textwrap.dedent('''
+    _kinds = sys.argv[sys.argv.index('--kinds') + 1].split(',') if '--kinds' in sys.argv else ['bundle', 'statement', 'piece']
+    _i = open(os.environ['STUB_LOG']).read().count('"tool": "carve_measure"') - 1
+    _seq = json.loads(os.environ.get('STUB_TIMES_SEQ', '[]'))
+    _tp = os.path.join(os.getcwd(), 'carve_work', 'times.json')
+    _t = json.load(open(_tp)) if os.path.exists(_tp) else {}
+    if _i < len(_seq):
+        _t.update({k: v for k, v in _seq[_i].items() if k.split(':')[0] in _kinds})
+    json.dump(_t, open(_tp, 'w'))
+    if os.environ.get('STUB_MEASURE_FAIL') in _kinds:
+        print('piece FAIL'); sys.exit(1)
+''')
+
+
+def _overlap_carve(env, monkeypatch, pieces=None, bundles=None, stimes=None, seq=()):
+    """A carve whose plan has bundles B0..., statements and pieces P0...; times all fine unless given."""
+    work = env.dir / 'carve_work'
+    work.mkdir(parents=True, exist_ok=True)
+    pieces = pieces or {'P0': (10, 30), 'P1': (40, 30)}            # name: (planned cost, measured s)
+    bundles = bundles or {'B0': (55, 20), 'B1': (55, 20)}
+    plan = {'bundles': [{'name': n, 'cost': c, 'nodes': ['d_' + n], 'imports': []} for n, (c, _) in bundles.items()],
+            'stubs': {n: {'bundles': ['B0']} for n in pieces},
+            'pieces': {n: {'cost': c, 'keep': [n, 'lemma_' + n], 'bundles': ['B0'], 'imports': []}
+                       for n, (c, _) in pieces.items()},
+            'external': []}
+    (work / 'plan.json').write_text(json.dumps(plan))
+    t = {'bundle:' + n: _t(s) for n, (_, s) in bundles.items()}
+    t.update({'statement:' + n: _t((stimes or {}).get(n, 5)) for n in pieces})
+    t.update({'piece:' + n: _t(s) for n, (_, s) in pieces.items()})
+    (work / 'times.json').write_text(json.dumps(t))
+    monkeypatch.setenv('STUB_HOOK_carve_measure_config_json', MEASURE_HOOK)
+    monkeypatch.setenv('STUB_TIMES_SEQ', json.dumps(list(seq)))
+    return plan
+
+
+def _raw(env):
+    return env.log.read_text().splitlines()
+
+
+def _index(lines, pred):
+    return next(i for i, l in enumerate(lines) if pred(l))
+
+
+def test_a_new_carve_is_in_overlap_mode_and_an_old_one_stays_classic(env):
+    assert run(env, *ARGS_NEW, '--stop-after', 'config').returncode == 0
+    assert json.load(open(env.dir / 'pipeline.json'))['overlap'] is True
+    listing = run(env, '--list').stdout.split()
+    assert 'measure_pieces' in listing and 'publish_early' in listing
+    # a pipeline.json from before (no key): classic, also after --upgrade
+    p = json.load(open(env.dir / 'pipeline.json'))
+    del p['overlap']
+    (env.dir / 'pipeline.json').write_text(json.dumps(p))
+    assert 'measure_pieces' not in run(env, '--list').stdout.split()
+    r = run(env, '--upgrade', '--stop-after', 'calibrate')
+    assert r.returncode == 0, r.stderr
+    measure = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure']
+    assert measure and all('--kinds' not in a for a in measure)
+
+
+def test_overlap_measures_and_checks_bundles_and_statements_before_the_pieces(env, monkeypatch):
+    _overlap_carve(env, monkeypatch)
+    r = run(env, *ARGS_NEW)
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = [(c['tool'], c['argv']) for c in calls(env)]
+    i = seq.index(('carve_measure', ['config.json', '--keep-going', '--kinds', 'bundle,statement']))
+    j = seq.index(('carve_measure', ['config.json', '--keep-going', '--kinds', 'piece']))
+    tail = [(t, a[0]) for t, a in seq[i:]]
+    assert tail[:6] == [('carve_measure', 'config.json'), ('carve_prep', 'publish-prep'), ('carve_prep', 'prose-template'),
+                        ('carve_prep', 'check-text'), ('split_run', 'publish/run_early.json'), ('carve_measure', 'config.json')]
+    assert seq[i + 3][1][-2:] == ['--kinds', 'bundle,statement']           # check-text: no explanations yet
+    after = [(t, a) for t, a in seq[j + 1:]]
+    assert [x[0] for x in after] == ['carve_prep', 'carve_prep', 'carve_prep', 'split_run']
+    assert after[0][1][0] == 'publish-prep' and after[0][1][-1] == '--sync'
+    assert after[2][1][0] == 'check-text' and '--kinds' not in after[2][1]
+    assert after[3][1] == ['publish/run.json']                                # the full dry run
+    # without --publish nothing is published, and nothing started in the background
+    assert not any(l.startswith('systemd-run') for l in _raw(env))
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert 'publish_early' not in st['steps'] and 'auto_config' not in st
+    assert 'pieces fit' in (env.dir / 'logs' / 'calibrate.log').read_text()
+
+
+def test_with_publish_bundles_and_statements_go_in_the_background_before_the_pieces_are_measured(env, monkeypatch):
+    plan = _overlap_carve(env, monkeypatch)
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    lines = _raw(env)
+    i_bg = _index(lines, lambda l: l.startswith('systemd-run'))
+    i_pieces = _index(lines, lambda l: '"--kinds", "piece"' in l)
+    i_final = _index(lines, lambda l: '"tool": "split_run"' in l and '"--go"' in l)
+    assert i_bg < i_pieces < i_final
+    bg = lines[i_bg]
+    assert '--unit=carve-pub-' in bg and 'split_run.py publish/run_early.json --go' in bg
+    assert json.loads(lines[i_final])['argv'] == ['publish/run.json', '--go']
+    # what goes out is frozen first: a later re-plan keeps every bundle and statement
+    cfg = json.load(open(env.dir / 'config.json'))
+    assert cfg['frozen']['bundles'] == ['B0', 'B1'] and cfg['frozen']['plan'] == str(env.dir / 'published' / 'plan.json')
+    assert set(cfg['forced']) >= {'P0', 'P1'} and set(cfg['template_forced']) == {'P0', 'P1'}
+    assert json.load(open(env.dir / 'published' / 'plan.json')) == plan
+    # the pieces are released for exactly this plan
+    import hashlib
+    rel = json.load(open(env.dir / 'publish' / 'release.json'))
+    assert rel['pieces'] == 'all'
+    assert rel['plan_sha'] == hashlib.sha1((env.dir / 'publish' / 'plan.json').read_bytes()).hexdigest()
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['publisher']['unit'].startswith('carve-pub-') and st['steps']['publish_early']['status'] == 'done'
+
+
+def test_a_failing_piece_does_not_hold_back_the_bundles_and_statements(env, monkeypatch):
+    # oaiq-081: rounds of piece compile errors (08:40: 6 pieces, nothing else) each held back everything
+    _overlap_carve(env, monkeypatch)
+    monkeypatch.setenv('STUB_MEASURE_FAIL', 'piece')
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1 and "step 'measure_pieces' failed" in r.stderr
+    assert any(l.startswith('systemd-run') for l in _raw(env))
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['steps']['publish_early']['status'] == 'done' and st['steps']['measure_pieces']['status'] == 'failed'
+
+
+def test_forced_named_results_keep_their_written_prose_requirement(env, monkeypatch):
+    _overlap_carve(env, monkeypatch)
+    r = run(env, *ARGS_NEW, '--forced', 'P1', '--publish')
+    assert r.returncode == 0, r.stderr
+    cfg = json.load(open(env.dir / 'config.json'))
+    assert cfg['template_forced'] == ['P0'] and set(cfg['forced']) >= {'P0', 'P1'}
+
+
+def test_a_slow_piece_after_publishing_is_split_by_a_frozen_replan_of_that_piece_alone(env, monkeypatch):
+    # oaiq-081: HighQueryCorrect.marked 283 s against a plan of 40 s. Its statements are live, so the
+    # whole carve is not re-planned: only the declarations the piece kept cost their measured ratio
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)},
+                   seq=[{}, {}, {}, {'piece:P0': _t(40)}])
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['auto_config']['cost_factors'] == {'P0': 19.2, 'lemma_P0': 19.2}
+    assert st['auto_split']['P0']['secs'] == 192 and st['piece_replans'] == 1 and st.get('replans', 0) == 0
+    cfg = json.load(open(env.dir / 'config.json'))
+    assert cfg['cost_factors'] == {'P0': 19.2, 'lemma_P0': 19.2} and cfg['frozen']['bundles'] == ['B0', 'B1']
+    assert cfg.get('time_scale', 1.5) == 1.5 or 'time_scale' not in cfg
+    seq = tools_called(env)
+    assert seq.count(('carve', 'plan')) == 2 and seq.count(('carve', 'split')) == 0
+    assert 'frozen re-plan' in (env.dir / 'logs' / 'calibrate.log').read_text()
+    # a resumed config keeps the frozen part and the factors (they live in pipeline_state.json too)
+    assert run(env, '--redo', 'config', '--stop-after', 'config').returncode == 0
+    cfg = json.load(open(env.dir / 'config.json'))
+    assert cfg['cost_factors'] == {'P0': 19.2, 'lemma_P0': 19.2} and 'frozen' in cfg and 'P0' in cfg['forced']
+
+
+def test_a_piece_still_slow_after_its_automatic_split_stops_for_a_person(env, monkeypatch):
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)}, seq=[{}, {}, {}, {'piece:P0': _t(180)}])
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1
+    assert "step 'calibrate_pieces'" in r.stderr and 'still over after an automatic split' in r.stderr
+    assert 'accept_over' in r.stderr and 'frozen' in r.stderr
+    assert not (env.dir / 'publish' / 'release.json').exists()
+    assert tools_called(env).count(('carve', 'plan')) == 2
+
+
+def test_a_slow_piece_whose_statement_is_the_cost_is_not_split(env, monkeypatch):
+    # oaiq-075: 316 s of 328 in .olean serialization of the statement's type (`sorry` just as slow):
+    # forcing lemmas cannot help, so no automatic split; the statement itself fits (80 s), so it is live
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 150), 'P1': (40, 30)}, stimes={'P0': 80})
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "step 'calibrate_pieces'" in r.stderr and 'the type is the cost' in r.stderr
+    assert 'theorem _root_.solution' in r.stderr
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert not st['auto_config'].get('cost_factors') and st['steps']['publish_early']['status'] == 'done'
+    assert tools_called(env).count(('carve', 'plan')) == 1
+
+
+def test_a_lone_slow_piece_before_anything_is_published_stops_as_before(env, monkeypatch):
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)})
+    r = run(env, *ARGS_NEW)
+    assert r.returncode == 1 and "step 'calibrate_pieces'" in r.stderr and 'profiler' in r.stderr
+    assert 'auto_config' not in json.load(open(env.dir / 'pipeline_state.json'))
+
+
+def test_one_late_slow_bundle_is_split_alone_and_only_what_imports_it_is_regenerated(env, monkeypatch):
+    # dbenbenn 2026-10-29: oaiq-081's first calibrate re-planned all 194 bundles for three slow ones;
+    # split just the slow bundle (carve.py split --only), keep every other bundle (and its time), and
+    # regenerate and re-measure: gen rewrites the files, measure re-runs only changed text
+    bundles = {'B%d' % i: (55, 20) for i in range(12)}
+    bundles['B10'] = (55, 150)
+    _overlap_carve(env, monkeypatch, bundles=bundles, seq=[{}, {'bundle:B10': _t(40), 'bundle:B12': _t(30)}])
+    r = run(env, *ARGS_NEW, '--stop-after', 'calibrate')
+    assert r.returncode == 0, r.stdout + r.stderr
+    split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split']
+    assert len(split) == 1
+    a = split[0]
+    assert a[a.index('--only') + 1] == 'B10' and a[a.index('--limit') + 1] == '55'
+    assert a[2] == str(env.dir / 'carve_work' / 'times.json')
+    seq = tools_called(env)
+    assert seq.count(('carve', 'plan')) == 1 and seq.count(('carve', 'gen')) == 2
+    after_split = seq[seq.index(('carve', 'split')) + 1:]
+    assert after_split[:4] == [('carve', 'gen'), ('carve_prep', 'name-check'), ('carve', 'order'), ('carve_measure', 'config.json')]
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['bundle_splits'] == 1 and st.get('replans', 0) == 0
+    times = json.load(open(env.dir / 'carve_work' / 'times.json'))
+    assert all(times['bundle:B%d' % i] == _t(20) for i in range(10))     # no other time was touched
+    assert 'splitting B10 alone' in (env.dir / 'logs' / 'calibrate.log').read_text()
+
+
+def test_many_uniformly_slow_bundles_before_publishing_replan_globally_as_before(env, monkeypatch):
+    # Batch 3 (2026-10-25): QuarticPowerFree / KirchbergRordam, every bundle 85-128 s against 55 s
+    bundles = {'B%d' % i: (55, 100 + i) for i in range(6)}
+    _overlap_carve(env, monkeypatch, bundles=bundles, seq=[{}, {'bundle:B%d' % i: _t(40) for i in range(6)}])
+    r = run(env, *ARGS_NEW, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}), '--stop-after', 'calibrate')
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert seq.count(('carve', 'plan')) == 2 and ('carve', 'split') not in seq
+    assert json.load(open(env.dir / 'config.json'))['time_scale'] == round(1.2 * 105 / 55, 1)
+    assert json.load(open(env.dir / 'pipeline_state.json'))['replans'] == 1
+
+
+def test_once_published_even_a_systematic_bundle_overrun_is_split_locally(env, monkeypatch):
+    bundles = {'B%d' % i: (55, 100 + i) for i in range(6)}
+    _overlap_carve(env, monkeypatch, bundles=bundles)
+    # an extension of a published carve: its frozen bundles are someone's already
+    r = run(env, *ARGS_NEW, '--config-set', json.dumps({'frozen': {'bundles': ['OLD0'], 'plan': 'x.json'}}),
+            '--stop-after', 'calibrate')
+    split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split']
+    assert split and split[0][split[0].index('--only') + 1] == 'B0,B1,B2,B3,B4,B5'
+    assert tools_called(env).count(('carve', 'plan')) == 1
+
+
+def test_a_change_to_a_published_statement_stops_at_gen(env, monkeypatch):
+    # a carve patch meant for a piece that also rewrites a published stub: caught before measuring
+    (env.dir / 'out' / 'lib').mkdir(parents=True)
+    (env.dir / 'out' / 'lib' / 'Thm_P0.lean').write_text('theorem P0 : True := by sorry\n')
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)})
+    monkeypatch.setenv('STUB_HOOK_carve_gen', textwrap.dedent('''
+        if open(os.environ['STUB_LOG']).read().count('"gen"') > 1:
+            open(os.path.join(os.getcwd(), 'out', 'lib', 'Thm_P0.lean'), 'w').write('theorem P0 : False := by sorry\\n')
+    '''))
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1 and "step 'gen'" in r.stderr and 'Thm_P0.lean' in r.stderr and 'frozen' in r.stderr
+    assert (env.dir / 'published' / 'lib' / 'Thm_P0.lean').read_text() == 'theorem P0 : True := by sorry\n'
+
+
+def test_publish_waits_for_the_background_publisher(env, tmp_path):
+    sys.path.insert(0, ROOT)
+    from p2mlib import carvepipeline as C
+    p = C.Pipeline(str(env.dir), {'overlap': True}, str(env.repo), ws=str(env.ws))
+    states = iter([True, True, True, False, False])
+    p.publisher_running = lambda: next(states)
+    slept = []
+    C.time.sleep, real = (lambda s: slept.append(s)), C.time.sleep
+    try:
+        p.join_publisher('the final publish', poll=7)
+    finally:
+        C.time.sleep = real
+    assert slept == [7, 7]

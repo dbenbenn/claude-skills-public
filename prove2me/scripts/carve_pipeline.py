@@ -3,6 +3,7 @@
 
 usage: carve_pipeline.py DIR [parameters] [--stop-after STEP] [--from STEP] [--redo STEP ...]
                          [--publish] [--upgrade | --snapshot REV] [--allow-dirty] [--list] [--detach]
+                         [--overlap | --no-overlap]
        carve_pipeline.py DIR --wait [MINUTES]
 
 DIR is the carve directory. The first run needs the parameters, which are stored in DIR/pipeline.json
@@ -25,6 +26,9 @@ DIR is the carve directory. The first run needs the parameters, which are stored
   --config-set JSON     keys merged into config.json after `carve_prep config` (pinned, frozen, ...)
   --measure-flag=FLAG   (repeat) passed to carve_measure.py, e.g. --measure-flag=--drop-false-edges
   --tags T              publish-prep tags (default openai-math)
+  --no-overlap          the classic order (every item measured before anything publishes); a new carve
+                        is in overlap mode (below) unless this is given, an existing pipeline.json without
+                        the key `overlap` stays classic
 
 Steps (STEPS in p2mlib.carvepipeline): fetch, inputs (the targets' published statements and their Def_
 bundles are fetched into the workspace when missing), filter_patches, port, build, wsbuild, config, graph,
@@ -51,9 +55,24 @@ its `prefixes` do not match the sources and the root module.
 `calibrate` reads what `measure` found: an item (not frozen) measured over 1.6 x the budget raises
 config `time_scale` to scale x (its measured seconds / its planned cost), forgets plan..measure and
 runs them again (cached files are not re-measured), at most twice; then it stops and lists the
-offenders. A piece (a proof: resubmittable) measured under 200 s never counts: submit it as is and
+offenders. A piece (a proof: resubmittable) measured under 120 s (PIECE_CAP) never counts: submit it as is and
 split only after two real verifier timeouts. Another item is excused the same way by listing it
 (`bundle:NAME`) in pipeline.json `accept_over`. Nothing is published before it. See p2mlib.carvepipeline.calibration.
+
+Overlap mode (pipeline.json "overlap": true; dbenbenn 2026-10-29, "a slow proof really shouldn't need to block
+submitting definition bundles"): measure, calibrate, publish_prep, prose, check_text and dryrun cover the
+bundles and statements only; publish_early (with --publish) freezes them (DIR/published/, config `frozen`,
+`forced`, `template_forced`, kept in pipeline_state.json `auto_config`) and publishes them from a background
+publisher, the systemd user unit carve-pub-<hash> running `split_run.py publish/run_early.json --go` (log
+logs/publish_early.log), while measure_pieces, calibrate_pieces and pieces_prep (publish-prep --sync,
+prose-template, the full check-text and dry run) deal with the pieces; publish releases them
+(publish/release.json, for this plan), waits for the background publisher and runs the final split_run. A
+failure after publish_early stops the driver at once and leaves the publisher running (--wait says so); a
+resumed driver waits for it before its final publish. Slow items: a statement stops, as ever; bundles over the
+limit re-plan globally only when many are (a systematic cost-model error) and nothing is published, else each is
+split alone (`carve.py split --only`, the rest of the plan kept); once published, a slow piece gets one frozen
+re-plan with its own declarations costed at its measured ratio (config `cost_factors`), and stops for a person
+when that cannot help. Without --publish the pieces are measured all the same and nothing is posted.
 
 Long runs: --detach starts the same run as its own systemd user unit (carve-<hash>, output appended to
 DIR/logs/driver.log) and returns at once; --wait [MINUTES] (default 100) then blocks until that run
@@ -106,6 +125,8 @@ def parse(argv):
     ap.add_argument('--tags')
     ap.add_argument('--config-set', type=json.loads)
     ap.add_argument('--measure-flag', action='append', dest='measure_flags')
+    ap.add_argument('--overlap', action='store_true', default=None)
+    ap.add_argument('--no-overlap', action='store_false', dest='overlap')
     ap.add_argument('--stop-after', choices=C.STEPS)
     ap.add_argument('--from', dest='frm', choices=C.STEPS)
     ap.add_argument('--redo', action='append', choices=C.STEPS, default=[])
@@ -122,8 +143,7 @@ def parse(argv):
     return a
 
 
-ENV_KEEP = ('PATH', 'HOME', 'USER', 'LANG', 'LC_ALL')
-ENV_PREFIXES = ('P2M_', 'LEAN_', 'ELAN_')
+ENV_KEEP, ENV_PREFIXES = C.ENV_KEEP, C.ENV_PREFIXES
 
 
 def unit_name(d):
@@ -226,17 +246,42 @@ def wait(a):
             print('== the run detached %s%s ended with exit %d%s' % (
                 m.group(1), ' (run %s)' % rid if rid else '', r,
                 '; it had already ended when --wait started' if first else ''))
+            publisher_note(a.dir)
             return r
         first = False
         if time.time() >= end:
             sp = os.path.join(a.dir, 'pipeline_state.json')
             st = json.load(open(sp)).get('steps', {}) if os.path.exists(sp) else {}
-            done = [k for k in C.STEPS if st.get(k, {}).get('status') in ('done', 'skipped')]
-            nxt = next((k for k in C.STEPS if k not in done), '?')
+            steps = mode_steps(a.dir)
+            done = [k for k in steps if st.get(k, {}).get('status') in ('done', 'skipped')]
+            nxt = next((k for k in steps if k not in done), '?')
             print('still running after %g min: %d steps done, now on %s (log %s). Re-arm --wait.'
                   % (a.wait, len(done), nxt, log))
             return 4
         time.sleep(15)
+
+
+def mode_steps(d):
+    """The steps of the carve in d: overlap mode's when its pipeline.json says so."""
+    try:
+        ov = json.load(open(os.path.join(d, 'pipeline.json'))).get('overlap')
+    except (OSError, ValueError):
+        ov = False
+    return list(C.STEPS) if ov else [s for s in C.STEPS if s not in C.OVERLAP_ONLY]
+
+
+def publisher_note(d):
+    """Say so when the carve's background publisher (overlap mode) outlives the driver."""
+    if C.OVERLAP_ONLY[0] not in mode_steps(d):
+        return False
+    unit = C.publisher_unit(d)
+    if unit_active(unit):
+        print('== the background publisher (unit %s) still publishes bundles and statements (pieces once '
+              'released); progress in %s, output in %s. A resumed driver waits for it before its final publish; '
+              'stop it only with `systemctl --user stop %s`.' % (
+                  unit, os.path.join(d, 'publish', 'PROGRESS.log'), os.path.join(d, 'logs', 'publish_early.log'), unit))
+        return True
+    return False
 
 
 def choose_snapshot(a, state):
@@ -268,6 +313,9 @@ def load_params(a):
         for need in ('folder', 'root_module', 'targets', 'bundle_prefix'):
             if not given.get(need):
                 sys.exit('first run of %s needs --folder, --root-module, --target and --bundle-prefix (see usage)' % a.dir)
+        # overlap mode is on for every carve created since 2026-10-29 (dbenbenn); a pipeline.json without
+        # the key (an older carve) keeps the classic order, so a resumed or upgraded carve never changes mode
+        given.setdefault('overlap', True)
         os.makedirs(a.dir, exist_ok=True)
         json.dump(given, open(path, 'w'), indent=1)
         return given
@@ -298,7 +346,7 @@ def main(argv=None):
         script = os.path.join(snap, 'prove2me', 'scripts', 'carve_pipeline.py')
         os.execv(sys.executable, [sys.executable, script, *argv])
     if a.list:
-        for s in C.STEPS:
+        for s in mode_steps(a.dir):
             print(s, (state or {}).get('steps', {}).get(s, {}).get('status', '-'))
         return 0
     C.lock(a.dir)
@@ -311,6 +359,8 @@ def main(argv=None):
         p.run(stop_after=a.stop_after, only_redo=set(a.redo))
     except C.StepFailed as e:
         print(e, file=sys.stderr)
+        if p.overlap():
+            publisher_note(a.dir)
         return 1
     print('pipeline ok (skill %s)' % os.path.basename(snap))
     return 0

@@ -31,10 +31,14 @@ usage:
       oai_port_modules.py; lists the others. Single-file-only patches go too: `"route": "single"`
       or a universe-list reordering (merge.py's `universe` line; a module has its own). Mark a
       patch `"route": "modules"` to keep oai_port.py from applying it.
-  carve_prep.py publish-prep DIR SOURCE TAG[,TAG...]
-      DIR/publish/: out/ and work/{plan,order,times}.json copied, run.json and
-      run_{1_bundles,2_statements,3_pieces}.json for split_run.py, MANIFEST.sha1; prose/ and
-      explanations/ created empty (written by hand).
+  carve_prep.py publish-prep DIR SOURCE TAG[,TAG...] [--sync]
+      DIR/publish/: out/ and work/{plan,order,times}.json copied, run.json,
+      run_{1_bundles,2_statements,3_pieces}.json and run_early.json (run.json with the pieces gated
+      by publish/release.json, which is removed: carve_pipeline's overlap mode) for split_run.py,
+      MANIFEST.sha1; prose/ and explanations/ created empty (written by hand). --sync, for a publish/
+      a publisher may be reading: nothing is removed, each new or changed file is replaced
+      atomically, and when a file already in publish/out/lib (a bundle or statement, published or
+      being published) would change or vanish it exits 1 naming them, writing nothing.
   carve_prep.py bundle-prose PUBLISH_DIR TEMPLATE.md
       prose/<NAME>.md for every bundle: TEMPLATE with {NAME}, {MODULES} (the bundle's `-- module`
       markers), {IMPORTS} (its bundle imports) and {EXTRA} (extra_<NAME>.md beside the template).
@@ -50,7 +54,7 @@ usage:
       right after `carve.py gen`: every planned bundle and statement name already live on prove2.me
       with other text, looked up as split_run's dry run does (read-only); exits 1 listing them, so a
       clash costs minutes, not the hours of measuring before publish (oaiq-068, oaiq-074).
-  carve_prep.py check-text PUBLISH_DIR [--search FILE ...] [--allow NAME ...]
+  carve_prep.py check-text PUBLISH_DIR [--search FILE ...] [--allow NAME ...] [--kinds bundle,statement]
       explanation rules (p2mlib.explanation) for explanations/*.md; every Lean-looking name in
       backticks in prose/ and explanations/ must occur in out/, the --search files, Mathlib or Lean
       core (a dotted name also passes by its last component; the workspace modules the files
@@ -58,7 +62,8 @@ usage:
       OpenAI's original that a port replaced); a stub (out/lib/Thm_*.lean) may hold
       no comment (the platform refuses one, and a statement's text freezes); with PUBLISH_DIR/run.json,
       every item still to send must have its prose/<slug>.md or explanations/<slug>.md (MISSING:
-      the goal's and forced items' are written by hand). Exit 1 on a problem.
+      the goal's and forced items' are written by hand). --kinds limits the check to those items
+      (without `piece`, explanations/ is not read). Exit 1 on a problem.
 """
 import glob
 import json
@@ -410,7 +415,21 @@ def cmd_filter_patches(argv):
 
 # ---------------------------------------------------------------- publishing
 
-def publish_prep(d, source, tags):
+def _atomic_write(path, data):
+    """Write bytes or text to path through a temporary file and os.replace: a reader (a running
+    publisher) sees the old file or the new one, never a half-written one."""
+    tmp = '%s.tmp%d' % (path, os.getpid())
+    with open(tmp, 'wb') as f:
+        f.write(data.encode('utf-8') if isinstance(data, str) else data)
+    os.replace(tmp, path)
+
+
+def published_drift(lib, published_lib):
+    from p2mlib.carvepipeline import published_drift as drift
+    return drift(lib, published_lib)
+
+
+def publish_prep(d, source, tags, sync=False):
     d = os.path.abspath(d)
     P = os.path.join(d, 'publish')
     for x in ('prose', 'explanations'):
@@ -418,29 +437,55 @@ def publish_prep(d, source, tags):
     for f in ('plan.json', 'times.json'):
         if not os.path.exists(os.path.join(d, 'work', f)):
             sys.exit('no work/%s: run carve.py plan/gen and carve_measure.py first' % f)
-    if os.path.exists(os.path.join(P, 'out')):
-        shutil.rmtree(os.path.join(P, 'out'))
-    shutil.copytree(os.path.join(d, 'out'), os.path.join(P, 'out'))
+    release = os.path.join(P, 'release.json')
+    if sync and os.path.isdir(os.path.join(P, 'out')):
+        drift = published_drift(os.path.join(d, 'out', 'lib'), os.path.join(P, 'out', 'lib'))
+        if drift:
+            sys.exit('publish-prep --sync: %d bundle/statement file(s) of publish/out/lib would change or vanish: %s.\n'
+                     'They are published or being published, so they are frozen: undo what changed them (a '
+                     'carve patch must not touch a bundle or statement once it publishes; a re-plan keeps '
+                     'them with config `frozen` and `forced`). Nothing was written.' % (len(drift), ', '.join(drift[:20])))
+        # no piece is sent while files change under it: the pipeline releases them again after its checks
+        if os.path.exists(release):
+            os.remove(release)
+        for sub in ('lib', 'solutions'):
+            src, dst = os.path.join(d, 'out', sub), os.path.join(P, 'out', sub)
+            os.makedirs(dst, exist_ok=True)
+            for f in sorted(os.listdir(src)):
+                data = open(os.path.join(src, f), 'rb').read()
+                q = os.path.join(dst, f)
+                if not os.path.exists(q) or open(q, 'rb').read() != data:
+                    _atomic_write(q, data)
+    else:
+        if os.path.exists(release):
+            os.remove(release)
+        if os.path.exists(os.path.join(P, 'out')):
+            shutil.rmtree(os.path.join(P, 'out'))
+        shutil.copytree(os.path.join(d, 'out'), os.path.join(P, 'out'))
     for f in ('plan.json', 'times.json'):
-        shutil.copy(os.path.join(d, 'work', f), os.path.join(P, f))
+        _atomic_write(os.path.join(P, f), open(os.path.join(d, 'work', f), 'rb').read())
     # the publish order, from the plan itself (HenonLaneEmden 2026-10-19: carve.py order had not
     # run, and a stale order.json could disagree with the plan)
     from p2mlib import carve as C
     plan = json.load(open(os.path.join(d, 'work', 'plan.json')))
-    json.dump(C.publish_order(plan, plan.get('external', ())), open(os.path.join(P, 'order.json'), 'w'), indent=1)
+    _atomic_write(os.path.join(P, 'order.json'), json.dumps(C.publish_order(plan, plan.get('external', ())), indent=1))
     base = {'plan': P + '/plan.json', 'out': P + '/out', 'prose': P + '/prose',
             'explanations': P + '/explanations', 'state': P + '/run_state.json',
             'log': P + '/PROGRESS.log', 'source': source, 'tags': tags, 'jobs': 4}
-    json.dump(base, open(os.path.join(P, 'run.json'), 'w'), indent=1, ensure_ascii=False)
+    _atomic_write(os.path.join(P, 'run.json'), json.dumps(base, indent=1, ensure_ascii=False))
     for i, k, nm in ((1, 'bundle', 'bundles'), (2, 'statement', 'statements'), (3, 'piece', 'pieces')):
-        json.dump(dict(base, kinds=[k]), open(os.path.join(P, 'run_%d_%s.json' % (i, nm)), 'w'),
-                  indent=1, ensure_ascii=False)
+        _atomic_write(os.path.join(P, 'run_%d_%s.json' % (i, nm)), json.dumps(dict(base, kinds=[k]), indent=1,
+                                                                              ensure_ascii=False))
+    # carve_pipeline's overlap mode: bundles and statements go while pieces are measured; the pieces
+    # wait for release.json, written for this plan once they are measured and checked
+    _atomic_write(os.path.join(P, 'run_early.json'), json.dumps(dict(base, release=release), indent=1,
+                                                                ensure_ascii=False))
     files = sorted('out/lib/' + f for f in os.listdir(os.path.join(P, 'out', 'lib'))) + \
         sorted('out/solutions/' + f for f in os.listdir(os.path.join(P, 'out', 'solutions')))
     import hashlib
     man = ''.join('%s  %s\n' % (hashlib.sha1(open(os.path.join(P, f), 'rb').read()).hexdigest(), f)
                   for f in files)
-    open(os.path.join(P, 'MANIFEST.sha1'), 'w').write(man)
+    _atomic_write(os.path.join(P, 'MANIFEST.sha1'), man)
     return P, man
 
 
@@ -552,8 +597,9 @@ def imported_workspace_files(ws, files):
     return out
 
 
-def missing_run_files(P):
-    """{item: path} of the files missing for the items still to send of P/run.json ({} without one)."""
+def missing_run_files(P, kinds=None):
+    """{item: path} of the files missing for the items (of `kinds`, default all) still to send of
+    P/run.json ({} without one)."""
     rj = os.path.join(P, 'run.json')
     if not os.path.exists(rj):
         return {}
@@ -561,16 +607,19 @@ def missing_run_files(P):
     cfg = json.load(open(rj, encoding='utf-8'))
     for k in ('plan', 'out', 'prose', 'explanations', 'state', 'log'):
         cfg[k] = os.path.expanduser(cfg[k])
+    if kinds:
+        cfg['kinds'] = list(kinds)
     return {x: why[len('missing '):] for x, why in R.Runner(cfg, None).unsendable().items()
             if why.startswith('missing ')}
 
 
 def cmd_check_text(argv):
     from p2mlib import explanation as E
-    pos = positional(argv, ('--ws',), ('--search', '--allow'))
+    pos = positional(argv, ('--ws', '--kinds'), ('--search', '--allow'))
     if len(pos) != 1:
         sys.exit(__doc__)
     P = pos[0]
+    kinds = [k for k in (opt(argv, '--kinds') or '').split(',') if k] or None
     gen = glob.glob(P + '/out/lib/*.lean') + glob.glob(P + '/out/solutions/*.lean')
     ws = ws_of(argv)
     extra = opts(argv, '--search') + imported_workspace_files(ws, gen)
@@ -590,7 +639,8 @@ def cmd_check_text(argv):
                                           for r in roots)
         return seen[name]
     bad, name_cache = 0, {}
-    for f in sorted(glob.glob(P + '/prose/*.md') + glob.glob(P + '/explanations/*.md')):
+    expl = glob.glob(P + '/explanations/*.md') if kinds is None or 'piece' in kinds else []
+    for f in sorted(glob.glob(P + '/prose/*.md') + expl):
         t = open(f, encoding='utf-8').read()
         if '/explanations/' in f:
             for pr in E.problems(t):
@@ -602,7 +652,7 @@ def cmd_check_text(argv):
     # every item still to send needs its prose or explanation file (oaiq-047: 12 forced statements had
     # none; this said 0 problems and the live run blocked them all); read from the run, which knows
     # what is live already
-    for x, why in sorted(missing_run_files(P).items()):
+    for x, why in sorted(missing_run_files(P, kinds).items()):
         bad += 1
         print('MISSING %s: %s' % (x, why))
     stubs = {os.path.basename(f): open(f, encoding='utf-8').read() for f in glob.glob(P + '/out/lib/Thm_*.lean')}
@@ -675,7 +725,8 @@ def cmd_prose_template(argv):
 
 
 CMDS = {'config': cmd_config, 'ext-defs': cmd_ext_defs, 'filter-patches': cmd_filter_patches,
-        'publish-prep': lambda a: print(publish_prep(a[0], a[1], a[2].split(','))[1]) if len(a) == 3 else sys.exit(__doc__),
+        'publish-prep': lambda a: print(publish_prep(a[0], a[1], a[2].split(','), sync='--sync' in a)[1])
+        if len([x for x in a if x != '--sync']) == 3 else sys.exit(__doc__),
         'bundle-prose': cmd_bundle_prose, 'prose-template': cmd_prose_template, 'name-check': cmd_name_check,
         'check-text': cmd_check_text}
 

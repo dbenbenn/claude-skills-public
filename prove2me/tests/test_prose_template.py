@@ -440,3 +440,28 @@ def test_needs_written_names_the_files_to_write_and_check_text_fails_without_the
     with pytest.raises(SystemExit) as e:
         CP.cmd_check_text([str(P), '--ws', str(ws)])
     assert e.value.code == 0, capsys.readouterr().out
+
+
+def test_check_text_kinds_scopes_the_check_to_bundles_and_statements(tmp_path, capsys):
+    # carve_pipeline overlap mode: bundles and statements publish while the pieces are measured,
+    # so their gate must not wait for the goal's hand-written explanation
+    d, ws = make_carve(tmp_path)
+    run(d)
+    P = d / 'publish'
+    (P / 'run.json').write_text(json.dumps({
+        'plan': str(P / 'plan.json'), 'out': str(P / 'out'), 'prose': str(P / 'prose'),
+        'explanations': str(P / 'explanations'), 'state': str(P / 'run_state.json'), 'log': str(P / 'log')}))
+    (P / 'prose' / 'OAI_Fam_named.md').write_text('---\ntitle: The named lemma\n---\n\nIt holds for every input.\n')
+    (P / 'explanations' / 'OAI_Fam_Lemmas_lemA.md').write_text('too short')
+    with pytest.raises(SystemExit) as e:
+        CP.cmd_check_text([str(P), '--ws', str(ws)])
+    out = capsys.readouterr().out
+    assert e.value.code == 1 and 'MISSING piece:OAI.main' in out and 'EXPLANATION' in out
+    with pytest.raises(SystemExit) as e:
+        CP.cmd_check_text([str(P), '--ws', str(ws), '--kinds', 'bundle,statement'])
+    out = capsys.readouterr().out
+    assert e.value.code == 0, out
+    (P / 'prose' / 'OAI_Fam_named.md').unlink()
+    with pytest.raises(SystemExit) as e:
+        CP.cmd_check_text([str(P), '--ws', str(ws), '--kinds', 'bundle,statement'])
+    assert e.value.code == 1 and 'MISSING statement:OAI.Fam.named' in capsys.readouterr().out

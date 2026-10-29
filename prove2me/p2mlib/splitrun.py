@@ -18,6 +18,13 @@ before anything is posted (LiveMismatch), which is what makes extending a publis
 a piece whose exact source is a live proof of its statement is adopted too. Terminal states (`split`, `stop`, `give_up`,
 `raise_heartbeats`) wait for a person; `reset(item)` clears one.
 
+The piece gate (`release` in the config, carve_pipeline's overlap mode): pieces are held, neither sent,
+looked up, blocked nor counted unsendable, until the file `release` names says {"plan_sha": sha1 of the
+plan file, "pieces": "all" | [item, ...]} for the plan this run loaded (re-read every pass, so a
+running publisher picks the release up; a release written for another plan releases nothing, since
+a re-planned piece may import a statement this run does not know). With nothing left to send but
+held pieces, the run ends.
+
 The platform is an object with `theorem_id(name)`, `existing(kind, name)` (the live statement or
 bundle under that name: adopted only when its text is ours, whitespace aside, else the item stops
 as "name taken"), `submit_definition(body) -> job`,
@@ -91,6 +98,8 @@ class Runner:
         self.kinds = set(cfg.get('kinds') or ('bundle', 'statement', 'piece'))
         self.max_items = cfg.get('max_items')
         self.sent = 0
+        self.plan_sha = hashlib.sha1(open(cfg['plan'], 'rb').read()).hexdigest()
+        self._released = None
         self._restart_changed()
 
     def file_sha(self, item):
@@ -111,6 +120,27 @@ class Runner:
                 was = st['state']
                 self.state.pop(x)
                 self.log(x, 'restart', 'text changed since it stopped (%s): sending it again' % was)
+
+    # ------------------------------------------------------------------ the piece gate
+    def released(self):
+        """The pieces the gate lets go: 'all', a set of items, or None (pieces held). Without a
+        `release` in the config every piece goes."""
+        path = self.cfg.get('release')
+        if not path:
+            return 'all'
+        try:
+            r = json.load(open(os.path.expanduser(path), encoding='utf-8'))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(r, dict) or r.get('plan_sha') != self.plan_sha:
+            return None
+        return 'all' if r.get('pieces') == 'all' else set(r.get('pieces') or ())
+
+    def held(self, item, rel=None):
+        if not item.startswith('piece:'):
+            return False
+        rel = self.released() if rel is None else rel
+        return not (rel == 'all' or (rel and item in rel))
 
     # ------------------------------------------------------------------ items and their files
     def info(self, item):
@@ -176,9 +206,10 @@ class Runner:
     def ready(self):
         self.blocked = {}
         out = []
+        rel = self._released = self.released()
         for x in self.items:
             s = self.state.get(x, {}).get('state', 'todo')
-            if s != 'todo' or x.split(':', 1)[0] not in self.kinds:
+            if s != 'todo' or x.split(':', 1)[0] not in self.kinds or self.held(x, rel):
                 continue
             stopped = [d for d in self.deps[x] if self.state.get(d, {}).get('state') in TERMINAL]
             if stopped:
@@ -201,8 +232,10 @@ class Runner:
         missing or fail a check: what a live run would block on (oaiq-047: 12 forced statements had no
         prose; the dry run, which checked only what it would send at once, was clean)."""
         out = {}
+        rel = self.released()
         for x in self.items:
-            if self.state.get(x, {}).get('state', 'todo') != 'todo' or x.split(':', 1)[0] not in self.kinds:
+            if self.state.get(x, {}).get('state', 'todo') != 'todo' or x.split(':', 1)[0] not in self.kinds \
+                    or self.held(x, rel):
                 continue
             why = self.check(x)
             if why:
@@ -219,9 +252,10 @@ class Runner:
         were live started from a fresh state, and its run would have re-posted them."""
         adopted, bad, self.proved_elsewhere = {}, [], {}
         proofs = getattr(self.api, 'live_proofs', None)
+        rel = self.released()
         for x in self.items:
             kind = x.split(':', 1)[0]
-            if self.state.get(x, {}).get('state') in ('live', 'inflight'):
+            if self.state.get(x, {}).get('state') in ('live', 'inflight') or self.held(x, rel):
                 continue
             f = self.info(x)
             if not os.path.exists(f['file']):
@@ -449,8 +483,10 @@ class Runner:
     def summary(self):
         states = [self.state.get(x, {}).get('state', 'todo') for x in self.items]
         self.ready()
+        rel = self.released()
         return {'live': states.count('live'), 'inflight': states.count('inflight'),
                 'todo': states.count('todo'),
+                'held': sum(1 for x, s in zip(self.items, states) if s == 'todo' and self.held(x, rel)),
                 'stopped': [x for x, s in zip(self.items, states) if s in TERMINAL],
                 'blocked': dict(self.blocked), 'total': len(self.items)}
 
@@ -468,6 +504,8 @@ class Runner:
                     'unsendable': self.unsendable(),
                     'mismatch': bad, 'proved_elsewhere': dict(getattr(self, 'proved_elsewhere', {})),
                     'items': len(self.items),
+                    'held': sum(1 for x in self.items if self.state.get(x, {}).get('state', 'todo') == 'todo'
+                                and self.held(x)),
                     'live': sum(self.live(x) for x in self.items)}
         finally:
             self.state = saved

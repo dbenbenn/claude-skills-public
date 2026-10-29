@@ -531,3 +531,86 @@ def test_command_line_dry_run_fails_on_an_item_that_could_not_be_sent(split, cap
         split_run.main([str(d / 'run.json'), '--offline'])
     out = capsys.readouterr().out
     assert e.value.code == 1 and str(d / 'prose' / 'A_mid_s2.md') in out
+
+
+# ---------------------------------------------------------------- the piece gate (overlapping carves)
+
+def _release(d, pieces='all', plan_file='plan.json'):
+    import hashlib
+    sha = hashlib.sha1((d / plan_file).read_bytes()).hexdigest()
+    (d / 'release.json').write_text(json.dumps({'plan_sha': sha, 'pieces': pieces}))
+
+
+def test_gated_pieces_wait_for_the_release_and_the_run_ends_without_them(split):
+    # carve_pipeline overlap mode: bundles and statements publish while the pieces are still being
+    # measured; a piece goes only once the pipeline has released it (publish/release.json)
+    d, cfg = split
+    gated = dict(cfg, release=str(d / 'release.json'))
+    api = FakeApi()
+    r, summary = run(gated, api)
+    assert not [p for p in api.posted if p[0] == 'verify']
+    assert ('def', 'XB001') in api.posted and ('thm', 'A.mid_s2') in api.posted
+    assert summary['held'] == 3 and summary['todo'] == 3 and not summary['blocked']
+    # held pieces are neither blocked nor unsendable, even with an explanation missing
+    (d / 'explanations' / 'A_top.md').unlink()
+    dry = R.Runner(gated, None).dry_run(read=False)
+    assert not dry['unsendable'] and not dry['blocked']
+    (d / 'explanations' / 'A_top.md').write_text(EXPL)
+    _release(d)
+    api2 = FakeApi(published=dict(api.published))
+    run(gated, api2)
+    assert {p[1] for p in api2.posted if p[0] == 'verify'} == {'A.low_s2', 'A.mid_s2', 'A.top'}
+
+
+def test_a_release_for_another_plan_releases_nothing(split):
+    # a remedy re-plan rewrites publish/plan.json; a publisher started on the old plan must not send
+    # the new pieces (they may import statements it does not know)
+    d, cfg = split
+    gated = dict(cfg, release=str(d / 'release.json'))
+    (d / 'old_plan.json').write_text(json.dumps(dict(PLAN, note='other')))
+    _release(d, plan_file='old_plan.json')
+    api = FakeApi()
+    run(gated, api)
+    assert not [p for p in api.posted if p[0] == 'verify']
+    _release(d, pieces=['piece:A.low'])
+    api2 = FakeApi(published=dict(api.published))
+    run(gated, api2)
+    assert [p for p in api2.posted if p[0] == 'verify'] == [('verify', 'A.low_s2')]
+
+
+def test_held_pieces_are_not_looked_up_at_reconcile(split):
+    d, cfg = split
+
+    class Counting(FakeApi):
+        asked = []
+
+        def live_proofs(self, name):
+            self.asked.append(name)
+            return []
+    api = Counting()
+    run(dict(cfg, release=str(d / 'release.json')), api)
+    assert api.asked == []
+
+
+def test_go_holds_the_publish_lock(split, monkeypatch, tmp_path):
+    # two publishers on one run state would post items twice: the pipeline's background publisher
+    # and a final (or hand-started) `--go` take the same lock, and the second exits 3
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
+    import split_run
+    from p2mlib import runlock
+    d, cfg = split
+    (d / 'run.json').write_text(json.dumps(cfg))
+    monkeypatch.setenv('P2M_LOCK_DIR', str(tmp_path / 'locks'))
+    monkeypatch.setattr(runlock, '_stop_tree_on_signals', lambda: None)
+    monkeypatch.setattr(R, 'LiveApi', lambda: FakeApi())
+    monkeypatch.setattr(R.Runner, 'run', lambda self, max_hours=None: self.summary())
+    key = runlock.dir_key('publish', str(d / 'run.json'))
+    try:
+        split_run.main([str(d / 'run.json'), '--go'])
+        assert key in runlock._held
+        assert key == runlock.dir_key('publish', str(d / 'run_early.json'))
+    finally:
+        f = runlock._held.pop(key, None)
+        if f:
+            f.close()

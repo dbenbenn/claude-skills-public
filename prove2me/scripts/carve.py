@@ -6,8 +6,9 @@ usage: carve.py graph CONFIG.json                  # DeclGraph + LeanInfo of eve
        carve.py check CONFIG.json                  # re-check the plan against the graph
        carve.py gen   CONFIG.json [bundles|stubs|pieces|all] [NAME ...]
        carve.py order CONFIG.json                  # the publish DAG, as concurrent waves
-       carve.py split CONFIG.json TIMES.json [--limit 60]   # cut only the bundles measured over
-                                                   # LIMIT s local (-j1); the rest stay as they are
+       carve.py split CONFIG.json TIMES.json [--limit 60] [--only B1,B2]   # cut only the bundles
+                                                   # measured over LIMIT s local (-j1), or only those
+                                                   # named; the rest stay as they are
        carve.py fold  CONFIG.json NODE ...         # NODEs stop being statements: their pieces go into
                                                    # every importer's piece (plan in place, config `folded`)
 
@@ -59,6 +60,9 @@ CONFIG.json (paths may use ~):
    "measured": {"plan": "work/plan_measured.json", "bundle_times": "work/bundle_times.json",
                 "overhead": 5.0},                # local -j1 times of that plan's bundles: costs
                                                  # rescaled to them, so a re-plan splits the heavy
+   "cost_factors": {"OAI.X.lemma": 4.0},      # a declaration's cost times this (carve_pipeline:
+                                              # the declarations of a piece measured over its
+                                              # plan, by that ratio, for a frozen re-plan)
    "folded": ["OAI.X.lemma"],                 # statements merged into their importers' pieces after
                                               # planning (carve.fold_statements; e.g. a polymorphic
                                               # statement the verifier's CoeT fallback rejects)
@@ -187,7 +191,7 @@ def costs(cfg, g):
         times.update(C.parse_build_log(open(os.path.expanduser(f), encoding='utf-8').read()))
     if not times:
         print('no build logs: costs by size (%d bytes/s)' % cfg.get('bytes_per_second', 2000))
-        return C.size_costs(g, cfg.get('bytes_per_second', 2000))
+        return apply_cost_factors(C.size_costs(g, cfg.get('bytes_per_second', 2000)), cfg)
     cost = C.module_costs(g, times, cfg.get('time_scale', 1.5))
     m = cfg.get('measured')
     if m:
@@ -196,7 +200,26 @@ def costs(cfg, g):
         cost = C.calibrate_costs(cost, mp['bundles'], mt, cfg.get('time_scale', 1.5),
                                  m.get('overhead', 5.0))
         print('costs calibrated by %d measured bundles' % sum(1 for v in mt.values() if v.get('ok')))
-    return cost
+    return apply_cost_factors(cost, cfg)
+
+
+def apply_cost_factors(cost, cfg):
+    """config `cost_factors` {declaration: factor}: the declarations of a piece measured over its
+    plan cost that much more (carve_pipeline), so a frozen re-plan promotes lemmas inside it only."""
+    f = cfg.get('cost_factors') or {}
+    if not f:
+        return cost
+    out = dict(cost)
+    for k, x in f.items():
+        if k in out:
+            out[k] = out[k] * x
+    return out
+
+
+def bundles_to_split(bundles, times, limit, only=None):
+    """The bundles `carve.py split` cuts: measured over `limit`, or (with `only`) just those named."""
+    slow = C.slow_bundles(bundles, times, limit)
+    return [n for n in slow if n in only] if only else slow
 
 
 def report_fallbacks(g, limit=10):
@@ -254,7 +277,11 @@ def main(argv):
         P = json.load(open(plan_path(cfg)))
         times = json.load(open(os.path.expanduser(rest[0])))
         limit = float(rest[rest.index('--limit') + 1]) if '--limit' in rest else 60.0
-        slow = C.slow_bundles(P['bundles'], times, limit)
+        only = rest[rest.index('--only') + 1].split(',') if '--only' in rest else None
+        slow = bundles_to_split(P['bundles'], times, limit, only)
+        if only and sorted(slow) != sorted(only):
+            sys.exit('split --only: %s not measured over %g s (or not in the plan)' % (
+                ', '.join(sorted(set(only) - set(slow))), limit))
         scale = cfg.get('time_scale', 1.5)
         overhead = cfg.get('import_overhead', 5.0)
         cost = C.calibrate_costs(costs(cfg, g), P['bundles'], times, scale, overhead)

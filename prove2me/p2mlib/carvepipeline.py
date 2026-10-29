@@ -9,6 +9,8 @@ import hashlib
 import json
 import os
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -16,10 +18,18 @@ import time
 from . import leantext, runlock, snapshot, workspace as wslib
 
 STEPS = ['fetch', 'inputs', 'filter_patches', 'port', 'build', 'wsbuild', 'config', 'graph', 'extdefs', 'plan', 'gen', 'names',
-         'order', 'measure', 'calibrate', 'publish_prep', 'prose', 'check_text', 'dryrun', 'publish']
+         'order', 'measure', 'calibrate', 'publish_prep', 'prose', 'check_text', 'dryrun', 'publish_early',
+         'measure_pieces', 'calibrate_pieces', 'pieces_prep', 'publish']
+# Overlap mode (pipeline.json `overlap`, on for carves created since 2026-10-29; dbenbenn: "a slow proof
+# really shouldn't need to block submitting definition bundles"): `measure`, `calibrate` and the gates
+# up to `dryrun` cover the bundles and statements only (the part that freezes at publish);
+# `publish_early` (with --publish) publishes them from a background publisher while these steps
+# measure, calibrate and check the pieces, which `publish` then releases.
+OVERLAP_ONLY = ('publish_early', 'measure_pieces', 'calibrate_pieces', 'pieces_prep')
 DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
-              'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags']
+              'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags',
+              'overlap']
 
 
 LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
@@ -33,6 +43,13 @@ class StepFailed(Exception):
 
 ACCEPT_CAP = 200        # an accept_over item is excused only below this many seconds
 UNIFORM_MIN, UNIFORM_RATIO = 3, 2.5   # pieces over plan by a similar factor >= this: re-plan (oaiq-073)
+SYSTEMATIC_FRACTION = 0.25   # bundles over the limit: a systematic cost-model error when at least
+                             # UNIFORM_MIN of them and this share of the measured bundles (Batch 3,
+                             # 2026-10-25: QuarticPowerFree, KirchbergRordam, nearly every bundle 85-128 s
+                             # against 55 s); fewer are split alone (oaiq-081: 3 of 194 bundles)
+MAX_BUNDLE_SPLITS = 3   # rounds of splitting single slow bundles before a person looks
+STATEMENT_SHARE = 0.5   # a slow piece whose statement alone compiles in this share of its time is slow
+                        # by its type (oaiq-075: 316 s of 328 in .olean serialization): no split helps
 PIECE_CAP = 120         # a piece (resubmittable) is excused below this; dbenbenn 2026-10-29 (was 150): a slow
                         # submit costs only wall-clock, a needless re-plan hours; verifier data: 94-103 s passed,
                         # 118-126 s timed out 3x (oaiq-078), 125 s and 162 s passed on a retry (oaiq-047, -085),
@@ -88,6 +105,44 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
     new_scale = round(min(MAX_SCALE, max(scale * 1.1, scale * ratio)), 1) if over else scale
     return {'over': over, 'ratio': ratio, 'new_scale': new_scale, 'limit': limit, 'measured': measured,
             'slowest': slowest, 'statements_over': statements_over}
+
+
+def published_drift(lib, published_lib):
+    """The .lean files of published_lib (bundles and statements published or being published) that
+    lib lacks or holds with other bytes."""
+    out = []
+    if not os.path.isdir(published_lib):
+        return out
+    for f in sorted(os.listdir(published_lib)):
+        if not f.endswith('.lean'):
+            continue
+        p = os.path.join(lib, f)
+        if not os.path.exists(p) or open(p, 'rb').read() != open(os.path.join(published_lib, f), 'rb').read():
+            out.append(f)
+    return out
+
+
+def unit_active(unit):
+    """Is the systemd user unit running (False without systemd)?"""
+    if not unit or not shutil.which('systemctl'):
+        return False
+    return subprocess.run(['systemctl', '--user', 'is-active', '--quiet', unit]).returncode == 0
+
+
+def publisher_unit(d):
+    return 'carve-pub-' + hashlib.sha1(os.path.realpath(d).encode()).hexdigest()[:10]
+
+
+ENV_KEEP = ('PATH', 'HOME', 'USER', 'LANG', 'LC_ALL')
+ENV_PREFIXES = ('P2M_', 'LEAN_', 'ELAN_')
+
+
+def systemd_run_command(unit, cwd, env, sh):
+    """systemd-run running `/bin/sh -c sh` as the transient user unit `unit`, with the environment
+    a carve's tools need."""
+    sets = ['--setenv=%s=%s' % (k, v) for k, v in sorted(env.items()) if k in ENV_KEEP or k.startswith(ENV_PREFIXES)]
+    return ['systemd-run', '--user', '--unit=' + unit, '--collect', '--quiet', '-p', 'WorkingDirectory=' + cwd,
+            *sets, '/bin/sh', '-c', sh]
 
 
 def module_root_name(rootmod, prefixes, files):
@@ -367,7 +422,15 @@ class Pipeline:
         return True
 
     def publishing_started(self):
-        return 'publish' in self.state['steps'] or os.path.exists(os.path.join(self.d, 'publish', 'run_state.json'))
+        return 'publish' in self.state['steps'] or 'publish_early' in self.state['steps'] or \
+            os.path.exists(os.path.join(self.d, 'publish', 'run_state.json'))
+
+    def overlap(self):
+        return bool(self.p.get('overlap'))
+
+    def steps(self):
+        """The steps this carve runs: every one in overlap mode, else the classic list."""
+        return list(STEPS) if self.overlap() else [x for x in STEPS if x not in OVERLAP_ONLY]
 
     def ported_modules(self):
         d = self.folder_dir()
@@ -509,8 +572,28 @@ class Pipeline:
         if self.p.get('compat_imports'):
             cfg['collapse_mathlib'] = False
         cfg.update(self.p.get('config_set') or {})
+        self.apply_auto(cfg)
         json.dump(cfg, open(path, 'w'), indent=1)
         self.state['config_set_applied'] = dict(self.p.get('config_set') or {})
+
+    def apply_auto(self, cfg):
+        """What the pipeline itself set once publishing began (pipeline_state.json `auto_config`), over
+        config.json: `frozen` (the published plan, its bundles, their published text), `forced` and
+        `template_forced` (the published statements, so a re-plan keeps them; unions with what the
+        user forced) and `cost_factors` (pieces measured over their plan). Re-applied whenever
+        config.json is rewritten from pipeline.json, so a re-run `config` cannot unfreeze a carve."""
+        a = self.state.get('auto_config') or {}
+        if a.get('frozen'):
+            cfg['frozen'] = dict(cfg.get('frozen') or {}, **a['frozen'])
+        for k in ('forced', 'template_forced'):
+            if a.get(k):
+                cfg[k] = sorted(set(cfg.get(k) or ()) | set(a[k]))
+        if a.get('cost_factors'):
+            cf = dict(cfg.get('cost_factors') or {})
+            for k, v in a['cost_factors'].items():
+                cf[k] = max(cf.get(k, 1.0), v)
+            cfg['cost_factors'] = cf
+        return cfg
 
     def sync_config_set(self):
         """pipeline.json `config_set` keys changed since `config` applied them go straight into
@@ -536,6 +619,7 @@ class Pipeline:
                 cfg[k] = want[k]
             else:
                 cfg.pop(k, None)
+        self.apply_auto(cfg)
         json.dump(cfg, open(path, 'w'), indent=1)
         self.state['config_set_applied'] = want
         frm = 'gen' if set(changed) <= {'patches'} else 'plan'
@@ -584,53 +668,112 @@ class Pipeline:
 
     def step_gen(self):
         self.run_cmds('gen', [self.tool('carve', 'gen', 'config.json')])
+        self.check_published_unchanged('gen')
+
+    def published_dir(self):
+        return os.path.join(self.d, 'published')
+
+    def check_published_unchanged(self, step):
+        """Overlap mode, once bundles and statements began publishing: none of their files may change
+        (published/lib holds them as they went to the publisher)."""
+        if not (self.state.get('auto_config') or {}).get('frozen'):
+            return
+        cfg = self.read_config() or {}
+        out = os.path.expanduser(cfg.get('out') or self.d)
+        drift = published_drift(os.path.join(out, 'lib'), os.path.join(self.published_dir(), 'lib'))
+        if drift:
+            raise StepFailed(
+                "step '%s': %d bundle/statement file(s) that are published or being published changed: %s. They are "
+                "frozen: undo what changed them (a carve patch must not touch a bundle or statement once it "
+                "publishes; config `frozen`/`forced`, which the pipeline set when publishing began, keep a "
+                "re-plan from moving them). Compare out/lib with %s/lib."
+                % (step, len(drift), ', '.join(drift[:20]), self.published_dir()))
 
     def step_order(self):
         self.run_cmds('order', [self.tool('carve', 'order', 'config.json')])
 
-    def step_measure(self):
+    def measure_flags(self):
         # every failing file in one run, not one per ~12 min round (oaiq-051), as the build does
         flags = list(self.p.get('measure_flags') or [])
         if '--keep-going' not in flags:
             flags.append('--keep-going')
-        self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *flags)])
+        return flags
 
-    def step_calibrate(self):
-        cfg = json.load(open(os.path.join(self.d, 'config.json')))
+    def step_measure(self):
+        kinds = ['--kinds', 'bundle,statement'] if self.overlap() else []
+        self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *self.measure_flags(), *kinds)])
+
+    def step_measure_pieces(self):
+        self.run_cmds('measure_pieces', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
+                                                   '--kinds', 'piece')])
+
+    def work_paths(self, cfg):
         work = os.path.expanduser(cfg.get('work') or os.path.join(self.d, 'carve_work'))
         plan_path = os.path.expanduser(cfg.get('plan') or os.path.join(work, 'plan.json'))
-        times_path = os.path.join(work, 'times.json')
+        return work, plan_path, os.path.join(work, 'times.json')
+
+    STATEMENT_OVER_MSG = (
+        "step 'calibrate': statement module(s) over the %.0f s limit: %s. A statement publishes, but every "
+        "verify that imports it compiles its module and times out (opus-kadison, oaiq-039), and re-planning "
+        "cannot shrink one. Profile it (`lean -o x.olean -Dprofiler=true`): if `.olean serialization` "
+        "dominates, the statement's type is huge; name its large sides or subterms with `abbrev`s in a "
+        "bundle (only declaration types cost, a definition's value is cheap) and state it with them "
+        "(references/openai-ports.md \"Slow or odd failures\"); log %s")
+
+    PIECE_HINT = (
+        "Find what is slow before splitting. (1) Compile the piece's check file with "
+        "`lean -o x.olean -Dprofiler=true`: if `.olean serialization` dominates while elaboration is fast, "
+        "the statement's type is huge (oaiq-075: 316 s of 341 s, a term re-embedded thousands of times); "
+        "name its large sides or subterms with `abbrev`s in a bundle and state it with them (declaration types cost, a definition's value is cheap; opus-kadison), do not split. (2) Else "
+        "`-Dtrace.profiler=true -Dtrace.profiler.threshold=20000` shows the slow declaration or tactic "
+        "(oaiq-074: one fun_prop goal, 53 s). (3) Kernel computation (`decide +kernel`, `native_decide`) or "
+        "plain bulk: force the heavy lemmas into statements, listing them in pipeline.json `forced` (a private "
+        "one by its graph node name, `_private.<module>.0.<name>`), then --from config (oaiq-031: one 192 s "
+        "piece became 20 pieces of ~11 s).")
+
+    def calibrate_inputs(self):
+        cfg = json.load(open(os.path.join(self.d, 'config.json')))
+        work, plan_path, times_path = self.work_paths(cfg)
         if not (os.path.exists(plan_path) and os.path.exists(times_path)):
-            return 'skipped'                                       # nothing was measured
-        plan, times = json.load(open(plan_path)), json.load(open(times_path))
+            return None                                            # nothing was measured
         frozen = cfg.get('frozen') or {}
         fz = list(frozen.get('bundles') or ())
         fp = os.path.expanduser(frozen.get('plan') or '')
         if fp and os.path.exists(os.path.join(self.d, fp)):
             fz += list((json.load(open(os.path.join(self.d, fp))).get('stubs') or {}))   # live statements
-        res = calibration(plan, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
-                          accepted=self.p.get('accept_over') or ())
+        return cfg, json.load(open(plan_path)), json.load(open(times_path)), fz, times_path
+
+    def calibrate_log(self, lines):
         log = os.path.join(self.d, 'logs', 'calibrate.log')
         os.makedirs(os.path.dirname(log), exist_ok=True)
-        lines = ['%s: measured %d items against budget %g (limit %.0f s), slowest %s' % (
-            _now(), res['measured'], cfg.get('budget', 55), res['limit'], res['slowest'])]
+        open(log, 'a').write('\n'.join(lines) + '\n')
+        return log
+
+    def calibrate_head(self, cfg, res, what=''):
+        lines = ['%s: %smeasured %d items against budget %g (limit %.0f s), slowest %s' % (
+            _now(), what, res['measured'], cfg.get('budget', 55), res['limit'], res['slowest'])]
         for key, secs, cost in res['over']:
             lines.append('  over: %s measured %.0f s, planned %.0f s' % (key, secs, cost))
+        return lines
+
+    def step_calibrate(self):
+        got = self.calibrate_inputs()
+        if got is None:
+            return 'skipped'
+        cfg, plan, times, fz, times_path = got
+        if self.overlap():
+            return self.calibrate_frozen_part(cfg, plan, times, fz, times_path)
+        res = calibration(plan, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
+                          accepted=self.p.get('accept_over') or ())
+        lines = self.calibrate_head(cfg, res)
+        log = os.path.join(self.d, 'logs', 'calibrate.log')
         if res['statements_over']:
-            open(log, 'a').write('\n'.join(lines + ['  statement over: %s measured %.0f s' % x
-                                                     for x in res['statements_over']]) + '\n')
-            raise StepFailed(
-                "step 'calibrate': statement module(s) over the %.0f s limit: %s. A statement publishes, but every "
-                "verify that imports it compiles its module and times out (opus-kadison, oaiq-039), and re-planning "
-                "cannot shrink one. Profile it (`lean -o x.olean -Dprofiler=true`): if `.olean serialization` "
-                "dominates, the statement's type is huge; name its large sides or subterms with `abbrev`s in a "
-                "bundle (only declaration types cost, a definition's value is cheap) and state it with them "
-                "(references/openai-ports.md \"Slow or odd failures\"); log %s"
-                % (res['limit'], ', '.join('%s (%.0f s)' % x for x in res['statements_over']), log))
+            self.calibrate_log(lines + ['  statement over: %s measured %.0f s' % x for x in res['statements_over']])
+            raise StepFailed(self.STATEMENT_OVER_MSG % (
+                res['limit'], ', '.join('%s (%.0f s)' % x for x in res['statements_over']), log))
         if not res['over']:
-            open(log, 'a').write('\n'.join(lines + ['fits the model; time_scale %g kept' % cfg.get('time_scale', 1.5)]) + '\n')
+            self.calibrate_log(lines + ['fits the model; time_scale %g kept' % cfg.get('time_scale', 1.5)])
             return None
-        n = self.state.get('replans', 0)
         pieces_only = all(k.startswith('piece:') for k, _, _ in res['over'])
         ratios = sorted(secs / max(cost, 1.0) for _, secs, cost in res['over'])
         uniform = (pieces_only and len(ratios) >= UNIFORM_MIN and ratios[len(ratios) // 2] >= UNIFORM_RATIO
@@ -638,31 +781,29 @@ class Pipeline:
         if pieces_only and not uniform:
             # one slow piece (or a scatter) is something specific, which re-planning has never shrunk
             # (KMedian 106 s through two re-plans, oaiq-031 192 s): stop and say how to find it
-            open(log, 'a').write('\n'.join(lines) + '\n')
+            self.calibrate_log(lines)
             raise StepFailed(
-                "step 'calibrate': only pieces are over the limit, and re-planning does not shrink a piece:\n%s\n"
-                "Find what is slow before splitting. (1) Compile the piece's check file with "
-                "`lean -o x.olean -Dprofiler=true`: if `.olean serialization` dominates while elaboration is fast, "
-                "the statement's type is huge (oaiq-075: 316 s of 341 s, a term re-embedded thousands of times); "
-                "name its large sides or subterms with `abbrev`s in a bundle and state it with them (declaration types cost, a definition's value is cheap; opus-kadison), do not split. (2) Else "
-                "`-Dtrace.profiler=true -Dtrace.profiler.threshold=20000` shows the slow declaration or tactic "
-                "(oaiq-074: one fun_prop goal, 53 s). (3) Kernel computation (`decide +kernel`, `native_decide`) or "
-                "plain bulk: force the heavy lemmas into statements, listing them in pipeline.json `forced` (a private "
-                "one by its graph node name, `_private.<module>.0.<name>`), then --from config (oaiq-031: one 192 s "
-                "piece became 20 pieces of ~11 s). Log %s" % ('\n'.join(lines[1:]), log))
+                "step 'calibrate': only pieces are over the limit, and re-planning does not shrink a piece:\n%s\n%s Log %s"
+                % ('\n'.join(lines[1:]), self.PIECE_HINT, log))
         if uniform:
             # several pieces over plan by a similar large factor: the model underestimates this port, and a
             # re-plan at that factor promotes lemmas to statements (oaiq-073: ratio 3.5-4.3, re-planned at 4,
             # all 364 items fitted)
             res['new_scale'] = round(min(MAX_SCALE, cfg.get('time_scale', 1.5) * ratios[len(ratios) // 2]), 1)
+        self.replan(cfg, res['new_scale'], lines)
+
+    def replan(self, cfg, new_scale, lines, step='calibrate'):
+        """Raise time_scale and plan again from `plan` (at most MAX_REPLANS times)."""
+        n = self.state.get('replans', 0)
+        log = os.path.join(self.d, 'logs', 'calibrate.log')
         if n >= MAX_REPLANS:
-            open(log, 'a').write('\n'.join(lines) + '\n')
-            raise StepFailed("step 'calibrate': %d re-plans did not fit the budget; items over the limit:\n%s\n"
-                             "split by hand (carve.py split) or raise time_scale; log %s" % (n, '\n'.join(lines[1:]), log))
+            self.calibrate_log(lines)
+            raise StepFailed("step '%s': %d re-plans did not fit the budget; items over the limit:\n%s\n"
+                             "split by hand (carve.py split) or raise time_scale; log %s" % (step, n, '\n'.join(lines[1:]), log))
         lines.append('re-planning %d/%d: time_scale %g -> %g' % (n + 1, MAX_REPLANS, cfg.get('time_scale', 1.5),
-                                                               res['new_scale']))
-        open(log, 'a').write('\n'.join(lines) + '\n')
-        cfg['time_scale'] = res['new_scale']
+                                                               new_scale))
+        self.calibrate_log(lines)
+        cfg['time_scale'] = new_scale
         json.dump(cfg, open(os.path.join(self.d, 'config.json'), 'w'), indent=1)
         self.state['replans'] = n + 1
         # work/repairs.json keys its cuts by file name, and a re-plan renumbers the bundles: the old
@@ -672,7 +813,146 @@ class Pipeline:
             os.replace(rp, rp.replace('repairs.json', 'repairs.before-replan-%d.json' % (n + 1)))
         self.invalidate('plan')
         self.restart = True
+        print('%s: %s' % (step, lines[-1]), file=sys.stderr, flush=True)
+
+    # -- overlap mode: calibrating the part that freezes, then the pieces -------------------------
+    def anything_published(self, cfg):
+        """Has any item of this carve (or of a carve it extends: config `frozen`) gone to the platform?"""
+        return self.publishing_started() or bool((cfg.get('frozen') or {}).get('bundles'))
+
+    def calibrate_frozen_part(self, cfg, plan, times, fz, times_path):
+        """Overlap mode, `calibrate`: the bundles and statements only (pieces are measured after).
+        A statement over the limit stops, as ever. Bundles over it: a systematic cost-model error (at
+        least UNIFORM_MIN and SYSTEMATIC_FRACTION of the measured bundles) re-plans globally at a
+        larger time_scale, but only while nothing is published; otherwise each slow bundle is split
+        alone (`carve.py split --only`), every other bundle kept, so only the files importing it
+        change and are measured again (dbenbenn 2026-10-29: oaiq-081's bundle 22 of 194 re-planned the
+        whole carve)."""
+        part = dict(plan, pieces={})
+        res = calibration(part, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
+                          accepted=self.p.get('accept_over') or ())
+        lines = self.calibrate_head(cfg, res, 'bundles and statements: ')
+        log = os.path.join(self.d, 'logs', 'calibrate.log')
+        if res['statements_over']:
+            self.calibrate_log(lines + ['  statement over: %s measured %.0f s' % x for x in res['statements_over']])
+            raise StepFailed(self.STATEMENT_OVER_MSG % (
+                res['limit'], ', '.join('%s (%.0f s)' % x for x in res['statements_over']), log))
+        if not res['over']:
+            self.calibrate_log(lines + ['fits the model; time_scale %g kept' % cfg.get('time_scale', 1.5)])
+            return None
+        measured = sum(1 for b in plan.get('bundles', []) if (times.get('bundle:' + b['name']) or {}).get('ok'))
+        systematic = len(res['over']) >= UNIFORM_MIN and len(res['over']) >= SYSTEMATIC_FRACTION * measured
+        if systematic and not self.anything_published(cfg):
+            return self.replan(cfg, res['new_scale'], lines)
+        n = self.state.get('bundle_splits', 0)
+        names = [k.split(':', 1)[1] for k, _, _ in res['over']]
+        if n >= MAX_BUNDLE_SPLITS:
+            self.calibrate_log(lines)
+            raise StepFailed("step 'calibrate': %d rounds of splitting single bundles left these over the limit:\n%s\n"
+                             "split by hand (carve.py split CONFIG TIMES --limit S --only NAME) or look at what is "
+                             "slow in them (lean -Dprofiler=true); log %s" % (n, '\n'.join(lines[1:]), log))
+        lines.append('splitting %s alone (round %d/%d; %s): every other bundle kept, its importers regenerated' % (
+            ', '.join(names), n + 1, MAX_BUNDLE_SPLITS,
+            'published items are frozen' if self.anything_published(cfg) else
+            '%d of %d bundles over: no systematic error' % (len(names), measured)))
+        self.calibrate_log(lines)
+        self.run_cmds('calibrate', [self.tool('carve', 'split', 'config.json', times_path, '--limit',
+                                              '%g' % cfg.get('budget', 55), '--only', ','.join(names))])
+        self.state['bundle_splits'] = n + 1
+        self.invalidate('gen')
+        self.restart = True
         print('calibrate: %s' % lines[-1], file=sys.stderr, flush=True)
+
+    def live_items(self):
+        sp = os.path.join(self.d, 'publish', 'run_state.json')
+        try:
+            st = json.load(open(sp))
+        except (OSError, ValueError):
+            return set()
+        return {x for x, v in st.items() if v.get('state') == 'live'}
+
+    def step_calibrate_pieces(self):
+        """Overlap mode: the pieces, measured after the bundles and statements. Nothing published:
+        as `calibrate` always did (a uniform overrun re-plans at the ratio, a lone slow piece stops
+        with the profiling hint). Once anything is published nothing is re-planned globally: each
+        slow piece is split by a frozen re-plan in which only its own declarations cost more (config
+        `cost_factors`, its measured / planned ratio), once; a piece still slow after that, or whose
+        statement alone is slow (its type is the cost), stops for a person."""
+        got = self.calibrate_inputs()
+        if got is None:
+            return 'skipped'
+        cfg, plan, times, _, _ = got
+        live = {x.split(':', 1)[1] for x in self.live_items() if x.startswith('piece:')}
+        part = dict(plan, bundles=[], stubs={})
+        res = calibration(part, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), live,
+                          accepted=self.p.get('accept_over') or ())
+        lines = self.calibrate_head(cfg, res, 'pieces: ')
+        log = os.path.join(self.d, 'logs', 'calibrate.log')
+        if not res['over']:
+            self.calibrate_log(lines + ['pieces fit; time_scale %g kept' % cfg.get('time_scale', 1.5)])
+            return None
+        ratios = sorted(secs / max(cost, 1.0) for _, secs, cost in res['over'])
+        uniform = (len(ratios) >= UNIFORM_MIN and ratios[len(ratios) // 2] >= UNIFORM_RATIO
+                   and ratios[-1] <= 2 * ratios[0])
+        if not self.anything_published(cfg):
+            if not uniform:
+                self.calibrate_log(lines)
+                raise StepFailed(
+                    "step 'calibrate_pieces': only pieces are over the limit, and re-planning does not shrink a "
+                    "piece:\n%s\n%s Log %s" % ('\n'.join(lines[1:]), self.PIECE_HINT, log))
+            return self.replan(cfg, round(min(MAX_SCALE, cfg.get('time_scale', 1.5) * ratios[len(ratios) // 2]), 1),
+                               lines, 'calibrate_pieces')
+        tried = self.state.setdefault('auto_split', {})
+        auto, manual = [], []
+        for key, secs, cost in res['over']:
+            n = key.split(':', 1)[1]
+            st = times.get('statement:' + n) or {}
+            if n in tried:
+                manual.append('%s: %.0f s, still over after an automatic split (it was %.0f s)' % (
+                    key, secs, tried[n]['secs']))
+            elif st.get('ok') and st['secs'] >= STATEMENT_SHARE * secs:
+                manual.append('%s: %.0f s, of which its statement alone takes %.0f s: the type is the cost, '
+                              'and no split helps' % (key, secs, st['secs']))
+            elif not (plan.get('pieces') or {}).get(n, {}).get('keep'):
+                manual.append('%s: %.0f s, no declarations recorded for it in the plan' % (key, secs))
+            else:
+                auto.append((n, secs, cost))
+        k = self.state.get('piece_replans', 0)
+        if auto and k < MAX_REPLANS:
+            a = self.state.setdefault('auto_config', {})
+            cf = dict(a.get('cost_factors') or {})
+            for n, secs, cost in auto:
+                r = round(max(1.0, secs / max(cost, 1.0)), 2)
+                for x in plan['pieces'][n]['keep']:
+                    cf[x] = max(cf.get(x, 1.0), r)
+                tried[n] = {'secs': secs, 'cost': cost, 'ratio': r}
+            a['cost_factors'] = cf
+            self.state['piece_replans'] = k + 1
+            lines.append('splitting %d piece(s) by a frozen re-plan (%d/%d), their declarations costed at their '
+                         'measured ratio: %s' % (len(auto), k + 1, MAX_REPLANS,
+                                                 ', '.join('%s x%.1f' % (n, tried[n]['ratio']) for n, _, _ in auto)))
+            for m in manual:
+                lines.append('  needs a person (after this round): ' + m)
+            self.calibrate_log(lines)
+            self.apply_auto(cfg)
+            json.dump(cfg, open(os.path.join(self.d, 'config.json'), 'w'), indent=1)
+            self.invalidate('plan')
+            self.restart = True
+            print('calibrate_pieces: %s' % lines[-1 - len(manual)], file=sys.stderr, flush=True)
+            return None
+        if auto:
+            manual += ['%s: %.0f s, %d automatic re-plans already' % ('piece:' + n, secs, k) for n, secs, _ in auto]
+        self.calibrate_log(lines + ['  needs a person: ' + m for m in manual])
+        raise StepFailed(
+            "step 'calibrate_pieces': piece(s) over the %.0f s limit after the bundles and statements began "
+            "publishing:\n  %s\nThe published part is frozen (config `frozen` and `forced`, set by the pipeline), so "
+            "nothing published is re-planned; the other pieces wait until every piece fits (the release is "
+            "written in `publish`). %s A published statement cannot be restated: where its type is the cost, "
+            "declaring OpenAI's theorem directly as `theorem _root_.solution` halves the serialization. Forced "
+            "lemmas: pipeline.json `forced` plus `config_set.template_forced` (template prose), then "
+            "`--from config --publish`. A piece under %d s may go as is and be split after two real timeouts: "
+            "pipeline.json `accept_over` [\"piece:NAME\"]. Log %s"
+            % (res['limit'], '\n  '.join(manual), self.PIECE_HINT, ACCEPT_CAP, log))
 
     def source_line(self):
         m = json.load(open(self.meta))
@@ -680,8 +960,10 @@ class Pipeline:
                 'Apache License 2.0' % (m['title'], m['date'], m['family']))
 
     def step_publish_prep(self):
+        # once publishing began, publish/ is read by a publisher: sync it, never rebuild it
+        sync = ['--sync'] if self.overlap() and self.publishing_started() else []
         self.run_cmds('publish_prep', [self.tool('carve_prep', 'publish-prep', self.d, self.source_line(),
-                                                 self.p.get('tags') or 'openai-math')])
+                                                 self.p.get('tags') or 'openai-math', *sync)])
 
     def step_prose(self):
         # the sources map each module to its openai/math path (oaiq-035: guessed paths doubled a directory)
@@ -694,15 +976,125 @@ class Pipeline:
                   'these files exist:', *need, sep='\n  ', file=sys.stderr)
 
     def step_check_text(self):
-        self.run_cmds('check_text', [self.tool('carve_prep', 'check-text', os.path.join(self.d, 'publish'))])
+        # overlap mode: the bundles' and statements' text now, the explanations in pieces_prep
+        kinds = ['--kinds', 'bundle,statement'] if self.overlap() else []
+        self.run_cmds('check_text', [self.tool('carve_prep', 'check-text', os.path.join(self.d, 'publish'), *kinds)])
 
     def step_dryrun(self):
-        self.run_cmds('dryrun', [self.tool('split_run', 'publish/run.json')])
+        run = 'publish/run_early.json' if self.overlap() else 'publish/run.json'
+        self.run_cmds('dryrun', [self.tool('split_run', run)])
 
     def step_publish(self):
         if not self.p.get('go'):
             return 'skipped'
+        if self.overlap():
+            # every piece measured, calibrated and checked (pieces_prep): release them for this plan; a
+            # background publisher still running on it sends them, and the final run below resumes it
+            plan = os.path.join(self.d, 'publish', 'plan.json')
+            rel = {'plan_sha': hashlib.sha1(open(plan, 'rb').read()).hexdigest(), 'pieces': 'all',
+                   'released': _now()}
+            tmp = os.path.join(self.d, 'publish', 'release.json.tmp')
+            json.dump(rel, open(tmp, 'w'), indent=1)
+            os.replace(tmp, os.path.join(self.d, 'publish', 'release.json'))
+            print('== pieces released for publishing (publish/release.json)', flush=True)
+            self.join_publisher('the final publish')
         self.run_cmds('publish', [self.tool('split_run', 'publish/run.json', '--go')])
+
+    # -- overlap mode: the background publisher ---------------------------------------------------
+    def publish_lock_key(self):
+        return runlock.dir_key('publish', os.path.join(self.d, 'publish', 'run.json'))
+
+    def publisher_running(self):
+        """Is a publisher (the background one, or any `split_run --go` on this carve) running?"""
+        if runlock.held_by(self.publish_lock_key()):
+            return True
+        pub = self.state.get('publisher') or {}
+        if pub.get('unit') and unit_active(pub['unit']):
+            return True
+        pid = pub.get('pid')
+        return bool(pid) and 'split_run' in runlock.cmdline(pid)
+
+    def join_publisher(self, before, poll=30):
+        if not self.publisher_running():
+            return
+        pub = self.state.get('publisher') or {}
+        print('== waiting for the background publisher (%s) to end before %s; progress in publish/PROGRESS.log, '
+              'its output in logs/publish_early.log' % (pub.get('unit') or 'pid %s' % pub.get('pid'), before), flush=True)
+        while self.publisher_running():
+            time.sleep(poll)
+        print('== background publisher ended %s' % _now(), flush=True)
+
+    def step_publish_early(self):
+        """Overlap mode, with --publish: the bundles and statements (measured, calibrated, checked)
+        go to the platform from a background publisher, its own systemd user unit, while the pieces
+        are measured. Before it starts, what it will publish is frozen: published/ keeps the plan and
+        the files, and config `frozen`, `forced` (the statements) and `template_forced` are set
+        (pipeline_state.json `auto_config`), so no later step re-plans or rewrites them."""
+        if self.publisher_running():
+            print('== a publisher already runs on this carve; it goes on (new items wait for the final publish)',
+                  flush=True)
+            return None
+        self.freeze_published()
+        self.start_publisher()
+
+    def freeze_published(self):
+        P = os.path.join(self.d, 'publish')
+        plan_file = os.path.join(P, 'plan.json')
+        if not os.path.exists(plan_file):
+            raise StepFailed("step 'publish_early': no publish/plan.json (publish_prep did not run?)")
+        plan = json.load(open(plan_file))
+        dst = self.published_dir()
+        os.makedirs(os.path.join(dst, 'lib'), exist_ok=True)
+        shutil.copy(plan_file, os.path.join(dst, 'plan.json'))
+        lib = os.path.join(P, 'out', 'lib')
+        for f in sorted(os.listdir(lib)) if os.path.isdir(lib) else ():
+            shutil.copy(os.path.join(lib, f), os.path.join(dst, 'lib', f))
+        ext = set(plan.get('external') or ())
+        stubs = {n for n in plan.get('stubs') or {} if n not in ext}
+        named = set(self.p.get('forced') or ()) | set((self.p.get('config_set') or {}).get('forced') or ())
+        a = self.state.setdefault('auto_config', {})
+        a['frozen'] = {'plan': os.path.join(dst, 'plan.json'), 'bundles': [b['name'] for b in plan.get('bundles') or ()],
+                       'lib': os.path.join(dst, 'lib')}
+        a['forced'] = sorted(set(a.get('forced') or ()) | stubs)
+        a['template_forced'] = sorted(set(a.get('template_forced') or ()) | (stubs - named))
+        path = os.path.join(self.d, 'config.json')
+        cfg = self.read_config() or {}
+        json.dump(self.apply_auto(cfg), open(path, 'w'), indent=1)
+        self.save()
+
+    def start_publisher(self):
+        log = os.path.join(self.d, 'logs', 'publish_early.log')
+        os.makedirs(os.path.dirname(log), exist_ok=True)
+        cmd = ' '.join(shlex.quote(x) for x in self.tool('split_run', 'publish/run_early.json', '--go'))
+        sh = '%s >> %s 2>&1; echo "== publisher exit $?" >> %s' % (cmd, shlex.quote(log), shlex.quote(log))
+        with open(log, 'a') as f:
+            f.write('== %s background publisher (bundles and statements; pieces once released), skill %s\n'
+                    % (_now(), os.path.basename(self.snap)))
+        unit, pid = None, None
+        if shutil.which('systemd-run'):
+            unit = publisher_unit(self.d)
+            r = subprocess.run(systemd_run_command(unit, self.d, self.env(), sh), capture_output=True, text=True)
+            if r.returncode:
+                raise StepFailed("step 'publish_early': systemd-run failed: %s" % (r.stderr or r.stdout).strip())
+        else:
+            pid = subprocess.Popen(['/bin/sh', '-c', sh], cwd=self.d, env=self.env(), start_new_session=True,
+                                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL).pid
+        self.state['publisher'] = {'unit': unit, 'pid': pid, 'started': _now(), 'log': log}
+        self.save()
+        print('== background publisher started (%s): bundles and statements now, pieces once released; '
+              'progress in publish/PROGRESS.log' % (unit or 'pid %d' % pid), flush=True)
+
+    def step_pieces_prep(self):
+        """Overlap mode: the pieces' gates, after calibrate_pieces. publish-prep --sync brings the measured
+        pieces (and any new statements) into publish/ without touching what is published (it refuses
+        if a published file would change), then prose-template, check-text and a dry run over every item."""
+        meta = ['--meta', self.meta, '--lean-root', self.lean_src]
+        self.run_cmds('pieces_prep', [
+            self.tool('carve_prep', 'publish-prep', self.d, self.source_line(), self.p.get('tags') or 'openai-math', '--sync'),
+            self.tool('carve_prep', 'prose-template', self.d, *meta),
+            self.tool('carve_prep', 'check-text', os.path.join(self.d, 'publish')),
+            self.tool('split_run', 'publish/run.json')])
 
     # -- driver -----------------------------------------------------------------------------
     def run(self, stop_after=None, only_redo=()):
@@ -716,7 +1108,7 @@ class Pipeline:
             redo = set()               # a re-plan invalidated what follows the plan: run it again
 
     def _run_once(self, stop_after, only_redo):
-        for s in STEPS:
+        for s in self.steps():
             while True:
                 st = self.stale_step()
                 if not st or STEPS.index(st[0]) > STEPS.index(s):
@@ -730,13 +1122,17 @@ class Pipeline:
             rec = self.state['steps'].get(s)
             # --publish always re-enters split_run (it resumes from its run state): after a re-split the
             # recorded `publish` made --publish a 2 s no-op (oaiq-065, oaiq-071)
-            again = s == 'publish' and self.p.get('go')
+            again = s in ('publish', 'publish_early') and self.p.get('go')
             if rec and rec['status'] in ('done', 'skipped') and s not in only_redo and not again:
                 if s == stop_after:
                     break
                 continue
             if s == 'publish' and not self.p.get('go'):
                 break                                              # publishing is opt-in, never recorded
+            if s == 'publish_early' and not self.p.get('go'):
+                if s == stop_after:
+                    break
+                continue                                           # the pieces are measured all the same
             print('== %s %s' % (s, _now()), flush=True)
             rec = self.state['steps'][s] = {'status': 'running', 'started': _now()}
             hashes = self.step_inputs_hash(s)

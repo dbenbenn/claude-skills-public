@@ -567,10 +567,19 @@ def write_templates(carve_dir, meta=None, force=False):
             rep['kept'].append(rel)
             continue
         os.makedirs(os.path.dirname(p), exist_ok=True)
-        open(p, 'w', encoding='utf-8').write(t)
+        _atomic_write(p, t)
         mans[sub][f] = _sha(t)
         rep['written'].append(rel)
     for s, m in mans.items():
         os.makedirs(os.path.join(P, s), exist_ok=True)
-        json.dump(m, open(os.path.join(P, s, MANIFEST), 'w'), indent=1, sort_keys=True)
+        _atomic_write(os.path.join(P, s, MANIFEST), json.dumps(m, indent=1, sort_keys=True))
     return rep
+
+
+def _atomic_write(path, text):
+    """Through a temporary file and os.replace: carve_pipeline's overlap mode re-runs this while a
+    publisher reads prose/ (a half-written file would read as prose without a title)."""
+    tmp = '%s.tmp%d' % (path, os.getpid())
+    with open(tmp, 'w', encoding='utf-8') as f:
+        f.write(text)
+    os.replace(tmp, path)

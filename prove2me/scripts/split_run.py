@@ -13,7 +13,11 @@ when any item still to send (in any wave) has a missing file or one that fails a
 A piece whose theorem has someone else's live proof is refused (submit_verify's guard) and waits.
 Read that proof, then write `comparisons/<slug>.md` beside `explanations/` (or RUN.json "comparisons"):
 "Different from <id>: ..." sends ours with it as the reason on the next run; "Same as <id>: ..."
-settles the item unsent (submit_all.py's convention; oaiq-068)."""
+settles the item unsent (submit_all.py's convention; oaiq-068).
+
+--go holds the carve's publish lock (one per publish/ directory, run.json and run_early.json alike): a
+second publisher on the same run state exits 3 naming the first (carve_pipeline's overlap mode runs one
+in the background while pieces are measured). RUN.json "release" gates the pieces (p2mlib.splitrun)."""
 import json
 import os
 import sys
@@ -26,6 +30,8 @@ def load(path):
     cfg = json.load(open(path, encoding='utf-8'))
     for k in ('plan', 'out', 'prose', 'explanations', 'state', 'log'):
         cfg[k] = os.path.expanduser(cfg[k])
+    if cfg.get('release'):
+        cfg['release'] = os.path.expanduser(cfg['release'])
     return cfg
 
 
@@ -55,6 +61,8 @@ def main(argv=None):
         offline = '--offline' in argv
         d = R.Runner(cfg, None if offline else R.ReadOnly(R.LiveApi())).dry_run(read=not offline)
         print('DRY RUN (add --go to publish): %d items, %d live' % (d['items'], d['live']))
+        if d.get('held'):
+            print('%d pieces held until their release (RUN.json "release")' % d['held'])
         if d['adopt']:
             print('would adopt (%d): %s' % (len(d['adopt']), ', '.join(
                 '%s %s' % (x, i) for x, i in sorted(d['adopt'].items()))))
@@ -72,6 +80,8 @@ def main(argv=None):
                 print('  %s: %s' % (x, why))
             sys.exit(1)
         return d
+    from p2mlib import runlock
+    runlock.hold(runlock.dir_key('publish', os.path.abspath(rest[0])), 'split_run.py --go ' + rest[0])
     r = R.Runner(cfg, R.LiveApi())
     for x in resets:
         r.reset(x)
