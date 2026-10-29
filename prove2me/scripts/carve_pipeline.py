@@ -39,7 +39,13 @@ Stale steps: each step records content hashes of what it reads from another step
 sources -> filter_patches; port_patches.json and sources -> port; the ported modules -> build, config).
 A resume that finds one changed prints `== stale: STEP ...` and re-runs that step and all later ones, so
 editing the patches and running `--redo filter_patches` (or just resuming) re-ports; a --redo whose output
-is unchanged leaves the later steps alone. Step `config` fails at once if DIR/oai_meta.json is missing or
+is unchanged leaves the later steps alone. Steps also record the skill rules they ran with (the port
+rules: oai_port_modules.py, oaiport.py and the compat sources, and the port options, for filter_patches and
+port; LeanInfo.lean and DeclGraph.lean for graph): after --upgrade across a change to them, that step alone
+runs again, like --redo, and its consumers follow only if its output changed (graph only while a step
+that loads the graph is still to run: it re-warms the LeanInfo cache, which is keyed by LeanInfo.lean, with
+a warning naming the module count). A re-run `config` that changes config.json re-runs from extdefs
+(from graph if a key graph reads changed). Step `config` fails at once if DIR/oai_meta.json is missing or
 its `prefixes` do not match the sources and the root module.
 
 `calibrate` reads what `measure` found: an item (not frozen) measured over 1.6 x the budget raises

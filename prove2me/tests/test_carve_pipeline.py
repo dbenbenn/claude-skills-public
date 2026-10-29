@@ -845,3 +845,126 @@ def test_a_slow_statement_stops_calibrate_with_the_abbrev_remedy(env):
     r = run(env, *ARGS, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}))
     assert r.returncode == 1 and 'A.big' in r.stderr and 'abbrev' in r.stderr
     assert json.load(open(env.dir / 'pipeline_state.json')).get('replans', 0) == 0
+
+
+# ---- port rules, LeanInfo and config consumers are step inputs (oaiq-047, oaiq-085, oaiq-092) ----------
+
+def _commit(env, rel, text, msg='edit'):
+    p = env.repo / 'prove2me' / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text)
+    git(env.repo, 'add', '-A')
+    git(env.repo, 'commit', '-qm', msg)
+
+
+def _ported(env):
+    return [c for c in calls(env) if c.get('tool') == 'oai_port_modules']
+
+
+def test_upgrade_with_changed_port_rules_ports_again_by_itself(env):
+    # oaiq-085/092: after a skill fix to an oaiport rewrite, `--upgrade` kept the old ported text and the
+    # build failed the same way; it took `--upgrade --redo port`
+    assert run(env, *ARGS).returncode == 0
+    _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# a new rewrite\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _ported(env) and 'stale: port' in r.stdout and 'port rules' in r.stdout
+
+
+def test_a_changed_compat_source_ports_again_too(env):
+    _commit(env, 'lean/compat_4_34.lean', '-- compat v1\n')
+    assert run(env, *ARGS).returncode == 0
+    _commit(env, 'lean/compat_4_34.lean', '-- compat v2\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade', '--stop-after', 'port')
+    assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
+
+
+def test_upgrade_that_leaves_the_port_rules_alone_does_not_port_again(env):
+    assert run(env, *ARGS).returncode == 0
+    _commit(env, 'scripts/carve.py', (env.repo / 'prove2me' / 'scripts' / 'carve.py').read_text() + '\n# other fix\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not _ported(env) and ('carve', 'graph') not in tools_called(env)
+
+
+def test_changed_port_options_port_again(env):
+    assert run(env, *ARGS).returncode == 0
+    p = json.load(open(env.dir / 'pipeline.json'))
+    p['compat_imports'] = 'narrow'
+    json.dump(p, open(env.dir / 'pipeline.json', 'w'))
+    env.log.write_text('')
+    r = run(env, '--stop-after', 'port')
+    assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
+    assert '--compat-imports' in _ported(env)[0]['argv']
+
+
+def _forget_rule_hashes(env):
+    """A state written before the rule hashes were recorded."""
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    for rec in st['steps'].values():
+        for k in list(rec.get('in') or {}):
+            if k in ('port rules', 'port options', 'LeanInfo tool'):
+                del rec['in'][k]
+    json.dump(st, open(env.dir / 'pipeline_state.json', 'w'))
+
+
+def test_a_state_without_rule_hashes_compares_with_the_snapshot_that_ported(env):
+    # the live carves of 2026-10-29 have no rule hash recorded; logs/port.log names the snapshot
+    # that ported, so an --upgrade over a rule change still re-ports
+    assert run(env, *ARGS).returncode == 0
+    _forget_rule_hashes(env)
+    _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# a new rewrite\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade')
+    assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
+
+
+def test_a_state_without_rule_hashes_is_not_stale_without_an_upgrade(env):
+    assert run(env, *ARGS).returncode == 0
+    _forget_rule_hashes(env)
+    env.log.write_text('')
+    assert run(env).returncode == 0 and tools_called(env) == []
+
+
+def test_a_changed_leaninfo_reruns_graph_with_a_warning_before_plan(env):
+    # oaiq-047: an upgrade across a LeanInfo.lean change left `graph` done, and `plan` re-ran LeanInfo
+    # on 1259 modules one at a time for ~3 h with no output. Re-running `graph` instead does it in
+    # parallel with progress, and the driver says what is coming first.
+    _commit(env, 'lean/LeanInfo.lean', '-- v1\n')
+    assert run(env, *ARGS, '--stop-after', 'graph').returncode == 0
+    _commit(env, 'lean/LeanInfo.lean', '-- v2\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade')
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert seq.index(('carve', 'graph')) < seq.index(('carve', 'plan')) and not _ported(env)
+    assert 'LeanInfo' in r.stdout and '1 module' in r.stdout
+    # once every step that loads the graph is done, a LeanInfo change costs nothing
+    _commit(env, 'lean/LeanInfo.lean', '-- v3\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade')
+    assert r.returncode == 0 and tools_called(env) == [], r.stdout
+
+
+def test_redo_config_that_changes_config_json_reruns_its_consumers(env):
+    # oaiq-047: `--redo config` reset time_scale but left `plan` done; the old 2758-node plan was measured
+    assert run(env, *ARGS).returncode == 0
+    cfg = json.load(open(env.dir / 'config.json'))
+    cfg['time_scale'] = 6.6                                  # what calibrate wrote
+    json.dump(cfg, open(env.dir / 'config.json', 'w'))
+    env.log.write_text('')
+    r = run(env, '--redo', 'config')
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert seq[0] == ('carve_prep', 'config') and ('carve_prep', 'ext-defs') in seq and ('carve', 'plan') in seq
+    assert ('carve', 'graph') not in seq                     # what graph reads did not change
+
+
+def test_redo_config_with_the_same_config_json_leaves_the_rest(env):
+    assert run(env, *ARGS).returncode == 0
+    env.log.write_text('')
+    assert run(env, '--redo', 'config').returncode == 0
+    assert tools_called(env) == [('carve_prep', 'config')]

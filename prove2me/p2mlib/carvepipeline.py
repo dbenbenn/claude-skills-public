@@ -243,6 +243,44 @@ def _now():
     return time.strftime('%Y-%m-%dT%H:%M:%S')
 
 
+# What in the running skill snapshot decides a step's output, beside what it reads from other steps:
+# {step: (input name, files relative to the snapshot's prove2me/)}. oaiq-085/092: after a fix to an
+# oaiport rewrite, `--upgrade` kept the old ported text (it took `--redo port`). oaiq-047: an upgrade
+# across a LeanInfo.lean change left `graph` done, and `plan` re-elaborated 1259 modules one at a time
+# (the LeanInfo cache is keyed by LeanInfo.lean) for ~3 h with no output.
+_COMPAT = ['lean/compat_4_34.lean', 'lean/StdSimplexCompat.lean', 'lean/StdSimplexTopCompat.lean']
+SNAPSHOT_RULES = {
+    'filter_patches': ('port rules', ['scripts/carve_prep.py', 'p2mlib/oaiport.py'] + _COMPAT),
+    'port': ('port rules', ['scripts/oai_port_modules.py', 'p2mlib/oaiport.py'] + _COMPAT),
+    'graph': ('LeanInfo tool', ['lean/LeanInfo.lean', 'lean/DeclGraph.lean']),
+}
+GRAPH_READERS = ('extdefs', 'plan', 'gen')     # the steps that load the graph (and LeanInfo's readings)
+GRAPH_CONFIG_KEYS = ('src', 'roots', 'prefix', 'work', 'external_theorems')   # what `carve.py graph` reads
+
+
+def rules_hash(snap, rels):
+    """sha1 over the files `rels` (relative to SNAP/prove2me) that exist, or None if none does."""
+    h, seen = hashlib.sha1(), False
+    for r in rels:
+        f = os.path.join(snap, 'prove2me', r)
+        if os.path.exists(f):
+            seen = True
+            h.update(r.encode() + b'\0' + open(f, 'rb').read() + b'\0')
+    return h.hexdigest() if seen else None
+
+
+def logged_snapshot(log):
+    """The snapshot directory of the last run recorded in a step log (`==== TIME STEP (skill SHA)`), if
+    it is still in the snapshot cache."""
+    if not os.path.exists(log):
+        return None
+    shas = re.findall(r'^==== \S+ \S+ \(skill (\S+)\)$', open(log, errors='replace').read(), re.M)
+    if not shas:
+        return None
+    d = os.path.join(snapshot.cache_dir(), shas[-1])
+    return d if os.path.isdir(d) else None
+
+
 class Pipeline:
     def __init__(self, d, params, snap_root, ws=None):
         self.d = os.path.abspath(d)
@@ -272,26 +310,67 @@ class Pipeline:
         as they were. config.json is not tracked: calibrate rewrites it on purpose."""
         pp = os.path.expanduser(self.p['patches']) if self.p.get('patches') else None
         port_out = hash_paths([self.folder_dir()], ('.lean',))
-        return {
+        opts = json.dumps(self.compat_args())
+        h = {
             'filter_patches': {'patches file': hash_paths([pp] if pp else []),
                                'sources': hash_paths([self.lean_src], ('.lean',))},
             'port': {'filter_patches': hash_paths([self.port_patches()]),
-                     'sources': hash_paths([self.lean_src], ('.lean',))},
+                     'sources': hash_paths([self.lean_src], ('.lean',)), 'port options': opts},
             'build': {'port': port_out},
             'config': {'port': port_out},
         }.get(s, {})
+        if s == 'filter_patches' and pp:           # a skipped filter_patches reads no rules
+            h['port options'] = opts
+        rule = SNAPSHOT_RULES.get(s)
+        if rule and (s != 'filter_patches' or pp):
+            h[rule[0]] = rules_hash(self.snap, rule[1])
+        return h
+
+    RULE_KEYS = {r[0] for r in SNAPSHOT_RULES.values()}
 
     def stale_step(self):
-        """The first finished step whose recorded input hashes differ from the current ones: (step, what)."""
+        """The first finished step whose recorded input hashes differ from the current ones: (step, what).
+        A record without a rule hash (a state from before they were recorded) is compared with the
+        snapshot its step log names, when that is still cached. A changed rule of `graph` matters only
+        while a step that loads the graph has still to run (it re-warms the LeanInfo cache)."""
         for s in STEPS:
             rec = self.state['steps'].get(s)
-            if not rec or rec['status'] not in ('done', 'skipped') or not rec.get('in'):
+            if not rec or rec['status'] not in ('done', 'skipped'):
                 continue
             now = self.step_inputs_hash(s)
-            for k, old in rec['in'].items():
-                if k in now and now[k] != old:
+            had = rec.get('in') or {}
+            for k, old in had.items():
+                if k in now and now[k] != old and (k not in self.RULE_KEYS or self._rule_matters(s)):
                     return s, k
+            rule = SNAPSHOT_RULES.get(s)
+            if rule and rule[0] in now and rule[0] not in had and rec['status'] == 'done' and self._rule_matters(s):
+                then = logged_snapshot(os.path.join(self.d, 'logs', s + '.log'))
+                if then and os.path.realpath(then) != os.path.realpath(self.snap):
+                    old = rules_hash(then, rule[1])
+                    if old is not None and old != now[rule[0]]:
+                        return s, rule[0]
         return None
+
+    def _rule_matters(self, s):
+        if s != 'graph':
+            return True
+        return any(self.state['steps'].get(x, {}).get('status') not in ('done', 'skipped') for x in GRAPH_READERS)
+
+    def ported_modules(self):
+        d = self.folder_dir()
+        return sum(1 for _, _, fs in os.walk(d) for f in fs if f.endswith('.lean')) if os.path.isdir(d) else 0
+
+    def stale_message(self, s, k):
+        if k not in self.RULE_KEYS:
+            return '== stale: %s (its input "%s" changed); re-running it and every later step' % (s, k)
+        msg = ('== stale: %s (the skill\'s %s changed since it ran); re-running it (later steps run again only '
+               'if its output changes)' % (s, k))
+        if s == 'graph':
+            n = self.ported_modules()
+            msg += ('\n   WARNING: the LeanInfo cache is keyed by LeanInfo.lean, so none of the %d module%s is '
+                    'cached for this snapshot: `graph` elaborates every one again (about the build\'s CPU time, '
+                    '`jobs` at a time; progress in logs/graph.log)' % (n, '' if n == 1 else 's'))
+        return msg
 
     def invalidate(self, frm):
         i = STEPS.index(frm)
@@ -452,6 +531,28 @@ class Pipeline:
             self.invalidate(frm)
         self.save()
 
+    def read_config(self):
+        path = os.path.join(self.d, 'config.json')
+        try:
+            return json.load(open(path))
+        except (OSError, ValueError):
+            return None
+
+    def config_consumers(self, before):
+        """config.json is not hashed (extdefs and calibrate rewrite it on purpose), so a re-run `config`
+        that changed it re-runs what reads it: from `graph` if a key graph reads changed, else from
+        `extdefs` (oaiq-047: `--redo config` reset time_scale and left the old plan done)."""
+        after = self.read_config()
+        if after is None or after == before:
+            return
+        frm = 'graph' if any(before.get(k) != after.get(k) for k in GRAPH_CONFIG_KEYS) else 'extdefs'
+        later = [x for x in STEPS[STEPS.index(frm):] if x in self.state['steps']]
+        if later:
+            print('== config.json changed (%s): re-running from %s' % (
+                ', '.join(sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k)))[:200], frm),
+                flush=True)
+            self.invalidate(frm)
+
     def step_names(self):
         # planned names already live with other text, checked before the hours of measuring (oaiq-068/074)
         self.run_cmds('names', [self.tool('carve_prep', 'name-check', 'config.json')])
@@ -606,8 +707,11 @@ class Pipeline:
                 st = self.stale_step()
                 if not st or STEPS.index(st[0]) > STEPS.index(s):
                     break
-                print('== stale: %s (its input "%s" changed); re-running it and every later step' % st, flush=True)
-                self.invalidate(st[0])
+                print(self.stale_message(*st), flush=True)
+                if st[1] in self.RULE_KEYS:
+                    self.state['steps'].pop(st[0])        # like --redo: its consumers check its output
+                else:
+                    self.invalidate(st[0])
                 self.save()
             rec = self.state['steps'].get(s)
             # --publish always re-enters split_run (it resumes from its run state): after a re-split the
@@ -625,6 +729,7 @@ class Pipeline:
             if hashes:
                 rec['in'] = hashes
             self.save()
+            cfg_before = self.read_config() if s == 'config' else None
             try:
                 res = getattr(self, 'step_' + s)()
             except StepFailed as e:
@@ -632,6 +737,8 @@ class Pipeline:
                 self.save()
                 raise
             rec.update(status=res or 'done', finished=_now())
+            if cfg_before is not None:
+                self.config_consumers(cfg_before)
             self.save()
             if self.restart:
                 self.state['steps'].pop(s, None)                   # re-run this step after the re-plan
