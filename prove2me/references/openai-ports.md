@@ -547,7 +547,13 @@ back WA. The lessons:
   exits 1 naming any root the closure imports that is neither OpenAI's nor in our toolchain. Put its sources
   beside `OAI/` in `src/lean` (the commit pinned in `lean/lake-manifest.json`, LeanArchitect annotations
   stripped: `~/claude/p2m-standalone/openai-ports/oaiq-083/prep_upstream.py`; the `Erdos970` forks are in `prove2me_workspace/Solutions/OAIChowla`)
-  and resume; the port takes them as OpenAI's. Look for statements already published from them (the Chowla
+  and resume; the port takes them as OpenAI's. With a local checkout at the pinned commit, `oai_fetch.py DEST ROOT
+  --foreign <checkout>` (repeatable) copies the package's import closure itself and names any module the
+  checkout lacks (oaiq-093: `Gromov.PolynomialGrowth`, a stray import to patch away). Packages written in the
+  module system (`module`, `public import`, `public section`, `@[expose]`, `public def`) need no strip script:
+  the port's `demodule` makes them plain (0edecdf, fb51151). LeanArchitect annotations still need
+  `prep_upstream.py`. Very large closures with foreign packages (oaiq-093: 2,679 modules, OpenAI's Mathlib
+  ahead of ours by missing structures such as `Group.Generators`) are a day's work, not a batch. Look for statements already published from them (the Chowla
   split) to use as `external_theorems`.
 - **The CoeT WA on universe-polymorphic statements** (opus-kadison, oaiq-039; also Erdős 3 v2 and oaiq-003 Rokhlin).
   The verifier's plain comparison of `solution`'s type with the target's fails for some polymorphic statements
@@ -561,6 +567,17 @@ back WA. The lessons:
   `comparisons/` note on each, since the old sketches are live). Regenerate pieces of a published carve with the
   carve's own snapshot (pipeline_state.json `snapshot`): a newer carver emits more `attribute [-instance]` lines
   than the frozen stubs have. A re-plan with a snapshot older than 19c7a63 drops the fold.
+- **CStarMatrix takes over `*` on Matrix products** (oaiq-092): Mathlib has `@[default_instance 100]` HMul instances on
+  both Matrix and CStarMatrix, and for a product whose factor's dimensions are still metavariables the later one,
+  CStarMatrix's, wins: `rw [Matrix.sum_mul]` fails with `CStarMatrix.inst…` in the error, while `#synth` shows
+  Matrix's instance. `--compat-imports narrow` and `attribute [-instance]` do not cure it. Patch the failing module
+  with `attribute [default_instance 200] Matrix.instHMulOfFintypeOfMulOfAddCommMonoid` after its imports (global:
+  `local` is refused; it would turn CStarMatrix products in importers into Matrix ones). `oaiport.module_texts`
+  can add it to every module naming `Matrix` (`matrix_default_instance=True`), off by default: one failure in
+  about 11,000 such modules, and the attribute rides along in every bundle carved from them.
+- **Platform lexer timeouts** ("Token scanner timed out after 10s", "Import parser timed out after 5s") on small
+  statements are platform load and retried automatically (2675af1); an item an older snapshot stopped:
+  `split_run.py publish/run.json --go --reset statement:NAME` once (oaiq-089).
 - **Unused imports of a definitions bundle are kept** (oaiq-075, 733702b). carve_measure reports them and fails
   or cuts only false edges between statements: a later bundle's `attribute [-instance]` line can name an
   instance it sees only through that import, and cutting it broke 17 items with "Unknown constant".

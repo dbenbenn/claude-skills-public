@@ -1774,7 +1774,8 @@ def names_matrix(text):
     return bool(_MATRIX_WORD.search(text, header_end(text)))
 
 
-def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsimplex='auto'):
+def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsimplex='auto',
+                 matrix_default_instance=False):
     """The workspace modules of a module-route port before the patches: {file name: text} under
     Lean prefix `mod` (e.g. Solutions.OAIQW_X), Compat.lean not included. `sources` as
     module_sources returns. Each module's OAI imports are rewritten to the ported copies (an import
@@ -1790,7 +1791,9 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
     sources = inline_module_macros(sources)
     smode = stdsimplex_mode([x for _, x in sources.values()], stdsimplex)
     known = declared_lemmas([x for _, x in sources.values()])
-    cstar = any('CStarMatrix' in x for _, x in sources.values())
+    # opt-in (MATRIX_DEFAULT_INSTANCE): one failing module seen in ~11,000 naming Matrix, and the global
+    # attribute rides along in every bundle carved from them; usually a patch on the failing module is better
+    cstar = not matrix_default_instance or any('CStarMatrix' in x for _, x in sources.values())
     files, missing = {}, set()
     for oai, (short, t) in sources.items():
         mx = MATRIX_DEFAULT_INSTANCE if not cstar and names_matrix(t) else ''

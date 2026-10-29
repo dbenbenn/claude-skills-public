@@ -2403,15 +2403,18 @@ def test_matrix_modules_prefer_the_matrix_product_default_instance():
     # an `A * col 1` whose right factor's dimensions are still metavariables takes CStarMatrix's `@[default_instance]`
     # HMul (the later of two at priority 100; CStarMatrix unfolds to Matrix), and `rw [Matrix.sum_mul]` fails.
     # Each module that names `Matrix` raises Matrix's to 200 (global: `local` is refused), unless a module of the
-    # port names CStarMatrix (the attribute reaches every importer, where it would steal CStarMatrix products)
+    # port names CStarMatrix (the attribute reaches every importer, where it would steal CStarMatrix products).
+    # Opt-in only (main session 2026-10-29): seen in one module of ~11,000 that name Matrix, and the global
+    # attribute would ride along in every published bundle carved from them; a patch adds it where needed
     line = 'attribute [default_instance 200] Matrix.instHMulOfFintypeOfMulOfAddCommMonoid'
     srcs = {'OAI.A': ('A', 'import Mathlib.Data.Matrix.Mul\n\nopen Matrix\ntheorem a (A : Matrix (Fin 2) (Fin 2) ℕ) : '
                            'A * 1 = A := Matrix.mul_one A\n'),
             'OAI.B': ('B', 'import OAI.A\n-- import Mathlib.Data.Matrix.Mul\ntheorem b : LinearMap.toMatrix = LinearMap.toMatrix := rfl\n')}
-    files = O.module_texts(srcs, 'Solutions.X')
+    assert not any(line in t for t in O.module_texts(srcs, 'Solutions.X').values())
+    files = O.module_texts(srcs, 'Solutions.X', matrix_default_instance=True)
     a = files['A.lean']
     assert a.count(line) == 1
     assert a.index('set_option linter.unreachableTactic false\n') < a.index(line) < a.index('open Matrix')
     assert line not in files['B.lean']
     srcs['OAI.C'] = ('C', 'import Mathlib\ndef c (A : CStarMatrix (Fin 2) (Fin 2) ℂ) := A\n')
-    assert not any(line in t for t in O.module_texts(srcs, 'Solutions.X').values())
+    assert not any(line in t for t in O.module_texts(srcs, 'Solutions.X', matrix_default_instance=True).values())
