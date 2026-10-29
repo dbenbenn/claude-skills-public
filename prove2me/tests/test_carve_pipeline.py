@@ -84,6 +84,11 @@ def env(tmp_path, monkeypatch):
     lake = bin / 'lake'
     lake.write_text('#!/bin/sh\necho "lake $@ (cwd $PWD)" >> "$STUB_LOG"\n')
     lake.chmod(lake.stat().st_mode | stat.S_IXUSR)
+    # never the real systemd: a --detach in a test must not start a user unit
+    for name, body in (('systemd-run', 'echo "systemd-run $@" >> "$STUB_LOG"\n'), ('systemctl', 'exit 3\n')):
+        f = bin / name
+        f.write_text('#!/bin/sh\n' + body)
+        f.chmod(f.stat().st_mode | stat.S_IXUSR)
     log = tmp_path / 'stub.log'
     for k, v in {'P2M_SKILL_REPO': str(repo), 'P2M_SNAPSHOT_CACHE': str(tmp_path / 'cache'), 'P2M_WORKSPACE': str(ws),
                  'STUB_LOG': str(log), 'P2M_LOCK_DIR': str(tmp_path / 'locks'), 'P2M_LEAN_CAP': '',
@@ -968,3 +973,77 @@ def test_redo_config_with_the_same_config_json_leaves_the_rest(env):
     env.log.write_text('')
     assert run(env, '--redo', 'config').returncode == 0
     assert tools_called(env) == [('carve_prep', 'config')]
+
+
+# ---- --wait reports this run's exit; --detach names what holds the carve (oaiq-084) -------------------
+
+def test_wait_ignores_an_exit_line_of_another_run():
+    # oaiq-084: `--wait` returned 0 at once while the unit was still in `publish`, reading an old
+    # "driver exit 0". Each detached run carries an id, and only its own exit line ends it.
+    cp = _cp()
+    old = '== detached 1 run r1\npipeline ok\n== driver exit 0 run r1\n'
+    assert cp.wait_result(old) == 0
+    # a second --detach whose unit never started, then the first run's exit line lands after it
+    assert cp.wait_result('== detached 1 run r1\n== detached 2 run r2\n== driver exit 0 run r1\n') is None
+    assert cp.wait_result(old + '== detached 2 run r2\n== publish\n== driver exit 1 run r2\n') == 1
+    # a log from before run ids
+    assert cp.wait_result('== detached 1\n== driver exit 1\n') == 1
+
+
+def test_detach_command_tags_the_exit_line_with_the_run(tmp_path):
+    cp = _cp()
+    unit, cmd = cp.detach_command(str(tmp_path / 'carve'), [], '/s/carve_pipeline.py', {}, run_id='r7')
+    assert '== driver exit $? run r7' in cmd[-1]
+
+
+def _wait_args(d, minutes):
+    return type('A', (), {'dir': str(d), 'wait': minutes})()
+
+
+def test_wait_keeps_waiting_while_the_unit_is_active(tmp_path, monkeypatch, capsys):
+    # whatever the log says, an active unit is a run that has not ended
+    cp = _cp()
+    log = tmp_path / 'logs' / 'driver.log'
+    log.parent.mkdir(parents=True)
+    log.write_text('== detached 2026-10-28 22:51:00 run r1\npipeline ok\n== driver exit 0 run r1\n')
+    states = iter([True, True, False])
+    monkeypatch.setattr(cp, 'unit_active', lambda unit: next(states))
+    monkeypatch.setattr(cp.time, 'sleep', lambda s: None)
+    assert cp.wait(_wait_args(tmp_path, 100)) == 0
+    out = capsys.readouterr().out
+    assert 'run r1' in out and '2026-10-28 22:51:00' in out
+    monkeypatch.setattr(cp, 'unit_active', lambda unit: True)
+    assert cp.wait(_wait_args(tmp_path, 0)) == 4
+
+
+def test_wait_says_when_the_run_had_already_ended(tmp_path, monkeypatch, capsys):
+    cp = _cp()
+    log = tmp_path / 'logs' / 'driver.log'
+    log.parent.mkdir(parents=True)
+    log.write_text('== detached 2026-10-28 22:51:00 run r1\npipeline ok\n== driver exit 0 run r1\n')
+    monkeypatch.setattr(cp, 'unit_active', lambda unit: False)
+    assert cp.wait(_wait_args(tmp_path, 100)) == 0
+    assert 'already ended' in capsys.readouterr().out
+
+
+def test_detach_refuses_at_once_naming_the_driver_that_holds_the_carve(env):
+    # oaiq-084: a foreground `--stop-after prose` run kept the lock for 10 min after the harness
+    # backgrounded it; the later --detach "started", its unit exited 3, and an hour went on stale logs
+    assert run(env, *ARGS, '--stop-after', 'config').returncode == 0
+    sys.path.insert(0, ROOT)
+    from p2mlib import runlock
+    key = runlock.dir_key('pipeline', str(env.dir))
+    holder = subprocess.Popen([sys.executable, '-c', textwrap.dedent('''
+        import sys, time
+        sys.path.insert(0, %r)
+        from p2mlib import runlock
+        runlock.hold(%r, 'holder'); print('held', flush=True); time.sleep(60)''' % (ROOT, key)),
+        '--stop-after', 'prose'], stdout=subprocess.PIPE, text=True, env=dict(os.environ))
+    try:
+        assert holder.stdout.readline().strip() == 'held'
+        r = run(env, '--detach')
+        assert r.returncode == 3, r.stdout + r.stderr
+        assert 'pid %d' % holder.pid in r.stderr and '--stop-after prose' in r.stderr
+        assert 'run' not in (env.dir / 'logs' / 'driver.log').read_text() if (env.dir / 'logs' / 'driver.log').exists() else True
+    finally:
+        holder.kill()

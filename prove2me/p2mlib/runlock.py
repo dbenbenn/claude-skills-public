@@ -41,6 +41,21 @@ def _path(key):
     return os.path.join(lock_dir(), hashlib.sha1(key.encode()).hexdigest()[:16] + '.lock')
 
 
+def cmdline(pid):
+    """The command line of a live process, or ''."""
+    try:
+        return ' '.join(open('/proc/%d/cmdline' % int(pid), 'rb').read().decode(errors='replace').split('\0')).strip()
+    except (OSError, ValueError, TypeError):
+        return ''
+
+
+def describe(h):
+    """'pid N (WHAT), started T; command: CMD' for a holder record."""
+    cmd = cmdline(h.get('pid'))
+    return 'pid %s (%s), started %s%s' % (h.get('pid', '?'), h.get('what', '?'), h.get('started', '?'),
+                                          '; command: ' + cmd if cmd else '')
+
+
 def held_by(key):
     """The holder's record if a live process holds KEY, else None."""
     p = _path(key)
@@ -74,10 +89,8 @@ def hold(key, what=''):
         except ValueError:
             h = {}
         f.close()
-        last_refusal = ('%s is already running on %s: pid %s (%s), started %s. Wait for it or stop it; '
-                        'do not start a second copy.' % (what or 'this step', key.split('|', 1)[1],
-                                                          h.get('pid', '?'), h.get('what', '?'),
-                                                          h.get('started', '?')))
+        last_refusal = ('%s is already running on %s: %s. Wait for it or stop it; '
+                        'do not start a second copy.' % (what or 'this step', key.split('|', 1)[1], describe(h)))
         print(last_refusal, file=sys.stderr)
         sys.exit(3)
     f.seek(0)

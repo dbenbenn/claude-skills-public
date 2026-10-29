@@ -58,7 +58,10 @@ split only after two real verifier timeouts. Another item is excused the same wa
 Long runs: --detach starts the same run as its own systemd user unit (carve-<hash>, output appended to
 DIR/logs/driver.log) and returns at once; --wait [MINUTES] (default 100) then blocks until that run
 ends, printing its log's tail and exiting with its status, or exits 4 after MINUTES with the step it is
-on. Arm --wait, not the driver, in a Bash background command: the harness kills a background command
+on. Each detached run carries an id (`== detached TIME run ID`) and only its own `== driver exit N run ID`
+ends the wait, never while the unit is still active; --wait says which run it reports, and when that run
+had already ended before it started. --detach refuses (exit 3) at once, naming the holder's pid and
+command line, when a driver (a foreground one too) already holds the carve or the unit is still active. Arm --wait, not the driver, in a Bash background command: the harness kills a background command
 at 2 h, which killed many drivers mid-build or mid-graph (oaiq-033..049); a killed wait costs nothing,
 so re-arm it.
 
@@ -80,7 +83,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from p2mlib import carvepipeline as C, snapshot
+from p2mlib import carvepipeline as C, runlock, snapshot
 
 
 def parse(argv):
@@ -123,40 +126,80 @@ ENV_KEEP = ('PATH', 'HOME', 'USER', 'LANG', 'LC_ALL')
 ENV_PREFIXES = ('P2M_', 'LEAN_', 'ELAN_')
 
 
-def detach_command(d, argv, script, env):
+def unit_name(d):
+    return 'carve-' + hashlib.sha1(os.path.realpath(d).encode()).hexdigest()[:10]
+
+
+def unit_active(unit):
+    """Is the systemd user unit running (False without systemd)?"""
+    if not shutil.which('systemctl'):
+        return False
+    return subprocess.run(['systemctl', '--user', 'is-active', '--quiet', unit]).returncode == 0
+
+
+def detach_command(d, argv, script, env, run_id=None):
     """(unit name, systemd-run command) that runs `script d argv` (minus --detach) as a user unit,
-    its output and a final `== driver exit N` line appended to d/logs/driver.log."""
-    unit = 'carve-' + hashlib.sha1(os.path.realpath(d).encode()).hexdigest()[:10]
+    its output and a final `== driver exit N run RUN_ID` line appended to d/logs/driver.log."""
+    unit = unit_name(d)
     log = os.path.join(d, 'logs', 'driver.log')
     inner = ' '.join(shlex.quote(x) for x in [sys.executable, script, d] + [x for x in argv if x != '--detach'])
-    sh = '%s >> %s 2>&1; echo "== driver exit $?" >> %s' % (inner, shlex.quote(log), shlex.quote(log))
+    tag = ' run %s' % run_id if run_id else ''
+    sh = '%s >> %s 2>&1; echo "== driver exit $?%s" >> %s' % (inner, shlex.quote(log), tag, shlex.quote(log))
     sets = ['--setenv=%s=%s' % (k, v) for k, v in sorted(env.items())
             if k in ENV_KEEP or k.startswith(ENV_PREFIXES)]
     return unit, ['systemd-run', '--user', '--unit=' + unit, '--collect', '--quiet', '-p', 'WorkingDirectory=' + d,
                   *sets, '/bin/sh', '-c', sh]
 
 
+DETACHED = re.compile(r'^== detached (.*?)(?: run (\S+))?$', re.M)
+
+
+def last_detached(log_text):
+    """(match of the last `== detached TIME run ID` line, its run id or None), or (None, None)."""
+    m = list(DETACHED.finditer(log_text))
+    return (m[-1], m[-1].group(2)) if m else (None, None)
+
+
 def wait_result(log_text):
-    """The exit status of the last detached run in a driver.log, or None while it runs."""
-    i = log_text.rfind('== detached')
-    if i < 0:
+    """The exit status of the last detached run in a driver.log, or None while it runs. Only that
+    run's own `== driver exit N run ID` line counts (oaiq-084: --wait returned another run's exit 0
+    while the unit was in `publish`); a log from before run ids takes any exit line after it."""
+    m, rid = last_detached(log_text)
+    if not m:
         return None
-    m = re.findall(r'^== driver exit (\d+)$', log_text[i:], re.M)
-    return int(m[-1]) if m else None
+    pat = r'^== driver exit (\d+) run %s$' % re.escape(rid) if rid else r'^== driver exit (\d+)$'
+    found = re.findall(pat, log_text[m.end():], re.M)
+    return int(found[-1]) if found else None
 
 
 def detach(a, argv):
     log = os.path.join(a.dir, 'logs', 'driver.log')
     os.makedirs(os.path.dirname(log), exist_ok=True)
+    # refuse here, naming the holder, rather than start a unit that exits 3 into the log (oaiq-084: a
+    # foreground driver the harness had backgrounded held the carve for 10 more minutes)
+    h = runlock.held_by(runlock.dir_key('pipeline', a.dir))
+    if h:
+        print('a driver already runs this carve: %s. Wait for it (`--wait`, or for a foreground run its '
+              'own end) or stop it (`kill PID`: it stops its children first); nothing was started.'
+              % runlock.describe(h), file=sys.stderr)
+        return 3
     rest = list(argv)
     rest.remove(a.dir_arg)
-    unit, cmd = detach_command(a.dir, rest, os.path.abspath(__file__), os.environ)
+    run_id = '%s-%d' % (time.strftime('%Y%m%d%H%M%S'), os.getpid())
+    unit, cmd = detach_command(a.dir, rest, os.path.abspath(__file__), os.environ, run_id)
+    if shutil.which('systemd-run') and unit_active(unit):
+        print('unit %s still runs this carve (an earlier --detach); wait with --wait; nothing was started.'
+              % unit, file=sys.stderr)
+        return 3
     with open(log, 'a') as f:
-        f.write('== detached %s\n' % time.strftime('%Y-%m-%d %H:%M:%S'))
+        f.write('== detached %s run %s\n' % (time.strftime('%Y-%m-%d %H:%M:%S'), run_id))
     if shutil.which('systemd-run'):
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode:
-            sys.exit('systemd-run failed: %s' % (r.stderr or r.stdout).strip())
+            msg = 'systemd-run failed: %s' % (r.stderr or r.stdout).strip()
+            with open(log, 'a') as f:                      # close this run, so --wait does not hang
+                f.write('%s\n== driver exit 125 run %s\n' % (msg, run_id))
+            sys.exit(msg)
         where = 'unit %s' % unit
     else:
         subprocess.Popen(['/bin/sh', '-c', cmd[-1]], cwd=a.dir, start_new_session=True,
@@ -170,14 +213,21 @@ def detach(a, argv):
 def wait(a):
     log = os.path.join(a.dir, 'logs', 'driver.log')
     end = time.time() + a.wait * 60
+    unit, first = unit_name(a.dir), True
     while True:
         text = open(log, encoding='utf-8', errors='replace').read() if os.path.exists(log) else ''
         if '== detached' not in text:
             sys.exit('no detached run recorded in %s (start one with --detach)' % log)
         r = wait_result(text)
-        if r is not None:
-            print('\n'.join(text[text.rfind('== detached'):].rstrip().split('\n')[-25:]))
+        # an active unit has not ended, whatever the log says
+        if r is not None and not unit_active(unit):
+            m, rid = last_detached(text)
+            print('\n'.join(text[m.start():].rstrip().split('\n')[-25:]))
+            print('== the run detached %s%s ended with exit %d%s' % (
+                m.group(1), ' (run %s)' % rid if rid else '', r,
+                '; it had already ended when --wait started' if first else ''))
             return r
+        first = False
         if time.time() >= end:
             sp = os.path.join(a.dir, 'pipeline_state.json')
             st = json.load(open(sp)).get('steps', {}) if os.path.exists(sp) else {}
