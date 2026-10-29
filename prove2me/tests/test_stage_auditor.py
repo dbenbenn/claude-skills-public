@@ -82,6 +82,26 @@ def test_teardown_waits_for_audit_and_never_follows_links(root):
     assert not os.path.exists(d) and keep.exists()
 
 
+@pytest.mark.parametrize('bad', ['.', '..', '', 'a/b', '/tmp', 'a/..'])
+def test_teardown_refuses_anything_but_one_staging_dir(root, bad):
+    # Viterbo 2026-10-30: `teardown --force . NAME` took '.' as the slug and removed the
+    # whole staging root, with eight live auditors' directories in it
+    tmp, art, keep = root
+    SA.stage('s4', art, [])
+    with pytest.raises(SystemExit):
+        SA.teardown(bad, force=True)
+    assert os.path.isdir(os.path.join(SA.ROOT, 's4'))
+
+
+def test_teardown_cli_rejects_extra_arguments(root, monkeypatch):
+    tmp, art, keep = root
+    SA.stage('s5', art, [])
+    monkeypatch.setattr(SA.sys, 'argv', ['stage_auditor.py', 'teardown', '--force', 's5', 'x'])
+    with pytest.raises(SystemExit):
+        SA.main()
+    assert os.path.isdir(os.path.join(SA.ROOT, 's5'))
+
+
 def test_collect_checks_and_import_denials(root, tmp_path, capsys):
     tmp, art, _ = root
     SA.stage('s4', art, [])

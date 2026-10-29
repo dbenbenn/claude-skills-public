@@ -287,6 +287,12 @@ def teardown(slug, force=False):
     were pre-final, and two sets of working notes were lost outright. Waiting on the
     filesystem is the wrong signal -- wait for the agent's completion notification -- but
     the guard belongs here too, because attention is not a mechanism."""
+    # Viterbo 2026-10-30: `teardown --force . NAME` took '.' as the slug, so d was ROOT itself
+    # and every live auditor's directory went with it. Only one plain child of ROOT is removable.
+    if (not slug or slug in ('.', '..') or os.sep in slug or (os.altsep and os.altsep in slug)
+            or os.path.dirname(os.path.abspath(os.path.join(ROOT, slug))) != os.path.abspath(ROOT)):
+        sys.exit(f"REFUSING to tear down {slug!r}: a slug names one staging directory, "
+                 f"a plain name under {ROOT}")
     d = os.path.join(ROOT, slug)
     if not force and os.path.isdir(d):
         missing = [f for f in ('readback.md', 'audit.md') if not os.path.exists(os.path.join(d, f))]
@@ -412,7 +418,7 @@ def collect_all(mdir, names, teardown_after=False):
     return not bad
 
 
-if __name__ == '__main__':
+def main():
     args = [a for a in sys.argv[1:] if a not in ('--force', '--teardown')]
     force = '--force' in sys.argv[1:]
     if args and args[0] in ('stage-all', 'collect-all'):
@@ -436,4 +442,11 @@ if __name__ == '__main__':
             print('WARNING: collect names files by slug; for a mission item use collect-all '
                   'MISSION_DIR NAME, which names them by key')
         sys.exit(1 if collect(args[1], args[2]) else 0)
-    else: teardown(args[1], force=force)
+    else:
+        if len(args) != 2:              # `teardown MISSION_DIR NAME` is the collect-all shape, not this
+            sys.exit(f"teardown takes exactly one slug, got {args[1:]}")
+        teardown(args[1], force=force)
+
+
+if __name__ == '__main__':
+    main()
