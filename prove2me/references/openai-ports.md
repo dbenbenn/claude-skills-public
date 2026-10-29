@@ -638,8 +638,10 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   in place against 1 h through the pipeline's `build`). Three habits that save rounds: after the first failure of
   a kind, `rg` the whole port for the same pattern and patch every site before rebuilding (oaiq-089: five
   2.5 h rounds); batch compat changes before the first full build, since a compat change rebuilds everything
-  (oaiq-091); and run the pipeline's `build` step once before the final in-place rounds, since an in-place build
-  does not write the LeanInfo cache and `graph` then elaborates every module itself (oaiq-092: about 6 h). Then turn the diff into patches whose `count` is taken over the
+  (oaiq-091); and let the pipeline's `build` build the modules, since an in-place build writes neither module
+  times nor the LeanInfo cache: `graph` then elaborates every module itself (oaiq-092: about 6 h) and the plan
+  is blind. `config` fills missing times from the LeanInfo cache and stops when under half the port is timed;
+  then delete `.lake/build/{lib/lean,ir}/Solutions/FOLDER` and `--redo build` (a03f3b3). Then turn the diff into patches whose `count` is taken over the
   unpatched port, never the patched workspace (oaiq-063, -071, -072). A patch `why` lands in the piece's
   explanation: write Lean names in it in backticks (oaiq-064: a hypothesis `he` failed the pronoun check).
 
