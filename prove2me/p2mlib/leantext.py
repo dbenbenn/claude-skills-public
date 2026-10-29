@@ -116,7 +116,7 @@ def explicit_binders(header):
     return names
 
 
-_HEADER_LINE = re.compile(r'(?:import|prelude|module|public\s+import|meta\s+import)\b[^\n]*')
+_HEADER_LINE = re.compile(r'(?:prelude|module|(?:public\s+)?(?:meta\s+)?import)\b[^\n]*')
 
 
 def header_end(text):

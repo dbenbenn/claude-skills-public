@@ -2359,3 +2359,59 @@ def test_smoothness_order_simp_keyword_on_a_earlier_line():
     assert "exact g (by simp)\n" in near
     typed = O.core_rewrites("  foo\n    (by simp : (k : ℕ∞ω) ≤ ∞)\n")
     assert "(by first | (simp; done) | exact WithTop.coe_le_coe.2 le_top | exact_mod_cast le_top : (k : ℕ∞ω) ≤ ∞)" in typed
+
+
+def test_bool_eq_true_of_ne_false_renamed():
+    # d13f23b's `Bool.eq_true_of_ne_false` is our Mathlib's `Bool.eq_true_of_not_eq_false` (same `{b} : ¬b = false →
+    # b = true`; ours has only the root `eq_true_of_ne_false`): ContingencyTables oaiq-089, 7 sites
+    out = O.core_rewrites("  apply Bool.eq_true_of_ne_false\n  exact (Bool.eq_true_of_ne_false h)\n  exact eq_true_of_ne_false h\n")
+    assert out == ("  apply Bool.eq_true_of_not_eq_false\n  exact (Bool.eq_true_of_not_eq_false h)\n"
+                   "  exact eq_true_of_ne_false h\n")
+    assert O.core_rewrites(out) == out
+    assert O.core_rewrites("  exact Bool.eq_true_of_ne_false'\n") == "  exact Bool.eq_true_of_ne_false'\n"
+
+
+def test_demodule_makes_module_system_files_plain_header_and_body():
+    # foreign packages written in Lean's module system (Gromov, oaiq-093: `public section`, `@[expose] public section`,
+    # `public meta section`) and OpenAI's own module files (`public theorem`, `@[expose] public noncomputable section`)
+    # become plain files, so no per-job strip script is needed; the header alone loses `module`/`public`/`meta`/`all`
+    # (a doc comment line reading `module` stays), and `public meta import` is part of the header
+    src = ('module\n\npublic import Mathlib.A\npublic meta import Mathlib.B\nimport all Mathlib.C\n\n'
+           '/-! doc\nmodule\npublic import X\n-/\n\n@[expose] public section\n\n@[expose] public noncomputable section\n\n'
+           'public meta section\n\n@[simp] public theorem t : True := trivial\n'
+           '@[simp]\npublic noncomputable def f := 1\n  public def notAtLineStart := 1\nprivate def g := 1\n'
+           'def publicity := 1\n\nend\n')
+    out = O.demodule(src)
+    assert out == ('\nimport Mathlib.A\nimport Mathlib.B\nimport Mathlib.C\n\n'
+                   '/-! doc\nmodule\npublic import X\n-/\n\nsection\n\nnoncomputable section\n\n'
+                   'meta section\n\n@[simp] theorem t : True := trivial\n'
+                   '@[simp]\nnoncomputable def f := 1\n  def notAtLineStart := 1\nprivate def g := 1\n'
+                   'def publicity := 1\n\nend\n')
+    assert O.demodule(out) == out
+    plain = 'import Mathlib\n\nnamespace OAI\n\ntheorem a : True := trivial\n\nend OAI\n'
+    assert O.demodule(plain) == plain
+
+
+def test_header_end_includes_public_meta_import():
+    from p2mlib.leantext import header_end
+    t = 'module\npublic meta import Mathlib.B\npublic import Mathlib.A\n\ndef a := 1\n'
+    assert t[header_end(t):] == 'def a := 1\n'
+
+
+def test_matrix_modules_prefer_the_matrix_product_default_instance():
+    # oaiq-092 (ContinuumCoulomb QubitMediatorMatrix): with CStarMatrix imported (all of Mathlib, through Compat),
+    # an `A * col 1` whose right factor's dimensions are still metavariables takes CStarMatrix's `@[default_instance]`
+    # HMul (the later of two at priority 100; CStarMatrix unfolds to Matrix), and `rw [Matrix.sum_mul]` fails.
+    # Each module that names `Matrix` raises Matrix's to 200 (global: `local` is refused), unless a module of the
+    # port names CStarMatrix (the attribute reaches every importer, where it would steal CStarMatrix products)
+    line = 'attribute [default_instance 200] Matrix.instHMulOfFintypeOfMulOfAddCommMonoid'
+    srcs = {'OAI.A': ('A', 'import Mathlib.Data.Matrix.Mul\n\nopen Matrix\ntheorem a (A : Matrix (Fin 2) (Fin 2) ℕ) : '
+                           'A * 1 = A := Matrix.mul_one A\n'),
+            'OAI.B': ('B', 'import OAI.A\n-- import Mathlib.Data.Matrix.Mul\ntheorem b : LinearMap.toMatrix = LinearMap.toMatrix := rfl\n')}
+    files = O.module_texts(srcs, 'Solutions.X')
+    a = files['A.lean']
+    assert a.count(line) == 1
+    assert a.index('set_option linter.unreachableTactic false\n') < a.index(line) < a.index('open Matrix')
+    assert line not in files['B.lean']
+    srcs['OAI.C'] = ('C', 'import Mathlib\ndef c (A : CStarMatrix (Fin 2) (Fin 2) ℂ) := A\n')
+    assert not any(line in t for t in O.module_texts(srcs, 'Solutions.X').values())

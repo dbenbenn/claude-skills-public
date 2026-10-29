@@ -21,6 +21,8 @@ Every function here pins a behaviour that went wrong on a live port (2026-10-18)
 import os
 import re
 
+from .leantext import header_end
+
 
 class PortError(Exception):
     pass
@@ -1330,6 +1332,9 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = re.sub(r"(?<![\w.'])Complex\.hasTemperateGrowth_ofReal(?![\w'])",
                   'Function.Complex.hasTemperateGrowth_ofReal', text)
     text = re.sub(r"(?<![\w.'])Finset\.sum_le_sum_of_injOn(?![\w'])", pre + 'sum_le_sum_of_injOn', text)
+    # d13f23b's `Bool.eq_true_of_ne_false` is our Mathlib's `Bool.eq_true_of_not_eq_false`, same `{b} : ¬b = false →
+    # b = true` (ours has only the root `eq_true_of_ne_false`; ContingencyTables oaiq-089, 7 sites)
+    text = re.sub(r"(?<![\w.'])Bool\.eq_true_of_ne_false(?![\w'])", 'Bool.eq_true_of_not_eq_false', text)
     # d13f23b's `FiniteMeasure.mass_map_le {f} {μ} (hf : AEMeasurable f μ)`; ours `mass_map_le (f) (μ)`, and
     # `_ _` leaves `f` undetermined: the compat block's form (BalancedRyser oaiq-063)
     text = re.sub(r"(?<![\w.'])(?:MeasureTheory\.)?FiniteMeasure\.mass_map_le(?![\w'])",
@@ -1713,15 +1718,29 @@ def inline_module_macros(sources):
             for oai, (short, _) in sources.items()}
 
 
+_SECTION_AHEAD = r'(?:meta[ \t]+)?(?:noncomputable[ \t]+)?section\b'
+_EXPOSE_SECTION = re.compile(r'^@\[expose\][ \t]+(?=(?:public[ \t]+)?' + _SECTION_AHEAD + ')', re.M)
+_PUBLIC_SECTION = re.compile(r'^public[ \t]+(?=' + _SECTION_AHEAD + ')', re.M)
+_PUBLIC_DECL = re.compile(r"^([ \t]*(?:@\[[^\]\n]*\][ \t]*)?)public[ \t]+(?=(?:(?:noncomputable|meta|partial|unsafe|"
+                          r"protected|nonrec)[ \t]+)*(?:theorem|lemma|def|abbrev|instance|structure|inductive|class|"
+                          r"opaque|axiom|irreducible_def|alias)\b)", re.M)
+
+
 def demodule(text):
     """A file of Lean's module system as a plain file: its `module` line dropped and each
     `public import` / `meta import` / `public meta import` / `import all` made a plain `import` (Ryser
     FiniteSetEstimates 2026-10-25: the Compat import went in front of `module`, and every import
-    after it then failed to parse)."""
-    hdr = header_end(text) if 'header_end' in globals() else len(text)
+    after it then failed to parse). In the body, `@[expose] public section`, `public (meta)
+    (noncomputable) section` and a `public` declaration modifier lose `@[expose]`/`public` (Lean takes
+    them in a plain file, `@[expose]` with a warning, but this module's declaration patterns know no
+    `public`): foreign packages written in the module system (Gromov, oaiq-093) need no strip script.
+    Only the header's import lines are touched there; a doc comment line reading `module` stays."""
+    hdr = header_end(text)
     head, body = text[:hdr], text[hdr:]
     head = re.sub(r'^module[ \t]*\n', '', head, flags=re.M)
     head = re.sub(r'^(?:public[ \t]+)?(?:meta[ \t]+)?import[ \t]+(?:all[ \t]+)?', 'import ', head, flags=re.M)
+    if 'public' in body or '@[expose]' in body:
+        body = _PUBLIC_DECL.sub(r'\1', _PUBLIC_SECTION.sub('', _EXPOSE_SECTION.sub('', body)))
     return head + body
 
 
@@ -1740,6 +1759,21 @@ def mathlib_has(module, root=None):
     return os.path.exists(os.path.join(root, *module.split('.')) + '.lean')
 
 
+# Mathlib declares `@[default_instance 100]` HMul instances on Matrix and on CStarMatrix (a def equal to Matrix);
+# for a product whose factor's dimensions are still metavariables, the later one, CStarMatrix's, wins once CStarMatrix
+# is imported, and `rw [Matrix.sum_mul]` fails on the CStarMatrix-typed product (oaiq-092 QubitMediatorMatrix).
+# Priority 200 still sits below core's homogeneous instHMul (1000); `local`/`scoped` are refused, so the line is global
+# and reaches every importer: module_texts adds it to each module naming `Matrix`, and to none in a port with a module
+# naming CStarMatrix, whose products it would turn into Matrix ones.
+MATRIX_DEFAULT_INSTANCE = 'attribute [default_instance 200] Matrix.instHMulOfFintypeOfMulOfAddCommMonoid\n'
+_MATRIX_WORD = re.compile(r"(?<![\w.'])Matrix(?![\w'])")
+
+
+def names_matrix(text):
+    """Does the module's body (after its imports) name `Matrix` (not `CStarMatrix`, `toMatrix`, an import path)?"""
+    return bool(_MATRIX_WORD.search(text, header_end(text)))
+
+
 def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsimplex='auto'):
     """The workspace modules of a module-route port before the patches: {file name: text} under
     Lean prefix `mod` (e.g. Solutions.OAIQW_X), Compat.lean not included. `sources` as
@@ -1756,8 +1790,10 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
     sources = inline_module_macros(sources)
     smode = stdsimplex_mode([x for _, x in sources.values()], stdsimplex)
     known = declared_lemmas([x for _, x in sources.values()])
+    cstar = any('CStarMatrix' in x for _, x in sources.values())
     files, missing = {}, set()
     for oai, (short, t) in sources.items():
+        mx = MATRIX_DEFAULT_INSTANCE if not cstar and names_matrix(t) else ''
         def rep(m):
             n = m.group(1)
             if n in names:
@@ -1785,7 +1821,7 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
             t = '\n'.join(ls[:k] + imps + ls[k:])
         ls = t.split('\n')
         k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
-        t = '\n'.join(ls[:k] + [''] + (LINT + header).rstrip().split('\n') + ls[k:])
+        t = '\n'.join(ls[:k] + [''] + (LINT + mx + header).rstrip().split('\n') + ls[k:])
         files[short + '.lean'] = guard_renames(apply_rewrites(core_rewrites(t, compat_ns, known), rewrites))
     if missing:
         raise PortError('imports of OpenAI modules that are not ported:\n  ' + '\n  '.join(sorted(missing)))
