@@ -486,3 +486,37 @@ def test_measure_never_leaves_an_old_olean_behind_a_failed_compile(tmp_path, mon
     res, _ = m.run(str(src), 'Definitions.Def_B010', {})
     assert not res['ok']
     assert not (old.parent / 'Def_B010.olean').exists() and not (old.parent / 'Def_B010.ilean').exists()
+
+
+def test_config_stops_when_the_build_log_lacks_most_modules(tmp_path):
+    # oaiq-092: 2102 modules repaired and built in place had no times in build_elab.log; the cost model took 2 s
+    # for each, three bundles measured 98-266 s against 55 s, and calibrate re-planned twice to the same plan
+    d, ws = tmp_path, tmp_path / 'ws'
+    (ws / 'Definitions').mkdir(parents=True)
+    f = ws / 'Solutions' / 'F'
+    (f / 'Sub').mkdir(parents=True)
+    for i in range(30):
+        (f / 'Sub' / ('M%d.lean' % i)).write_text('-- m\n')
+    (f / 'Compat.lean').write_text('-- generated\n')
+    (d / 'build_elab.log').write_text(''.join('✔ Built Solutions.F.Sub.M%d (1.0s)\n' % i for i in range(10)))
+    with pytest.raises(SystemExit) as e:
+        CP.make_config(str(d), 'F', 'Main', 'OAI.Fam.main', [], 'FAM', [], 40, 0.0, str(ws), None)
+    assert '10 of 30' in str(e.value) and '--redo build' in str(e.value)
+    (d / 'build_elab_2.log').write_text(''.join('✔ Built Solutions.F.Sub.M%d (1.0s)\n' % i for i in range(10, 25)))
+    CP.make_config(str(d), 'F', 'Main', 'OAI.Fam.main', [], 'FAM', [], 40, 0.0, str(ws), None)   # 25 of 30
+
+
+def test_config_fills_missing_times_from_the_leaninfo_cache(tmp_path, monkeypatch):
+    # most carves built before 2026-10-29 kept only the last round's modules in build_elab.log (oaiq-047: 37 of
+    # 1258); the LeanInfo cache holds a compile time for nearly all of the rest
+    import oai_build_modules as BM
+    d, ws = tmp_path, tmp_path / 'ws'
+    (ws / 'Definitions').mkdir(parents=True)
+    (ws / 'Solutions' / 'F').mkdir(parents=True)
+    for i in range(30):
+        (ws / 'Solutions' / 'F' / ('M%d.lean' % i)).write_text('-- m\n')
+    (d / 'build_elab.log').write_text('✔ Built Solutions.F.M0 (1.0s)\n')
+    monkeypatch.setattr(BM, 'cached_build_secs', lambda ws, folder: (lambda m: None if m.endswith('M29') else 8.0))
+    CP.make_config(str(d), 'F', 'Main', 'OAI.Fam.main', [], 'FAM', [], 40, 0.0, str(ws), None)
+    adj = (d / 'build_adj.log').read_text()
+    assert 'Solutions.F.M0 (1.0s)' in adj and 'Solutions.F.M5 (5.0s)' in adj and 'M29' not in adj

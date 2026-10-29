@@ -126,6 +126,46 @@ def merged_build_log(d, overhead):
     return ''.join('✔ [1/1] Built %s (%.1fs)\n' % (m, max(t - overhead, 0.1)) for m, t in times.items())
 
 
+GENERATED = ('Compat.lean', O.STDSIMPLEX_MODULE + '.lean', 'StdSimplexTopCompat.lean')
+
+
+def port_modules(ws, folder):
+    root = os.path.join(ws, 'Solutions', folder)
+    return {'Solutions.%s.%s' % (folder, os.path.relpath(os.path.join(dp, f), root)[:-5].replace(os.sep, '.'))
+            for dp, _, fs in os.walk(root) for f in fs if f.endswith('.lean') and f not in GENERATED}
+
+
+def cached_build_lines(d, ws, folder, overhead):
+    """Build-log lines for the port's modules the build logs lack, from the compile time LeanInfo cached
+    (less oai_build_modules' 3 s import overhead, as --elab-log takes it off): a build before 2026-10-29
+    kept only its last round's modules (oaiq-047: 37 of 1258; the cache had 1221 of the rest)."""
+    import oai_build_modules as BM
+    have = set(re.findall(r'Built (\S+) \(', merged_build_log(d, overhead)))
+    cached, out = BM.cached_build_secs(ws, folder), []
+    for m in sorted(port_modules(ws, folder) - have):
+        secs = cached(m)
+        if secs:
+            out.append('✔ [1/1] Built %s (%.1fs)\n' % (m, max(secs - 3.0 - overhead, 0.1)))
+    return ''.join(out)
+
+
+def check_build_log_coverage(adj, ws, folder, least=0.5, small=20):
+    """Exit when the merged build log times fewer than `least` of the port's modules: the cost model takes 2 s
+    for a module it has no time for, so the plan is blind (oaiq-092: modules built in place had none; three
+    bundles measured 98-266 s against 55 s and calibrate re-planned twice to the same plan). Ports under
+    `small` modules are left alone."""
+    mods = port_modules(ws, folder)
+    if len(mods) < small:
+        return
+    timed = set(re.findall(r'Built (\S+) \(', adj)) & mods
+    if len(timed) < least * len(mods):
+        sys.exit('build_elab*.log and the LeanInfo cache time only %d of %d modules of Solutions.%s, so the cost model would take 2 s '
+                 'for the rest and plan blind (oaiq-092). Rebuild through the pipeline: `--redo build` (after '
+                 'repairs made in place, first delete .lake/build/lib/lean/Solutions/%s and '
+                 '.lake/build/ir/Solutions/%s so every module is built and timed)'
+                 % (len(timed), len(mods), folder, folder, folder))
+
+
 def bundle_names(ws, defmods):
     """{full name: module} of what each bundle declares, parsed from its source."""
     ext = {}
@@ -163,7 +203,9 @@ def make_config(d, folder, root, target, defmods=(), bundle_prefix=None, forced=
             and os.path.exists(shim_bundle) and O.STDSIMPLEX_BUNDLE not in defmods):
         print('the port uses the StdSimplex shim: external definitions from', O.STDSIMPLEX_BUNDLE)
         defmods.append(O.STDSIMPLEX_BUNDLE)
-    open(os.path.join(d, 'build_adj.log'), 'w', encoding='utf-8').write(merged_build_log(d, overhead))
+    adj = merged_build_log(d, overhead) + cached_build_lines(d, ws, folder, overhead)
+    check_build_log_coverage(adj, ws, folder)
+    open(os.path.join(d, 'build_adj.log'), 'w', encoding='utf-8').write(adj)
     cfg = {'src': ws, 'roots': ['Solutions.%s.%s' % (folder, root)], 'prefix': 'Solutions.' + folder,
            'targets': [target], 'forced': list(forced), 'external': [target],
            'external_defs': dict(sorted(bundle_names(ws, defmods).items())),
