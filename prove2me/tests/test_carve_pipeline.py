@@ -1357,3 +1357,40 @@ def test_publish_waits_for_the_background_publisher(env, tmp_path):
     finally:
         C.time.sleep = real
     assert slept == [7, 7]
+
+
+def test_keep_port_takes_new_tools_without_re_porting_a_planned_carve(env):
+    # oaiq-081 (2026-10-29): 1,586 items planned and mostly measured on an old snapshot; the skill's port
+    # rules changed since, so `--upgrade` re-ran filter_patches, whose output changed, and that would have
+    # re-ported, rebuilt and re-planned the whole carve. --keep-port records the current rules as the
+    # ones the port ran with, once, so this and every later resume keep the port
+    (env.tmp / 'patches.json').write_text('[]')
+    assert run(env, *ARGS, '--patches', str(env.tmp / 'patches.json'), '--stop-after', 'measure').returncode == 0
+    _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# a new rewrite\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade', '--keep-port', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not _ported(env) and ('carve_prep', 'filter-patches') not in tools_called(env)
+    assert '--keep-port' in r.stdout and 'keep the port' in r.stdout
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert 'port rules' in st['steps']['port']['in'] and 'port rules' in st['steps']['filter_patches']['in']
+    r = run(env, '--stop-after', 'measure')                                # later resumes: still kept
+    assert r.returncode == 0 and not _ported(env) and 'stale' not in r.stdout
+
+
+def test_a_classic_carve_switched_to_overlap_keeps_its_plan_and_measurements(env, monkeypatch):
+    # the same carve: every item measured on the classic route, then "overlap": true in pipeline.json
+    _overlap_carve(env, monkeypatch)
+    assert run(env, *ARGS, '--stop-after', 'measure').returncode == 0
+    p = json.load(open(env.dir / 'pipeline.json'))
+    p['overlap'] = True
+    (env.dir / 'pipeline.json').write_text(json.dumps(p))
+    env.log.write_text('')
+    r = run(env, '--upgrade', '--keep-port')
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert ('carve', 'plan') not in seq and ('carve', 'gen') not in seq
+    measures = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure']
+    assert measures == [['config.json', '--keep-going', '--kinds', 'piece']]   # the classic measure stands
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['steps']['calibrate_pieces']['status'] == 'done' and st.get('replans', 0) == 0

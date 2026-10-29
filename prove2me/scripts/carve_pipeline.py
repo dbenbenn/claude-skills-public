@@ -3,7 +3,7 @@
 
 usage: carve_pipeline.py DIR [parameters] [--stop-after STEP] [--from STEP] [--redo STEP ...]
                          [--publish] [--upgrade | --snapshot REV] [--allow-dirty] [--list] [--detach]
-                         [--overlap | --no-overlap]
+                         [--overlap | --no-overlap] [--keep-port]
        carve_pipeline.py DIR --wait [MINUTES]
 
 DIR is the carve directory. The first run needs the parameters, which are stored in DIR/pipeline.json
@@ -87,7 +87,8 @@ so re-arm it.
 The driver re-executes itself from a read-only snapshot of the skill (p2mlib.snapshot) and calls
 every sub-tool from that snapshot, so editing or pushing the live skill never affects a running
 carve. The snapshot sha is recorded in the state file; a resume reuses it. --upgrade moves a resumed
-carve to the current HEAD; --snapshot REV picks a revision; --allow-dirty snapshots an uncommitted
+carve to the current HEAD (with --keep-port: keeping its port even if the port rules changed, which
+otherwise re-ports and, when the ported text changes, rebuilds and re-plans the carve); --snapshot REV picks a revision; --allow-dirty snapshots an uncommitted
 skills tree. Exit 3: another driver already runs this carve. Never write a job-dir driver script:
 to change a tool, change the skill (tests first), push, and new runs pick it up."""
 import argparse
@@ -132,6 +133,7 @@ def parse(argv):
     ap.add_argument('--redo', action='append', choices=C.STEPS, default=[])
     ap.add_argument('--publish', action='store_true')
     ap.add_argument('--upgrade', action='store_true')
+    ap.add_argument('--keep-port', action='store_true')
     ap.add_argument('--snapshot')
     ap.add_argument('--allow-dirty', action='store_true')
     ap.add_argument('--list', action='store_true')
@@ -352,6 +354,8 @@ def main(argv=None):
     C.lock(a.dir)
     p = C.Pipeline(a.dir, dict(params, go=a.publish), snap)
     p.state['snapshot'] = {'sha': os.path.basename(snap), 'path': snap}
+    if a.keep_port:
+        p.keep_port()
     if a.frm:
         p.invalidate(a.frm)
     p.save()

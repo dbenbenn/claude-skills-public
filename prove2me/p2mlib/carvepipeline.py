@@ -409,6 +409,26 @@ class Pipeline:
                         return s, rule[0]
         return None
 
+    def keep_port(self):
+        """--keep-port: record the running snapshot's port rules (and options) as the ones filter_patches
+        and port ran with, so an --upgrade across a change to them keeps the port, now and on every
+        later resume. oaiq-081: planned and measured (1,586 items) on an old snapshot, the new rules
+        changed port_patches.json and would have re-ported, rebuilt and re-planned the whole carve."""
+        kept = []
+        for s in ('filter_patches', 'port'):
+            rec = self.state['steps'].get(s)
+            if not rec or rec['status'] != 'done':
+                continue
+            now, had = self.step_inputs_hash(s), rec.setdefault('in', {})
+            for k in (SNAPSHOT_RULES[s][0], 'port options'):
+                if k in now and had.get(k) != now[k]:
+                    had[k] = now[k]
+                    kept.append(s)
+        if kept:
+            print('== --keep-port: %s keep the port as it is; the current port rules are recorded as theirs '
+                  '(`--redo port` re-ports deliberately)' % ' and '.join(sorted(set(kept))), flush=True)
+        self.save()
+
     def _rule_matters(self, s):
         if s == 'graph':
             return any(self.state['steps'].get(x, {}).get('status') not in ('done', 'skipped') for x in GRAPH_READERS)
