@@ -2564,7 +2564,7 @@ class Carver:
             if i in self.keep:
                 if i not in earlier:
                     continue
-            elif pubname(i) not in have:
+            elif not instance_imported(i, have, rename):
                 continue
             if i in names:
                 full = names[i]

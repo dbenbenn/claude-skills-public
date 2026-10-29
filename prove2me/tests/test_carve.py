@@ -1881,6 +1881,23 @@ def test_a_collided_local_instance_kept_from_another_module_still_comes_back(g):
     assert sec.index('attribute [local instance] CD.IC.zeroR_p1') < sec.index('instance oneR_p1')
 
 
+def test_a_collided_instance_of_an_unimported_copy_is_not_hidden(g, monkeypatch):
+    # oaiq-096 (CubicMoment, 2026-10-29): bundle A018 hid `instFinite…_p0` and `_p1`, copies of one
+    # anonymous instance declared in the later bundles A019/A021: "Unknown constant". The check
+    # `pubname(i) in have` took the base name, which another collided copy (the one the file keeps)
+    # supplies; a collided copy counts as imported only under its own renamed name.
+    keep = IC_DEFS | {IC_A + 'zeroR'}
+    ren = C.collision_renames(g)
+    cv = C.Carver(g)
+    cv.keep = set(keep)
+    monkeypatch.setattr(g, '_global_insts', [IC_B + 'zeroR'], raising=False)
+    monkeypatch.setattr(C, '_could_match', lambda *a: True)
+    have = g.have_names(keep)
+    assert cv._unseen_instances('CarveDev.InstColA', have, set(), ren) == []
+    have = have | {'CD.IC.zeroR_p1'}
+    assert cv._unseen_instances('CarveDev.InstColA', have, set(), ren) == ['_root_.CD.IC.zeroR_p1']
+
+
 def test_a_reemitted_local_instance_brings_back_the_earlier_ones_it_used_first(g):
     # one_b's record names only oneR (Lech: the declaration's term kept a defeq instance for
     # concreteRing); oneR, emitted again, needs zeroR before it, which one_b alone never asked for
