@@ -1183,8 +1183,11 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # `simp` no longer proves `(↑n : ℕ∞ω) ≤ ∞` (the smoothness-order argument of `ContDiff.of_le`,
     # `iteratedFDeriv_right`, `contDiffOn'`, ...): fall back on `exact_mod_cast le_top` (oaiq-088: 17 sites)
     def _smooth_simp(m):
-        line = re.sub(r"(\(show (?:[^()\n]|\([^()\n]*\))*≤ ∞) by simp\)", r"\1 by first | simp | exact_mod_cast le_top)", m.group(0))
-        if not re.search(r"iteratedFDeriv|iteratedDeriv|ContDiff|contDiff|of_le|ContinuousAt", line):
+        text_, line = m.string, m.group(0)
+        line = re.sub(r"(\(show (?:[^()\n]|\([^()\n]*\))*≤ ∞) by simp\)", r"\1 by first | simp | exact_mod_cast le_top)", line)
+        # the keyword may sit on one of the three lines before (a long application broken across lines)
+        before = '\n'.join(text_[:m.start()].split('\n')[-4:-1])
+        if not re.search(r"iteratedFDeriv|iteratedDeriv|ContDiff|contDiff|of_le|ContinuousAt|≤ ∞", before + '\n' + line):
             return line
         return re.sub(r"\(by simp( : [^()\n]*(?:\([^()\n]*\)[^()\n]*)*)?\)",
                       lambda k: '(by first | simp | exact_mod_cast le_top%s)' % (k.group(1) or ''), line)

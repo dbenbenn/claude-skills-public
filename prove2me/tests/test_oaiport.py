@@ -2299,6 +2299,9 @@ def test_smoothness_order_simp_gets_le_top_fallback():
            "  obtain ⟨U,hU,hx,hfU⟩ := hf.contDiffOn' (by simp : (k : ℕ∞ω) ≤ ∞) (by simp)\n"
            "    ((contDiff_const.mul hk).of_le (by simp)).contDiffAt\n"
            "  have h : 0 < x := by simp\n"
+           "  have h2 : 0 < y := by simp\n"
+           "  have h3 : 0 < z := by simp\n"
+           "  have h4 : 0 < w := by simp\n"
            "  exact foo (by simp)\n")
     out = O.core_rewrites(src)
     fb = "first | simp | exact_mod_cast le_top"
@@ -2326,3 +2329,13 @@ def test_compat_narrow_imports_build_the_whole_compat_block():
               'Mathlib.Analysis.VonNeumannAlgebra.Basic', 'Mathlib.Analysis.Distribution.SchwartzSpace.Basic',
               'Mathlib.Analysis.InnerProductSpace.Positive', 'Mathlib.Geometry.Manifold.IsManifold.Basic'):
         assert m in O.COMPAT_NARROW_IMPORTS
+
+
+def test_smoothness_order_simp_keyword_on_a_earlier_line():
+    # the smoothness keyword may sit up to three lines before the `(by simp)` (oaiq-088: 4 more sites)
+    far = O.core_rewrites("  have := (hf.iteratedFDeriv_right\n    (hg x)\n    foo\n    (by simp)).continuous\n")
+    assert "(by first | simp | exact_mod_cast le_top)).continuous" in far
+    near = O.core_rewrites("  have := foo\n  bar\n  baz\n  qux\n  exact g (by simp)\n")
+    assert "exact g (by simp)\n" in near
+    typed = O.core_rewrites("  foo\n    (by simp : (k : ℕ∞ω) ≤ ∞)\n")
+    assert "(by first | simp | exact_mod_cast le_top : (k : ℕ∞ω) ≤ ∞)" in typed
