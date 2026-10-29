@@ -2289,3 +2289,19 @@ def test_fold_problems_are_only_the_ones_the_fold_adds(g, plan):
     broken = C.fold_statements(plan, ['CD.double_succ'])
     broken['pieces']['CD.main']['bundles'] = []
     assert C.fold_problems(g, plan, broken)
+
+
+def test_frozen_bundle_members_get_no_implicit_dependencies(g):
+    # oaiq-088 (Falconer all dimensions extending oaiq-038's published carve): a frozen member
+    # (`PolicyBranch.exponentSum`) "implicitly used" an attributed lemma that this carve put in a
+    # NEW bundle, which in turn needs the frozen bundle: an import cycle, so `_reduce` emptied
+    # every import and the check said "needs X from the frozen bundle, not imported". A published
+    # bundle's imports are fixed; implicit dependencies apply to new material only.
+    old = {'bundles': [{'name': 'F0', 'nodes': ['CD.Space', 'CD.Space.size', 'CD.Space.coord']}],
+           'external_defs': {}}
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.01,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='N', chunker='schedule', frozen=(old, ['F0']))
+    new = {k: b for b in p['bundles'] for k in b['nodes']}
+    assert new['CD.Space.size_eq']['imports'] == ['F0']
+    assert C.check_plan(g, p) == []

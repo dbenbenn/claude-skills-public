@@ -1645,6 +1645,11 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         B |= g.extra_roots(B, set())
         B -= set(ext) | stmts
     extra = implicit_deps(g, B, B) if chunker == 'schedule' else {}
+    for ch in fz_chunks:
+        # a published bundle's imports are fixed: implicit dependencies are for new material only
+        # (oaiq-088: a frozen member 'used' a lemma of a new bundle that needs the frozen bundle)
+        for k in ch:
+            extra.pop(k, None)
     pin_chunks = _pin_chunks(g, pinned, B, {k for ch in fz_chunks for k in ch}, extra)
     if stmts:
         taken = {k for ch in fz_chunks + pin_chunks for k in ch}
