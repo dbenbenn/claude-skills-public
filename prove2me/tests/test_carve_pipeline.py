@@ -1047,3 +1047,23 @@ def test_detach_refuses_at_once_naming_the_driver_that_holds_the_carve(env):
         assert 'run' not in (env.dir / 'logs' / 'driver.log').read_text() if (env.dir / 'logs' / 'driver.log').exists() else True
     finally:
         holder.kill()
+
+
+def test_once_publishing_started_a_port_rule_change_keeps_the_port_and_says_so(env):
+    # live items freeze their text: a carve that has started publishing never re-ports by itself
+    assert run(env, *ARGS, '--publish').returncode == 0
+    _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# a new rewrite\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not _ported(env) and 'publishing has started' in r.stdout and '--redo port' in r.stdout
+    # the same once split_run has a run state (a --go run outside the pipeline)
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    st['steps'].pop('publish', None)
+    json.dump(st, open(env.dir / 'pipeline_state.json', 'w'))
+    (env.dir / 'publish').mkdir(exist_ok=True)
+    (env.dir / 'publish' / 'run_state.json').write_text('{}')
+    _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# another\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade')
+    assert r.returncode == 0 and not _ported(env), r.stdout + r.stderr

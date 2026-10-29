@@ -292,6 +292,7 @@ class Pipeline:
         self.state = json.load(open(self.state_path)) if os.path.exists(self.state_path) else {'steps': {}}
         self.lean_src = os.path.abspath(os.path.expanduser(params.get('lean_src') or os.path.join(self.d, 'src', 'lean')))
         self.meta = os.path.abspath(os.path.expanduser(params.get('meta') or os.path.join(self.d, 'oai_meta.json')))
+        self._kept_rules = set()
 
     # -- state ------------------------------------------------------------------------------
     def save(self):
@@ -352,9 +353,19 @@ class Pipeline:
         return None
 
     def _rule_matters(self, s):
-        if s != 'graph':
-            return True
-        return any(self.state['steps'].get(x, {}).get('status') not in ('done', 'skipped') for x in GRAPH_READERS)
+        if s == 'graph':
+            return any(self.state['steps'].get(x, {}).get('status') not in ('done', 'skipped') for x in GRAPH_READERS)
+        if self.publishing_started():
+            # live items froze their text: never re-port under them by ourselves
+            if s not in self._kept_rules:
+                self._kept_rules.add(s)
+                print('== note: the skill\'s port rules changed since %s ran, but publishing has started, so '
+                      'the port is kept (`--redo port` re-ports anyway)' % s, flush=True)
+            return False
+        return True
+
+    def publishing_started(self):
+        return 'publish' in self.state['steps'] or os.path.exists(os.path.join(self.d, 'publish', 'run_state.json'))
 
     def ported_modules(self):
         d = self.folder_dir()
