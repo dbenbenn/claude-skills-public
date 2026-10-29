@@ -168,6 +168,19 @@ def module_body(text):
     return text[header_end(text):]
 
 
+def dev_theorem(text, target):
+    """The development's theorem the wrapper applies: TARGET itself when the merged text declares
+    it, else TARGET_dev when that is declared (the usual name of a development's copy). Applying the
+    published name when only `_dev` exists makes resolve_imports inline the target's own sorried
+    statement (oaiq-111, 2026-10-29)."""
+    short = target.rsplit('.', 1)[-1]
+    if re.search(r'\btheorem\s+' + re.escape(short) + r'\s', text):
+        return target
+    if re.search(r'\btheorem\s+' + re.escape(short) + r'_dev\b', text):
+        return target + '_dev'
+    return target
+
+
 def wrap_module(text):
     """A module's copy for merge.py: its import header kept (merge.py takes the merged file's imports
     from the modules' headers and parses the modules with them; without `import Mathlib` the parse
@@ -233,7 +246,8 @@ def main():
     fs2, n = re.subn(r'\btheorem\s+' + re.escape(short) + r'\b', 'theorem solution', fs, count=1)
     if n != 1:
         sys.exit('cannot find `theorem %s` in the published formal_statement' % short)
-    tactic = ('exact %s %s' % (a.target, a.args)) if a.args else ('apply %s <;> assumption' % a.target)
+    dev = dev_theorem(text, a.target)
+    tactic = ('exact %s %s' % (dev, a.args)) if a.args else ('apply %s <;> assumption' % dev)
     fs2, n = re.subn(r':=\s*by\s+sorry\s*', lambda _: ':= by\n  %s\n' % tactic, fs2, count=1)
     if n != 1:
         sys.exit('cannot find `:= by sorry` in the published formal_statement')

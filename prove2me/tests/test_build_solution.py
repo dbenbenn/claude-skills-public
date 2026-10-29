@@ -125,3 +125,12 @@ def test_wrapped_module_keeps_its_imports_for_merge():
     w = BS.wrap_module(text)
     assert merge.header([w]) == 'import Mathlib\n'
     assert 'section\nopen Real\n\ntheorem a : True := trivial\n\nend\n' in w
+
+
+def test_wrapper_applies_the_dev_theorem_when_the_target_name_is_not_declared():
+    # 2026-10-29 (oaiq-111): developments name their theorem `<target>_dev`; the wrapper applied
+    # the published name, which resolve_imports then inlined as the target's own sorried statement
+    text = 'namespace TaoBR\ntheorem restr_zero_of_restr_dev (n : Nat) : True := trivial\nend TaoBR\n'
+    assert BS.dev_theorem(text, 'TaoBR.restr_zero_of_restr') == 'TaoBR.restr_zero_of_restr_dev'
+    text2 = 'namespace TaoBR\ntheorem restr_zero_of_restr (n : Nat) : True := trivial\nend TaoBR\n'
+    assert BS.dev_theorem(text2, 'TaoBR.restr_zero_of_restr') == 'TaoBR.restr_zero_of_restr'
