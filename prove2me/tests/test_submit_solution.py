@@ -45,7 +45,7 @@ def proof(sid='old', status='ACCEPTED', edges=True, content='-- an earlier proof
                 username='someone', explanation='We prove it by induction.')
 
 
-def fake_platform(live_edges=None, live=None):
+def fake_platform(live_edges=None, live=None, dep_status=None):
     """The theorem N.target (id T) with the live proofs `live` (default: one ACCEPTED proof, with the
     edge N.dep if live_edges). Like the platform, the graph has a sketch node only for a proof with
     theorem edges, and none for a deprecated one; /submissions lists them all."""
@@ -53,6 +53,8 @@ def fake_platform(live_edges=None, live=None):
         live = [proof(edges=bool(live_edges))] if live_edges is not None else []
 
     def call(method, path, body=None):
+        if path.startswith('/theorems?theorem_name=N.dep') and dep_status:
+            return {'theorems': [{'theorem_name': 'N.dep', 'theorem_id': 'D', 'status': dep_status}]}
         if path.startswith('/theorems?theorem_name='):
             return {'theorems': [{'theorem_name': 'N.target', 'id': 'T'}]}
         if path == '/theorems/T/graph':
@@ -233,3 +235,17 @@ def test_guard_token_prelude_refused(tmp_path):
     # a longer identifier, a comment or a string is fine
     S.check_no_metaprogramming(sol(tmp_path, '-- the prelude\ndef prelude_size : String := "prelude"\n'
                                    'theorem solution : prelude_size = "prelude" := rfl\n'))
+
+
+def test_importing_a_disproved_theorem_is_refused(ws, tmp_path, monkeypatch):
+    # JM Prop 3.3 and Theorem C (oaiq-100, 2026-10-29) were SKETCH_ACCEPTED resting on a JdlS
+    # statement already Disproved; the platform accepted them, /open-leaves showed nothing, and the
+    # goal above them stayed Open with no visible reason
+    with pytest.raises(SystemExit) as e:
+        run(monkeypatch, fake_platform(dep_status='Disproved'), 'N.target', sol(tmp_path, TOP))
+    assert 'Disproved' in str(e.value) and 'N.dep' in str(e.value)
+
+
+def test_importing_a_proved_theorem_goes_through(ws, tmp_path, monkeypatch, capsys):
+    run(monkeypatch, fake_platform(dep_status='Proved'), 'N.target', sol(tmp_path, TOP))
+    assert 'dry run' in capsys.readouterr().out

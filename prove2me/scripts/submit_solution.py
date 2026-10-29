@@ -197,6 +197,21 @@ def check_no_draft_imports(path):
                  'once its statement is published):\n  ' + '\n  '.join(bad))
 
 
+def check_no_disproved_imports(names):
+    """Refuse a solution importing a Disproved theorem. The verifier accepts it (SKETCH_ACCEPTED),
+    but the target can then never resolve to Proved, and /open-leaves does not list a Disproved
+    leaf, so everything above it stays Open with no visible reason (JM Prop 3.3 and Theorem C,
+    oaiq-100, 2026-10-29, rested on a disproved JdlS statement)."""
+    bad = []
+    for name in sorted(names):
+        r = call('GET', '/theorems?theorem_name=%s&limit=5' % name)
+        bad += [name for t in (r.get('theorems') or [])
+                if t.get('theorem_name') == name and t.get('status') == 'Disproved']
+    if bad:
+        sys.exit('REFUSED: imports Disproved theorems, so the target could never become Proved:\n  ' +
+                 '\n  '.join(bad) + '\nimport a corrected (Proved or Open) statement instead.')
+
+
 def check_no_metaprogramming(path):
     """The platform's soundness guard rejects custom syntax/elaborator registration ("line N: `macro`
     ... metaprogramming is not supported in submissions"; CFP §6's Lemma 6.1 was refused for a
@@ -309,6 +324,7 @@ def main():
         else call('GET', '/theorems/%s' % tid).get('theorem_name', '')
     check_no_inline_copies(path, target, allow)
     want = import_names(path)
+    check_no_disproved_imports(want)
     print('%s\n   file %s\n   edges it should create: %s\n   replaces: %s'
           % (args[0], path, sorted(want) or 'none (a full proof)', replaces or 'nothing'))
     # checked here, at submission time: a batch built hours earlier can find its theorem proved by
