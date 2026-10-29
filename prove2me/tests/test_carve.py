@@ -2104,6 +2104,34 @@ def test_extending_a_frozen_carve_keeps_its_external_definitions_external(g, ext
     assert p['external_defs'] == {'CD.double': 'Definitions.Def_Mine'}
 
 
+def test_frozen_carve_against_another_definitions_bundle_says_so(g, ext_plan):
+    # w2/oaiq-113 (TorsionFreeBass extending the first BassTrace carve): the frozen bundles were
+    # carved against Def_BassTrace, this carve's goal imports Def_BassTorsionFree, which declares
+    # the same names. This carve's external_defs win (right when one bundle imports the other), but
+    # here the frozen bundles then needed Def_BassTrace-only declarations from a new bundle and
+    # check_plan said only "imports a later or unknown bundle". The plan records the disagreement
+    # and check_plan names it, with the way out.
+    names = [b['name'] for b in ext_plan['bundles']]
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    frozen=(ext_plan, names), bundle_prefix='NEW',
+                    external_defs={'CD.double': 'Definitions.Def_Mine'})
+    assert p['frozen_external_conflicts'] == {'Definitions.Def_Ext': ['Definitions.Def_Mine']}
+    # a frozen bundle that now needs a new bundle
+    q = json.loads(json.dumps(p))
+    q['bundles'][0]['imports'] = [q['bundles'][-1]['name']]
+    probs = C.check_plan(g, q)
+    msg = [x for x in probs if 'later or unknown' in x]
+    assert msg and q['bundles'][-1]['name'] in msg[0], probs
+    assert 'Definitions.Def_Ext' in msg[0] and 'Definitions.Def_Mine' in msg[0], msg
+    assert 'statement_suffix' in msg[0], msg
+    # no disagreement: nothing recorded
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    frozen=(ext_plan, names), bundle_prefix='NEW')
+    assert 'frozen_external_conflicts' not in p
+
+
 def _dq_graph():
     """The fixture graph with dq_use's and dq_use_late's records naming only dqW (SharpRamsey
     oaiq-060: the statement's term kept a defeq instance in place of the BDE it used)."""

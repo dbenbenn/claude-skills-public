@@ -1643,10 +1643,16 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         # and the plan has a cycle (oaiq-057: DimensionTen Channel extending oaiq-033's carve,
         # whose Def_DimensionTenPair this carve's targets do not import; "needs krausMap from
         # bundle OAIQ033D009, not imported")
+        conflicts = {}
         for k, m in (old.get('external_defs') or {}).items():
             k = g.owner.get(k, k)
             if k in g.nodes and k not in ext:
                 ext[k] = m
+            elif k in ext and ext[k] != m:
+                # this carve takes k from another bundle than the frozen ones did: fine when one
+                # imports the other, fatal when both declare it (w2/oaiq-113: Def_BassTrace vs
+                # Def_BassTorsionFree); check_plan names it if a frozen bundle then breaks
+                conflicts.setdefault(m, set()).add(ext[k])
     for k in ext:
         if k not in g.nodes:
             raise CarveError('unknown external definition %s' % k)
@@ -1807,6 +1813,8 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             'external_defs': dict(sorted(ext.items())), 'statement_suffix': statement_suffix,
             'external': sorted(external),
             'sorry': sorted(k for k in reach | B if g.nodes[k].sorry and k not in ext)}
+    if frozen and conflicts:
+        plan['frozen_external_conflicts'] = {m: sorted(v) for m, v in sorted(conflicts.items())}
     if stmts:
         for n in resolve_piece_cycles(g, plan):
             plan['pieces'][n]['cost'] = round(pcost(set(plan['pieces'][n]['keep'])), 2)
@@ -2176,8 +2184,16 @@ def check_plan(g, plan):
             ' -> '.join([c[0] for c in cyc] + [cyc[0][0]]),
             '; '.join('%s in %s needs %s from %s' % (k, a, d, b) for a, k, d, b in cyc)))
     for i, b in enumerate(plan['bundles']):
-        if any(pos.get(x, len(pos)) >= i for x in b['imports']):
-            probs.append('bundle %s imports a later or unknown bundle' % b['name'])
+        late = [x for x in b['imports'] if pos.get(x, len(pos)) >= i]
+        if late:
+            msg = 'bundle %s imports a later or unknown bundle (%s)' % (b['name'], ', '.join(late))
+            cf = plan.get('frozen_external_conflicts')
+            if cf:
+                msg += ('; the frozen bundles were carved against %s, this carve takes the same '
+                        'declarations from %s: if those bundles declare the same names no file can '
+                        'import both, so carve fresh (no frozen) with a statement_suffix' % (
+                            ', '.join(sorted(cf)), ', '.join(sorted({x for v in cf.values() for x in v}))))
+            probs.append(msg)
         cl = _bundle_closure(bimp, [i])
         sts = set(b.get('statements', ()))
         for st in sts:
