@@ -3376,7 +3376,7 @@ class Carver:
                 # read that text as some other project declaration (a library constant included:
                 # a project `CD.Finset.foo` in the file would capture `Finset.foo`)
                 if len(r.head) != 1 or r.field or r.binder or is_field(info, i) or \
-                        not g.is_project(r.head[0]) or r.head[0].startswith('_private.') or \
+                        r.head[0].startswith('_private.') or \
                         r.head[0] in self.rename or _alternative_name(info, i):
                     continue      # a field, a declared name, a case name (`| zero =>`): not a reference
                 orig = r.head[0]
@@ -3384,6 +3384,20 @@ class Carver:
                 if a < i['start'] or info.text_bytes[a:b].startswith(b'.'):
                     continue                       # a dot-identifier: resolved by its expected type
                 htxt = info.text_bytes[a:b].decode('utf-8')
+                if not g.is_project(orig):
+                    # a library constant: pinned only when a project declaration the module did not
+                    # see would capture the text in the carved file (oaiq-096: project `norm_nonneg`
+                    # over Mathlib's); a local or an unresolvable name is left alone
+                    if not orig or orig != htxt:
+                        continue
+                    now, k2 = g.lean_hits(htxt, c.namespace, opens, lambda n: pubname(n) in have)
+                    if k2 or not now:
+                        continue
+                    src, k = g.lean_hits(htxt, c.namespace, opens, lambda n: self._seen_at(n, m, c))
+                    if k == 0 and {pubname(n) for n in src} == {pubname(n) for n in now}:
+                        continue
+                    out.append((a, b, '_root_.' + orig))
+                    continue
                 now, k2 = g.lean_hits(htxt, c.namespace, opens, lambda n: pubname(n) in have)
                 if k2 or not now or {pubname(n) for n in now} == {pubname(orig)}:
                     continue

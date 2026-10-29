@@ -1881,6 +1881,22 @@ def test_a_collided_local_instance_kept_from_another_module_still_comes_back(g):
     assert sec.index('attribute [local instance] CD.IC.zeroR_p1') < sec.index('instance oneR_p1')
 
 
+def test_a_library_name_a_project_declaration_shadows_is_pinned(g):
+    # oaiq-096 (CubicMoment, 2026-10-29): the project lemma `norm_nonneg` (CubicGram_Coordinates) sat
+    # in the same carved piece as modules that never imported it and meant Mathlib's: `norm_nonneg _`
+    # inside `namespace CubicFirstMoment` read the project one ("Type mismatch", 20 pieces). A library
+    # constant Lean resolved is written `_root_.` when the carved file would read the text as a
+    # project declaration the module did not see.
+    keep = {'CD.Sh.Nat.le_refl', 'CD.Sh.useRefl'}
+    txt = C.Carver(g).carve(keep, g.have_names(keep))
+    sec = _section(txt, 'CarveDev.ShadowB')
+    assert 'Nat.le_refl n' in sec and '_root_.Nat.le_refl n' in sec, sec
+    # alone, nothing shadows it: no pin
+    keep = {'CD.Sh.useRefl'}
+    sec = _section(C.Carver(g).carve(keep, g.have_names(keep)), 'CarveDev.ShadowB')
+    assert '_root_.Nat.le_refl' not in sec, sec
+
+
 def test_a_collided_instance_of_an_unimported_copy_is_not_hidden(g, monkeypatch):
     # oaiq-096 (CubicMoment, 2026-10-29): bundle A018 hid `instFinite…_p0` and `_p1`, copies of one
     # anonymous instance declared in the later bundles A019/A021: "Unknown constant". The check

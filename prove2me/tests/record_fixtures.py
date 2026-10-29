@@ -36,7 +36,7 @@ def record_carve():
     from p2mlib import carve
     src = os.path.join(FIX, 'carve')
     with tempfile.TemporaryDirectory() as d:
-        for rel in carve.record_fixture(src, 'CarveDev', ['CarveDev.Top'], os.path.join(d, 'olean'), src):
+        for rel in carve.record_fixture(src, 'CarveDev', ['CarveDev.Top', 'CarveDev.ShadowA', 'CarveDev.ShadowB'], os.path.join(d, 'olean'), src):
             print('recorded carve/' + rel)
 
 
