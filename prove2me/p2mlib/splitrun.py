@@ -196,6 +196,19 @@ class Runner:
         rank = {'bundle': 0, 'statement': 1, 'piece': 2}
         return sorted(out, key=lambda x: rank[x.split(':', 1)[0]])
 
+    def unsendable(self):
+        """{item: why} for every item still to send (any wave, not only the ready ones) whose files are
+        missing or fail a check: what a live run would block on (oaiq-047: 12 forced statements had no
+        prose; the dry run, which checked only what it would send at once, was clean)."""
+        out = {}
+        for x in self.items:
+            if self.state.get(x, {}).get('state', 'todo') != 'todo' or x.split(':', 1)[0] not in self.kinds:
+                continue
+            why = self.check(x)
+            if why:
+                out[x] = why
+        return out
+
     # ------------------------------------------------------------------ what is already live
     def reconcile(self, write=True):
         """Look up every bundle and statement not yet live in the state: one live under its name
@@ -452,6 +465,7 @@ class Runner:
             self.st(x).update(state='live', id=i)
         try:
             return {'ready': self.ready(), 'blocked': dict(self.blocked), 'adopt': adopted,
+                    'unsendable': self.unsendable(),
                     'mismatch': bad, 'proved_elsewhere': dict(getattr(self, 'proved_elsewhere', {})),
                     'items': len(self.items),
                     'live': sum(self.live(x) for x in self.items)}

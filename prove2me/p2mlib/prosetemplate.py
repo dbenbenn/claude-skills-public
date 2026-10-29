@@ -11,7 +11,9 @@ using, and says which items import it; it makes no mathematical claim of its own
 
 Written: `prose/<slug>.md` for every intermediate statement (not the goal, not a `forced` named
 result), `prose/<NAME>.md` for every bundle, and `explanations/<slug>.md` for every proof piece of
-an intermediate statement. The goal and the forced nodes are listed as needing written prose.
+an intermediate statement. The goal and the forced nodes are listed as needing written prose, each
+with the file to write (`prose/<slug>.md` for a forced statement, `explanations/<slug>.md` for a
+proof), while that file is missing; check-text and split_run's dry run fail until they exist.
 
 Generated files are marked: prose carries the front-matter field `template:` (split_run reads only
 `title` and `source`), and every generated file's sha1 is kept in `prose/.template.json` /
@@ -536,19 +538,26 @@ def write_templates(carve_dir, meta=None, force=False):
     for b in ctx.plan['bundles']:
         texts['prose/%s.md' % b['name']] = bundle_prose(ctx, b)
     need = []
+
+    def needs(kind, n, why, rel):
+        # the file to write, while it is missing (oaiq-047: only the explanations were noticed)
+        if not os.path.exists(os.path.join(P, rel)):
+            need.append('%s %s (%s): write %s' % (kind, C.statement_name(ctx.plan, n), why, rel))
     for n in ctx.plan['stubs']:
         why = 'goal' if (n in ctx.ext or n in ctx.targets) else 'forced' if n in ctx.forced else None
+        rel = 'prose/%s.md' % C.slug(C.statement_name(ctx.plan, n))
         if why:
             if n not in ctx.ext:
-                need.append('statement %s (%s)' % (C.statement_name(ctx.plan, n), why))
+                needs('statement', n, why, rel)
             continue
-        texts['prose/%s.md' % C.slug(C.statement_name(ctx.plan, n))] = statement_prose(ctx, n)
+        texts[rel] = statement_prose(ctx, n)
     for n in ctx.plan['pieces']:
         why = 'goal' if (n in ctx.ext or n in ctx.targets) else 'forced' if n in ctx.forced else None
+        rel = 'explanations/%s.md' % C.slug(C.statement_name(ctx.plan, n))
         if why:
-            need.append('explanation %s (%s)' % (C.statement_name(ctx.plan, n), why))
+            needs('explanation', n, why, rel)
             continue
-        texts['explanations/%s.md' % C.slug(C.statement_name(ctx.plan, n))] = explanation(ctx, n)
+        texts[rel] = explanation(ctx, n)
     rep = {'written': [], 'kept': [], 'needs_written': need}
     mans = {s: _manifest(P, s) for s in ('prose', 'explanations')}
     for rel, t in sorted(texts.items()):

@@ -677,7 +677,8 @@ class Pipeline:
         log = os.path.join(self.d, 'logs', 'prose.log')
         need = [l for l in open(log).read().splitlines() if 'needs written prose' in l]
         if need:
-            print('NOTE: written prose still needed (goal and forced items):', *need, sep='\n  ', file=sys.stderr)
+            print('NOTE: written prose still needed (goal and forced items); check_text and dryrun fail until '
+                  'these files exist:', *need, sep='\n  ', file=sys.stderr)
 
     def step_check_text(self):
         self.run_cmds('check_text', [self.tool('carve_prep', 'check-text', os.path.join(self.d, 'publish'))])

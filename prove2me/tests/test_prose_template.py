@@ -207,8 +207,9 @@ def test_writes_intermediate_items_and_lists_the_goal_and_forced_nodes(tmp_path)
     assert sorted(os.listdir(P / 'prose')) == [T.MANIFEST, 'FAMQ000.md', 'OAI_Fam_Lemmas_lemA.md']
     assert sorted(os.listdir(P / 'explanations')) == [T.MANIFEST, 'OAI_Fam_Lemmas_lemA.md']
     assert sorted(rep['needs_written']) == [
-        'explanation OAI.Fam.named (forced)', 'explanation OAI.main (goal)',
-        'statement OAI.Fam.named (forced)']
+        'explanation OAI.Fam.named (forced): write explanations/OAI_Fam_named.md',
+        'explanation OAI.main (goal): write explanations/OAI_main.md',
+        'statement OAI.Fam.named (forced): write prose/OAI_Fam_named.md']
     assert sorted(rep['written']) == ['explanations/OAI_Fam_Lemmas_lemA.md', 'prose/FAMQ000.md',
                                       'prose/OAI_Fam_Lemmas_lemA.md']
 
@@ -388,7 +389,7 @@ def test_template_forced_gives_a_cost_forced_node_template_prose(tmp_path):
     cfg['template_forced'] = ['OAI.Fam.named']
     (d / 'config.json').write_text(json.dumps(cfg))
     rep = run(d)
-    assert rep['needs_written'] == ['explanation OAI.main (goal)']
+    assert rep['needs_written'] == ['explanation OAI.main (goal): write explanations/OAI_main.md']
     assert 'prose/OAI_Fam_named.md' in rep['written']
     assert 'explanations/OAI_Fam_named.md' in rep['written']
 
@@ -407,3 +408,35 @@ def test_check_text_memoizes_name_lookups_across_files():
     finally:
         CP.re.search = real
     assert calls == []
+
+
+def test_needs_written_names_the_files_to_write_and_check_text_fails_without_them(tmp_path, capsys):
+    # oaiq-047: 12 forced statements had no prose/<slug>.md; check-text said 0 problems, the dry run
+    # was clean, and the live run blocked all 12 ("missing .../prose/...md")
+    d, ws = make_carve(tmp_path)
+    rep = run(d)
+    assert sorted(rep['needs_written']) == [
+        'explanation OAI.Fam.named (forced): write explanations/OAI_Fam_named.md',
+        'explanation OAI.main (goal): write explanations/OAI_main.md',
+        'statement OAI.Fam.named (forced): write prose/OAI_Fam_named.md']
+    P = d / 'publish'
+    (P / 'run.json').write_text(json.dumps({
+        'plan': str(P / 'plan.json'), 'out': str(P / 'out'), 'prose': str(P / 'prose'),
+        'explanations': str(P / 'explanations'), 'state': str(P / 'run_state.json'), 'log': str(P / 'PROGRESS.log')}))
+    with pytest.raises(SystemExit) as e:
+        CP.cmd_check_text([str(P), '--ws', str(ws)])
+    out = capsys.readouterr().out
+    assert e.value.code == 1
+    for f in ('prose/OAI_Fam_named.md', 'explanations/OAI_Fam_named.md', 'explanations/OAI_main.md'):
+        assert 'MISSING' in out and str(P / f) in out, f
+    # written: no longer needed, and check-text passes
+    (P / 'prose' / 'OAI_Fam_named.md').write_text('---\ntitle: The named lemma\n---\n\n`Foo n = Foo n` for every `n`.\n')
+    expl = ('The statement is\n\n$$\\mathrm{Foo}(n) = \\mathrm{Foo}(n)$$\n\nfor every natural number `n`, and it holds by reflexivity of '
+            'equality, which is all the proof uses; the carved file states it, imports the bundle that defines the '
+            'objects, and closes the goal with `rfl` after unfolding nothing at all in the claim.\n')
+    for f in ('OAI_Fam_named.md', 'OAI_main.md'):
+        (P / 'explanations' / f).write_text(expl)
+    assert run(d)['needs_written'] == []
+    with pytest.raises(SystemExit) as e:
+        CP.cmd_check_text([str(P), '--ws', str(ws)])
+    assert e.value.code == 0, capsys.readouterr().out

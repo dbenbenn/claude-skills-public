@@ -496,3 +496,38 @@ def test_a_piece_held_by_the_live_proof_guard_goes_on_once_its_comparison_is_wri
     run(cfg, api)
     assert ('verify', 'A.top') in api.posted and api.also['A.top'] == note.strip()
     assert json.loads((d / 'run_state.json').read_text())['piece:A.top']['state'] == 'live'
+
+
+# ---- a missing prose file fails the dry run, not only the live run (oaiq-047) ----------------------------
+# 12 forced statements had no prose/<slug>.md; check-text and the dry run were clean (the dry run checks
+# only what it would send now, and these waited on bundles), and the live run blocked all 12.
+
+def test_dry_run_names_every_item_that_could_not_be_sent_not_only_the_ready_ones(split):
+    d, cfg = split
+    os.remove(d / 'prose' / 'A_mid_s2.md')
+    os.remove(d / 'explanations' / 'A_top.md')
+    plan = R.Runner(cfg, None, sleep=lambda s: None).dry_run(read=False)
+    assert plan['ready'] == ['bundle:XB000'] and plan['blocked'] == {}
+    assert plan['unsendable'] == {'statement:A.mid': 'missing %s' % (d / 'prose' / 'A_mid_s2.md'),
+                                  'piece:A.top': 'missing %s' % (d / 'explanations' / 'A_top.md')}
+
+
+def test_dry_run_does_not_ask_prose_of_what_it_adopts(split):
+    d, cfg = split
+    os.remove(d / 'prose' / 'XB000.md')
+    api = FakeApi(published={'A.top': 'TOP', 'XB000': 'b0'})
+    plan = R.Runner(cfg, api, sleep=lambda s: None).dry_run()
+    assert plan['adopt'] == {'bundle:XB000': 'b0'} and plan['unsendable'] == {}
+
+
+def test_command_line_dry_run_fails_on_an_item_that_could_not_be_sent(split, capsys):
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
+    import split_run
+    d, cfg = split
+    os.remove(d / 'prose' / 'A_mid_s2.md')
+    (d / 'run.json').write_text(json.dumps(cfg))
+    with pytest.raises(SystemExit) as e:
+        split_run.main([str(d / 'run.json'), '--offline'])
+    out = capsys.readouterr().out
+    assert e.value.code == 1 and str(d / 'prose' / 'A_mid_s2.md') in out

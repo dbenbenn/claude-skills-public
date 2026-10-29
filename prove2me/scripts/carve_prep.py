@@ -56,7 +56,9 @@ usage:
       core (a dotted name also passes by its last component; the workspace modules the files
       import are searched too; --allow names a prose mention of a name this Mathlib lacks, such as
       OpenAI's original that a port replaced); a stub (out/lib/Thm_*.lean) may hold
-      no comment (the platform refuses one, and a statement's text freezes). Exit 1 on a problem.
+      no comment (the platform refuses one, and a statement's text freezes); with PUBLISH_DIR/run.json,
+      every item still to send must have its prose/<slug>.md or explanations/<slug>.md (MISSING:
+      the goal's and forced items' are written by hand). Exit 1 on a problem.
 """
 import glob
 import json
@@ -508,6 +510,19 @@ def imported_workspace_files(ws, files):
     return out
 
 
+def missing_run_files(P):
+    """{item: path} of the files missing for the items still to send of P/run.json ({} without one)."""
+    rj = os.path.join(P, 'run.json')
+    if not os.path.exists(rj):
+        return {}
+    from p2mlib import splitrun as R
+    cfg = json.load(open(rj, encoding='utf-8'))
+    for k in ('plan', 'out', 'prose', 'explanations', 'state', 'log'):
+        cfg[k] = os.path.expanduser(cfg[k])
+    return {x: why[len('missing '):] for x, why in R.Runner(cfg, None).unsendable().items()
+            if why.startswith('missing ')}
+
+
 def cmd_check_text(argv):
     from p2mlib import explanation as E
     pos = positional(argv, ('--ws',), ('--search', '--allow'))
@@ -542,6 +557,12 @@ def cmd_check_text(argv):
         for nm in missing_names(t, local, in_library, skip, suffix, cache=name_cache):
             bad += 1
             print('NOT FOUND %s: %s' % (os.path.basename(f), nm))
+    # every item still to send needs its prose or explanation file (oaiq-047: 12 forced statements had
+    # none; this said 0 problems and the live run blocked them all); read from the run, which knows
+    # what is live already
+    for x, why in sorted(missing_run_files(P).items()):
+        bad += 1
+        print('MISSING %s: %s' % (x, why))
     stubs = {os.path.basename(f): open(f, encoding='utf-8').read() for f in glob.glob(P + '/out/lib/Thm_*.lean')}
     for n in stub_comments(stubs):
         bad += 1

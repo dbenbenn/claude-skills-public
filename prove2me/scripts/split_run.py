@@ -7,7 +7,8 @@ RUN.json: {"plan", "out", "prose", "explanations", "state", "log", "source", "ta
 (paths may start with ~). Without --go it looks the plan's bundles and statements up on the
 platform (reads only) and prints what a run would adopt as already live, any live name whose text
 differs from ours (a run refuses to post anything then), what it would send first and what is
-blocked; it writes neither the platform nor the state file. --offline skips the lookups.
+blocked; it writes neither the platform nor the state file. --offline skips the lookups. It exits 1
+when any item still to send (in any wave) has a missing file or one that fails a check, listing them.
 
 A piece whose theorem has someone else's live proof is refused (submit_verify's guard) and waits.
 Read that proof, then write `comparisons/<slug>.md` beside `explanations/` (or RUN.json "comparisons"):
@@ -64,6 +65,12 @@ def main(argv=None):
         print('would send now (%d): %s' % (len(d['ready']), ' '.join(d['ready'][:40])))
         for x, why in sorted(d['blocked'].items()):
             print('blocked %s: %s' % (x, why))
+        if d['unsendable']:
+            # any wave, not only what would go now: a live run would block on each (oaiq-047)
+            print('CANNOT BE SENT (%d; a live run would block on each; write or fix them first):' % len(d['unsendable']))
+            for x, why in sorted(d['unsendable'].items()):
+                print('  %s: %s' % (x, why))
+            sys.exit(1)
         return d
     r = R.Runner(cfg, R.LiveApi())
     for x in resets:
