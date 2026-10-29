@@ -441,6 +441,16 @@ def test_compat_has_walk_length_le_bypass_length_iff():
 
 
 
+def test_compat_has_vecCons_tail_and_fin_mk_simp_lemmas():
+    # after simp, `![a, b, c]` lookups are `vecCons a (fun i => ..) 2` and `fin_cases` leaves `⟨2, ⋯⟩`; norm_num
+    # (no simprocs here) evaluates neither without these rfl lemmas (oaiq-091, WeylEstimates01: 10 sites)
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for n in ('vecConsTail2_2', 'vecConsTail3_3', 'fin3_mk_2', 'fin5_mk_4'):
+        assert '@[simp] theorem ' + n + ' ' in src, n
+
+
 def test_compat_has_fin_literal_disequality_simp_lemmas():
     # `norm_num` (unlike `simp`) cannot decide `(0 : Fin 3) = 2` here (no Fin simprocs), which leaves `if 0 = 2 then ..`
     # in every `fin_cases … <;> norm_num` site; rfl-decided simp lemmas fix them all (oaiq-091, WeylEstimates01)
