@@ -223,6 +223,20 @@ and new `carve.py` inside one carve. So:
   exits 4 still running: re-arm that. A Bash background command dies at 2 h, and that killed drivers mid-build
   and mid-graph on every port over ~300 modules (oaiq-033..049); a killed wait costs nothing. Since a932a18 the
   build leaves `graph` its LeanInfo reading, so `graph` takes seconds after a build.
+  `--wait` reports only its own run (never while the unit is active, and it says when the run had already
+  ended); `--detach` refuses at once with exit 3, naming the pid and command line of a driver that holds the
+  carve: stop that one or wait for it (oaiq-084; 1a4f175).
+- **What re-runs by itself after `--upgrade`** (2026-10-29, oaiq-047/-085/-092). `port` and `filter_patches`
+  record the port rules and options they ran with, so a skill fix to a port rewrite re-ports without `--redo
+  port`; a re-port that changes no module's text rebuilds nothing. Once publishing has started (publish ran or
+  `publish/run_state.json` exists) a rule change keeps the port: `--redo port` only deliberately. A change to
+  `LeanInfo.lean` re-runs `graph`, with a warning giving the module count, while a step that loads the graph is
+  still to run; a `config.json` that `--redo config` changed re-runs from `extdefs`. A rebuild keeps the replayed
+  modules' times in `build_elab.log`: carves built before 2026-10-29 can have a log missing most modules (oaiq-047:
+  37 of 1,259), which costs each at a default 2 s, so run `--redo build` once before planning such a carve again.
+- **Missing prose stops `check_text`**: the "needs written prose" lines name the files to write (forced and goal
+  items), and check-text and the dry run fail (MISSING / CANNOT BE SENT) until they exist, in any wave, not only
+  the first (oaiq-047: twelve forced statements passed both, then blocked the live run; eafc6da).
 - Parameters live in `DIR/pipeline.json`: a different CLI value is refused, so edit the file. A changed
   `config_set` in pipeline.json reaches config.json on the next resume by itself, without re-running `config`
   (which would reset calibrate's `time_scale`): `patches` re-runs from `gen`, any other key from `plan`
