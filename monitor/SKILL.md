@@ -1,11 +1,11 @@
 ---
 name: monitor
-description: The machine's monitoring page at http://<hostname>:8765/ (on dbenbenn's NixOS box https://nixos.taila1b358.ts.net/ through tailscale serve, or http://nixos:8765/) — system resources (memory, CPU, load, stall pressure, Lean processes) on top, then one section per piece of work in progress. Use whenever you start background or long-running work on the machine (a publisher, a batch of builds or provers, a watcher, anything expected to run more than about 15 minutes or past the end of your turn) so it publishes its progress in its own section; also when asked about the monitoring page, the machine's load or memory, or why the machine feels slow.
+description: The machine's monitoring page at http://<hostname>:8765/ (on dbenbenn's NixOS box https://nixos.taila1b358.ts.net/ through tailscale serve; 8765 itself is firewalled there) — system resources (memory, CPU, load, stall pressure, Lean processes) on top, then one section per piece of work in progress. Use whenever you start background or long-running work on the machine (a publisher, a batch of builds or provers, a watcher, anything expected to run more than about 15 minutes or past the end of your turn) so it publishes its progress in its own section; also when asked about the monitoring page, the machine's load or memory, or why the machine feels slow.
 ---
 
 # The monitoring page
 
-https://nixos.taila1b358.ts.net/ (`tailscale serve` of port 8765 with a Let's Encrypt certificate Tailscale renews; plain http://nixos:8765/ still works) is dbenbenn's one place to see what the machine is doing. On top: the whole
+https://nixos.taila1b358.ts.net/ (`tailscale serve` of port 8765 with a Let's Encrypt certificate Tailscale renews; since 2026-10-29 the firewall closes 8765 to other machines, so http://nixos:8765/ no longer works, while http://localhost:8765/ on the box itself does) is dbenbenn's one place to see what the machine is doing. On top: the whole
 machine's memory and CPU (split into four categories, below), load, kernel
 stall pressure, every Lean/lake process with its working directory, and a red banner for machine trouble.
 Below: **one section per piece of work**, written by whoever runs that work.
