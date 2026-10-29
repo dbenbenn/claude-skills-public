@@ -441,6 +441,16 @@ def test_compat_has_walk_length_le_bypass_length_iff():
 
 
 
+def test_compat_has_fin_literal_disequality_simp_lemmas():
+    # `norm_num` (unlike `simp`) cannot decide `(0 : Fin 3) = 2` here (no Fin simprocs), which leaves `if 0 = 2 then ..`
+    # in every `fin_cases … <;> norm_num` site; rfl-decided simp lemmas fix them all (oaiq-091, WeylEstimates01)
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for n in ('fin3_lit_0_2', 'fin4_lit_3_2', 'fin5_lit_1_3'):
+        assert '@[simp] theorem ' + n + ' :' in src, n
+
+
 def test_compat_has_vector_literal_lookup_simp_lemmas():
     # `norm_num` (not `simp`) leaves `![a, b, c, d] 2` unevaluated here, which d13f23b evaluates; the compat
     # block's rfl simp lemmas fix every `fin_cases … <;> norm_num [tables]` site at once (oaiq-091:
