@@ -649,7 +649,8 @@ back WA. The lessons:
   made no progress` / `rewrite failed` on `comp_f`, `ShiftedHom`, `Cocycle`, `single…` lemmas are the "not
   type-correct under the `implicit` transparency level" check, not API drift: compile each failing module as is
   and with `set_option backward.isDefEq.respectTransparency false` at module scope and keep the version with
-  fewer errors (`~/claude/p2m-standalone/openai-ports/oaiq-116/tools/try_module.py` does both); where the option
+  fewer errors (`scripts/try_module.py FILE [--show LINE,...]` does both, with the pipeline's `-j1 -DautoImplicit=false`
+  and through the lean-cap wrapper, and names the version with fewer errors); where the option
   breaks later steps, scope it with `set_option … false in` per declaration. oaiq-002's "several more hours" of
   drift became 2 hours. Repair with the pipeline's own flags (`lean -j1 -DautoImplicit=false`): a `-j1` build can
   hit heartbeats an in-place `lake build` does not.
@@ -793,7 +794,8 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   against the published bundles; do not just resubmit (oaiq-120).
 - **A goal Open with no open leaves**: `GET /theorems/:id/open-leaves` does not list a Disproved child; walk
   `/decompositions` (oaiq-109: a sketch imported a Disproved statement and was still SKETCH_ACCEPTED).
-  `submit_solution.py` refuses such an import since 9397093.
+  Every submission path refuses a Disproved import: `submit_solution.py` since 9397093 (and through it
+  `submit_all.py` and `oai_submit.py`), and split_run's pieces for statements of others (59f4e2a).
 - **Folding on a carve whose snapshot predates `carve.py fold`** (oaiq-118): `carve.py fold CONFIG N…` from a
   current snapshot; `carve.py gen CONFIG pieces <changed>` from the carve's own snapshot (a newer gen emits
   different `attribute [-instance]` lines); `carve_measure.py --kinds piece` from the current one (it runs the

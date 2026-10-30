@@ -867,7 +867,9 @@ as edges.)
 **How a solution is built and what it may import** is in Expansion 11 (*Solutions*). Three
 points matter at Submit time: a proof can import any published statement, Open or Proved, from a
 live mission or one still in review, but not one the publish queue has not reached (a draft stub;
-`submit_all.py` holds such a solution back until the import publishes); deprecated theorems are
+`submit_all.py` holds such a solution back until the import publishes; once the platform has
+published it, `submit_solution.py` and `submit_all.py` run `fetch_theorems.py --names` themselves, and
+for one still unpublished the refusal prints that command, c2f2fc9); deprecated theorems are
 copied in, never imported; and **a private mission's theorems are private**, so a proof of a
 public theorem cannot import them (`unknown import`) until the mission is made public. Check the
 goal's imports especially: on QFS the goal's proof repeated Lemma A.1's argument rather than
@@ -911,6 +913,8 @@ lemma is `sorry`, and the main theorem is proved from those lemmas. The provers 
 `Part<X>.lean` files that restate their lemmas verbatim under `namespace <NS>.Part<X>`, and they
 follow a shared brief that holds the mathematics part by part. `scripts/assemble_blueprint.py
 BLUEPRINT OUT PARTS…` merges the result into one file:
+- every `Solutions.*` helper module the Blueprint or a Part imports is inlined, so the assembled
+  file never keeps `import Solutions.` (42aa390; oaiq-121 spliced it by hand);
 - every stub becomes `alias foo := Part<X>.foo`;
 - every Part declaration is placed by a dependency sort, after the Blueprint items it mentions.
 
