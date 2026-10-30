@@ -2456,3 +2456,25 @@ def test_splitting_one_bundle_leaves_every_file_that_does_not_import_it_unchange
             if big['name'] not in x['bundles'] and not reaches(x['bundles']):
                 assert q[kind][n]['bundles'] == x['bundles']
     assert C.check_plan(g, q) == []
+
+
+def test_stub_and_piece_imports_restore_a_bundle_edge_the_real_text_lacks():
+    # oaiq-010/oaiq-120: the plan had B008 -> B004, so the statements needing `holderShift` (in B004) imported
+    # B008 alone; the published B008 had that import cut (an unused definitions import), and the three
+    # statements failed to publish with "Unknown identifier `holderShift`". Imports follow the real texts.
+    plan = {'bundles': [{'name': 'B004', 'imports': []}, {'name': 'B005', 'imports': []},
+                        {'name': 'B008', 'imports': ['B004', 'B005']}],
+            'stubs': {'s': {'bundles': ['B008']}, 't': {'bundles': ['B004']}},
+            'pieces': {'s': {'bundles': ['B008'], 'keep': []}}}
+    real = {'B004': [], 'B005': [], 'B008': ['B005']}
+    new = C.restore_cut_bundle_imports(plan, real)
+    assert new['stubs']['s']['bundles'] == ['B004', 'B008']
+    assert new['pieces']['s']['bundles'] == ['B004', 'B008']
+    assert new['stubs']['t']['bundles'] == ['B004']
+    assert [b['imports'] for b in new['bundles']] == [[], [], ['B005']]
+    assert plan['stubs']['s']['bundles'] == ['B008']          # the input is not changed
+    assert C.restore_cut_bundle_imports(plan, {'B004': [], 'B005': [], 'B008': ['B004', 'B005']}) is plan
+    # only what the file needs: a published piece that never used B004 keeps its text (frozen)
+    need = lambda kind, n: {'B008'} if kind == 'pieces' else {'B004', 'B008'}
+    new = C.restore_cut_bundle_imports(plan, real, need)
+    assert new['stubs']['s']['bundles'] == ['B004', 'B008'] and new['pieces']['s']['bundles'] == ['B008']

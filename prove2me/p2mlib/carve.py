@@ -2016,6 +2016,38 @@ def _bundle_closure(bimp, ks):
     return out
 
 
+def restore_cut_bundle_imports(plan, real, need=None):
+    """`plan` with each bundle's imports as its real text has them (`real`: {bundle: [bundle, ...]}),
+    and each stub and piece importing, beside its own bundles, every bundle the plan's import graph
+    made it reach that the real one no longer does. A bundle published with a definitions import cut
+    (an unused one, by the old --drop-false-edges) otherwise leaves the files that reached a bundle
+    through it unable to see it (oaiq-010: "Unknown identifier `holderShift`" on three statements).
+    `need(kind, node)` ('stubs' or 'pieces'), when given, is the set of bundles the file uses: only
+    those are added, so a published file that never used the lost bundle keeps its frozen text.
+    Returns `plan` itself when nothing was cut."""
+    names = [b['name'] for b in plan['bundles']]
+    pos = {n: i for i, n in enumerate(names)}
+    pimp = [[pos[x] for x in b['imports'] if x in pos] for b in plan['bundles']]
+    rimp = [[pos[x] for x in real.get(b['name'], b['imports']) if x in pos] for b in plan['bundles']]
+    if all(set(pimp[i]) <= set(rimp[i]) for i in range(len(names))):
+        return plan
+
+    def fix(kind, n, e):
+        ks = [pos[x] for x in e['bundles'] if x in pos]
+        want = _bundle_closure(pimp, ks)
+        add = want - _bundle_closure(rimp, ks)
+        if add and need is not None:
+            add &= {pos[x] for x in need(kind, n) if x in pos}
+        if not add:
+            return e
+        return dict(e, bundles=[names[i] for i in sorted(_reduce(rimp, set(ks) | add))])
+    out = dict(plan, bundles=[dict(b, imports=[names[i] for i in rimp[j]]) for j, b in enumerate(plan['bundles'])])
+    for k in ('stubs', 'pieces'):
+        if k in plan:
+            out[k] = {n: fix(k, n, e) for n, e in plan[k].items()}
+    return out
+
+
 def fold_statements(plan, nodes):
     """A copy of `plan` in which each of `nodes` is no longer a statement: its piece's declarations,
     statement imports and bundles go into every piece that imported it (transitively, when a folded
@@ -3686,6 +3718,7 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
     # and emits the others again (`absent_instances`); a bundle not written now is read as it stands
     # (published, or the earlier run's file)
     plan = dict(plan, absent_instances={})
+    real_imports = {}
     for b in plan['bundles']:
         name = b['name']
         path = os.path.join(out, 'lib', 'Def_%s.lean' % name)
@@ -3700,6 +3733,17 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
         lost = absent_instances(g, plan, name, txt)
         if lost:
             plan['absent_instances'][name] = sorted(lost)
+        real_imports[name] = [m for m in re.findall(r'^import Definitions\.Def_(\S+)\s*$', txt, re.M)]
+    bof = {k: b['name'] for b in plan['bundles'] for k in b['nodes']}
+
+    def need(kind, n):
+        if kind == 'stubs':
+            ds = set(g.nodes[n].sig) if n in g.nodes else set()
+        else:
+            keep = plan['pieces'][n].get('keep', ())
+            ds = {d for x in keep if x in g.nodes for d in g.nodes[x].deps | {x}}
+        return {bof[d] for d in ds if d in bof}
+    plan = restore_cut_bundle_imports(plan, real_imports, need)
     for n in plan['nodes']:
         if names is not None and n not in names:
             continue
