@@ -619,6 +619,18 @@ def test_a_bare_def_name_means_the_definitions_module(env):
     assert json.load(open(env.dir / 'pipeline.json'))['defs'] == ['Definitions.Def_A']
 
 
+def test_a_bare_def_name_stored_before_the_rule_is_read_as_the_definitions_module(env):
+    # oaiq-125: oaiq-022's pipeline.json (2026-10-26) held a bare "Def_AffineBernstein", so its resume
+    # reached `lake build Def_AffineBernstein` ("unknown target") in wsbuild
+    run(env, *ARGS, '--def', 'Def_A', '--stop-after', 'fetch')
+    p = json.load(open(env.dir / 'pipeline.json'))
+    p['defs'] = ['Def_A']
+    json.dump(p, open(env.dir / 'pipeline.json', 'w'))
+    r = run(env, '--def', 'Def_A', '--stop-after', 'inputs')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert json.load(open(env.dir / 'pipeline.json'))['defs'] == ['Definitions.Def_A']
+
+
 # ---- --detach / --wait (2026-10-27) ------------------------------------------------------------
 # oaiq-033/034/036/038/041/042/046/049: the driver ran inside a Bash background command, which the
 # harness kills at 2 h, mid-build or mid-graph. Detached, the driver is its own systemd user unit;

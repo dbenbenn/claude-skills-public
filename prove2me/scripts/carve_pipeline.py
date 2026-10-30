@@ -347,6 +347,12 @@ def load_params(a):
         os.makedirs(a.dir, exist_ok=True)
         json.dump(given, open(path, 'w'), indent=1)
         return given
+    # a pipeline.json from before parse() normalized --def keeps the bare name (oaiq-125: oaiq-022's
+    # resume reached `lake build Def_AffineBernstein`); normalize it the same way, in the file too
+    defs = [('Definitions.' + d if d.startswith('Def_') else d) for d in old.get('defs') or []]
+    if defs != (old.get('defs') or []):
+        old['defs'] = defs
+        json.dump(old, open(path, 'w'), indent=1)
     bad = [k for k, v in given.items() if old.get(k) != v]
     if bad:
         sys.exit('parameters differ from the stored %s: %s (edit that file to change them)' % (path, ', '.join(bad)))
