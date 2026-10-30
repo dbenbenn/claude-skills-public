@@ -359,6 +359,13 @@ class Runner:
         lines[last + 1:last + 1] = ['', 'set_option maxHeartbeats %d' % RAISED_HEARTBEATS]
         with open(f['file'], 'w', encoding='utf-8') as out:
             out.write('\n'.join(lines))
+        # overlap mode keeps the published text in published/lib, which `gen` writes frozen bundles from
+        # (oaiq-122: without this a re-plan regenerated the old text and the names step stopped)
+        fz = self.cfg.get('frozen_lib')
+        q = os.path.join(os.path.expanduser(fz), os.path.basename(f['file'])) if fz else None
+        if q and os.path.exists(q):
+            with open(q, 'w', encoding='utf-8') as out:
+                out.write('\n'.join(lines))
         return True
 
     def poll(self):

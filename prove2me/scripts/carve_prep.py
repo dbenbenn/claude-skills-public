@@ -488,7 +488,8 @@ def publish_prep(d, source, tags, sync=False):
     _atomic_write(os.path.join(P, 'order.json'), json.dumps(C.publish_order(plan, plan.get('external', ())), indent=1))
     base = {'plan': P + '/plan.json', 'out': P + '/out', 'prose': P + '/prose',
             'explanations': P + '/explanations', 'state': P + '/run_state.json',
-            'log': P + '/PROGRESS.log', 'source': source, 'tags': tags, 'jobs': 4}
+            'log': P + '/PROGRESS.log', 'source': source, 'tags': tags, 'jobs': 4,
+            'frozen_lib': os.path.join(d, 'published', 'lib')}   # a heartbeat raise updates the frozen copy too
     _atomic_write(os.path.join(P, 'run.json'), json.dumps(base, indent=1, ensure_ascii=False))
     for i, k, nm in ((1, 'bundle', 'bundles'), (2, 'statement', 'statements'), (3, 'piece', 'pieces')):
         _atomic_write(os.path.join(P, 'run_%d_%s.json' % (i, nm)), json.dumps(dict(base, kinds=[k]), indent=1,

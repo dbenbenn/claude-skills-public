@@ -676,3 +676,18 @@ def test_the_live_api_reports_disproved_names(monkeypatch):
     api._call = call
     assert api.disproved(['B.y', 'B.x']) == ['B.x']
     assert 'disproved' in R.ReadOnly.READS
+
+
+def test_a_heartbeat_raise_also_updates_the_frozen_copy(split):
+    # oaiq-122: the resend's heartbeat line went into publish/out/lib but not published/lib, which `gen` writes
+    # frozen bundles from; after a re-plan the names step found ours ('section') differing from the live text
+    d, cfg = split
+    frozen = d / 'published' / 'lib'
+    frozen.mkdir(parents=True)
+    (frozen / 'Def_XB001.lean').write_text((d / 'out' / 'lib' / 'Def_XB001.lean').read_text())
+    cfg = dict(cfg, frozen_lib=str(frozen))
+    hb = ('FAILED', 'definition does not compile: (deterministic) timeout at `whnf`, maximum number of heartbeats (200000)')
+    run(cfg, FakeApi(script={'XB001': [hb]}))
+    assert (frozen / 'Def_XB001.lean').read_text() == (d / 'out' / 'lib' / 'Def_XB001.lean').read_text()
+    assert 'set_option maxHeartbeats 1000000' in (frozen / 'Def_XB001.lean').read_text()
+    assert not (frozen / 'Def_XB000.lean').exists()
