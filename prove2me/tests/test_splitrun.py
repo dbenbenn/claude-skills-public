@@ -498,6 +498,31 @@ def test_a_piece_held_by_the_live_proof_guard_goes_on_once_its_comparison_is_wri
     assert json.loads((d / 'run_state.json').read_text())['piece:A.top']['state'] == 'live'
 
 
+
+def test_a_live_piece_whose_text_changed_goes_again_once_a_comparison_answers_its_live_proof(split):
+    # oaiq-124 (2026-10-30): `carve.py fold` merged a statement the verifier rejected into its two
+    # importers' pieces, both already live (SKETCH_ACCEPTED, reducing to the folded statement). The
+    # regenerated pieces were never resent: only a stopped item restarts when its text changes. A changed
+    # live piece goes again when a comparisons note says why (the old sketch is live); without one it
+    # stays live, so a cosmetic regeneration resubmits nothing.
+    d, cfg = split
+    api = FakeApi()
+    run(cfg, api)
+    assert api.posted.count(('verify', 'A.top')) == 1
+    (d / 'out' / 'solutions' / 'Sol_A_top.lean').write_text(
+        'import Mathlib\n\ntheorem folded : True := trivial\n\ntheorem solution : True := folded\n')
+    run(cfg, api)
+    assert api.posted.count(('verify', 'A.top')) == 1
+    assert json.loads((d / 'run_state.json').read_text())['piece:A.top']['state'] == 'live'
+    note = 'Different from old: ours inlines the folded lemma, so it has no open leaf.\n'
+    (d / 'comparisons').mkdir()
+    (d / 'comparisons' / 'A_top.md').write_text(note)
+    run(cfg, api)
+    assert api.posted.count(('verify', 'A.top')) == 2 and api.also['A.top'] == note.strip()
+    assert json.loads((d / 'run_state.json').read_text())['piece:A.top']['state'] == 'live'
+    run(cfg, api)                                     # and once only
+    assert api.posted.count(('verify', 'A.top')) == 2
+
 # ---- a missing prose file fails the dry run, not only the live run (oaiq-047) ----------------------------
 # 12 forced statements had no prose/<slug>.md; check-text and the dry run were clean (the dry run checks
 # only what it would send now, and these waited on bundles), and the live run blocked all 12.

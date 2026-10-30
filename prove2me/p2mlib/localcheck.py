@@ -18,7 +18,10 @@ compiled locally.
   2026-10-28: 13 pieces got WA "failed to synthesize CoeT ... (deterministic) timeout at
   `typeclass`"; this search failed for exactly those 13 of the carve's 246 polymorphic statements).
   Such a statement can never be proved there: fold it into its importers (carve.py fold) or state it
-  monomorphically.
+  monomorphically. The same check settles the universe constraints `isDefEq` postponed, as the
+  elaborator does: a universe that occurs only under `max` (`{σ : Type (max us v)}` with an instance
+  binder over `MvPolynomial σ ℝ`) left `max ?a ?v =?= max ?b ?v` stuck, and the verifier said WA "stuck
+  at solving universe constraint" (oaiq-124, 2026-10-30) where `isDefEq` alone said yes.
 """
 import hashlib
 import os
@@ -50,6 +53,8 @@ run_meta do
     let t ← inferType (← mkConstWithFreshMVarLevels tgt)
     unless ← isDefEq s t do
       throwError "the type of solution is not the target's"
+    unless ← processPostponed (mayPostpone := false) do
+      throwError "%s: stuck at solving a universe constraint between the solution's and the target's types; fold the statement into its importers (carve.py fold) or state it with every universe bare (oaiq-124)"
     withLocalDeclD `x s fun x => do
       let coe := mkAppN (mkConst ``CoeT [← getLevel s, ← getLevel t]) #[s, x, t]
       let ok ← try pure (← synthInstance? coe).isSome catch _ => pure false
@@ -60,7 +65,7 @@ run_meta do
 
 def server_check_text(solution, preamble, formal_statement, target):
     body = solution.rstrip('\n') + '\n\n' + formal_statement.rstrip('\n') + '\n\n' + \
-        'theorem _check : type_of%% @%s := @solution\n' % target + COE_CHECK % (target, COE_FAILURE)
+        'theorem _check : type_of%% @%s := @solution\n' % target + COE_CHECK % (target, COE_FAILURE, COE_FAILURE)
     imps = list(dict.fromkeys(IMPORT.findall(solution) + IMPORT.findall(preamble or '') + ['Lean']))
     rest = IMPORT.sub('', body).lstrip('\n')
     return ''.join('import %s\n' % i for i in imps) + '\n' + rest

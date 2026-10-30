@@ -1,4 +1,5 @@
 """p2mlib.localcheck: the pure parts of a local check that predicts the verifier (Erdős 3, 2026-10-16)."""
+import pytest
 from p2mlib import localcheck as L
 
 SOL = """import Mathlib
@@ -49,3 +50,34 @@ def test_server_check_text_runs_the_verifiers_coercion_fallback_for_a_polymorphi
     assert 'mkConstWithFreshMVarLevels `solution' in tail and 'synthInstance?' in tail
     assert 'levelParams.isEmpty' in tail          # a monomorphic target is compared directly
     assert L.COE_FAILURE in tail                  # the message carve_measure reports
+
+
+def test_the_coercion_fallback_fails_on_a_stuck_universe_constraint():
+    # oaiq-124 (2026-10-30): `boundary_edge_image_le`, with `{σ : Type (max us v)}` and an instance binder
+    # `[Module.Free (MvPolynomial σ ℝ) …]`, got WA "stuck at solving universe constraint max ?u.5 ?u.11 =?=
+    # max ?u.10 ?u.11 while trying to unify CoeT …"; locally `isDefEq` said true and left the constraint
+    # postponed, so the check passed. Settle the postponed constraints as the elaborator does.
+    tail = L.server_check_text(SOL, PRE, FS, 'foo')
+    tail = tail[tail.index('theorem _check'):]
+    assert 'processPostponed (mayPostpone := false)' in tail
+    assert tail.index('isDefEq s t') < tail.index('processPostponed') < tail.index('synthInstance?')
+
+
+MAX_STMT = """theorem %s {I : Type u} [Fintype I] {W : Type v} [Group W] {σ : Type (max us v)} [Fintype σ]
+    {I' : Type u'} {W' : Type v'} (b : Module.Basis σ ℝ (I → ℝ)) (w : W') (i : I')
+    [Module.Free (MvPolynomial σ ℝ) (MvPolynomial σ ℝ)] :
+    let D := MvPolynomial σ ℝ
+    (⊥ : Submodule D D) ≤ ⊤ := %s
+"""
+
+
+@pytest.mark.lean
+def test_a_max_only_universe_with_an_instance_binder_fails_the_local_check(tmp_path):
+    from p2mlib import carve as C
+    sol = ('import Mathlib\n\nuniverse u v us u\' v\'\n\n' + MAX_STMT % ('foo_oai', 'bot_le') +
+           '\ntheorem solution.{a, b, c, d, e} : type_of% @foo_oai.{a, b, c, d, e} := @foo_oai.{a, b, c, d, e}\n')
+    chk = tmp_path / 'Chk.lean'
+    chk.write_text(L.server_check_text(sol, 'import Mathlib\n', MAX_STMT % ('foo', 'by sorry'), 'foo'))
+    with pytest.raises(C.CarveError) as e:
+        C.compile_file(str(chk), None, str(tmp_path / 'olean'))
+    assert L.COE_FAILURE in str(e.value)

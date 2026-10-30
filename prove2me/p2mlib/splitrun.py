@@ -114,12 +114,21 @@ class Runner:
     def _restart_changed(self):
         """A terminal item (it waits for a person) whose file changed since it was sent starts over:
         that change is the person's answer, e.g. a re-split after verifier timeouts (oaiq-065, oaiq-071
-        edited run_state.json by hand). States from before `sha` was recorded are left alone."""
+        edited run_state.json by hand). So does a live piece whose file changed once its comparisons
+        note exists (a fold, oaiq-124). States from before `sha` was recorded are left alone."""
         for x, st in list(self.state.items()):
             if x in self.items and st.get('state') in TERMINAL and st.get('sha') and st['sha'] != self.file_sha(x):
                 was = st['state']
                 self.state.pop(x)
                 self.log(x, 'restart', 'text changed since it stopped (%s): sending it again' % was)
+            elif x in self.items and x.startswith('piece:') and st.get('state') == 'live' and st.get('sha') \
+                    and st['sha'] != self.file_sha(x) and os.path.exists(self.info(x)['comparison']):
+                # a live piece regenerated on purpose (`carve.py fold`: the folded statement's proof now
+                # inline, oaiq-124) goes again once comparisons/<slug>.md says why, as its old proof is
+                # live; without a note a changed live piece stays as it is
+                self.state.pop(x)
+                self.log(x, 'restart', 'text changed since it went live and a comparison answers its '
+                         'live proof: sending it again')
 
     # ------------------------------------------------------------------ the piece gate
     def released(self):
