@@ -2081,6 +2081,37 @@ def test_a_used_local_instance_brings_its_prop_partner_on_the_same_carrier():
     assert 'CD.LC.towerHi' not in sec and re.search(r'^local instance towerHi_r\w+', sec, re.M), sec
 
 
+def test_a_used_local_instance_brings_a_partner_stated_over_it_on_a_variable_carrier():
+    # oaiq-123 (NuclearUltrapower): `local instance normEntryOrder (i : ι) : PartialOrder (A i)` and
+    # `local instance normEntryStarOrder (i : ι) : StarOrderedRing (A i)`; the carrier `A i` is a bound
+    # variable, so neither has a type head and the shared-carrier rule never matched; the carved bundle
+    # lacked the StarOrderedRing one ("failed to synthesize" at CStarMatrix). The partner's heads name
+    # the used instance itself (its class takes it as an argument): that alone brings it back.
+    # Here actHi (heads gone) is found only through its bare class key, as normEntryOrder was through
+    # `key:PartialOrder`, and towerHi's heads are just actHi.
+    g = _lc_graph_tower_unseen()
+    user = g.nodes['CD.LC.tower_use']
+    for c in g.infos[user.module].commands:
+        for i, x in enumerate(c.declares or ()):
+            if x[0] == 'CD.LC.actHi':
+                c.declares[i] = [x[0], x[1], []]
+            elif x[0] == 'CD.LC.towerHi':
+                c.declares[i] = [x[0], x[1], ['CD.LC.actHi']]
+    c = g.infos[user.module].commands[user.cmd]
+    c.insts = c.sig_insts = []
+    c.inst_keys = c.used_keys = c.sig_used_keys = ['CD.LC.Act']
+    for n in user.names:
+        for f in ('t', 'v'):
+            g.consts[n][f] = [x for x in g.consts[n][f] if x != 'CD.LC.actHi']
+    keep = LC_DEFS | {'CD.LC.tower_use'}
+    car = C.Carver(g)
+    car._carrier_used = lambda *a: False      # `A i` is a bound variable: no carrier to mention
+    sec = _section(car.carve(keep, g.have_names(keep)), 'CarveDev.LocalCtx')
+    a = re.search(r'^local instance \(priority := 3000\) actHi_r\w+', sec, re.M)
+    t = re.search(r'^local instance towerHi_r\w+', sec, re.M)
+    assert a and t and a.start() < t.start() < sec.index('theorem tower_use'), sec
+
+
 def test_extending_a_frozen_carve_keeps_its_external_definitions_external(g, ext_plan):
     # oaiq-057 (DimensionTen Channel extending oaiq-033's published carve): the first carve took
     # Mat, krausMap's types, … from Def_DimensionTenPair (its external_defs); the second carve's

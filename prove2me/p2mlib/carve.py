@@ -3062,13 +3062,23 @@ class Carver:
         classes = {x[1] for x in vc.declares or () if x[1]}
         if not classes:
             return False
-        mine = self._carriers(info, [h for x in vc.declares or () if x[1] for h in x[2]])
+        heads = {h for x in vc.declares or () if x[1] for h in x[2]}
+        mine = self._carriers(info, heads)
         for c2 in info.commands[:c.index]:
             if c2.index == vc.index or not _in_scope(info, c2.index, c) or \
                     not _local_instance(info, c2)[0]:
                 continue
             for x in c2.declares or ():
-                if not x[1] or x[0] not in used:
+                if not x[1]:
+                    continue
+                # vc is stated over c2 (its class takes c2 as an argument: `StarOrderedRing (A i)` over
+                # the `PartialOrder (A i)` instance normEntryOrder) and c2 comes back, by name or by its
+                # class key: c2 then wins instance search, and only vc agrees with it (NuclearUltrapower
+                # oaiq-123: the carrier `A i` is a bound variable, so no carrier matched; "failed to
+                # synthesize" at a CStarMatrix instance)
+                if x[0] in heads and ('key:' + ' '.join([x[1]] + list(x[2])) in used or x[0] in used):
+                    return True
+                if x[0] not in used:
                     continue
                 if x[1] in classes or (mine and mine & self._carriers(info, x[2])):
                     return True
