@@ -234,8 +234,8 @@ def cgroup_usage(base=USER_CG):
 
 
 def machine_row(now, procs, meminfo, stat, prev, ncpu=None, clk=CLK, cg=None):
-    """{'t', 'total', 'mem': {category: GiB, 'rest': GiB}, 'cpu': {category: cores, 'rest': cores} or None}.
-    Memory in use = MemTotal - MemAvailable; the rest is what no category accounts for. CPU of a
+    """{'t', 'total', 'mem': {category: GiB, 'rest': GiB}, 'cpu': {category: cores, 'rest': cores} or None,
+    'swap', 'swap_total'} (GiB). Memory in use = MemTotal - MemAvailable; the rest is what no category accounts for. CPU of a
     category with cgroup usage (`cg`, from cgroup_usage) comes from it: a unit seen for the first time
     counts from 0, one gone since the last sample drops out; the others' from their processes' ticks."""
     ncpu = ncpu or os.cpu_count()
@@ -246,7 +246,9 @@ def machine_row(now, procs, meminfo, stat, prev, ncpu=None, clk=CLK, cg=None):
         mem[p['cat']] += p['anon']
     row = {'t': now, 'total': round(meminfo['MemTotal'] / G, 1),
            'mem': dict({g: round(v / G, 2) for g, v in mem.items()}, rest=round(max(0, used - sum(mem.values())) / G, 2)),
-           'cpu': None}
+           'cpu': None,
+           'swap': round((meminfo.get('SwapTotal', 0) - meminfo.get('SwapFree', 0)) / G, 2),
+           'swap_total': round(meminfo.get('SwapTotal', 0) / G, 1)}
     if prev and now > prev['t']:
         dt = now - prev['t']
         cpu = {g: 0.0 for g in mem}

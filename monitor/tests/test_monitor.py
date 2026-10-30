@@ -142,6 +142,15 @@ def test_machine_row_splits_memory_and_cpu_by_category():
     assert row['cpu']['rest'] == 3.0             # 4 of 8 cores busy in all, minus Lean's 1
 
 
+def test_machine_row_records_swap_in_use():
+    G = 2 ** 30
+    meminfo = {'MemTotal': 64 * G, 'MemAvailable': 40 * G, 'SwapTotal': 32 * G, 'SwapFree': 20 * G}
+    row, _ = M.machine_row(1000, [], meminfo, [1000, 500], None, ncpu=8)
+    assert row['swap'] == 12.0 and row['swap_total'] == 32.0
+    row, _ = M.machine_row(1000, [], {'MemTotal': 64 * G, 'MemAvailable': 40 * G}, [1000, 500], None, ncpu=8)
+    assert row['swap'] == 0.0 and row['swap_total'] == 0.0     # no swap configured
+
+
 # 2026-10-27: the charts had one group per section, ~100 "Headless agent: oaiq-0NN" entries; now a few
 # categories by where a process lives (dbenbenn): Lean, queue workers, Claude sessions, the rest.
 UNIT = '0::/user.slice/user-1000.slice/user@1000.service/app.slice/%s\n'

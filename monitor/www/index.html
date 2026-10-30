@@ -34,7 +34,7 @@ h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14
 h2{font-size:17px;margin:0 0 2px} h3{font-size:14px;margin:0 0 2px} .chart-sub{color:var(--text-secondary);font-size:13px;margin:0 0 6px}
 .meta{color:var(--text-muted);font-size:13px;margin:0 0 6px}.meta a{color:var(--series-1)}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px 20px}
-.chart{min-width:0}
+.chart{min-width:0} .grid2 .wide{grid-column:1/-1}
 .empty{color:var(--text-muted);font-size:14px}
 details{margin-top:10px;color:var(--text-secondary);font-size:13px}
 code{font-size:13px}
@@ -67,9 +67,10 @@ code{font-size:13px}
 </div>
 <div class="grid2">
 <div class="chart"><h3>Memory in use</h3><p class="chart-sub" id="s-mem"></p><div id="c-mem"></div></div>
+<div class="chart"><h3>Swap in use</h3><p class="chart-sub" id="s-swap"></p><div id="c-swap"></div></div>
 <div class="chart"><h3>CPU in use</h3><p class="chart-sub" id="s-cpu"></p><div id="c-cpu"></div></div>
 <div class="chart"><h3>System load (1-min average)</h3><p class="chart-sub" id="s-load"></p><div id="c-load"></div></div>
-<div class="chart"><h3>Stall pressure</h3><p class="chart-sub" id="s-psi"></p><div id="c-psi"></div></div>
+<div class="chart wide"><h3>Stall pressure</h3><p class="chart-sub" id="s-psi"></p><div id="c-psi"></div></div>
 </div>
 <h3 style="margin-top:16px">Lean processes</h3><div id="lean"></div>
 <div id="cleared-box" hidden><h3 style="margin-top:16px" id="t-cleared">Cleared alerts (last 24 h)</h3>
@@ -200,6 +201,10 @@ function drawSystem(sy){
   // CPU: scaled to what is visible, so a core or two of use is not lost against 32
   b = stacked(document.getElementById('c-cpu'), H, x, groups, cpuRaw, labelOf, colorOf, v => v.toFixed(1), 'cores',
               (u, mn, mx) => [0, Math.min(cores, Math.max(1, Math.ceil((mx || 0) * 1.15)))]); b.key = key; upsert('c-cpu', b);
+  // swap: recorded since 2026-10-30, so older rows have none; scale to the swap size
+  const swapTotal = sy.swap_total_gib || (lastRow && lastRow.swap_total) || 1;
+  b = lines(document.getElementById('c-swap'), H, x, [{label: 'swap used', color: '--series-5', ys: M.map(r => r.swap ?? null)}], v => v.toFixed(1), ' GiB',
+            [0, swapTotal]); b.key = key; upsert('c-swap', b);
   b = lines(document.getElementById('c-load'), H, x, [{label: 'load', color: '--series-1', ys: M.map(r => r.load1)}], v => v.toFixed(1), '',
             (u, mn, mx) => [0, Math.max(1, Math.ceil((mx || 0) * 1.15))]); b.key = key; upsert('c-load', b);
   const P = sy.psi || [], lp = P.length ? P[P.length-1] : null;
@@ -215,6 +220,8 @@ function drawSystem(sy){
     const swap = sy.swap_total_gib ? ` · swap ${(sy.swap_total_gib - sy.swap_free_gib).toFixed(1)} of ${sy.swap_total_gib} GiB used` : '';
     document.getElementById('s-mem').textContent = `now ${used.toFixed(1)} of ${memTotal} GiB in use · ${sy.free_gib} GiB available${swap}`;
     if (lastRow.cpu) document.getElementById('s-cpu').textContent = `now ${Object.values(lastRow.cpu).reduce((a,b)=>a+b,0).toFixed(1)} of ${cores} cores busy (scale fits the visible range)`;
+    document.getElementById('s-swap').textContent = sy.swap_total_gib
+      ? `now ${(sy.swap_total_gib - sy.swap_free_gib).toFixed(1)} of ${sy.swap_total_gib} GiB used (Lean spills here when RAM fills; history starts 30 Oct)` : 'no swap configured';
     document.getElementById('s-load').textContent = `now ${lastRow.load1.toFixed(2)} on ${cores} cores`;
   }
   const L = sy.lean || [];

@@ -74,7 +74,7 @@ producer unit, and let the section expire.
 ## Reading it from a shell
 
 `~/claude/monitor/state/status.json` is exactly what the page shows: `alerts`; `system.machine` rows
-`{t, total, mem: {group: GiB}, cpu: {group: cores}, load1}`; `system.psi` rows `[t, cpu some, memory
+`{t, total, mem: {group: GiB}, cpu: {group: cores}, load1, swap, swap_total}` (swap in GiB, recorded since 2026-10-30 and charted as "Swap in use"); `system.psi` rows `[t, cpu some, memory
 some, memory full, io some, io full]` (avg10, %); `system.free_gib`, `swap_free_gib`, `swap_total_gib`; `system.lean`; and `sections` with history, rates
 and ETAs. The top banner is for machine trouble only (dbenbenn 2026-10-18): memory full > 5%, I/O full >
 20%, CPU some > 50%, less than 4 GiB of memory and swap available together (low free RAM alone is
