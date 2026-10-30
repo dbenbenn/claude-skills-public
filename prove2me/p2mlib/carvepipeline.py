@@ -135,7 +135,7 @@ def publisher_unit(d):
     return 'carve-pub-' + hashlib.sha1(os.path.realpath(d).encode()).hexdigest()[:10]
 
 
-ENV_KEEP = ('PATH', 'HOME', 'USER', 'LANG', 'LC_ALL')
+ENV_KEEP = ('PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'MONITOR_HOME')
 ENV_PREFIXES = ('P2M_', 'LEAN_', 'ELAN_')
 
 
@@ -405,6 +405,7 @@ class Pipeline:
         self.meta = os.path.abspath(os.path.expanduser(params.get('meta') or os.path.join(self.d, 'oai_meta.json')))
         self._kept_rules = set()
         self.ran_now = set()
+        self.waiting = None          # what the driver waits for, if anything (the monitoring-page section)
 
     # -- state ------------------------------------------------------------------------------
     def save(self):
@@ -1320,8 +1321,12 @@ class Pipeline:
         pub = self.state.get('publisher') or {}
         print('== waiting for the background publisher (%s) to end before %s; progress in publish/PROGRESS.log, '
               'its output in logs/publish_early.log' % (pub.get('unit') or 'pid %s' % pub.get('pid'), before), flush=True)
-        while self.publisher_running():
-            time.sleep(poll)
+        self.waiting = 'the background publisher (%s)' % (pub.get('unit') or 'pid %s' % pub.get('pid'))  # monitor note
+        try:
+            while self.publisher_running():
+                time.sleep(poll)
+        finally:
+            self.waiting = None
         print('== background publisher ended %s' % _now(), flush=True)
 
     def step_publish_early(self):

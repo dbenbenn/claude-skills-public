@@ -109,6 +109,12 @@ The main page has two more cards between the system charts and the sections:
   publish; each covers the `carve_pipeline.py` steps listed in `agents.STAGES`), current one outlined, failed
   red, plus items live/total from `run_state.json`. Carve dirs are found at `~/.claude/jobs/<agent>/**/` (depth 3)
   and `~/claude/p2m-standalone/openai-ports/<agent>/`; no state yet shows "setting up" (queue agents only).
+- **Carve sections** `carve-<hash>` (the hash of the driver's unit `carve-<hash>`): written by the carve driver itself
+  (`prove2me/p2mlib/carvemonitor.py`, a daemon thread of `carve_pipeline.py`, every 60 s and at each step boundary;
+  `split_run.py --go` keeps the counts current while a background publisher outlives its driver). Phases: Steps,
+  Build (modules), a running step's LeanInfo modules, Measure (items of the plan), Publish (live of the plan);
+  done or failed with the stopping reason at the end. Carves on a skill snapshot from before 2026-10-30 have none
+  until resumed with `--upgrade`.
 - **Log viewer** `/page/agent.html?name=<agent>`: transcript.jsonl as readable events (assistant text, tool calls
   with command/description, results cut to 4 lines with expand, clock times in CEST), newest at the bottom,
   polls every 3 s from the byte offset it has, filters All / Text / Tools / Errors plus a search box, "Load

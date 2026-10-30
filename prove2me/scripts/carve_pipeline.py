@@ -88,6 +88,11 @@ command line, when a driver (a foreground one too) already holds the carve or th
 at 2 h, which killed many drivers mid-build or mid-graph (oaiq-033..049); a killed wait costs nothing,
 so re-arm it.
 
+Monitoring page: the driver publishes the section `carve-<hash>` (the unit's hash) of the machine's monitoring
+page (monitor skill) and keeps it current from a daemon thread (p2mlib.carvemonitor): the current step, the
+steps done, modules built, items measured of planned, items live of the plan, the driver's, publisher's and
+Lean processes; done or failed with the stopping reason when it ends. Without the monitor skill it does nothing.
+
 The driver re-executes itself from a read-only snapshot of the skill (p2mlib.snapshot) and calls
 every sub-tool from that snapshot, so editing or pushing the live skill never affects a running
 carve. The snapshot sha is recorded in the state file; a resume reuses it. --upgrade moves a resumed
@@ -359,6 +364,36 @@ def load_params(a):
     return old
 
 
+def start_monitor(a, p):
+    """The carve's monitoring-page section (p2mlib.carvemonitor), kept current from a daemon thread; None
+    when the monitor skill is absent or anything about it fails: the section never stops a carve."""
+    try:
+        from p2mlib import carvemonitor
+        return carvemonitor.Reporter(a.dir, go=a.publish, pipeline=p).start()
+    except Exception:
+        return None
+
+
+def finish_monitor(mon, state, why):
+    if mon is None:
+        return
+    try:
+        if not isinstance(why, str):
+            from p2mlib import carvemonitor
+            why = carvemonitor.stop_reason(why)
+        mon.finish(state, why)
+    except Exception:
+        pass
+
+
+def done_reason(a, p):
+    if a.stop_after:
+        return 'stopped after %s (--stop-after)' % a.stop_after
+    if not a.publish:
+        return 'all steps done; nothing published (run again with --publish)'
+    return 'pipeline ok: published (skill %s)' % p.state.get('snapshot', {}).get('sha', '?')[:12]
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     a = parse(argv)
@@ -391,6 +426,7 @@ def main(argv=None):
         redo_port.append('--from ' + a.frm)
     if a.keep_port and redo_port:
         sys.exit('--keep-port with %s: keep the port or redo it, not both' % ', '.join(redo_port))
+    mon = start_monitor(a, p)
     try:
         p.check_ownership(a.claim_folder)          # before any state changes: a refused copy keeps its state
         if a.forget_publishing:
@@ -405,9 +441,14 @@ def main(argv=None):
         p.run(stop_after=a.stop_after, only_redo=set(a.redo), claim_folder=a.claim_folder)
     except C.StepFailed as e:
         print(e, file=sys.stderr)
+        finish_monitor(mon, 'failed', e)
         if p.overlap():
             publisher_note(a.dir)
         return 1
+    except BaseException as e:
+        finish_monitor(mon, 'failed', 'driver stopped: %s%s' % (type(e).__name__, ': %s' % e if str(e) else ''))
+        raise
+    finish_monitor(mon, 'done', done_reason(a, p))
     print('pipeline ok (skill %s)' % os.path.basename(snap))
     return 0
 

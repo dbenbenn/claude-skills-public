@@ -156,8 +156,34 @@ def stop_tree(root=None, grace=5.0):
             _send(p, signal.SIGKILL)
 
 
+_on_stop = []        # callables(signum) run when a signal stops this process, after its children stopped
+
+
+def at_stop(fn):
+    """Run fn(signum) when SIGTERM, SIGHUP or SIGINT stops this process (after its children are stopped);
+    a failing fn is ignored. carve_pipeline marks its monitoring-page section failed this way."""
+    _on_stop.append(fn)
+
+
+def peek(key, needle):
+    """The holder record of KEY when its recorded pid is alive and its command line contains `needle`,
+    else None. Takes no lock (held_by takes the flock for an instant, which a starting run could hit):
+    for readers that poll, such as the monitoring-page reporter."""
+    try:
+        h = json.loads(open(_path(key)).read() or '{}')
+    except (OSError, ValueError):
+        return None
+    pid = h.get('pid') if isinstance(h, dict) else None
+    return h if pid and needle in cmdline(pid) else None
+
+
 def _stop_and_exit(signum, frame):
     stop_tree()
+    for fn in list(_on_stop):
+        try:
+            fn(signum)
+        except Exception:
+            pass
     if signum == signal.SIGINT:
         raise KeyboardInterrupt     # as before: finally blocks run, and the exit status says SIGINT
     signal.signal(signum, signal.SIG_DFL)

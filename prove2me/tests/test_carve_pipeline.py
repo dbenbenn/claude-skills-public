@@ -1750,3 +1750,52 @@ def test_a_plan_from_before_the_graph_hash_is_stale_when_graph_ran_after_it(env,
     r = run(env, '--stop-after', 'plan')
     assert r.returncode == 0, r.stdout + r.stderr
     assert ('carve', 'plan') in tools_called(env), tools_called(env)
+
+
+def with_monitor(env):
+    """The synthetic skills repo with the monitor skill's section.py beside prove2me, as in the real one."""
+    src = os.path.join(os.path.dirname(ROOT), 'monitor', 'section.py')
+    if not os.path.isfile(src):
+        pytest.skip('monitor skill not beside prove2me')
+    (env.repo / 'monitor').mkdir()
+    shutil.copy(src, env.repo / 'monitor' / 'section.py')
+    git(env.repo, 'add', '-A')
+    git(env.repo, 'commit', '-qm', 'monitor')
+
+
+def carve_section(env):
+    from p2mlib import carvemonitor
+    f = os.path.join(os.environ['MONITOR_HOME'], 'sections', carvemonitor.section_id(str(env.dir)) + '.json')
+    return json.load(open(f)) if os.path.exists(f) else None
+
+
+def test_the_driver_keeps_a_monitor_section_and_marks_it_done(env):
+    with_monitor(env)
+    r = run(env, *ARGS)
+    assert r.returncode == 0, r.stdout + r.stderr
+    sec = carve_section(env)
+    assert sec['state'] == 'done' and sec['alerts'] == []
+    assert sec['note'] == 'all steps done; nothing published (run again with --publish)'
+    assert sec['title'].endswith(': OAI.Pre.Main')
+    steps = sec['phases'][0]
+    assert steps['name'] == 'Steps' and steps['done'] == steps['total'] == 19 and steps['state'] == 'done'
+    assert {p['label'] for p in sec['processes']} == {'driver', 'publisher', 'lean'}
+    r = run(env, '--stop-after', 'dryrun')
+    assert carve_section(env)['note'] == 'stopped after dryrun (--stop-after)'
+
+
+def test_a_failed_step_marks_the_section_failed_with_the_reason(env, monkeypatch):
+    with_monitor(env)
+    monkeypatch.setenv('STUB_FAIL', 'carve plan')
+    r = run(env, *ARGS)
+    assert r.returncode == 1
+    sec = carve_section(env)
+    assert sec['state'] == 'failed' and sec['note'].startswith('stopped at plan: (exit 1): boom from carve')
+    assert sec['alerts'] == [sec['note']]
+    assert sec['phases'][0]['state'] == 'failed'
+
+
+def test_without_the_monitor_skill_the_driver_runs_as_before(env):
+    r = run(env, *ARGS)                    # the synthetic repo has no monitor/ directory
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert carve_section(env) is None

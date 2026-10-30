@@ -17,7 +17,10 @@ settles the item unsent (submit_all.py's convention; oaiq-068).
 
 --go holds the carve's publish lock (one per publish/ directory, run.json and run_early.json alike): a
 second publisher on the same run state exits 3 naming the first (carve_pipeline's overlap mode runs one
-in the background while pieces are measured). RUN.json "release" gates the pieces (p2mlib.splitrun)."""
+in the background while pieces are measured). RUN.json "release" gates the pieces (p2mlib.splitrun).
+
+When RUN.json lies in a carve directory, --go keeps that carve's monitoring-page section current while no driver
+runs on it (p2mlib.carvemonitor), so a background publisher that outlives its driver still shows its counts."""
 import json
 import os
 import sys
@@ -33,6 +36,25 @@ def load(path):
     if cfg.get('release'):
         cfg['release'] = os.path.expanduser(cfg['release'])
     return cfg
+
+
+def publisher_monitor(run_json):
+    """When RUN.json lies in a carve: its monitoring-page section kept current while no driver runs
+    (p2mlib.carvemonitor, role publisher: overlap mode's background publisher outlives a stopped driver).
+    None otherwise or on any failure."""
+    try:
+        from p2mlib import carvemonitor
+        return carvemonitor.publisher_reporter(run_json)
+    except Exception:
+        return None
+
+
+def end_monitor(mon, state, why):
+    try:
+        if mon is not None:
+            mon.finish(state, why)
+    except Exception:
+        pass
 
 
 def main(argv=None):
@@ -82,13 +104,19 @@ def main(argv=None):
         return d
     from p2mlib import runlock
     runlock.hold(runlock.dir_key('publish', os.path.abspath(rest[0])), 'split_run.py --go ' + rest[0])
-    r = R.Runner(cfg, R.LiveApi())
-    for x in resets:
-        r.reset(x)
+    mon = publisher_monitor(rest[0])
     try:
-        s = r.run(max_hours=hours)
-    except R.LiveMismatch as e:
-        sys.exit(str(e))
+        r = R.Runner(cfg, R.LiveApi())
+        for x in resets:
+            r.reset(x)
+        try:
+            s = r.run(max_hours=hours)
+        except R.LiveMismatch as e:
+            sys.exit(str(e))
+    except BaseException as e:
+        end_monitor(mon, 'failed', 'publisher stopped: %s' % (str(e).splitlines() or [type(e).__name__])[0][:300])
+        raise
+    end_monitor(mon, 'done', 'ended: %d live of %d, %d stopped' % (s['live'], s['total'], len(s['stopped'])))
     print(json.dumps(s, indent=1))
     return s
 

@@ -234,6 +234,12 @@ and new `carve.py` inside one carve. So:
   `--wait` reports only its own run (never while the unit is active, and it says when the run had already
   ended); `--detach` refuses at once with exit 3, naming the pid and command line of a driver that holds the
   carve: stop that one or wait for it (oaiq-084; 1a4f175).
+- **The carve's own section on the monitoring page** (2026-10-30): the driver publishes `carve-<hash>` (the
+  unit's hash; p2mlib.carvemonitor) with the current step, steps done, modules built, items measured of planned,
+  items live of the plan and its processes, refreshed every minute and at each step boundary, and marks it done
+  or failed with the stopping reason; `split_run --go` keeps the counts current while a background publisher
+  outlives its driver. A worker's own section need not repeat any of that. A carve on a snapshot from before
+  it shows no section until it is resumed with `--upgrade`.
 - **What re-runs by itself after `--upgrade`** (2026-10-29, oaiq-047/-085/-092). `port` and `filter_patches`
   record the port rules and options they ran with, so a skill fix to a port rewrite re-ports without `--redo
   port`; a re-port that changes no module's text rebuilds nothing. Once publishing has started a rule change keeps

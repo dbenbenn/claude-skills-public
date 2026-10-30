@@ -37,3 +37,10 @@ def no_live_submissions(monkeypatch):
     def refuse(*a, **k):
         raise AssertionError('a test reached POST /verify')
     monkeypatch.setattr(submit_verify, 'post_verify', refuse)
+
+
+@pytest.fixture(autouse=True)
+def private_monitor_home(monkeypatch, tmp_path):
+    """Monitoring-page sections (p2mlib.carvemonitor, the monitor skill's section.py) go to a tmp dir,
+    never the machine's page."""
+    monkeypatch.setenv('MONITOR_HOME', str(tmp_path / 'monitor-home'))
