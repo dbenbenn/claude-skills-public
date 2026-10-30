@@ -779,7 +779,20 @@ class Pipeline:
             a += ['--compat-imports', self.p['compat_imports']]
         if self.p.get('stdsimplex'):
             a += ['--stdsimplex', self.p['stdsimplex']]
+        if self.p.get('hide_instances'):
+            a += ['--header', self.port_header()]
         return a
+
+    def port_header(self):
+        """pipeline.json `hide_instances` (instance names, e.g. compat ones) as the port's --header file, an
+        `attribute [-instance]` line after the imports of every ported module, named by its content so a changed list
+        changes the port options (oaiq-122: the compat block's global von Neumann instances, added for Kadison
+        similarity, made `whnf` time out in FactorGeneration modules with their own instances on a subalgebra)."""
+        text = 'attribute [-instance] %s\n' % ' '.join(self.p['hide_instances'])
+        path = os.path.join(self.d, 'port_header_%s.lean' % hashlib.sha1(text.encode()).hexdigest()[:10])
+        if not os.path.exists(path):
+            open(path, 'w', encoding='utf-8').write(text)
+        return path
 
     def step_fetch(self):
         if not self.p.get('fetch'):

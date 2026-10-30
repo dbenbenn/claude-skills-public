@@ -1001,6 +1001,25 @@ def test_changed_port_options_port_again(env):
     assert '--compat-imports' in _ported(env)[0]['argv']
 
 
+def test_hide_instances_reach_every_ported_module_and_port_again(env):
+    # oaiq-122: FactorGeneration builds its own CStarAlgebra/order instances on `M.toStarSubalgebra`, and the compat
+    # block's global von Neumann instances (for Kadison similarity, whose closure shares modules with it) made `whnf`
+    # time out; pipeline.json `hide_instances` hides them in every module through the port's --header
+    assert run(env, *ARGS).returncode == 0
+    p = json.load(open(env.dir / 'pipeline.json'))
+    p['hide_instances'] = ['OAI.vonNeumannToStarSubalgebraIsClosed', 'OAI.starSubalgebraStarOrderedRing']
+    json.dump(p, open(env.dir / 'pipeline.json', 'w'))
+    env.log.write_text('')
+    r = run(env, '--stop-after', 'port')
+    assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
+    argv = _ported(env)[0]['argv']
+    h = argv[argv.index('--header') + 1]
+    assert open(h).read() == ('attribute [-instance] OAI.vonNeumannToStarSubalgebraIsClosed '
+                              'OAI.starSubalgebraStarOrderedRing\n')
+    filt = [c for c in calls(env) if c.get('tool') == 'carve_prep' and c['argv'][0] == 'filter-patches']
+    assert all('--header' in c['argv'] for c in filt)
+
+
 def _forget_rule_hashes(env):
     """A state written before the rule hashes were recorded."""
     st = json.load(open(env.dir / 'pipeline_state.json'))

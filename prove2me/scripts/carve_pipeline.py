@@ -29,6 +29,9 @@ DIR is the carve directory. The first run needs the parameters, which are stored
   --no-overlap          the classic order (every item measured before anything publishes); a new carve
                         is in overlap mode (below) unless this is given, an existing pipeline.json without
                         the key `overlap` stays classic
+  pipeline.json `hide_instances` (no flag; edit the file): instance names hidden by an `attribute [-instance]`
+                        line after the imports of every ported module (the port's --header), e.g. global compat
+                        instances that slow a development with its own instances (oaiq-122)
 
 Steps (STEPS in p2mlib.carvepipeline): fetch, inputs (the targets' published statements and their Def_
 bundles are fetched into the workspace when missing), filter_patches, port, build, wsbuild, config, graph,
