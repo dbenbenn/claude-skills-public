@@ -25,6 +25,12 @@ stub `<NS>.foo`. This script:
 
 Other commands (module docs, `attribute`, notation) travel with the next declaration of their
 file. Stubs no Part proves are kept. Run `lake env lean OUT.lean` and `#print axioms` afterwards.
+
+A `Solutions.*` module the Blueprint or a Part imports (other than the Blueprint itself) is inlined
+before the Blueprint, as merge.py inlines the modules it is given (each its own section,
+duplicates dropped), with the `Solutions.*` modules it imports in turn, dependencies first: a
+solution may import only Mathlib, `Definitions.*` and `Theorems.*`, and the assembled file kept
+`import Solutions.TaoBRCS.Tools` (oaiq-121). A module with no file under the workspace is refused.
 """
 import heapq
 import os
@@ -46,6 +52,43 @@ def imports(text):
     return re.findall(r'^import\s+(\S+)', strip(text[:header_end(text)]), re.M)
 
 
+def module_path(mod, ws):
+    return os.path.join(ws, *mod.split('.')) + '.lean'
+
+
+def solution_imports(texts, skip, ws):
+    """[(module, path)] of the `Solutions.*` modules `texts` import, other than `skip` (the
+    Blueprint's own names), closed under their own `Solutions.*` imports, dependencies first."""
+    out, seen = [], set(skip)
+
+    def visit(mod, via):
+        if mod in seen:
+            return
+        seen.add(mod)
+        path = module_path(mod, ws)
+        if not os.path.exists(path):
+            sys.exit('refusing: %s imports %s, which has no file %s to inline (a submission cannot '
+                     'import Solutions.*)' % (via, mod, path))
+        for m in imports(open(path, encoding='utf-8').read()):
+            if m.startswith('Solutions.'):
+                visit(m, mod)
+        out.append((mod, path))
+    for k, t in enumerate(texts):
+        for m in imports(t):
+            if m.startswith('Solutions.'):
+                visit(m, 'the Blueprint' if k == 0 else 'a Part')
+    return out
+
+
+def header_imports(texts, skip):
+    """The assembled file's imports: every import of `texts` but the Blueprint's (`skip`) and any
+    other `Solutions.*` module (inlined), first-seen order."""
+    hdr = []
+    for t in texts:
+        hdr += [m for m in imports(t) if m not in skip and not m.startswith('Solutions.') and m not in hdr]
+    return hdr
+
+
 def blueprint_modules(bpf, part_texts, ws):
     """The module names under which the Parts import the Blueprint: its own module, from its path
     under the workspace (CFW's blueprint is Solutions/CFW/Route.lean), and, as before, any
@@ -63,11 +106,19 @@ def main():
     texts = [open(f, encoding='utf-8').read() for f in files]
     owners = [None] + [os.path.splitext(os.path.basename(p))[0] for p in parts]
     from p2mlib.workspace import workspace
-    bp_mods = blueprint_modules(bpf, texts[1:], workspace())
-    hdr = []
-    for t in texts:
-        hdr += [m for m in imports(t) if m not in bp_mods and m not in hdr]
-    header = ''.join('import %s\n' % m for m in hdr)
+    ws = workspace()
+    bp_mods = blueprint_modules(bpf, texts[1:], ws)
+    helpers = solution_imports(texts, bp_mods, ws)
+    pre = ''
+    if helpers:
+        # inlined as merge.py would, ahead of the Blueprint and outside every Part's span, so they
+        # are never reordered, aliased or taken for stubs (oaiq-121)
+        from merge import merge
+        merged, _ = merge([p for _, p in helpers], scratch=os.path.dirname(os.path.abspath(out)))
+        pre = merged[header_end(merged):].rstrip('\n') + '\n'
+        print('inlined %s' % ', '.join(m for m, _ in helpers))
+    hdr = header_imports([open(p, encoding='utf-8').read() for _, p in helpers] + texts, bp_mods)
+    header = ''.join('import %s\n' % m for m in hdr) + pre
     concat, spans = header, []
     for t in texts:
         concat += 'section\n'
