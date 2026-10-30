@@ -644,6 +644,12 @@ back WA. The lessons:
   patch, oaiq-124), kernel-bound (rewrite it, or `cost_factors` + `accept_over`, oaiq-092) or elaboration-bound. The
   automatic frozen split of a slow piece also promotes its private lemmas (config `promote_private`, graph node
   names), so no hand `forced` entry is needed for them (oaiq-091).
+- **A slow, memory-heavy piece with a short tactic proof** (oaiq-123: 281 s, ~22 GiB): compile it with `set_option
+  debug.skipKernelTC true in` on the theorem. If that makes it fast (4 s there), the kernel is re-evaluating a
+  certificate term a cheap `simp` left behind (`simp only [List.sum_cons]` over `[augmentation (residualBucket 0),
+  …]` made the kernel compute what the cached `bucket_aug_k` lemmas exist to avoid): rewrite the cached-value
+  lemmas in before any arithmetic `simp` (3 s). On a loaded machine bisect with `sorry` truncations under
+  `timeout 300`, not the profiler.
 - **Kernel time is invisible to the cost model** (oaiq-092, oaiq-114). `lean -Dtrace.profiler=true
   -Dtrace.profiler.threshold=4000 FILE` prints `[Kernel] typechecking declarations [X]` lines: single opaque
   `Procedure …` defs and one `structure … : Prop` took 23-474 s in oaiq-092, and splitting a bundle cannot get
@@ -764,6 +770,10 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
 - **Heartbeat timeouts on the server.** A bundle or piece that compiled in `measure` can still hit the
   verifier's `maxHeartbeats 200000` (oaiq-055: `rfl` lemmas, instance-heavy statements). split_run adds
   `set_option maxHeartbeats 1000000` after the imports and resends once; a second one waits for a person.
+- **Extending another carve's frozen plan** (oaiq-088): a private node name embeds the old port folder
+  (`_private.Solutions.OAIQ038_FA…`): rewrite the frozen plan's folder name to the new one, or a spurious import
+  cycle appears; every `external_theorems` entry must exist in the new graph (drop those outside the new closure,
+  else `unknown external definition`).
 - **A later target of an already-carved family** (oaiq-057): extend it with the earlier carve's plan,
   bundles and lib as `frozen`; the planner takes the frozen plan's `external_defs` as its own (56fd083),
   so declarations the earlier carve took from a published bundle stay there. Not handled: a frozen bundle
