@@ -126,6 +126,21 @@ def test_a_statement_imported_only_by_orphans_is_orphaned_in_the_same_report():
     assert M.edge_report(plan, edges)['orphaned_statements'] == ['A.u', 'A.v', 'A.w']
 
 
+def test_a_failed_pieces_imports_still_count_so_its_statements_are_not_orphaned():
+    # q129 (2026-10-30): a piece failing its local check gets no edge record, so every statement only it
+    # imported was reported orphaned; folding those "orphans" merged them into the failing piece (32 s ->
+    # 278 s). A failed file's import lines count as unchecked imports.
+    import carve_measure as M
+    plan = {'stubs': {'A.t': {}, 'A.u': {}}, 'targets': ['A.main'], 'forced': [],
+            'external': ['A.main'], 'statement_suffix': ''}
+    edges = {'piece:A.t': {'file': 'Sol_A_t.lean', 'false': [], 'imports': {}, 'restore': {}}}
+    failed = M.unchecked_records({'piece:A.main': 'import Mathlib\nimport Theorems.Thm_A_t\n'
+                                  'import Definitions.Def_B\n\ntheorem solution : True := trivial\n'})
+    assert failed['piece:A.main']['imports'] == {'Theorems.Thm_A_t': 'unchecked'}
+    rep = M.edge_report(plan, {**edges, **failed})
+    assert rep['orphaned_statements'] == ['A.u'] and rep['false_edges'] == []
+
+
 def test_drop_records_the_cut_so_it_survives_gen(tmp_path):
     import carve_measure as M
     from p2mlib import repair as RP

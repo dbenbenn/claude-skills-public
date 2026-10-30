@@ -420,8 +420,17 @@ class Measure:
         if edges:
             # only this run's items: with --kinds, another kind's records (a piece's, from an earlier
             # full measure) are not this run's to judge (oaiq-081: phase 1 failed on stale piece edges)
-            rep = edge_report(self.plan, {i: e for i, e in self.edges.items()
-                                          if i in self.times and i in scope})
+            failed = {i for i in scope if i in self.times and not self.times[i].get('ok')}
+            texts = {}
+            for i in failed:
+                kind, n = i.split(':', 1)
+                try:
+                    texts[i] = open(self.item_files(kind, n)[0], encoding='utf-8').read()
+                except OSError:
+                    pass
+            rep = edge_report(self.plan, {**{i: e for i, e in self.edges.items()
+                                             if i in self.times and i in scope and i not in failed},
+                                          **unchecked_records(texts)})
             if kinds and 'piece' not in kinds:
                 rep['orphaned_statements'] = []
             json.dump(rep, open(os.path.join(self.cfg['work'], 'false_edges.json'), 'w'), indent=1)
@@ -520,6 +529,15 @@ def failing_false_edges(rep):
     """The false edges that fail a measure: theorem-graph edges only (definitions imports are
     reported and kept, 2026-10-28)."""
     return [f for f in rep['false_edges'] if f.get('graph_edge')]
+
+
+def unchecked_records(texts):
+    """Edge records for files that failed before their edge check ({item: file text}): each
+    `import Theorems.*` line counts as an unchecked import, so the statements only such a file imports
+    are not reported orphaned (q129: folding those merged them into the failing piece)."""
+    return {item: {'file': None, 'false': [], 'restore': {},
+                   'imports': {m: 'unchecked' for m in re.findall(r'^import (Theorems\.\S+)\s*$', t, re.M)}}
+            for item, t in texts.items()}
 
 
 def edge_report(plan, edges):
