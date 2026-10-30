@@ -191,8 +191,16 @@ Problem336).** Fix each at the cause; none needs a macro.
   exact hh | (convert hh; all_goals first | rfl | exact Subsingleton.elim _ _)`; `Function.update` with
   `FunLike.toDecidableEq` vs `Classical.propDecidable`: `convert` where `exact` fails. The patch must keep the
   port's module compiling too. Test it on the stage file before another re-port and re-measure (about 15
-  minutes): `lake env env LEAN_PATH=<carve>/olean:$(lake env printenv LEAN_PATH) lean <stage file>` from the
-  workspace (a plain `LEAN_PATH=… lake env` is overridden by lake). A line patch whose `old` is also the tail of a
+  minutes): `LEAN_PATH=<carve>/olean:$(lake env printenv LEAN_PATH) lean -j1 -DautoImplicit=false <stage file>`
+  from the workspace, with `~/claude/claude-private/tools/lean-cap` first on PATH (`which lean` shows the wrapper;
+  `lake env env … lean` runs the toolchain's lean outside the cap, oaiq-114). Other carve-only causes: dot notation
+  on a `def`-typed value (`ψ.map_zero`, `ψ : Nakayama …`) resolves to a `Nakayama.map_zero` the carved file now
+  declares first, where the module had fallen through to `LinearMap.map_zero`: write `LinearMap.map_zero ψ`
+  (oaiq-116); a `local notation` written with another local notation is dropped when the statement is carved,
+  while the piece copying the whole module keeps it, so scope an insertion patch by its preceding context
+  (oaiq-081); a `local instance : Coe …` or `@[local gcongr]` leaves no constant in the term, so it does not
+  travel: a post-carve patch inserting `private local instance …` (private, or every bundle holding it declares
+  it again) and `exact` in place of the `gcongr` (oaiq-096). A line patch whose `old` is also the tail of a
   more-indented line double-counts: anchor it with a leading `\n` (oaiq-086).
 - *`import all`.* OpenAI reaches Mathlib's *private* declarations (`import all …IsGaussianProcess` for
   `Finset.orderEmbOfFinWithBot`) with `import all`, which a non-`module` file cannot use. Copy the private declarations
@@ -605,6 +613,26 @@ back WA. The lessons:
      evenly spaced: `~/claude/p2m-standalone/openai-ports/oaiq-047/resplit_prep.py`) brought them to 85-97 s and all passed first time. In a
      kernel-heavy carve, force them at the first plan rather than after the verifier's timeouts. Big carves take
      time: a 1,300-module carve took about 20 driver restarts and two days at load 15-22 (oaiq-050).
+- **Kernel time is invisible to the cost model** (oaiq-092, oaiq-114). `lean -Dtrace.profiler=true
+  -Dtrace.profiler.threshold=4000 FILE` prints `[Kernel] typechecking declarations [X]` lines: single opaque
+  `Procedure …` defs and one `structure … : Prop` took 23-474 s in oaiq-092, and splitting a bundle cannot get
+  one declaration under the limit. Rewrite the heavy declaration by patch (state the function up front instead of
+  leaving the kernel to unify it), else `cost_factors` + `accept_over`. The `.olean serialization` case above
+  applies to bundles too (oaiq-124: a one-theorem bundle at 92 s, `sizeWithoutSharing` 2.0e9; an `abbrev` for
+  the map in the same bundle brought it to 55 s). Kernel pieces are load-sensitive (42 s measured, 85 s on a
+  rerun, three verifier timeouts): profile any kernel piece over ~30 s. A `decide` on `Finset.card` or Finset
+  equality over a long `List.toFinset` is quadratic in the kernel; when the list is sorted, prove `Nodup` from a
+  strict chain (`List.IsChain (toLex · < toLex ·)` by `decide +kernel`, `List.isChain_iff_pairwise`) and use
+  `List.toFinset_card_of_nodup` (85 s to 0.3 s). In a kernel-heavy development, force the source's own block or
+  merge lemmas at the first plan (oaiq-114: 31 of them, every piece under 42 s, Proved in 80 minutes).
+- **Category theory / homological algebra: try the transparency option first** (oaiq-116). Errors full of `simp
+  made no progress` / `rewrite failed` on `comp_f`, `ShiftedHom`, `Cocycle`, `single…` lemmas are the "not
+  type-correct under the `implicit` transparency level" check, not API drift: compile each failing module as is
+  and with `set_option backward.isDefEq.respectTransparency false` at module scope and keep the version with
+  fewer errors (`~/claude/p2m-standalone/openai-ports/oaiq-116/tools/try_module.py` does both); where the option
+  breaks later steps, scope it with `set_option … false in` per declaration. oaiq-002's "several more hours" of
+  drift became 2 hours. Repair with the pipeline's own flags (`lean -j1 -DautoImplicit=false`): a `-j1` build can
+  hit heartbeats an in-place `lake build` does not.
 - **`(kernel) deterministic timeout` where the elaborator accepted every step** (oaiq-068): typically a goal
   equating `f a i₁` with `f a i₂` for two proofs of a Prop-valued instance argument (a `letI … := h ▸
   inferInstance` in two statements). State the irrelevance as a lemma, `@f … i₁ = @f … i₂ := by cases
@@ -720,6 +748,50 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   then delete `.lake/build/{lib/lean,ir}/Solutions/FOLDER` and `--redo build` (a03f3b3). Then turn the diff into patches whose `count` is taken over the
   unpatched port, never the patched workspace (oaiq-063, -071, -072). A patch `why` lands in the piece's
   explanation: write Lean names in it in backticks (oaiq-064: a hypothesis `he` failed the pronoun check).
+
+## Retrying an earlier attempt (worker lessons, 2026-10-30)
+
+- **Read references for the symptom first.** A blocker an older batch recorded as "untried next steps" may have a
+  documented remedy by now (oaiq-118: the CoeT WA fold had been documented for a day).
+- **A carve from before `carve_pipeline.py`** (a `config.json` and no `pipeline.json`) cannot be resumed by the
+  driver. Do not repair it: start a fresh pipeline carve under a new folder and bundle prefix, carrying over only
+  its hand patches; expect some to count 0 now (the port rewrites them) and drop those (oaiq-115: ported,
+  built, planned and measured clean in 55 minutes).
+- **A carve from before 2026-10-29**: before the first `--detach`, check `pipeline.json` and its meta against the
+  current brief: `defs` (bare `Def_X` normalised since 1e02cec), meta `prefixes` (the root's top directory, never
+  the result's own folder), `overlap`; a driver killed mid-build shows `build: running` and no failure line, and
+  resuming replays the built modules in seconds (oaiq-125). Resume with `--upgrade --keep-port` unless the port
+  rules' changes are wanted; on an unpublished carve, `--from plan` picks up carver fixes (oaiq-122). Re-derive
+  every old patch's `old` from the current ported text, not from the old notes (oaiq-117).
+- **A carve published on an old skill with a few broken items**: finish its own `publish/` rather than
+  re-planning frozen across many skill versions: newer graph rules infer needs the published bundles never had
+  (oaiq-120: 40 plan problems). Compile each item against the *published* bundles (`fetch_theorems.py --names
+  Definitions.Def_X …`), fix it, and resend with `split_run.py publish/run.json --go --reset statement:NAME`
+  (old run states have no `sha`, so a changed stopped item is not resent without `--reset`).
+- **A `SORRY` verdict on a carved piece whose local `#print axioms solution` is clean** usually means the server
+  failed to elaborate it (an unknown identifier): compile the submitted source (`GET /submissions/:id/solution`)
+  against the published bundles; do not just resubmit (oaiq-120).
+- **A goal Open with no open leaves**: `GET /theorems/:id/open-leaves` does not list a Disproved child; walk
+  `/decompositions` (oaiq-109: a sketch imported a Disproved statement and was still SKETCH_ACCEPTED).
+  `submit_solution.py` refuses such an import since 9397093.
+- **Folding on a carve whose snapshot predates `carve.py fold`** (oaiq-118): `carve.py fold CONFIG N…` from a
+  current snapshot; `carve.py gen CONFIG pieces <changed>` from the carve's own snapshot (a newer gen emits
+  different `attribute [-instance]` lines); `carve_measure.py --kinds piece` from the current one (it runs the
+  CoeT check); then `publish-prep --sync`, prose, check-text, and write the `comparisons/<slug>.md` notes *before*
+  resuming, since they are what makes split_run resend the live importers (2442579; oaiq-124).
+- **An `elab` that builds tactic syntax** (oaiq-119, `pts_pl`, 54 sites): expand it at its call sites by running a
+  logging variant in place (build the replacement text, parse and run it, log it), then `mkpatches.py`; traps:
+  restore the message log before logging a failure, count error messages around `evalTactic`, `try a; b` is
+  `try (a; b)`, no `pp.oneline`, keep explicit atoms. Budget an hour or two: not a blocker.
+- **Compat instances are global** (oaiq-122): one added for Kadison similarity made `whnf` time out in three
+  FactorGeneration modules. A compat instance carrying data is a `@[reducible] def` made local by a port rule keyed
+  on what the module names (2165390); a carve whose port built before a compat instance was added can hide it with
+  pipeline.json `hide_instances` (0eea563). A module that built before and now times out at `whnf` after an
+  upgrade: bisect the compat instances first (`attribute [-instance]` in a copy, ~20 s each). A heartbeat failure
+  in the pipeline's build is not evidence until plain `lean -DautoImplicit=false` reproduces it: LeanInfo
+  elaborates synchronously and spends more (3230451 retries such modules with plain `lean -o`).
+- **Post-carve patches naming a collision suffix** (`_r<hex>_<n>`) break silently across snapshots: prefer a
+  carver fix (oaiq-123). Editing the post-carve patches file re-runs `gen` since dad2e72 (older: `--redo gen`).
 
 ## Which local instances and lemmas a carved file brings back (carver rules, 2026-10-27/28)
 

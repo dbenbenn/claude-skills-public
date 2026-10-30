@@ -536,6 +536,10 @@ $A$ is abelian and that $B$ is finitely generated"), even where a proof does not
 general form, if wanted, is a separate theorem. Take quantifier dependence from the result the
 proof cites, not only from the sentence: English statements under-specify it, and the intended
 strength lives in the cited lemma or in a remark after the statement.
+For a conclusion `∃` constants, also look where the paper *uses* the result: quantify each constant
+before every parameter a consumer varies afterwards. "C denotes a constant that changes from line to line"
+hides the order (Tao 1999, oaiq-111: Lemma 3.2's `C₀` stated after `α` could blow up as `α → 0`, so Theorem
+1.2 did not follow from it; the uniform form `∃ C₀, ∀ α, …` was published and the printed form reduced to it).
 
 **Name the object the sentence is about.** When the source asserts a property of a structure it
 defines -- a graph, a tree, an action, a relation -- define that structure and state the property of
@@ -1145,6 +1149,8 @@ Failures that no local build reproduces. The detail and the case behind each is 
 | `WA` "failed to synthesize CoeT (∀ {H : Type ?u.4} …) x (∀ {H : Type ?u.3} …)", printed types identical | A universe-polymorphic statement with a heavy type: the verifier's plain type comparison fails and its `CoeT` fallback runs out of `typeclass` budget (opus-kadison, oaiq-039). Never resubmit unchanged: the local check (`localcheck`, since 19c7a63) runs that fallback; state it monomorphically if every importer is, or `carve.py fold` it into its importers' pieces. |
 | "unknown universe level", or `SORRY` on a declaration above the real fault | The verifier runs with `autoImplicit` off and `lake env lean` does not. Hoist every `universe` line to the top of an assembled file. |
 | "FAILED: Compilation timed out after 300s", "Verification timed out after 300s" | The item itself is slow. Retry unchanged first; after about two real timeouts split it into pieces of about 60 s or less at `-j1` locally. |
+| `WA` "stuck at solving universe constraint `max ?a ?v =?= max ?b ?v`" | A universe that occurs only under `max` in a statement with heavy binders (oaiq-124). The local check reports it since 2442579; fold the statement, or restate it with every universe bare. |
+| `SORRY` on a carved piece whose local `#print axioms` is clean | The server could not elaborate it (an unknown identifier, say). Compile the *submitted* source against the published bundles before resubmitting (oaiq-120). |
 | "Module compilation timed out" | A cold worker building imported bundles. Retry unchanged, never split, unless an imported *statement* module takes over about 90 s locally (`lean -o`): then every importer fails, and the statement needs restating (its large sides as `abbrev`s in a bundle). |
 | `whnf` heartbeat timeout on the server only | A `rfl` proof: rewrite it without the deep unfolding. A definition: `set_option maxHeartbeats 1000000 in`. |
 | "Source too large for token scanner" | The 1 MiB cap. Split into published statements; a disproof cannot import, so golf it. |
