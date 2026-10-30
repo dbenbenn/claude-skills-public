@@ -762,6 +762,28 @@ def test_a_changed_config_set_reaches_config_json_and_reruns_from_gen(env):
     assert tools_called(env)[0] == ('carve', 'plan')
 
 
+def test_a_config_set_added_to_a_state_from_before_the_record_still_applies(env):
+    # oaiq-120: a carve from before `config_set_applied` was recorded; config_set gained `frozen`/`forced` on the
+    # resume, which took it as already applied, so the run went straight to publish with the old plan
+    run(env, *ARGS, '--stop-after', 'measure')
+    sp = env.dir / 'pipeline_state.json'
+    st = json.load(open(sp))
+    st.pop('config_set_applied', None)
+    json.dump(st, open(sp, 'w'))
+    p = json.load(open(env.dir / 'pipeline.json'))
+    p['config_set'] = {'forced_note': 1}
+    json.dump(p, open(env.dir / 'pipeline.json', 'w'))
+    env.log.write_text('')
+    r = run(env, '--stop-after', 'measure')
+    assert r.returncode == 0, r.stderr
+    assert json.load(open(env.dir / 'config.json'))['forced_note'] == 1
+    assert tools_called(env)[0] == ('carve', 'plan')
+    # nothing changed: nothing re-runs
+    env.log.write_text('')
+    run(env, '--stop-after', 'measure')
+    assert ('carve', 'plan') not in tools_called(env)
+
+
 def test_measure_keeps_going_past_a_failed_file(env):
     # oaiq-051: carve_measure stopped at the first failing proof, ~12 min per fix
     run(env, *ARGS, '--stop-after', 'measure')

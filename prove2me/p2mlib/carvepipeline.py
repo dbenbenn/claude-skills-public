@@ -856,14 +856,16 @@ class Pipeline:
         if not rec or rec['status'] != 'done' or not os.path.exists(path):
             return
         want = dict(self.p.get('config_set') or {})
-        if 'config_set_applied' not in self.state:           # a state from before this was recorded
-            self.state['config_set_applied'] = want
-            return
+        cfg = json.load(open(path))
+        if 'config_set_applied' not in self.state:
+            # a state from before this was recorded: config.json holds what was applied (oaiq-120: taking
+            # `want` as applied skipped a new `frozen`/`forced`, and the resume published the old plan)
+            self.state['config_set_applied'] = {k: cfg[k] for k in want if k in cfg}
         old = self.state['config_set_applied']
         changed = sorted(k for k in set(want) | set(old) if want.get(k) != old.get(k))
         if not changed:
+            self.save()
             return
-        cfg = json.load(open(path))
         for k in changed:
             if k in want:
                 cfg[k] = want[k]
