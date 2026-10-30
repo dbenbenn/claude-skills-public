@@ -1379,7 +1379,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
         text = _drop_positional_arg(text, _n)     # GreenOperator, 2026-10-26
     text = _drop_positional_arg(_drop_positional_arg(text, 'eLpNorm_congr_norm_ae'), 'eLpNorm_congr_norm_ae')
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
-    text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first \|[^\n]*)$", r"\1 <;> \2", text)
+    text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first[ \t]*\|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
     # `convert h using n; tac` / `<;> tac` (field_simp, ring_nf, dsimp ...) on an inequality leaves an `instLE`
     # diamond as the FIRST goal, which tac cannot see through ("made no progress"; oaiq-088: 8 sites).

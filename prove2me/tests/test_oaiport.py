@@ -930,6 +930,16 @@ def test_convert_using_semicolon_parenthesised_first_closes_all_goals():
     assert "convert h using 1; (first | rfl | simp)" in out
 
 
+def test_convert_using_semicolon_unspaced_first_closes_all_goals():
+    # GeneralMahler (q133, 2026-10-30): `first|rfl|ring` written without spaces ran only on the first goal,
+    # leaving `K = K * 1` and a `Module` instance goal (4 modules)
+    src = ("    convert ((hasDerivAt_id' x).const_mul K) using 1; first|rfl|ring\n"
+           "    convert (hd _).comp t (hc t) using 1; first|rfl|(unfold l;ring)\n")
+    out = O.core_rewrites(src)
+    assert "convert ((hasDerivAt_id' x).const_mul K) using 1 <;> first|rfl|ring\n" in out
+    assert "convert (hd _).comp t (hc t) using 1 <;> first|rfl|(unfold l;ring)\n" in out
+
+
 # d13f23b renames/signatures (UnitDistances, StandardMap 2026-10-25): `finsum_le_finsum` (ordered monoid, finite
 # supports) is our `finsum_le_finsum'`; `Filter.eventuallyEqSet_iff` is `Filter.eventuallyEq_set`;
 # `posLog_le_posLog` asks `-1 ≤ x` there and `0 ≤ x` here.
