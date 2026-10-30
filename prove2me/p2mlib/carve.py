@@ -4033,7 +4033,7 @@ def gen_piece(g, plan, node, collapse_mathlib=True):
 
 
 def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, external=(),
-             collapse_mathlib=True, patches=(), repairs=None, frozen_text=None):
+             collapse_mathlib=True, patches=(), repairs=None, frozen_text=None, frozen_stubs=None):
     """Write out/lib/Def_<bundle>.lean, out/lib/Thm_<slug>.lean (not for `external` nodes,
     published by someone else) and out/solutions/Sol_<slug>.lean. Returns {'files', 'sizes',
     'over_cap'} (files over prove2.me's 1 MiB cap), 'patches_unused'}.
@@ -4047,11 +4047,14 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
     after the patches, so a regenerated file is the one that was measured (and published);
     a cut that no longer matches is returned in 'stale_repairs' as (file name, cut).
 
+    `frozen_stubs`: {file name: text} of live statements, written the same way (a live statement
+    cannot change).
     `frozen_text`: {bundle name: text} of published bundles. A published bundle is frozen, so its
     file is written exactly as published; when the generator (with patches and repairs) would
     write something else, the bundle is listed in 'frozen_drift' (Boone-Higman, 2026-10-24: a
     carve extending a published one regenerated its frozen bundles without their repair)."""
     repairs, frozen_text = repairs or {}, frozen_text or {}
+    frozen_stubs = frozen_stubs or {}
     stale, drift = [], []
     os.makedirs(os.path.join(out, 'lib'), exist_ok=True)
     os.makedirs(os.path.join(out, 'solutions'), exist_ok=True)
@@ -4119,8 +4122,8 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
             continue
         external = set(external) | set(plan.get('external', ()))
         if 'stubs' in what and n not in external:
-            put(os.path.join(out, 'lib', 'Thm_%s.lean' % slug(statement_name(plan, n))),
-                gen_stub(g, plan, n, collapse_mathlib))
+            fn = 'Thm_%s.lean' % slug(statement_name(plan, n))
+            put(os.path.join(out, 'lib', fn), gen_stub(g, plan, n, collapse_mathlib), frozen_stubs.get(fn))
         if 'pieces' in what:
             put(os.path.join(out, 'solutions', 'Sol_%s.lean' % slug(statement_name(plan, n))),
                 gen_piece(g, plan, n, collapse_mathlib))

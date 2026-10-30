@@ -176,6 +176,27 @@ def published_frozen(cfg, plan, names=None):
     return out
 
 
+def published_frozen_stubs(cfg, plan, names=None):
+    """{file name: published text} of the statements gen is asked for that have a copy in `frozen.lib`
+    (publish_early keeps the live files there). A live statement cannot change, and a frozen re-plan
+    of an overlap carve regenerated 13 of them with another import or `attribute [-instance]` line
+    (oaiq-081, 2026-10-30), which stopped the re-split of two slow pieces."""
+    fz = cfg.get('frozen') or {}
+    if not fz.get('lib'):
+        return {}
+    lib = os.path.expanduser(fz['lib'])
+    external = set(cfg.get('external', ())) | set(plan.get('external', ()))
+    out = {}
+    for n in plan['nodes']:
+        if n in external or (names is not None and n not in names):
+            continue
+        fn = 'Thm_%s.lean' % C.slug(C.statement_name(plan, n))
+        p = os.path.join(lib, fn)
+        if os.path.exists(p):
+            out[fn] = open(p, encoding='utf-8').read()
+    return out
+
+
 def load_graph(cfg):
     if not os.path.exists(graph_path(cfg)):
         sys.exit('no %s: run `carve.py graph` first' % graph_path(cfg))
@@ -391,10 +412,12 @@ def main(argv):
         names = set(rest[1:] if rest and rest[0] == what else rest) or None
         kinds = ('bundles', 'stubs', 'pieces') if what == 'all' else (what,)
         frozen_text = published_frozen(cfg, P, names) if 'bundles' in kinds else {}
+        frozen_stubs = published_frozen_stubs(cfg, P, names) if 'stubs' in kinds else {}
         patches = json.load(open(os.path.expanduser(cfg['patches']))) if cfg.get('patches') else ()
         r = C.generate(g, P, cfg['out'], kinds,
                        names, cfg.get('external', ()), cfg.get('collapse_mathlib', True),
-                       patches, repairs=recorded_repairs(cfg), frozen_text=frozen_text)
+                       patches, repairs=recorded_repairs(cfg), frozen_text=frozen_text,
+                       frozen_stubs=frozen_stubs)
         for f in r['files']:
             print('%9d  %s' % (r['sizes'][f], f))
         for f, c in r['stale_repairs']:

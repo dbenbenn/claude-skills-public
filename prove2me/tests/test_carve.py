@@ -978,6 +978,27 @@ def test_gen_takes_frozen_bundles_verbatim_from_the_published_copy(tmp_path):
     assert (out3 / 'lib' / 'Def_CDB002.lean').read_text().endswith('-- published later\n')
 
 
+def test_gen_takes_published_statements_verbatim_from_frozen_lib(tmp_path):
+    # oaiq-081 (2026-10-30): a frozen re-plan of an overlap carve regenerated 13 live statements with an
+    # extra `import` or a different `attribute [-instance]` line; publish_early's drift check refuses
+    # that, so no slow piece could be re-split. A published statement is as frozen as a bundle: gen
+    # writes the copy in frozen.lib byte for byte.
+    cfg, work, out, run = _carve_cli(tmp_path, 'first')
+    run('plan', str(cfg))
+    run('gen', str(cfg))
+    pub = tmp_path / 'published'
+    pub.mkdir()
+    thm = sorted(p.name for p in (out / 'lib').glob('Thm_*.lean'))[0]
+    for b in ('CDB000', 'CDB002'):
+        (pub / ('Def_%s.lean' % b)).write_bytes((out / 'lib' / ('Def_%s.lean' % b)).read_bytes())
+    (pub / thm).write_text((out / 'lib' / thm).read_text() + '-- as published\n')
+    frozen = {'plan': str(work / 'plan.json'), 'bundles': ['CDB000', 'CDB002'], 'lib': str(pub)}
+    cfg2, work2, out2, run2 = _carve_cli(tmp_path, 'second', frozen=frozen)
+    run2('plan', str(cfg2))
+    run2('gen', str(cfg2))
+    assert (out2 / 'lib' / thm).read_bytes() == (pub / thm).read_bytes()
+
+
 def test_gen_fails_on_a_patch_matching_no_generated_file(tmp_path):
     # oaiq-123 (NuclearUltrapower): post-carve patches naming a collision-suffixed instance
     # (`normEntryOrder_r606002_1`) silently stopped matching after a snapshot change; gen only
