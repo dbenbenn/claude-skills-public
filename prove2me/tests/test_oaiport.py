@@ -441,6 +441,16 @@ def test_compat_has_walk_length_le_bypass_length_iff():
 
 
 
+# d13f23b has `SimpleGraph.ncard_neighborSet G v : (G.neighborSet v).ncard = G.degree v`; ours has only
+# `card_neighborSet_eq_degree` (Nat.card / Fintype.card forms). CycleClique (oaiq-107): ten modules use it.
+
+def test_compat_has_simplegraph_ncard_neighborSet():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem _root_.SimpleGraph.ncard_neighborSet' in src
+
+
 def test_compat_has_vecCons_tail_and_fin_mk_simp_lemmas():
     # after simp, `![a, b, c]` lookups are `vecCons a (fun i => ..) 2` and `fin_cases` leaves `⟨2, ⋯⟩`; norm_num
     # (no simprocs here) evaluates neither without these rfl lemmas (oaiq-091, WeylEstimates01: 10 sites)

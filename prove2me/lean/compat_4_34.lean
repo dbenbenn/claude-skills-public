@@ -117,6 +117,10 @@ separately). `_root_`, so `p.length_le_bypass_length_iff` resolves by dot notati
 theorem _root_.SimpleGraph.Walk.length_le_bypass_length_iff {V : Type*} {G : SimpleGraph V}
     [DecidableEq V] {u v : V} (p : G.Walk u v) : p.length ≤ p.bypass.length ↔ p.bypass = p :=
   ⟨p.bypass_eq_self_of_length_le_length_bypass, fun h => by rw [h]⟩
+/-- Mathlib d13f23b's `SimpleGraph.ncard_neighborSet`: the neighbour set's `Set.ncard` is the degree. -/
+theorem _root_.SimpleGraph.ncard_neighborSet {V : Type*} (G : SimpleGraph V) (v : V)
+    [Fintype (G.neighborSet v)] : (G.neighborSet v).ncard = G.degree v := by
+  rw [← Nat.card_coe_set_eq, Nat.card_eq_fintype_card, SimpleGraph.card_neighborSet_eq_degree]
 /-- Mathlib d13f23b's `CStarAlgebra.norm_le_norm_of_le_of_nonneg hab ha`; ours is `norm_le_norm_of_nonneg_of_le ha hab`. -/
 theorem _root_.CStarAlgebra.norm_le_norm_of_le_of_nonneg {A : Type*} [NonUnitalCStarAlgebra A]
     [PartialOrder A] [StarOrderedRing A] {a b : A} (hab : a ≤ b) (ha : 0 ≤ a) : ‖a‖ ≤ ‖b‖ :=
