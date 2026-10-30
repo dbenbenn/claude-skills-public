@@ -1391,6 +1391,9 @@ def core_rewrites(text, compat_ns='OAI', known=None):
         # a sequence ending in `; rfl`: our stronger simp lemmas can close the goal first, and the bare
         # `rfl` then fails with "No goals to be solved" (RandomMean, oaiq-117)
         tac = re.sub(r";[ \t]*rfl[ \t]*$", '; try rfl', tac)
+        # one line: inside the parentheses a continuation line left of the opening column ends a term
+        # application early (`apply Finset.sum_congr rfl` read `rfl` as "expected ')'"; SKRatio, q130)
+        tac = re.sub(r"<;>[ \t]*\n[ \t]*", '<;> ', tac)
         return '%s <;> first | (with_reducible_and_instances rfl) | (%s)' % (m.group('head'), tac)
     # the term may span lines, and a chain ending in `<;>` continues on the next line (oaiq-092)
     text = re.sub(r"(?m)^(?P<head>[ \t]*(?:· )?convert (?:(?!convert\b)[^;\n])*?"

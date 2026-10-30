@@ -905,11 +905,18 @@ def test_convert_using_chain_continued_on_next_line_stays_one_tactic():
     one = "  convert h using 1 <;> (try funext y) <;>\n    (dsimp [f]; all_goals ring)\n"
     out = O.core_rewrites(one)
     assert out == ("  convert h using 1 <;> first | (with_reducible_and_instances rfl) | "
-                   "((try funext y) <;>\n    (dsimp [f]; all_goals ring))\n")
+                   "((try funext y) <;> (dsimp [f]; all_goals ring))\n")
     two = "  convert (a.add\n    b) using 1 <;> (try funext y) <;>\n    (dsimp; all_goals ring)\n"
     out = O.core_rewrites(two)
     assert out == ("  convert (a.add\n    b) using 1 <;> first | (with_reducible_and_instances rfl) | "
-                   "((try funext y) <;>\n    (dsimp; all_goals ring))\n")
+                   "((try funext y) <;> (dsimp; all_goals ring))\n")
+    # the continuation joins the wrapped line: inside the parentheses a continuation line left of the
+    # opening column ends a term application early (SKRatio SpectralLower, q130: `apply Finset.sum_congr rfl`
+    # on the next line read `rfl` as "unexpected identifier; expected ')'")
+    four = ("  convert he using 1 <;> simp only [a,b] <;>\n"
+            "    apply Finset.sum_congr rfl <;> intro x _ <;> ring\n")
+    assert O.core_rewrites(four) == ("  convert he using 1 <;> first | (with_reducible_and_instances rfl) | "
+                                     "(simp only [a,b] <;> apply Finset.sum_congr rfl <;> intro x _ <;> ring)\n")
     # an earlier convert without `using` is not swallowed
     three = "  convert foo\n  convert bar using 1; simp\n"
     assert "convert foo\n  convert bar using 1 <;> first" in O.core_rewrites(three)
