@@ -193,3 +193,64 @@ def test_already_proved_waits_for_a_comparison(mission, monkeypatch):
     code, done = run(mission, monkeypatch, submit)
     assert code == 0 and done['c'] == 'ACCEPTED s-c' and got == {'c': str(mission / 'comparisons' / 'c.md')}
     assert done['b'].startswith('SKIPPED same as 226ad5b4')
+
+
+def test_a_waiting_import_published_meanwhile_is_fetched_by_name(mission, monkeypatch, tmp_path):
+    # oaiq-100 (2026-10-29): the import was a sibling of ANOTHER mission, published and proved, but
+    # still a draft stub here: the round's own fetch (--proposal / this folder's names) never names
+    # it, so the solution would wait for ever. The live API is asked, and `--names` fetches it.
+    from p2mlib.workspace import set_drafts
+    ws = tmp_path / 'ws'
+    (ws / 'Theorems' / 'Thm_Other_x.lean').write_text('theorem Other.x : True := by sorry\n')
+    set_drafts({'Theorems.Thm_Other_x': '/m'}, str(ws))
+    (mission / 'solutions' / 'Sol_b.lean').write_text('import Theorems.Thm_Other_x\ntheorem solution : True := trivial\n')
+    fetched = []
+
+    def fake_run(cmd, *a, **k):
+        if '--names' in cmd:
+            fetched.append(cmd[cmd.index('--names') + 1:])
+            set_drafts({}, str(ws))
+        return types.SimpleNamespace(returncode=0, stdout='', stderr='')
+    monkeypatch.setattr(S.subprocess, 'run', fake_run)
+
+    def call(method, path, body=None):
+        if path.startswith('/theorems?theorem_name=Other.x'):
+            return {'theorems': [{'theorem_name': 'Other.x', 'id': 'X', 'status': 'Proved'}]}
+        return {}
+    code, done = run(mission, monkeypatch, lambda ns, n, f, expl=None, differs=None: 'ACCEPTED s-' + n, call=call)
+    assert code == 0 and done['b'] == 'ACCEPTED s-b' and fetched == [['Other.x']]
+
+
+def test_the_hold_message_names_the_fetch(mission, monkeypatch, tmp_path, capsys):
+    from p2mlib.workspace import set_drafts
+    ws = tmp_path / 'ws'
+    (ws / 'Theorems' / 'Thm_Other_x.lean').write_text('theorem Other.x : True := by sorry\n')
+    set_drafts({'Theorems.Thm_Other_x': '/m'}, str(ws))
+    (mission / 'solutions' / 'Sol_b.lean').write_text('import Theorems.Thm_Other_x\ntheorem solution : True := trivial\n')
+    rounds = [0]
+
+    def fake_run(cmd, *a, **k):
+        if '--proposal' in cmd:
+            rounds[0] += 1
+            if rounds[0] == 2:
+                set_drafts({}, str(ws))
+        return types.SimpleNamespace(returncode=0, stdout='', stderr='')
+    monkeypatch.setattr(S.subprocess, 'run', fake_run)
+    code, done = run(mission, monkeypatch, lambda ns, n, f, expl=None, differs=None: 'ACCEPTED s-' + n)
+    assert code == 0 and done['b'] == 'ACCEPTED s-b'
+    assert 'fetch_theorems.py --names Other.x' in capsys.readouterr().out
+
+
+def test_a_disproved_import_refusal_is_final(monkeypatch):
+    # oaiq-109: submit_all submits only through submit_solution.py, whose Disproved-import refusal
+    # (p2mlib.importcheck) must be recorded as final, not retried
+    out = 'REFUSED: imports Disproved theorems, so the target could never become Proved:\n  N.dep\n'
+    seen = []
+
+    def fake_run(cmd, *a, **k):
+        seen.append(cmd)
+        return types.SimpleNamespace(returncode=1, stdout='', stderr=out)
+    monkeypatch.setattr(S.subprocess, 'run', fake_run)
+    res = S.submit('N', 'target', 'Sol.lean', 'e.md')
+    assert seen[0][1].endswith('submit_solution.py') and '--go' in seen[0]
+    assert res.startswith(S.FINAL) and 'Disproved' in res

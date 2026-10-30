@@ -249,3 +249,34 @@ def test_importing_a_disproved_theorem_is_refused(ws, tmp_path, monkeypatch):
 def test_importing_a_proved_theorem_goes_through(ws, tmp_path, monkeypatch, capsys):
     run(monkeypatch, fake_platform(dep_status='Proved'), 'N.target', sol(tmp_path, TOP))
     assert 'dry run' in capsys.readouterr().out
+
+
+def test_a_draft_import_published_meanwhile_is_fetched_then_submitted(ws, tmp_path, monkeypatch, capsys):
+    # oaiq-100 (2026-10-29): two siblings of an in-review mission had just been published and proved,
+    # but Theorems/.drafts.json still listed their stubs; the refusal named no cure, and the cure was
+    # `fetch_theorems.py --names ...`. Now the live API is asked and the fetch is run here.
+    from p2mlib.workspace import set_drafts, drafts
+    set_drafts({'Theorems.Thm_N_dep': '/m'}, str(ws))
+    ran = []
+
+    def fake_run(cmd, *a, **k):
+        ran.append(cmd)
+        set_drafts({}, str(ws))                      # what fetch_theorems.py does for a published stub
+        return types.SimpleNamespace(returncode=0, stdout='1 draft stub(s) now published\n', stderr='')
+    monkeypatch.setattr(S.subprocess, 'run', fake_run)
+    run(monkeypatch, fake_platform(dep_status='Proved'), 'N.target', sol(tmp_path, TOP))
+    assert ran and ran[0][-2:] == ['--names', 'N.dep'] and drafts(str(ws)) == {}
+    assert 'dry run' in capsys.readouterr().out
+
+
+def test_a_draft_import_still_unpublished_is_refused_naming_the_fetch(ws, tmp_path, monkeypatch):
+    from p2mlib.workspace import set_drafts
+    set_drafts({'Theorems.Thm_N_dep': '/m'}, str(ws))
+
+    def fake_run(cmd, *a, **k):
+        raise AssertionError('nothing is published: no fetch')
+    monkeypatch.setattr(S.subprocess, 'run', fake_run)
+    with pytest.raises(SystemExit) as e:
+        run(monkeypatch, fake_platform(), 'N.target', sol(tmp_path, TOP))
+    msg = str(e.value)
+    assert 'REFUSED' in msg and 'Theorems.Thm_N_dep' in msg and 'fetch_theorems.py --names N.dep' in msg

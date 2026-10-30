@@ -71,6 +71,8 @@ def test_submit_refuses_a_draft_import(env, monkeypatch, tmp_path):
     mdir, ws = env
     stubs.sync(mdir, ws)
     monkeypatch.setenv('P2M_WORKSPACE', ws)
+    # the platform has not published Mini.t1 (the refusal asks it first: oaiq-100)
+    monkeypatch.setattr(submit_solution, 'call', lambda *a, **k: {'theorems': []})
     f = tmp_path / 'Sol.lean'
     f.write_text('import Theorems.Thm_Mini_t1\n\ntheorem solution : True := trivial\n')
     with pytest.raises(SystemExit, match='draft statements not yet published'):

@@ -30,7 +30,10 @@ every statement has an entry.
 
 A solution that imports a sibling statement the platform has not published yet (a draft stub) is
 not submitted: it waits, unrecorded, and is rebuilt once the queue publishes the import; with
-proofs written against sibling stubs this lets solutions stream out as the queue advances.
+proofs written against sibling stubs this lets solutions stream out as the queue advances. A stub
+whose statement the live API already lists as published (a sibling of another mission, which this
+run's own fetch does not name) is retired by `fetch_theorems.py --names` at once; the hold line
+names that command (oaiq-100).
 
 --wait-all builds nothing until every statement is published: a solution built while a sibling it
 uses is still unpublished keeps that sibling's proof inline (rewire.py only sees published names),
@@ -128,6 +131,31 @@ def waiting_on(path, ws=None):
     return sorted(set(imps) & set(dr))
 
 
+def pending_imports(path, ws=None):
+    """waiting_on, after retiring the stubs whose statements the platform has published meanwhile:
+    each round's own fetch names only this mission's statements (or its proposal's), so a sibling of
+    another mission, published and proved, stayed a draft stub here and its user waited for ever
+    (oaiq-100, 2026-10-29). p2mlib.importcheck.retire_published asks the live API about each one and
+    runs `fetch_theorems.py --names` for the published ones."""
+    w = waiting_on(path, ws)
+    if w:
+        from p2mlib.importcheck import retire_published
+        w, fetched = retire_published(w, ws or _workspace(), call=call, run=subprocess.run)
+        if fetched:
+            print(time.strftime('%H:%M'), 'published meanwhile, fetched by name:', ', '.join(fetched), flush=True)
+    return w
+
+
+def hold_message(n, w, ws=None):
+    """The line printed while solution `n` waits for the draft stubs `w`, naming the fetch that
+    retires them once they are published (it runs by itself when the platform lists them)."""
+    from p2mlib.importcheck import module_theorem, fetch_command
+    ws = ws or _workspace()
+    names = [module_theorem(m, ws) for m in w]
+    return '%s waits for %s (unpublished; once published: %s)' % (
+        n, ', '.join(m.split('.')[-1] for m in w), fetch_command([x for x in names if x] or ['NS.name']))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('mission_dir')
@@ -193,7 +221,7 @@ def main():
                 json.dump(done, open(state, 'w'), indent=1)
                 continue
             f = os.path.join(out, 'Sol_%s.lean' % n)
-            if n in waiting and os.path.exists(f) and waiting_on(f):
+            if n in waiting and os.path.exists(f) and pending_imports(f):
                 continue    # still waiting: no rebuild until the import publishes
             # a held solution is submitted as built: the audit fixes made by hand between the
             # --build-only run and this one were being overwritten by a rebuild (Moore, 2026-10-02)
@@ -219,11 +247,11 @@ def main():
                         print(time.strftime('%H:%M'), n, 'waits for explanations/%s.md' % n, flush=True)
                         waiting[n] = 'explanation'
                     continue
-                w = waiting_on(f)
+                w = pending_imports(f)
                 if w:
                     # not recorded: rebuilt and checked again next round, once the queue publishes w
                     if waiting.get(n) != w:
-                        print(time.strftime('%H:%M'), n, 'waits for', ', '.join(m.split('.')[-1] for m in w), flush=True)
+                        print(time.strftime('%H:%M'), hold_message(n, w), flush=True)
                         waiting[n] = w
                     continue
                 batch.append((n, f))

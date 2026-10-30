@@ -46,35 +46,16 @@ def theorem_id(name):
 
 
 def import_names(path):
-    """The theorem each `import Theorems.Thm_<X>` line brings in. The declaration is the one
-    whose name, dots read as underscores, is `<X>`: a first-match regex once read a module
-    docstring line beginning "theorem for balls" as the theorem `for`, and missed `lemma`s."""
+    """The theorem each `import Theorems.Thm_<X>` line brings in (p2mlib.importcheck.module_theorem:
+    the declaration whose name, dots read as underscores, is `<X>`)."""
+    from p2mlib.importcheck import theorem_imports, module_theorem
     ws = _workspace()
     out = set()
-    for mod in re.findall(r'^import (Theorems\.\S+)', open(path, encoding='utf-8').read(), re.M):
-        t = open(os.path.join(ws, mod.replace('.', '/') + '.lean'), encoding='utf-8').read()
-        want = mod.split('.', 1)[1][len('Thm_'):]
-        # the namespace in force at each declaration: nested `namespace A` / `namespace B` lines
-        # give `A.B` (an OAI-generated statement nests `namespace OAI` and `namespace X`, and
-        # only the first was read, 2026-10-07)
-        cands, stack = [], []
-        for line in t.split('\n'):
-            m = re.match(r'^(namespace|section)\b\s*(\S*)', line)
-            if m:
-                stack.append((m.group(1), m.group(2))); continue
-            m = re.match(r'^end\b\s*(\S*)\s*$', line)
-            if m and stack:
-                stack.pop(); continue
-            m = re.match(r'^\s*(?:private\s+)?(?:theorem|lemma)\s+(\S+)', line)
-            if m:
-                name = m.group(1)
-                # `theorem _root_.A.b` ignores the namespaces in force (carved SWPort pieces, 2026-10-08)
-                cands.append(name[len('_root_.'):] if name.startswith('_root_.') else
-                             '.'.join([n for k, n in stack if k == 'namespace'] + [name]))
-        hit = [c for c in cands if c.replace('.', '_') == want or c.split('.')[-1] == want]
-        if not hit:
+    for mod in theorem_imports(open(path, encoding='utf-8').read()):
+        name = module_theorem(mod, ws)
+        if not name:
             sys.exit('cannot find the theorem of %s' % mod)
-        out.add(hit[0])
+        out.add(name)
     return out
 
 
@@ -188,28 +169,37 @@ def check_solution_top_level(path):
 
 def check_no_draft_imports(path):
     """Refuse a file importing a draft statement stub (stubs.py): the platform has no such module
-    until that statement is published, so the verifier would fail on the import."""
+    until that statement is published, so the verifier would fail on the import. A stub whose
+    statement the platform HAS published (a sibling proved meanwhile; oaiq-100) is retired first by
+    running `fetch_theorems.py --names` for it (p2mlib.importcheck.retire_published)."""
     from p2mlib.workspace import drafts
-    from p2mlib.copies import imports_of
-    bad = sorted(set(imports_of(open(path, encoding='utf-8').read())) & set(drafts()))
+    from p2mlib.importcheck import theorem_imports, retire_published, module_theorem, fetch_command
+    ws = _workspace()
+    bad = sorted(set(theorem_imports(open(path, encoding='utf-8').read())) & set(drafts(ws)))
+    if not bad:
+        return
+    bad, fetched = retire_published(bad, ws, call=call, run=subprocess.run)
+    if fetched:
+        print('   published meanwhile, fetched (fetch_theorems.py --names): %s' % ', '.join(fetched))
     if bad:
-        sys.exit('REFUSED: imports draft statements not yet published (fetch_theorems.py retires a stub '
-                 'once its statement is published):\n  ' + '\n  '.join(bad))
+        names = [module_theorem(m, ws) for m in bad]
+        sys.exit('REFUSED: imports draft statements not yet published:\n  ' +
+                 '\n  '.join('%s (%s)' % (m, n or '?') for m, n in zip(bad, names)) +
+                 ('\nthe platform lists %s as published, but the fetch left %s a draft stub; run it by hand:'
+                  % (', '.join(fetched), 'them' if len(bad) > 1 else 'it') if fetched else
+                  '\nonce the platform publishes them, this retires the stubs (submit_solution.py also runs '
+                  'it itself when it finds them published):') +
+                 '\n  ' + fetch_command([n for n in names if n]))
 
 
 def check_no_disproved_imports(names):
-    """Refuse a solution importing a Disproved theorem. The verifier accepts it (SKETCH_ACCEPTED),
-    but the target can then never resolve to Proved, and /open-leaves does not list a Disproved
-    leaf, so everything above it stays Open with no visible reason (JM Prop 3.3 and Theorem C,
-    oaiq-100, 2026-10-29, rested on a disproved JdlS statement)."""
-    bad = []
-    for name in sorted(names):
-        r = call('GET', '/theorems?theorem_name=%s&limit=5' % name)
-        bad += [name for t in (r.get('theorems') or [])
-                if t.get('theorem_name') == name and t.get('status') == 'Disproved']
+    """Refuse a solution importing a Disproved theorem (p2mlib.importcheck.disproved: the verifier
+    accepts it, but the target can never resolve to Proved, and /open-leaves does not list a
+    Disproved leaf; JM Prop 3.3 and Theorem C, oaiq-100, 2026-10-29)."""
+    from p2mlib.importcheck import disproved, disproved_message
+    bad = disproved(names, call=call)
     if bad:
-        sys.exit('REFUSED: imports Disproved theorems, so the target could never become Proved:\n  ' +
-                 '\n  '.join(bad) + '\nimport a corrected (Proved or Open) statement instead.')
+        sys.exit(disproved_message(bad))
 
 
 def check_no_metaprogramming(path):
