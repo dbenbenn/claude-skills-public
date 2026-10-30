@@ -2438,3 +2438,14 @@ def test_tfae_out_counts_from_zero():
     assert O.core_rewrites(out) == out
     # the RKHS rule (a changed list) still wins at its own site
     assert "(RKHS.posSemidef_tfae.out 2 0).mp" in O.core_rewrites("apply (RKHS.posSemidef_tfae.out 1 3).mpr\n")
+
+
+def test_convert_wrapped_sequence_trailing_rfl_is_optional():
+    # RandomMean (oaiq-117): OpenAI's `convert … using 1; simp only [l, hd]; rfl` — our `simp only` closes the
+    # side goal by itself, and the trailing `rfl` failed with "No goals to be solved" (three sites)
+    src = "  convert Emit.runs z [] [] cs using 1; simp only [List.nil_append,hd] ; rfl\n"
+    out = O.core_rewrites(src)
+    assert out == ("  convert Emit.runs z [] [] cs using 1 <;> first | (with_reducible_and_instances rfl) | "
+                   "(simp only [List.nil_append,hd] ; try rfl)\n")
+    # a lone `rfl` after convert is left alone, as before
+    assert "using 1; rfl\n" in O.core_rewrites("  convert h using 1; rfl\n")
