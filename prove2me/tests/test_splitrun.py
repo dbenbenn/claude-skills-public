@@ -641,6 +641,31 @@ def test_go_holds_the_publish_lock(split, monkeypatch, tmp_path):
             f.close()
 
 
+def test_go_exits_nonzero_when_items_stopped_for_a_person(split, monkeypatch, tmp_path):
+    # q128-finitistic-retry: a bundle stopped on a verifier-only heartbeat timeout ("NEEDS A PERSON"),
+    # 18 items still to do, and the pipeline's publish step and driver reported "pipeline ok"
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
+    import split_run
+    from p2mlib import runlock
+    d, cfg = split
+    (d / 'run.json').write_text(json.dumps(cfg))
+    monkeypatch.setenv('P2M_LOCK_DIR', str(tmp_path / 'locks'))
+    monkeypatch.setattr(runlock, '_stop_tree_on_signals', lambda: None)
+    monkeypatch.setattr(R, 'LiveApi', lambda: FakeApi())
+    monkeypatch.setattr(R.Runner, 'run',
+                        lambda self, max_hours=None: dict(self.summary(), stopped=['bundle:B0']))
+    key = runlock.dir_key('publish', str(d / 'run.json'))
+    try:
+        with pytest.raises(SystemExit) as e:
+            split_run.main([str(d / 'run.json'), '--go'])
+        assert e.value.code not in (0, None)
+    finally:
+        f = runlock._held.pop(key, None)
+        if f:
+            f.close()
+
+
 def test_a_piece_importing_someone_elses_disproved_statement_stops_unsent(split):
     # oaiq-109: a proof resting on a Disproved statement is SKETCH_ACCEPTED, but its target can never
     # become Proved and /open-leaves hides why. A piece may import someone else's statements

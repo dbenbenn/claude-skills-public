@@ -118,6 +118,11 @@ def main(argv=None):
         raise
     end_monitor(mon, 'done', 'ended: %d live of %d, %d stopped' % (s['live'], s['total'], len(s['stopped'])))
     print(json.dumps(s, indent=1))
+    if s['stopped']:
+        # an item waits for a person: fail, so a pipeline's publish step does not report success
+        # with items left unsent (q128-finitistic-retry)
+        sys.exit('STOPPED for a person (%d): %s; fix, then run again (--reset ITEM if its file is unchanged)'
+                 % (len(s['stopped']), ' '.join(s['stopped'])))
     return s
 
 
