@@ -728,6 +728,18 @@ back WA. The lessons:
   or cuts only false edges between statements: a later bundle's `attribute [-instance]` line can name an
   instance it sees only through that import, and cutting it broke 17 items with "Unknown constant".
 
+- **The same theorem name in two modules is handled** (2ae7988; oaiq-088, -090, -095, -096). OpenAI's sibling
+  modules, never imported together, can both declare `OAI.X.foo`; Lean keeps one constant. DeclGraph now records
+  every copy; the carver keeps the name for the copy most modules see, renames the others `<name>_dup<i>` with the
+  references that mean them, and `graph`/`plan` list each case (`DUPLICATE …`). No port patch is needed. A graph
+  recorded before this change is re-run by the pipeline after `--upgrade` (DeclGraph changed) while planning is
+  still ahead; a published carve keeps its graph.
+- **Universes only under `max`** (oaiq-124): `plan` never makes such a theorem a statement on its own (it stays
+  inside its importers' pieces, as a fold would put it); a target or forced statement with one gets a WARNING:
+  fold it, or restate it with every universe bare.
+- **A stale post-carve patch stops `gen`** (20365e5): a full `carve.py gen` fails when a post-carve patch matches
+  no generated file and names it (oaiq-123).
+
 ## After publishing: re-splitting, extending, overlapping carves
 
 From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
@@ -736,6 +748,9 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   already hold the published plan, bundles and statements (`pipeline_state.json` `auto_config`), and a slow piece
   gets its frozen re-plan automatically (previous section). The recipe below is what that automates; it is still
   the way for classic carves, for a piece the automation hands back, and for real verifier timeouts.
+- **Frozen bundles keep their old imports** (20365e5): with `frozen`, published bundles keep their old plan's
+  imports, and `check_plan` no longer reports their inferred needs or cycles, unless the frozen carve used another
+  external bundle (`frozen_external_conflicts`) (oaiq-120).
 - **Re-split one item after real verifier timeouts** (two or more on a bundle or piece). Keep everything
   live as it is: in `pipeline.json` `config_set`, set `frozen` = {`plan`: a copy of the published
   plan.json, `bundles`: every live bundle, `lib`: `publish/out/lib`} and `forced` = the live intermediate
@@ -835,6 +850,17 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
 A carved file loses the context its module had, so the carver restores what its declarations used.
 Lean's records (LeanInfo `insts`, `inst_keys`, `declares`) name most uses, but some leave no trace, so
 these rules over-approximate on purpose; each comes from a worker carve that failed without it:
+- (2ae7988, 2026-10-30) a global `@[simp]` declaration of this carve that a module never saw is hidden at the
+  top of that module's section with `attribute [-simp]` (section-local) when a kept declaration there calls the
+  default simp set and the lemma could apply; never a library lemma (oaiq-081: `status_read` closed goals
+  early, about 40 hand patches). A local coercion instance between library types (`local instance : Coe (E → ℝ)
+  (E → ℂ)`) comes back for every kept declaration in its scope, since its use leaves no constant (oaiq-096
+  `Wiener`). A `@[local X]` attribute (`gcongr`, `simp`, …) on a declaration the file imports from a bundle is
+  applied again, `attribute [local X] _root_.N`, before the kept commands that use it (oaiq-096). In a notation
+  body, a token that starts with a section variable is that variable: LeanInfo reads notation bodies without
+  the section's variables, which once dropped a statement's `local notation "work"` and turned `run.output`
+  into `run.run_oai` (oaiq-081). An `export` that still exports something keeps its namespace block (oaiq-081
+  `PA.denote`).
 - a local instance used by a kept command comes back, reactivated (`attribute [local instance P] N`,
   with its source priority) when an imported bundle declares it, else emitted again under a file-unique
   name after the earlier local instances its own elaboration used (oaiq-032, oaiq-031);
