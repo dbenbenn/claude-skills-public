@@ -29,7 +29,9 @@ The platform is an object with `theorem_id(name)`, `existing(kind, name)` (the l
 bundle under that name: adopted only when its text is ours, whitespace aside, else the item stops
 as "name taken"), `submit_definition(body) -> job`,
 `submit_problems([problem]) -> [job]`, `job(id) -> record`, `verify(theorem_id, path, explanation)
--> submission`, `verdict(submission) -> record`; `LiveApi` is the real one, tests pass a fake.
+-> submission`, `verdict(submission) -> record`, and optionally `disproved(names) -> [name]` (a
+piece importing someone else's Disproved statement stops unsent); `LiveApi` is the real one, tests
+pass a fake.
 Erdős 3 v1 (2026-10-08..16) is why: per-mission loops retried one piece 740 times and re-carved
 published bundles."""
 import hashlib
@@ -450,11 +452,32 @@ class Runner:
                 self.log(x, 'settled', also.split('\n')[0][:200])
                 self.save()
                 return
+            bad = self.disproved_imports(f['file'])
+            if bad:                                      # submit() stops the item for a person
+                from .importcheck import disproved_message
+                raise RuntimeError(disproved_message(bad))
             expl = open(f['text'], encoding='utf-8').read()
             sid = self.api.verify(tid, f['file'], expl, also=also) if also else self.api.verify(tid, f['file'], expl)
             st.update(state='inflight', sid=sid, sha=self.file_sha(x))
             self.log(x, 'submit piece (try %d)' % (sum(st['history'].values()) + 1), sid)
             self.save()
+
+    def disproved_imports(self, path):
+        """The statements published by someone else (`external` nodes and the `Theorems.*` modules of
+        the plan's external_defs, i.e. carve.py's external_theorems) that the piece at `path` imports
+        and the platform lists as Disproved: a proof resting on one is accepted, but its target can
+        never become Proved, and /open-leaves hides why (oaiq-109; p2mlib.importcheck, the check
+        submit_solution.py runs). The run's own statements are not looked up."""
+        check = getattr(self.api, 'disproved', None)
+        if check is None:
+            return []
+        from .importcheck import theorem_imports
+        foreign = {m: n for n, m in (self.plan.get('external_defs') or {}).items() if m.startswith('Theorems.')}
+        for n in self.ext:
+            name = C.statement_name(self.plan, n)
+            foreign['Theorems.Thm_' + C.slug(name)] = name
+        names = sorted({foreign[m] for m in theorem_imports(open(path, encoding='utf-8').read()) if m in foreign})
+        return check(names) if names else []
 
     def _submit_statements(self, batch):
         probs = []
@@ -537,7 +560,7 @@ def mismatch_message(bad):
 
 class ReadOnly:
     """An API wrapper for dry runs: lookups pass through, every write raises."""
-    READS = ('theorem_id', 'existing', 'live_proofs')
+    READS = ('theorem_id', 'existing', 'live_proofs', 'disproved')
 
     def __init__(self, api):
         self._api = api
@@ -606,6 +629,11 @@ class LiveApi:
                         'author': r.get('username') or r.get('created_by_username') or r.get('user'),
                         'content': self._api.submission_source(sid, call=self._call)})
         return out
+
+    def disproved(self, names):
+        """The theorems of `names` the platform lists as Disproved (p2mlib.importcheck)."""
+        from .importcheck import disproved
+        return disproved(names, call=self._call)
 
     def submit_definition(self, body):
         return self._ok(self._call('POST', '/submit-definition', body), 'submit-definition')['job_id']

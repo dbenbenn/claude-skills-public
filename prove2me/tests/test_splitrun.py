@@ -639,3 +639,40 @@ def test_go_holds_the_publish_lock(split, monkeypatch, tmp_path):
         f = runlock._held.pop(key, None)
         if f:
             f.close()
+
+
+def test_a_piece_importing_someone_elses_disproved_statement_stops_unsent(split):
+    # oaiq-109: a proof resting on a Disproved statement is SKETCH_ACCEPTED, but its target can never
+    # become Proved and /open-leaves hides why. A piece may import someone else's statements
+    # (external_theorems, in the plan's external_defs, and `external` nodes); those are checked
+    # (p2mlib.importcheck, as submit_solution.py does), the run's own statements are not looked up.
+    d, cfg = split
+    plan = dict(PLAN, external_defs={'B.ext': 'Theorems.Thm_B_ext', 'B.d': 'Definitions.Def_B'})
+    (d / 'plan.json').write_text(json.dumps(plan))
+    (d / 'out' / 'solutions' / 'Sol_A_mid_s2.lean').write_text(
+        'import Mathlib\nimport Theorems.Thm_B_ext\nimport Theorems.Thm_A_low_s2\n\ntheorem solution : True := trivial\n')
+    asked = []
+
+    class WithStatus(FakeApi):
+        def disproved(self, names):
+            asked.append(sorted(names))
+            return [n for n in names if n == 'B.ext']
+    api = WithStatus()
+    r, summary = run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.mid']['state'] == 'stop' and 'Disproved' in st['piece:A.mid']['last']
+    assert 'B.ext' in st['piece:A.mid']['last']
+    assert ('verify', 'A.mid_s2') not in api.posted and ('verify', 'A.low_s2') in api.posted
+    assert asked == [['B.ext']]                     # only the piece that imports a foreign statement
+    assert summary['stopped'] == ['piece:A.mid']
+
+
+def test_the_live_api_reports_disproved_names(monkeypatch):
+    api = R.LiveApi.__new__(R.LiveApi)
+
+    def call(method, path, body=None):
+        name = path.split('=', 1)[1].split('&')[0]
+        return {'theorems': [{'theorem_name': name, 'status': 'Disproved' if name == 'B.x' else 'Open'}]}
+    api._call = call
+    assert api.disproved(['B.y', 'B.x']) == ['B.x']
+    assert 'disproved' in R.ReadOnly.READS
