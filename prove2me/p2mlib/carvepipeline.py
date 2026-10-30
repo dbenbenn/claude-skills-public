@@ -1463,10 +1463,16 @@ class Pipeline:
         os.makedirs(os.path.join(dst, 'lib'), exist_ok=True)
         shutil.copy(plan_file, os.path.join(dst, 'plan.json'))
         lib = os.path.join(P, 'out', 'lib')
-        for f in sorted(os.listdir(lib)) if os.path.isdir(lib) else ():
-            shutil.copy(os.path.join(lib, f), os.path.join(dst, 'lib', f))
         ext = set(plan.get('external') or ())
         stubs = {n for n in plan.get('stubs') or {} if n not in ext}
+        # only this plan's bundles and statements: publish/out/lib keeps earlier plans' files (oaiq-122: 227
+        # never-posted files frozen beside 83 published blocked every later re-plan reusing one of their names)
+        from p2mlib import carve as CV
+        mine = {'Def_%s.lean' % b['name'] for b in plan.get('bundles') or ()} | \
+            {'Thm_%s.lean' % CV.slug(CV.statement_name(plan, n)) for n in stubs}
+        for f in sorted(os.listdir(lib)) if os.path.isdir(lib) else ():
+            if f in mine:
+                shutil.copy(os.path.join(lib, f), os.path.join(dst, 'lib', f))
         named = set(self.p.get('forced') or ()) | set((self.p.get('config_set') or {}).get('forced') or ())
         self.mark_publishing('publish_early froze the published part')
         a = self.state.setdefault('auto_config', {})

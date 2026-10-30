@@ -1339,6 +1339,20 @@ def test_with_publish_bundles_and_statements_go_in_the_background_before_the_pie
     assert st['publisher']['unit'].startswith('carve-pub-') and st['steps']['publish_early']['status'] == 'done'
 
 
+def test_publish_early_freezes_only_the_plans_bundles_and_statements(env, monkeypatch):
+    # oaiq-122: publish/out/lib kept the files of earlier plans (an automatic split's statements, old bundle
+    # numbers: 227 beside 83 published); freezing them all made every later re-plan that reused one of those
+    # names fail "published or being published changed", though none was ever posted
+    _overlap_carve(env, monkeypatch)
+    lib = env.dir / 'out' / 'lib'
+    lib.mkdir(parents=True)
+    for f in ('Def_B0.lean', 'Def_B1.lean', 'Thm_P0.lean', 'Thm_P1.lean', 'Def_B7.lean', 'Thm_Stale_lemma.lean'):
+        (lib / f).write_text('-- ' + f + '\n')
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert sorted(os.listdir(env.dir / 'published' / 'lib')) == ['Def_B0.lean', 'Def_B1.lean', 'Thm_P0.lean', 'Thm_P1.lean']
+
+
 def test_a_failing_piece_does_not_hold_back_the_bundles_and_statements(env, monkeypatch):
     # oaiq-081: rounds of piece compile errors (08:40: 6 pieces, nothing else) each held back everything
     _overlap_carve(env, monkeypatch)
