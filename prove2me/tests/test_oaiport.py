@@ -2418,3 +2418,23 @@ def test_matrix_modules_prefer_the_matrix_product_default_instance():
     assert line not in files['B.lean']
     srcs['OAI.C'] = ('C', 'import Mathlib\ndef c (A : CStarMatrix (Fin 2) (Fin 2) ℂ) := A\n')
     assert not any(line in t for t in O.module_texts(srcs, 'Solutions.X', matrix_default_instance=True).values())
+
+
+# d13f23b's `List.TFAE.out i j` counts from 1 (`l[i - 1]?`, and refuses 0); ours counts from 0 (`l[i]?`).
+# Every `.out N M` in openai/math is a TFAE (`Functor.exact_tfae`, `IsLocalRing.local_hom_TFAE`,
+# `IsDiscreteValuationRing.TFAE`, ...), and earlier ports patched them one by one as list drift (oaiq-068).
+# The port writes `.out (N-1) (M-1)`, which a second pass leaves alone (Tachikawa, oaiq-116).
+
+def test_tfae_out_counts_from_zero():
+    src = ("have h := ((Functor.exact_tfae (res φ)).out 2 4).mp (res_map_exact φ)\n"
+           "exact ((IsDiscreteValuationRing.TFAE R hnf).out 5 1).mp hp\n"
+           "apply (Functor.exact_tfae F).out 1 3 |>.mp\n"
+           "exact (h.out 0 1).mp x\n")
+    out = O.core_rewrites(src)
+    assert "((Functor.exact_tfae (res φ)).out (2-1) (4-1)).mp" in out
+    assert "(IsDiscreteValuationRing.TFAE R hnf).out (5-1) (1-1)).mp" in out
+    assert "(Functor.exact_tfae F).out (1-1) (3-1) |>.mp" in out
+    assert "(h.out 0 1).mp" in out                 # a 0 is already our indexing
+    assert O.core_rewrites(out) == out
+    # the RKHS rule (a changed list) still wins at its own site
+    assert "(RKHS.posSemidef_tfae.out 2 0).mp" in O.core_rewrites("apply (RKHS.posSemidef_tfae.out 1 3).mpr\n")

@@ -1287,6 +1287,10 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # d13f23b's `RKHS.posSemidef_tfae` has a fourth item; its `.out 1 3).mpr` is our `.out 2 0).mp`
     # (HotSpots Reciprocal, 2026-10-26)
     text = re.sub(r"\(RKHS\.posSemidef_tfae\.out 1 3\)\.mpr", "(RKHS.posSemidef_tfae.out 2 0).mp", text)
+    # d13f23b's `List.TFAE.out i j` counts from 1, ours from 0: `.out N M` (both >= 1, so not already ours)
+    # becomes `.out (N-1) (M-1)`, which a second pass leaves alone (Tachikawa, oaiq-116)
+    text = re.sub(r"(?<=\.out)([ \t]+)([1-9]\d*)([ \t]+)([1-9]\d*)(?![\w'.])",
+                  lambda m: f"{m.group(1)}({m.group(2)}-1){m.group(3)}({m.group(4)}-1)", text)
     # d13f23b's `eLpNorm_restrict_eq_of_support_subset` and `eLpNorm_congr_norm_ae` take measurability
     # arguments first (one, resp. two); ours take none (HotSpots Sobolev, 2026-10-26)
     text = _drop_positional_arg(text, 'eLpNorm_restrict_eq_of_support_subset')
