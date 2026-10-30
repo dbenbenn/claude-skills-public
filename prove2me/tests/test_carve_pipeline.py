@@ -490,6 +490,19 @@ def test_editing_the_patches_file_alone_marks_filter_patches_stale(env):
     assert tools_called(env)[0] == ('carve_prep', 'filter-patches') and ('carve', 'plan') in tools_called(env)
 
 
+def test_editing_the_post_carve_patches_file_reruns_gen(env):
+    # oaiq-114: a fix to config `patches` (same path, new text) was not seen; gen kept the broken patch
+    cp = env.tmp / 'gen_patches.json'
+    cp.write_text('[]')
+    assert run(env, *ARGS, '--config-set', json.dumps({'patches': str(cp)})).returncode == 0
+    cp.write_text('[{"literal_old": "a", "literal_new": "b", "why": "w"}]')
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert ('carve', 'gen') in seq and ('carve', 'plan') not in seq and 'stale' in r.stdout
+
+
 def test_state_from_before_hashes_existed_is_not_called_stale(env):
     assert run(env, *ARGS).returncode == 0
     st = json.load(open(env.dir / 'pipeline_state.json'))

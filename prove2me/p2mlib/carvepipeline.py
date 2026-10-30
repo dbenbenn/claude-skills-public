@@ -423,6 +423,7 @@ class Pipeline:
                      'sources': hash_paths([self.lean_src], ('.lean',)), 'port options': opts},
             'build': {'port': port_out},
             'config': {'port': port_out},
+            'gen': {'carve patches': hash_paths([cp] if (cp := self.carve_patches_path()) else [])},
         }.get(s, {})
         if s == 'filter_patches' and pp:           # a skipped filter_patches reads no rules
             h['port options'] = opts
@@ -430,6 +431,16 @@ class Pipeline:
         if rule and (s != 'filter_patches' or pp):
             h[rule[0]] = rules_hash(self.snap, rule[1])
         return h
+
+    def carve_patches_path(self):
+        """The post-carve patches file `carve.py gen` applies (config `patches`), or None. Its text is an input
+        of `gen`: oaiq-114 fixed a broken patch in place, and the resume kept generating the old one."""
+        try:
+            p = json.load(open(os.path.join(self.d, 'config.json'))).get('patches')
+        except (OSError, ValueError):
+            p = None
+        p = p or (self.p.get('config_set') or {}).get('patches')
+        return os.path.join(self.d, os.path.expanduser(p)) if p else None
 
     RULE_KEYS = {r[0] for r in SNAPSHOT_RULES.values()}
 
