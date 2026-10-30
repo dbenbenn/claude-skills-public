@@ -824,7 +824,11 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   in the pipeline's build is not evidence until plain `lean -DautoImplicit=false` reproduces it: LeanInfo
   elaborates synchronously and spends more (3230451 retries such modules with plain `lean -o`).
 - **Post-carve patches naming a collision suffix** (`_r<hex>_<n>`) break silently across snapshots: prefer a
-  carver fix (oaiq-123). Editing the post-carve patches file re-runs `gen` since dad2e72 (older: `--redo gen`).
+  carver fix (oaiq-123). After a re-plan, re-read every post-carve patch that names an `<x>_oai`: it is right
+  only while `x` is still a piece target (oaiq-122: one still matched and broke a piece, the other matched nothing
+  and its heartbeat timeout came back). A plan from before 20365e5 recomputes frozen bundles' imports: after
+  `--upgrade`, `--redo plan` (plain `--upgrade` keeps the old plan). A heartbeat raise by split_run updates the
+  frozen `published/lib` copy too since 4b230e3. Editing the post-carve patches file re-runs `gen` since dad2e72 (older: `--redo gen`).
 
 ## Which local instances and lemmas a carved file brings back (carver rules, 2026-10-27/28)
 
