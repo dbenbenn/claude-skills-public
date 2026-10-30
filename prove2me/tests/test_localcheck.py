@@ -63,6 +63,19 @@ def test_the_coercion_fallback_fails_on_a_stuck_universe_constraint():
     assert tail.index('isDefEq s t') < tail.index('processPostponed') < tail.index('synthInstance?')
 
 
+def test_the_coercion_failure_reports_the_types_unshared_size_and_the_shortcut_remedy():
+    # q129 (2026-10-30): the CoeT search fails on a statement compared with itself; what decides it is the
+    # type's size as a tree (`Expr.sizeWithoutSharing`): `u * v = 1` on `unitary (Q τ ω)`, a RingCon
+    # quotient, is 18.9M nodes and fails, 8.5M passes, and high-priority shortcut instances for the
+    # carrier's classes bring it to 2,613 nodes and it passes. Say so in the message, rather than only
+    # "fold it" (folding made FactorGeneration's pieces too slow for the verifier).
+    tail = L.server_check_text(SOL, PRE, FS, 'foo')
+    tail = tail[tail.index('theorem _check'):]
+    assert 'sizeWithoutSharing' in tail
+    assert 'shortcut instances' in tail
+    assert L.COE_FAILURE in tail
+
+
 MAX_STMT = """theorem %s {I : Type u} [Fintype I] {W : Type v} [Group W] {σ : Type (max us v)} [Fintype σ]
     {I' : Type u'} {W' : Type v'} (b : Module.Basis σ ℝ (I → ℝ)) (w : W') (i : I')
     [Module.Free (MvPolynomial σ ℝ) (MvPolynomial σ ℝ)] :

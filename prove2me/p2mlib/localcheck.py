@@ -22,6 +22,10 @@ compiled locally.
   elaborator does: a universe that occurs only under `max` (`{σ : Type (max us v)}` with an instance
   binder over `MvPolynomial σ ℝ`) left `max ?a ?v =?= max ?b ?v` stuck, and the verifier said WA "stuck
   at solving universe constraint" (oaiq-124, 2026-10-30) where `isDefEq` alone said yes.
+  What makes the CoeT search fail is the type's size as a tree (q129, 2026-10-30): it fails even on a
+  statement compared with itself; `u * v = 1` on `unitary (Q τ ω)` (a RingCon quotient) is 18.9M nodes
+  without sharing and fails, and high-priority `inferInstance` shortcut instances for the carrier's
+  classes bring it to 2,613 nodes and it passes. The failure message prints the size.
 """
 import hashlib
 import os
@@ -59,7 +63,8 @@ run_meta do
       let coe := mkAppN (mkConst ``CoeT [← getLevel s, ← getLevel t]) #[s, x, t]
       let ok ← try pure (← synthInstance? coe).isSome catch _ => pure false
       unless ok do
-        throwError "%s (CoeT solType x targetType) fails or times out; fold the statement into its importers (carve.py fold) or state it monomorphically (oaiq-039)"
+        let n := (← instantiateMVars t).sizeWithoutSharing
+        throwError "%s (CoeT solType x targetType) fails or times out; the target's type is {n} nodes without sharing (millions: huge instance terms, cured by high-priority `inferInstance` shortcut instances for the carrier's classes, q129); else fold the statement into its importers (carve.py fold) or state it monomorphically (oaiq-039)"
 """
 
 
