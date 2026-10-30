@@ -43,6 +43,16 @@ associates, which direction an operation folds over a list, what a bracket or pr
 expands to, which instance a numeral or coercion resolves to, and whether a definition is the
 one in scope or a same-named one from another namespace.
 
+## Conventions already settled
+
+If your directory holds `settled-conventions.md`, an earlier blind auditor of the imported
+definition files has already settled the conventions it lists from library source, with
+citations. Take those as settled: do not re-derive them or probe them again, and in `audit.md`
+cite them as "settled-conventions.md". Spend your effort on what this declaration adds: its own
+binders, hypotheses, quantifier order, numerals, coercions, and how it combines the definitions.
+Settle anything the file does not cover yourself, as above. If an entry looks wrong where this
+declaration uses it, say so in `audit.md` and settle that point from source.
+
 ## Write two separate files
 
 These are two different artifacts for two different readers. Do not merge them, and **write

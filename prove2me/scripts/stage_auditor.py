@@ -53,6 +53,18 @@ def write_stripped(dst, src):
     open(dst, 'w', encoding='utf-8').write(strip(open(src, encoding='utf-8').read()))
 
 
+def stripped_sha(path):
+    """sha256 of a Lean file as an auditor sees it (comments removed): what a read-back is of."""
+    import hashlib
+    return hashlib.sha256(strip(open(path, encoding='utf-8').read()).encode()).hexdigest()
+
+
+def conventions_section(audit_text):
+    """The '## Conventions settled' section of an audit.md (heading included), or None."""
+    m = re.search(r'^## Conventions settled\s*$.*?(?=^## |\Z)', audit_text, re.M | re.S)
+    return m.group(0).rstrip('\n') + '\n' if m else None
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIEF = os.path.join(HERE, 'readback-brief.md')
 ROOT = os.environ.get('AUDITOR_STAGE_ROOT') or os.path.join(
@@ -125,7 +137,7 @@ def fresh_oleans(files):
              '; rebuilt %d' % len(built) if built else '; already current'))
 
 
-def stage(slug, statement, extras, force=False):
+def stage(slug, statement, extras, force=False, settled=None):
     d = os.path.join(ROOT, slug)
     # Re-staging over a live directory is the teardown hazard by another door: an auditor still
     # working there loses its files mid-flight. Tear down first (which has the guard), or --force.
@@ -145,6 +157,19 @@ def stage(slug, statement, extras, force=False):
         # so every bundle auditor read the docstrings it was meant to reconstruct blind
         write_stripped(os.path.join(d, b), f)
         names.append(b)
+    # what this read-back is of, so a later statement read-back can trust its settled conventions
+    # only while the bundle is unchanged (collect-all keeps it as readbacks/<key>.artifact.sha256)
+    with open(os.path.join(d, 'ARTIFACT.sha256'), 'w') as f:
+        f.write(stripped_sha(statement) + '\n')
+    # Viterbo 2026-10-30: 19 statement auditors each re-derived the same conventions (ENNReal
+    # division, junk values, empty infima) that the bundle's blind read-back had already settled
+    # from source; settled = [(bundle file, its '## Conventions settled' section)]
+    if settled:
+        with open(os.path.join(d, 'settled-conventions.md'), 'w', encoding='utf-8') as f:
+            f.write('# Conventions already settled for the imported definitions\n\n'
+                    'Settled from library source by an earlier blind read-back of each file below.\n')
+            for b, sec in settled:
+                f.write('\n# From the read-back of %s\n\n%s' % (b, sec.replace('## Conventions settled', '', 1).lstrip('\n')))
     # Expose each library at its CANONICAL root, so the auditor's natural relative path is
     # already the citation form everyone else can resolve (`Mathlib/Algebra/...:76`). The layout
     # does the work that an instruction in the brief used to ask for, which is why the brief no
@@ -185,6 +210,9 @@ def stage(slug, statement, extras, force=False):
                '\nImported definitions, already published, given so you can expand what the artifact uses: '
                + ', '.join(names[1:]) + '. Do not render their declarations on their own; expand them '
                'inline where the artifact uses them.')
+    if settled:
+        imports += ('\nsettled-conventions.md lists conventions of those definitions that an earlier blind '
+                    'read-back already settled from source; the brief says how to use it.')
     print(f"""Work only inside {d}. Everything below is relative to it.
 
 Read readback-brief.md and follow it exactly. Library source is here at its normal root, so
@@ -358,15 +386,37 @@ def stage_all(mdir, names, force=False):
     items = [i for i in mission_items(mdir) if not names or i[0] in names]
     if names and len(items) != len(set(names)):
         sys.exit('unknown item(s): %s' % sorted(set(names) - {i[0] for i in items}))
+    paths = {key: art for key, art, _ in mission_items(mdir)}
     for key, art, extras in items:
         slug = slug_of(mdir, key)
+        settled = None if key.startswith('Def_') else settled_conventions(mdir, extras, paths)
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            stage(slug, art, extras, force=force)
+            stage(slug, art, extras, force=force, settled=settled)
         prompt = buf.getvalue().split('\n\n', 1)[-1] if buf.getvalue().startswith('library') else buf.getvalue()
         prompt = prompt[prompt.find('Work only inside'):]
         open(os.path.join(pdir, slug + '.txt'), 'w').write(prompt)
         print('staged %-60s %d bundle(s)   prompt: %s' % (key[:60], len(extras), os.path.join(pdir, slug + '.txt')))
+
+
+def settled_conventions(mdir, extras, paths):
+    """[(bundle file, conventions section)] for each imported bundle of this mission whose collected
+    read-back is of the bundle as it now is; a stale or missing one is named and left out."""
+    out = []
+    for e in extras:
+        key = os.path.basename(e)[:-len('.lean')]
+        rb = os.path.join(os.path.abspath(mdir), 'readbacks', key)
+        if key not in paths or not os.path.exists(rb + '.audit.md'):
+            continue
+        sha = open(rb + '.artifact.sha256').read().strip() if os.path.exists(rb + '.artifact.sha256') else None
+        if sha != stripped_sha(paths[key]):
+            print('NOTE %s: its read-back is not of the current file, so its conventions are not passed on '
+                  '(re-run that read-back first)' % key)
+            continue
+        sec = conventions_section(open(rb + '.audit.md', encoding='utf-8').read())
+        if sec:
+            out.append((os.path.basename(e), sec))
+    return out
 
 
 def stale_stagings(mdir):
@@ -397,6 +447,8 @@ def collect_all(mdir, names, teardown_after=False):
             continue
         tmp = tempfile.mkdtemp()
         print('== %s' % key)
+        shaf = os.path.join(ROOT, slug, 'ARTIFACT.sha256')
+        sha = open(shaf).read() if os.path.exists(shaf) else None
         failed = collect(slug, tmp)
         # a failing pair never replaces the read-back in readbacks/ (it may be an auditor that has
         # not finished, or testimony that breaks the spec); it goes to readbacks/_failed/ to inspect
@@ -407,6 +459,8 @@ def collect_all(mdir, names, teardown_after=False):
             if os.path.exists(f):
                 shutil.move(f, os.path.join(dest, '%s.%s.md' % (key, kind)))
         shutil.rmtree(tmp, ignore_errors=True)
+        if sha and not failed:
+            open(os.path.join(dest, '%s.artifact.sha256' % key), 'w').write(sha)
         if failed:
             bad.append(key)
         elif teardown_after:

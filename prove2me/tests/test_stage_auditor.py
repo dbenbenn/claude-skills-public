@@ -132,3 +132,52 @@ def test_collect_all_names_stagings_left_by_a_renamed_item(tmp_path, monkeypatch
     mdir = tmp_path / 'pkg'
     mdir.mkdir()
     assert SA.stale_stagings(str(mdir)) == ['pkg-old_name']
+
+
+AUDIT = """# Audit notes: Def_B.lean
+
+## Conventions settled
+- `x / 0 = ⊤` in ℝ≥0∞ (`Mathlib/Data/ENNReal/Inv.lean:1`).
+
+## What it does not say
+- nothing
+"""
+
+
+def test_conventions_section_is_extracted_alone():
+    assert SA.conventions_section(AUDIT) == (
+        "## Conventions settled\n- `x / 0 = ⊤` in ℝ≥0∞ (`Mathlib/Data/ENNReal/Inv.lean:1`).\n")
+    assert SA.conventions_section('# no such section\n') is None
+
+
+def test_statement_readbacks_get_the_current_bundles_settled_conventions(root, tmp_path, monkeypatch):
+    # Viterbo 2026-10-30: 19 statement auditors each re-derived the same ENNReal / deriv / infimum
+    # conventions from Mathlib source; the bundle's blind read-back had already settled them
+    tmp, art, keep = root
+    bundle = tmp_path / 'Def_B.lean'
+    bundle.write_text('def b : Nat := 1\n')
+    mdir = tmp_path / 'm'
+    (mdir / 'readbacks').mkdir(parents=True)
+    (mdir / 'readbacks' / 'Def_B.audit.md').write_text(AUDIT)
+    monkeypatch.setattr(SA, 'mission_items',
+                        lambda d: [('Def_B', str(bundle), []), ('thm', art, [str(bundle)])])
+    # no recorded hash yet: the conventions are not passed on
+    SA.stage_all(str(mdir), ['thm'])
+    d = os.path.join(SA.ROOT, SA.slug_of(str(mdir), 'thm'))
+    assert not os.path.exists(os.path.join(d, 'settled-conventions.md'))
+    # the bundle's read-back recorded the current bundle's hash: they are
+    (mdir / 'readbacks' / 'Def_B.artifact.sha256').write_text(SA.stripped_sha(str(bundle)))
+    SA.stage_all(str(mdir), ['thm'], force=True)
+    text = open(os.path.join(d, 'settled-conventions.md')).read()
+    assert 'Def_B' in text and 'x / 0' in text and 'What it does not say' not in text
+    assert 'settled-conventions.md' in open(os.path.join(SA.ROOT, '_prompts', SA.slug_of(str(mdir), 'thm') + '.txt')).read()
+    # a changed bundle makes the recorded hash stale: not passed on
+    bundle.write_text('def b : Nat := 2\n')
+    SA.stage_all(str(mdir), ['thm'], force=True)
+    assert not os.path.exists(os.path.join(d, 'settled-conventions.md'))
+
+
+def test_staging_records_the_artifact_hash(root):
+    tmp, art, keep = root
+    SA.stage('s6', art, [])
+    assert open(os.path.join(SA.ROOT, 's6', 'ARTIFACT.sha256')).read().strip() == SA.stripped_sha(art)

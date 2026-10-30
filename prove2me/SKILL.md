@@ -633,6 +633,23 @@ check goes to `readbacks/_failed/` and never replaces a good read-back. `stage` 
 comment from what it stages, so pass the real files. The prompt's reply asks for five lines: conventions settled and whether source
 settled them, anything unsettled, the name check, unused imported files.
 
+**Order the audits so nothing is read twice** (Viterbo, 2026-10-30: 19 items took 77 read-backs
+and 67 source-audit runs, about a third of a week's quota). First the bundle: its read-back, then
+its source audit, then one question asked of every definition: *can it make a milestone false or
+vacuous?* (an empty class giving ⊤, a junk value, a degenerate case such as a constant loop or a
+0-length polygon). The c_EHZ definition change came from asking that late, and it re-ran 13 read-backs
+and their audits. Only then stage the statements. Collect every statement fix the audits ask
+for (renames, added conjuncts) and re-run once, not after each.
+
+**Statement read-backs inherit the bundle's settled conventions.** `stage` records the sha256 of
+the stripped artifact (`ARTIFACT.sha256`; `collect-all` keeps it as
+`readbacks/<key>.artifact.sha256`). When a statement imports a mission bundle whose collected
+read-back is of the current file, `stage-all` copies that audit's `## Conventions settled`
+section into `settled-conventions.md`, and the brief tells the auditor to take it as settled and
+spend its effort on the statement itself. A stale bundle read-back is named and not passed on.
+Before 2026-10-30 every statement auditor re-derived ENNReal division, junk values and empty
+infima from Mathlib on its own.
+
 **Two files from one blind reading.** `readback.md` is testimony, published beside the statement
 on a draft item: what the declaration literally asserts, in mathematics, no judgment, no Lean
 identifiers, no citations. `audit.md` is captain-side: conventions with `file:line`, what the
