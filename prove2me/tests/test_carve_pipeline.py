@@ -993,6 +993,25 @@ def test_a_changed_compat_source_ports_again_too(env):
     assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
 
 
+def test_a_compat_change_after_the_build_warns_that_every_module_rebuilds(env):
+    # oaiq-088: four snapshot changes rebuilt all 2,385 modules, each starting `Built ...Compat`: every
+    # snapshot's compat_4_34.lean differed, and every ported module imports Compat. The build depends on
+    # nothing else of the snapshot (an unchanged port replays: test_oai_build_modules); say it up front
+    sys.path.insert(0, ROOT)
+    from p2mlib import oaiport
+    _commit(env, 'lean/compat_4_34.lean', 'theorem v1 : True := trivial\n')
+    assert run(env, *ARGS, '--stop-after', 'build').returncode == 0
+    compat = env.ws / 'Solutions' / 'F' / 'Compat.lean'
+    compat.write_text('import Mathlib\n\n' + oaiport.compat_block('theorem v1 : True := trivial\n')[0])
+    _commit(env, 'scripts/carve.py', (env.repo / 'prove2me' / 'scripts' / 'carve.py').read_text() + '\n# other fix\n')
+    _commit(env, 'p2mlib/oaiport.py', open(os.path.join(ROOT, 'p2mlib', 'oaiport.py')).read() + '\n# a new rewrite\n')
+    r = run(env, '--upgrade', '--stop-after', 'port')
+    assert r.returncode == 0 and 'stale: port' in r.stdout and 'WARNING' not in r.stdout, r.stdout
+    _commit(env, 'lean/compat_4_34.lean', 'theorem v1 : True := trivial\ntheorem v2 : True := trivial\n')
+    r = run(env, '--upgrade', '--stop-after', 'port')
+    assert r.returncode == 0 and 'compat shims' in r.stdout and '--keep-port' in r.stdout, r.stdout
+
+
 def test_upgrade_that_leaves_the_port_rules_alone_does_not_port_again(env):
     assert run(env, *ARGS).returncode == 0
     _commit(env, 'scripts/carve.py', (env.repo / 'prove2me' / 'scripts' / 'carve.py').read_text() + '\n# other fix\n')
@@ -1232,7 +1251,7 @@ def _overlap_carve(env, monkeypatch, pieces=None, bundles=None, stimes=None, seq
     work.mkdir(parents=True, exist_ok=True)
     pieces = pieces or {'P0': (10, 30), 'P1': (40, 30)}            # name: (planned cost, measured s)
     bundles = bundles or {'B0': (55, 20), 'B1': (55, 20)}
-    plan = {'bundles': [{'name': n, 'cost': c, 'nodes': ['d_' + n], 'imports': []} for n, (c, _) in bundles.items()],
+    plan = {'bundles': [{'name': n, 'cost': c, 'nodes': ['d_' + n, 'e_' + n], 'imports': []} for n, (c, _) in bundles.items()],
             'stubs': {n: {'bundles': ['B0']} for n in pieces},
             'pieces': {n: {'cost': c, 'keep': [n, 'lemma_' + n], 'bundles': ['B0'], 'imports': []}
                        for n, (c, _) in pieces.items()},
@@ -1361,6 +1380,25 @@ def test_a_slow_piece_after_publishing_is_split_by_a_frozen_replan_of_that_piece
     assert cfg['cost_factors'] == {'P0': 19.2, 'lemma_P0': 19.2} and 'frozen' in cfg and 'P0' in cfg['forced']
 
 
+def test_the_automatic_split_may_promote_the_slow_pieces_private_lemmas(env, monkeypatch):
+    # oaiq-091: pieces of 60 and 394 private lemmas (`traceLift_*`, `B_ACE_*`); the frozen re-plan could
+    # promote public lemmas only, so each private one needed a hand `forced` entry by graph node name
+    plan = _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)},
+                          seq=[{}, {}, {}, {'piece:P0': _t(40)}])
+    priv = '_private.Solutions.F.M.0.OAI.X.traceLift_1'
+    plan['pieces']['P0']['keep'].append(priv)
+    plan['pieces']['P1']['keep'].append('_private.Solutions.F.M.0.OAI.X.other')
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['auto_config']['promote_private'] == [priv]          # the slow piece's only
+    cfg = json.load(open(env.dir / 'config.json'))
+    assert cfg['promote_private'] == [priv] and cfg['cost_factors'][priv] == 19.2
+    assert run(env, '--redo', 'config', '--stop-after', 'config').returncode == 0
+    assert json.load(open(env.dir / 'config.json'))['promote_private'] == [priv]
+
+
 def test_a_piece_still_slow_after_its_automatic_split_stops_for_a_person(env, monkeypatch):
     _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)}, seq=[{}, {}, {}, {'piece:P0': _t(180)}])
     r = run(env, *ARGS_NEW, '--publish')
@@ -1414,6 +1452,81 @@ def test_one_late_slow_bundle_is_split_alone_and_only_what_imports_it_is_regener
     times = json.load(open(env.dir / 'carve_work' / 'times.json'))
     assert all(times['bundle:B%d' % i] == _t(20) for i in range(10))     # no other time was touched
     assert 'splitting B10 alone' in (env.dir / 'logs' / 'calibrate.log').read_text()
+
+
+PROFILE_HOOK = textwrap.dedent('''
+    if '--profile' in sys.argv:
+        _w = os.path.join(os.getcwd(), 'carve_work')
+        _p = os.path.join(_w, 'profiles.json')
+        _all = json.load(open(_p)) if os.path.exists(_p) else {}
+        for _it in sys.argv[sys.argv.index('--profile') + 1].split(','):
+            _all[_it] = {'kind': 'serialization', 'message': 'serialization-bound: `.olean serialization` 91 s of 92 s '
+                         '(its one declaration: OAI.KL.bottInterKernelFirst_surjective); name the large sides '
+                         'with `abbrev`s', 'key': None}
+        json.dump(_all, open(_p, 'w'))
+        sys.exit(0)
+''')
+
+
+def _profiled(env):
+    return [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure' and '--profile' in c['argv']]
+
+
+def test_a_slow_bundle_of_one_declaration_is_profiled_not_split(env, monkeypatch):
+    # oaiq-124: calibrate split OAIQ124K032 until it was one 7-line theorem, still 92 s (limit 88):
+    # `.olean serialization` 91 s. A bundle of one declaration cannot be split: profile it once, and stop
+    # with the diagnosis naming the declaration
+    plan = _overlap_carve(env, monkeypatch, bundles={'B0': (55, 20), 'B1': (55, 20), 'K032': (55, 92)})
+    plan['bundles'][2]['nodes'] = ['OAI.KL.bottInterKernelFirst_surjective']
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    monkeypatch.setenv('STUB_HOOK_carve_measure_config_json', PROFILE_HOOK + MEASURE_HOOK)
+    r = run(env, *ARGS_NEW, '--stop-after', 'calibrate')
+    assert r.returncode == 1
+    assert 'splitting cannot shrink' in r.stderr and 'K032 (92 s): serialization-bound' in r.stderr
+    assert 'bottInterKernelFirst_surjective' in r.stderr and 'accept_over' in r.stderr
+    assert _profiled(env) == [['config.json', '--profile', 'bundle:K032']]
+    assert ('carve', 'split') not in tools_called(env) and tools_called(env).count(('carve', 'plan')) == 1
+    assert 'cannot shrink: K032' in (env.dir / 'logs' / 'calibrate.log').read_text()
+    # a resume reuses the recorded profile of the same text instead of compiling again
+    times = json.load(open(env.dir / 'carve_work' / 'times.json'))
+    times['bundle:K032']['key'] = 'k1'
+    (env.dir / 'carve_work' / 'times.json').write_text(json.dumps(times))
+    prof = json.load(open(env.dir / 'carve_work' / 'profiles.json'))
+    prof['bundle:K032']['key'] = 'k1'
+    (env.dir / 'carve_work' / 'profiles.json').write_text(json.dumps(prof))
+    r = run(env, '--stop-after', 'calibrate')
+    assert r.returncode == 1 and 'serialization-bound' in r.stderr and len(_profiled(env)) == 1
+
+
+def test_a_split_that_returns_the_bundle_unchanged_profiles_it_instead_of_another_round(env, monkeypatch):
+    # oaiq-124: "34 bundles -> 34": `carve.py split --only` returned the slow bundle as it was; the next
+    # rounds cannot do better. Other slow bundles are still split first; the unshrinkable one is profiled
+    # once only it is left
+    _overlap_carve(env, monkeypatch, bundles={'B%d' % i: (55, 20) for i in range(10)} | {'B10': (55, 150)},
+                   seq=[{}, {'bundle:B10': _t(140)}])
+    monkeypatch.setenv('STUB_HOOK_carve_measure_config_json', PROFILE_HOOK + MEASURE_HOOK)
+    r = run(env, *ARGS_NEW, '--stop-after', 'calibrate')
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert tools_called(env).count(('carve', 'split')) == 1          # the stub split returned it unchanged
+    assert _profiled(env) == [['config.json', '--profile', 'bundle:B10']]
+    assert "step 'calibrate'" in r.stderr and 'B10 (140 s): serialization-bound' in r.stderr
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['bundle_splits'] == 1 and st['bundle_split_nodes'] == {'B10': ['d_B10', 'e_B10']}
+
+
+def test_a_classic_carve_whose_only_slow_bundle_is_one_declaration_stops_without_replanning(env, monkeypatch):
+    _calibration_setup(env, monkeypatch, None)
+    plan = _plan({'B0': 55, 'B1': 55})
+    plan['bundles'][1]['nodes'] = ['OAI.P.ratAdd_comp']
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    hook = env.repo / 'prove2me' / 'scripts' / 'carve_measure.py'
+    hook.write_text(CALIBRATING_MEASURE.replace('import json, os, sys\n', 'import json, os, sys\n' + PROFILE_HOOK, 1))
+    git(env.repo, 'add', '-A')
+    git(env.repo, 'commit', '-qm', 'profiling measure stub')
+    r = run(env, *ARGS, '--config-set', json.dumps({'time_scale': 1.2, 'budget': 55}))
+    assert r.returncode == 1 and 'B1 (128 s)' in r.stderr and 'serialization-bound' in r.stderr
+    assert 'replans' not in json.load(open(env.dir / 'pipeline_state.json'))
+    assert tools_called(env).count(('carve', 'plan')) == 1
 
 
 def test_many_uniformly_slow_bundles_before_publishing_replan_globally_as_before(env, monkeypatch):

@@ -714,11 +714,32 @@ class Pipeline:
         d = self.folder_dir()
         return sum(1 for _, _, fs in os.walk(d) for f in fs if f.endswith('.lean')) if os.path.isdir(d) else 0
 
+    def compat_changed(self):
+        """Would a re-port under this snapshot rewrite the built port's Compat.lean? Every ported module
+        imports it, so that rebuilds them all (oaiq-088: every full rebuild of four began `Built ...Compat`,
+        the snapshots' compat_4_34.lean all differed; an unchanged port replays, oai_build_modules)."""
+        if (self.state['steps'].get('build') or {}).get('status') != 'done':
+            return False
+        cl = os.path.join(self.folder_dir(), 'Compat.lean')
+        src = os.path.join(self.snap, 'prove2me', 'lean', 'compat_4_34.lean')
+        if not (os.path.exists(cl) and os.path.exists(src)):
+            return False
+        from . import oaiport
+        block = oaiport.compat_block(open(src, encoding='utf-8').read())[0]
+        return not open(cl, encoding='utf-8').read().endswith(block)
+
     def stale_message(self, s, k):
         if k not in self.RULE_KEYS:
             return '== stale: %s (its input "%s" changed); re-running it and every later step' % (s, k)
         msg = ('== stale: %s (the skill\'s %s changed since it ran); re-running it (later steps run again only '
                'if its output changes)' % (s, k))
+        if s in self.PORT_STEPS and self.compat_changed():
+            n = self.ported_modules()
+            msg += ('\n   WARNING: the skill\'s compat shims (lean/compat_4_34.lean) changed since the port: re-porting '
+                    'rewrites Compat.lean, which every ported module imports, so `build` recompiles all %d modules '
+                    '(oaiq-088: 2.5-7 h for 2,385; oaiq-095: 9 h for 3,243). Nothing else in the build depends on the '
+                    'skill snapshot: an unchanged port replays. To keep this port, stop and resume with '
+                    '`--keep-port`' % n)
         if s == 'graph':
             n = self.ported_modules()
             msg += ('\n   WARNING: the LeanInfo cache is keyed by LeanInfo.lean, so none of the %d module%s is '
@@ -877,7 +898,8 @@ class Pipeline:
         """What the pipeline itself set once publishing began (pipeline_state.json `auto_config`), over
         config.json: `frozen` (the published plan, its bundles, their published text), `forced` and
         `template_forced` (the published statements, so a re-plan keeps them; unions with what the
-        user forced) and `cost_factors` (pieces measured over their plan). Re-applied whenever
+        user forced), `cost_factors` (pieces measured over their plan) and `promote_private` (their private
+        lemmas, which the plan may then promote like public ones). Re-applied whenever
         config.json is rewritten from pipeline.json, so a re-run `config` cannot unfreeze a carve."""
         a = self.state.get('auto_config') or {}
         if a.get('frozen'):
@@ -885,6 +907,8 @@ class Pipeline:
         for k in ('forced', 'template_forced'):
             if a.get(k):
                 cfg[k] = sorted(set(cfg.get(k) or ()) | set(a[k]))
+        if a.get('promote_private'):
+            cfg['promote_private'] = sorted(set(cfg.get('promote_private') or ()) | set(a['promote_private']))
         if a.get('cost_factors'):
             cf = dict(cfg.get('cost_factors') or {})
             for k, v in a['cost_factors'].items():
@@ -1030,6 +1054,64 @@ class Pipeline:
         "one by its graph node name, `_private.<module>.0.<name>`), then --from config (oaiq-031: one 192 s "
         "piece became 20 pieces of ~11 s).")
 
+    UNSHRINKABLE_MSG = (
+        "step '%s': bundle(s) over the %.0f s limit that splitting cannot shrink (down to one declaration, or a "
+        "split returned it unchanged), so no further split round was spent; each was profiled once "
+        "(carve_measure --profile, logs <work>/profile_*.log):\n  %s\n"
+        "Fix it at the source (a post-carve patch, config_set.patches, or a port patch), then --from gen; "
+        "or excuse it below %d s with pipeline.json `accept_over` [\"bundle:NAME\"]. Log %s")
+
+    def unshrinkable(self, plan, names):
+        """Which of the over-limit bundles `names` splitting cannot shrink: down to one declaration, or the
+        same declarations a split round (or re-plan) already had (oaiq-124: `--only` returned
+        OAIQ124K032 unchanged twice; one 7-line theorem, 91 s of 92 in .olean serialization)."""
+        seen = {tuple(v) for v in (self.state.get('bundle_split_nodes') or {}).values()}
+        by = {b['name']: b for b in plan.get('bundles', [])}
+        out = []
+        for n in names:
+            nodes = tuple(sorted(by.get(n, {}).get('nodes') or ()))
+            if len(nodes) == 1 or (nodes and nodes in seen):
+                out.append(n)
+        return out
+
+    def remember_split(self, plan, names):
+        """Record the declarations of the bundles a split round (or re-plan) is about to cut."""
+        rec = self.state.setdefault('bundle_split_nodes', {})
+        for b in plan.get('bundles', []):
+            if b['name'] in names and b.get('nodes'):
+                rec[b['name']] = sorted(b['nodes'])
+
+    def profile_bundles(self, cfg, names, times):
+        """{name: diagnosis} of each bundle by Lean's profiler (carve_measure --profile, one compile
+        each; a profile of the same text is reused), for a bundle splitting cannot shrink: serialization-
+        or kernel-bound, naming the declaration (oaiq-124, oaiq-092)."""
+        work, _, _ = self.work_paths(cfg)
+        path = os.path.join(work, 'profiles.json')
+
+        def load():
+            try:
+                return json.load(open(path))
+            except (OSError, ValueError):
+                return {}
+        have = load()
+        todo = [n for n in names if not (have.get('bundle:' + n) and (times.get('bundle:' + n) or {}).get('key')
+                                         and have['bundle:' + n].get('key') == times['bundle:' + n]['key'])]
+        if todo:
+            flags = list(self.p.get('measure_flags') or [])
+            extra = ['--dir', flags[flags.index('--dir') + 1]] if '--dir' in flags else []
+            self.run_cmds('calibrate', [self.tool('carve_measure', 'config.json', *extra, '--profile',
+                                                  ','.join('bundle:' + n for n in todo))])
+            have = load()
+        return {n: (have.get('bundle:' + n) or {}).get('message') or 'no profile recorded (see logs/calibrate.log)'
+                for n in names}
+
+    def stop_unshrinkable(self, cfg, plan, times, res, stuck, lines, step):
+        diag = self.profile_bundles(cfg, stuck, times)
+        secs = {k.split(':', 1)[1]: v for k, v, _ in res['over'] if k.startswith('bundle:')}
+        found = ['%s (%.0f s): %s' % (n, secs.get(n, 0), diag[n]) for n in stuck]
+        log = self.calibrate_log(lines + ['  cannot shrink: ' + x for x in found])
+        raise StepFailed(self.UNSHRINKABLE_MSG % (step, res['limit'], '\n  '.join(found), ACCEPT_CAP, log))
+
     def calibrate_inputs(self):
         cfg = json.load(open(os.path.join(self.d, 'config.json')))
         work, plan_path, times_path = self.work_paths(cfg)
@@ -1073,6 +1155,12 @@ class Pipeline:
         if not res['over']:
             self.calibrate_log(lines + ['fits the model; time_scale %g kept' % cfg.get('time_scale', 1.5)])
             return None
+        over_b = [k.split(':', 1)[1] for k, _, _ in res['over'] if k.startswith('bundle:')]
+        stuck = self.unshrinkable(plan, over_b)
+        if stuck and len(stuck) == len(res['over']):
+            # a re-plan cannot shrink these either: say why they are slow instead (oaiq-124, oaiq-092)
+            self.stop_unshrinkable(cfg, plan, times, res, stuck, lines, 'calibrate')
+        self.remember_split(plan, over_b)
         pieces_only = all(k.startswith('piece:') for k, _, _ in res['over'])
         ratios = sorted(secs / max(cost, 1.0) for _, secs, cost in res['over'])
         uniform = (pieces_only and len(ratios) >= UNIFORM_MIN and ratios[len(ratios) // 2] >= UNIFORM_RATIO
@@ -1140,11 +1228,20 @@ class Pipeline:
             self.calibrate_log(lines + ['fits the model; time_scale %g kept' % cfg.get('time_scale', 1.5)])
             return None
         measured = sum(1 for b in plan.get('bundles', []) if (times.get('bundle:' + b['name']) or {}).get('ok'))
-        systematic = len(res['over']) >= UNIFORM_MIN and len(res['over']) >= SYSTEMATIC_FRACTION * measured
+        names = [k.split(':', 1)[1] for k, _, _ in res['over']]
+        stuck = self.unshrinkable(plan, names)
+        if stuck and len(stuck) == len(names):
+            # one declaration, or a split that returned it unchanged: profile once and say why, rather than
+            # spend more split rounds (oaiq-124: two more rounds on a serialization-bound 7-line theorem)
+            self.stop_unshrinkable(cfg, plan, times, res, stuck, lines, 'calibrate')
+        if stuck:
+            lines.append('splitting cannot shrink %s: left over until the others fit, then profiled' % ', '.join(stuck))
+            names = [x for x in names if x not in stuck]
+        systematic = len(names) >= UNIFORM_MIN and len(names) >= SYSTEMATIC_FRACTION * measured
         if systematic and not self.anything_published(cfg):
+            self.remember_split(plan, names)
             return self.replan(cfg, res['new_scale'], lines)
         n = self.state.get('bundle_splits', 0)
-        names = [k.split(':', 1)[1] for k, _, _ in res['over']]
         if n >= MAX_BUNDLE_SPLITS:
             self.calibrate_log(lines)
             raise StepFailed("step 'calibrate': %d rounds of splitting single bundles left these over the limit:\n%s\n"
@@ -1155,6 +1252,7 @@ class Pipeline:
             'published items are frozen' if self.anything_published(cfg) else
             '%d of %d bundles over: no systematic error' % (len(names), measured)))
         self.calibrate_log(lines)
+        self.remember_split(plan, names)
         self.run_cmds('calibrate', [self.tool('carve', 'split', 'config.json', times_path, '--limit',
                                               '%g' % cfg.get('budget', 55), '--only', ','.join(names))])
         self.state['bundle_splits'] = n + 1
@@ -1175,7 +1273,8 @@ class Pipeline:
         as `calibrate` always did (a uniform overrun re-plans at the ratio, a lone slow piece stops
         with the profiling hint). Once anything is published nothing is re-planned globally: each
         slow piece is split by a frozen re-plan in which only its own declarations cost more (config
-        `cost_factors`, its measured / planned ratio), once; a piece still slow after that, or whose
+        `cost_factors`, its measured / planned ratio; its private lemmas may be promoted too, config
+        `promote_private`), once; a piece still slow after that, or whose
         statement alone is slow (its type is the cost), stops for a person."""
         got = self.calibrate_inputs()
         if got is None:
@@ -1220,12 +1319,19 @@ class Pipeline:
         if auto and k < MAX_REPLANS:
             a = self.state.setdefault('auto_config', {})
             cf = dict(a.get('cost_factors') or {})
+            pp = set(a.get('promote_private') or ())
             for n, secs, cost in auto:
                 r = round(max(1.0, secs / max(cost, 1.0)), 2)
                 for x in plan['pieces'][n]['keep']:
                     cf[x] = max(cf.get(x, 1.0), r)
+                    if x.startswith('_private.'):
+                        # its private lemmas may be promoted too, as a hand `forced` entry by node name
+                        # does (oaiq-091: pieces of 60 and 394 private lemmas)
+                        pp.add(x)
                 tried[n] = {'secs': secs, 'cost': cost, 'ratio': r}
             a['cost_factors'] = cf
+            if pp:
+                a['promote_private'] = sorted(pp)
             self.state['piece_replans'] = k + 1
             lines.append('splitting %d piece(s) by a frozen re-plan (%d/%d), their declarations costed at their '
                          'measured ratio: %s' % (len(auto), k + 1, MAX_REPLANS,

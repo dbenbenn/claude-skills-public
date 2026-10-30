@@ -180,3 +180,58 @@ def test_a_replayed_module_without_a_logged_time_takes_it_from_the_leaninfo_cach
     os.utime(main, (os.path.getmtime(main) + 100,) * 2)
     code, log, elab = _run_main(monkeypatch, tmp_path, ws, _fake_build({'A': 99.0, 'Main': 3.0}))
     assert code == 0 and _times(elab) == {'Solutions.F.A': 7.0, 'Solutions.F.Main': 2.0}
+
+
+def test_an_unchanged_port_replays_under_another_snapshot_and_leaninfo(monkeypatch, tmp_path):
+    # oaiq-088 item 1: four skill-snapshot changes each rebuilt all 2,385 modules (`Built`, never
+    # `Replayed`). The build's staleness reads nothing of the snapshot: a module is rebuilt when its .lean
+    # is newer than its .olean or an import was rebuilt / has a newer .olean, and the port rewrites only
+    # files whose text changed (oai_port_modules.write_changed). Every one of those rebuilds began with
+    # `Built ...Compat`: each snapshot's lean/compat_4_34.lean differed, and every module imports Compat.
+    import oai_port_modules as PM
+    from p2mlib import leaninfo
+    ws = tmp_path / 'ws'
+    out = ws / 'Solutions' / 'F'
+    files = {'Compat.lean': 'import Mathlib\n\nnamespace OAI\ntheorem c : True := trivial\nend OAI\n',
+             'A.lean': 'import Mathlib\nimport Solutions.F.Compat\ntheorem a : True := trivial\n',
+             'Main.lean': 'import Mathlib\nimport Solutions.F.Compat\nimport Solutions.F.A\ntheorem m : True := a\n'}
+    assert sorted(PM.write_changed(str(out), files)) == ['A.lean', 'Compat.lean', 'Main.lean']
+    built = []
+
+    def fake(path, module, olean, ilean, ws=None, **k):
+        built.append(module)
+        open(olean, 'w').close()
+        return True, 1.0, []
+    clock = [1_000_000_000]
+
+    def tick(p):
+        clock[0] += 10
+        os.utime(p, (clock[0], clock[0]))
+
+    def build():
+        built.clear()
+        ok, lines = B.build(str(ws), 'F', 'Main')
+        assert ok
+        for f in ('Compat', 'A', 'Main'):
+            o = ws / '.lake' / 'build' / 'lib' / 'lean' / 'Solutions' / 'F' / (f + '.olean')
+            if ('Solutions.F.' + f) in built:
+                tick(o)
+        return lines
+    for f in files:
+        tick(out / f)
+    monkeypatch.setattr(leaninfo, 'build_module', fake)
+    monkeypatch.setattr(leaninfo, 'native_tool', lambda ws: '/snapshot-1/leaninfo')
+    build()
+    assert built == ['Solutions.F.Compat', 'Solutions.F.A', 'Solutions.F.Main']
+    # a new snapshot: another LeanInfo binary, the same ported text written again
+    monkeypatch.setattr(leaninfo, 'native_tool', lambda ws: '/snapshot-2/leaninfo')
+    monkeypatch.setattr(leaninfo, 'TOOL', str(tmp_path / 'OtherLeanInfo.lean'))
+    assert PM.write_changed(str(out), files) == []
+    lines = build()
+    assert built == [] and all('Replayed' in l for l in lines)
+    # the legitimate case (oaiq-095 item 3): a new compat shim rewrites Compat.lean, and everything rebuilds
+    files['Compat.lean'] = files['Compat.lean'].replace('end OAI', 'theorem d : True := trivial\nend OAI')
+    assert PM.write_changed(str(out), files) == ['Compat.lean']
+    tick(out / 'Compat.lean')
+    build()
+    assert built == ['Solutions.F.Compat', 'Solutions.F.A', 'Solutions.F.Main']
