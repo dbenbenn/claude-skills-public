@@ -119,10 +119,9 @@ Problem336).** Fix each at the cause; none needs a macro.
   TraceHessian` (oaiq-091): qualify it; a `local instance` whose explicit arguments typeclass synthesis cannot
   infer is now an error: make it a `theorem` (it never fired; oaiq-091, -092); `simpa [..] using X` reporting
   `(f ∘ g) / (f * g)` against a lambda: `exact X` (defeq; ~25 sites in oaiq-091's Sobolev modules);
-  `fin_cases … <;> norm_num [defs]` leaving `![a, b, c] 2` or `¬0 = 2 : Fin 4`: compat now has rfl simp lemmas
-  for 3/4-element vector lookups and Fin literal disequalities (07634a4, c92a80b), and where that is not
-  enough `fin_cases … <;> simp [defs, Fin.ext_iff] <;> norm_num` (`~/claude/p2m-standalone/openai-ports/oaiq-092/cc/nn_fin_cases.py` rewrites a
-  file; ~35 modules there); `Finset.sum_le_sum_of_injOn` is gone (`sum_image` + `sum_le_sum_of_subset_of_nonneg`);
+  `norm_num` on `Fin` literals is rewritten by the port since 1a89f36 (below); still by hand: a bare `(by
+  norm_num)` whose goal is a Fin literal fact (`(190 : Fin 768) ∉ list`, oaiq-081: `first | decide | norm_num`),
+  and a non-terminal `norm_num` after `fin_cases` (more tactics follow in the block); `Finset.sum_le_sum_of_injOn` is gone (`sum_image` + `sum_le_sum_of_subset_of_nonneg`);
   `decide (G.Reachable …)` under `omit [Fintype V] in` needs `@decide _ (Classical.propDecidable _)` (oaiq-089);
   `liminf_le_liminf (hu := …) (hv := …)` has the two names swapped; `MemLp.smul` takes the function first;
   `toReal_eLpNorm` and `summable_norm_of_tsum_eLpNorm_ne_top` gained a measurability argument;
@@ -142,6 +141,18 @@ Problem336).** Fix each at the cause; none needs a macro.
   body `by unfold; infer_instance` on a type synonym breaks `simp`/`rw` instance matching, `inferInstanceAs` fixes
   it (oaiq-075); the port's `first | infer_instance | exact Measure.isProbabilityMeasure_map …` line times out at
   `whnf` when the measure is a `let`: name `Measure.isProbabilityMeasure_map hφ.aemeasurable` (oaiq-074).
+- *Rewritten by the port since 2026-10-30.* `convert h using 1` + `· rfl` / `· ext x …` on a `HasDerivAt` /
+  `HasFDerivAt` goal becomes `h.congr_deriv (Eq.symm ?_)` (`congr_fderiv`, or `(h.congr_of_eventuallyEq …)
+  .congr_deriv (Eq.symm ?_)`), keeping convert's orientation `goal' = h'` (8fdf735; before it was `h' = goal'`,
+  and hand patches adding a `symm` for that now count 0: drop them). A terminal `norm_num [L]` / `norm_num … at
+  …` after `fin_cases` (also a `<;>` chain continued over lines), or one whose list names a `Fin.` lemma, becomes
+  `first | (simp L; all_goals first | (norm_num L; done) | rfl | decide) | (norm_num L; done) | norm_num L`
+  (1a89f36; 1,278 sites in openai/math; this Mathlib's `norm_num` runs no simprocs): drop hand patches
+  `norm_num [L]` → `simp [L] <;> norm_num` at such sites. `List.TFAE.out N M` → `.out (N-1) (M-1)` (e359e08;
+  d13f23b counts from 1). A hand patch dropped for too few occurrences prints `why:` in filter-patches: the rule
+  that now rewrites its site and what the port writes there, or "not in the port's input"; check the new text and
+  drop the patch rather than marking it `allow_drop` blindly (oaiq-090). `core_rewrites` is not idempotent as a
+  whole (the argument-dropping rules drop again): never re-run it on ported text.
 - *Rewritten by the port since 2026-10-28* (f6bb691, d0c5d2c, f76350b): the `Measure.map` fallback tries
   the mapped function's named measurability facts first (a hypothesis about it, or a `foo_measurable` /
   `measurable_foo` lemma anywhere in the port), then a bounded `infer_instance`, then `AEM_TAC`; also
