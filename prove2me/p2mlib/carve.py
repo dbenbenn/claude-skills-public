@@ -1740,7 +1740,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         def ok_node(k):
             nd = g.nodes[k]
             return public_ok(k) or (k in allowed and nd.private and nd.theorem and ascii_ok(k)
-                                    and nd.sig <= B | set(ext) and k not in renames)
+                                    and nd.sig <= b_or_ext and k not in renames)
 
     def fresh(n):
         s, todo = set(), [n]
