@@ -92,6 +92,20 @@ def test_local_notation_names_are_dependencies_of_what_uses_the_notation(g):
     # without Lean's record, a notation still counts for everything after it in its scope
 
 
+def test_listed_private_lemmas_may_be_promoted_like_public_ones(g, monkeypatch):
+    # oaiq-091: the automatic split of a slow piece could promote public lemmas only; pieces of 60 and 394
+    # private lemmas needed a hand `forced` entry per graph node name. `promote_private` lists the private
+    # theorems the plan may promote (carve_pipeline: the slow piece's own); unlisted ones never are
+    h = '_private.CarveDev.Top.0.CD.helper'
+    monkeypatch.setattr(C, 'collision_renames', lambda g: {})     # the fixture's two helpers collide
+    cost = dict(C.size_costs(g, bytes_per_second=10000), **{h: 1.0})
+    kw = dict(budget=0.05, piece_size=10**6, bundle_budget=0.005, bundle_size=10**6, cost=cost, bundle_prefix='PP')
+    before = C.make_plan(g, ['CD.main'], **kw)
+    assert h not in before['nodes'] and 'CD.main' in before['over']
+    after = C.make_plan(g, ['CD.main'], promote_private=[h], **kw)
+    assert h in after['nodes'] and 'CD.main' not in after['over'] and h not in after['pieces']['CD.main']['keep']
+
+
 def test_private_names_are_per_module(g):
     a, b = '_private.CarveDev.Mid.0.CD.helper', '_private.CarveDev.Top.0.CD.helper'
     assert a in g.nodes and b in g.nodes
@@ -962,6 +976,29 @@ def test_gen_takes_frozen_bundles_verbatim_from_the_published_copy(tmp_path):
     msg = run3('gen', str(cfg3))
     assert 'Def_CDB002' in msg and 'differs' in msg
     assert (out3 / 'lib' / 'Def_CDB002.lean').read_text().endswith('-- published later\n')
+
+
+def test_gen_fails_on_a_patch_matching_no_generated_file(tmp_path):
+    # oaiq-123 (NuclearUltrapower): post-carve patches naming a collision-suffixed instance
+    # (`normEntryOrder_r606002_1`) silently stopped matching after a snapshot change; gen only
+    # listed "patches matching no generated file". A full gen now fails and names the patch.
+    pat = tmp_path / 'patches.json'
+    pat.write_text(json.dumps([
+        {'literal_old': 'theorem double_succ', 'literal_new': 'theorem double_succ', 'why': 'matches'},
+        {'literal_old': 'normEntryOrder_r606002_1', 'literal_new': 'x', 'why': 'stale instance name'}]))
+    cfg, work, out, run = _carve_cli(tmp_path, 'a', patches=str(pat))
+    run('plan', str(cfg))
+    msg = run('gen', str(cfg), ok=False)
+    assert 'normEntryOrder_r606002_1' in msg and 'stale instance name' in msg, msg
+    assert 'theorem double_succ' not in msg.split('MATCHING NO GENERATED FILE')[-1]
+    # the files are written all the same, so the stale patch can be checked against them
+    assert (out / 'solutions' / 'Sol_CD_main.lean').exists()
+    # a partial gen (named files, or one kind) cannot tell
+    run('gen', str(cfg), 'pieces')
+    run('gen', str(cfg), 'all', 'CD.top_pick')
+    pat.write_text(json.dumps([{'literal_old': 'theorem double_succ',
+                                'literal_new': 'theorem double_succ', 'why': 'matches'}]))
+    run('gen', str(cfg))
 
 
 def test_gen_refuses_a_frozen_bundle_without_a_published_copy(tmp_path):
@@ -2397,6 +2434,35 @@ def test_frozen_bundle_members_get_no_implicit_dependencies(g):
     new = {k: b for b in p['bundles'] for k in b['nodes']}
     assert new['CD.Space.size_eq']['imports'] == ['F0']
     assert C.check_plan(g, p) == []
+
+
+def test_a_frozen_bundles_inferred_needs_are_not_problems():
+    # oaiq-120 (BallPacking, a carve published on an old skill, re-planned frozen after --upgrade):
+    # the new graph rules (simp-set and implicit edges) made the published B000 "need" 37
+    # declarations the new plan put in new bundles, and two import cycles. B000 compiled and was
+    # published without them: a frozen bundle keeps its published imports, and its members' needs
+    # are not reported.
+    g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    first = C.make_plan(g, ['CD.top_pick'], budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                        bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                        bundle_prefix='F')
+    names = [b['name'] for b in first['bundles']]
+    fz = {k for b in first['bundles'] for k in b['nodes']}
+    k = first['bundles'][0]['nodes'][0]
+    # a declaration the first carve never bundled, which needs the frozen bundle in turn
+    d = next(x for x in ('CD.Space.size', 'CD.Space', 'CD.double') if x not in fz)
+    g.nodes[k].deps.add(d)
+    g.nodes[d].deps.add(k)
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    frozen=(first, names), bundle_prefix='NEW')
+    assert p['frozen'] == names
+    assert p['bundles'][0]['imports'] == first['bundles'][0]['imports']
+    assert C.check_plan(g, p) == [], C.check_plan(g, p)
+    # without `frozen` in the plan (an old plan file), the same need is a problem
+    q = dict(p)
+    q.pop('frozen')
+    assert any(d in x for x in C.check_plan(g, q))
 
 
 def test_graph_load_warns_and_counts_the_modules_leaninfo_must_elaborate(tmp_path, monkeypatch, capsys):

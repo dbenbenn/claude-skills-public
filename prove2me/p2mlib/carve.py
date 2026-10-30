@@ -1585,7 +1585,7 @@ def _pin_chunks(g, pinned, B, taken, extra):
 def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_budget=90.0,
               bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
               external_defs=None, statement_suffix='', external=(), chunker='bands', pinned=None,
-              bundles_import_statements=True):
+              bundles_import_statements=True, promote_private=()):
     """The split: bundles, nodes (published statements) and each node's piece.
 
     - Bundle material B: every reachable non-theorem, what reachable statements need, their
@@ -1595,7 +1595,8 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
       are then present.
     - Nodes: targets and `forced`, plus theorems promoted greedily, bottom-up, until each piece
       (its closure over non-node theorems) costs at most `budget` seconds and `piece_size` bytes.
-      A node needs an ASCII public name and a statement that only uses bundle material.
+      A node needs an ASCII public name and a statement that only uses bundle material; a private
+      theorem is promoted only when listed in `promote_private` (a forced one always is a node).
     - `frozen`: (old plan, [bundle names]) of bundles already published, kept as they are.
     - `external_defs`: {declaration: module} provided by someone else's published Definitions bundle
       (Erdős 3: the target's own definitions in marwahaha's Def_ErdosReciprocal). They stay out of
@@ -1730,6 +1731,17 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
                 t, 'not a theorem' if not g.nodes[t].theorem else
                 'its statement needs %s' % sorted(g.nodes[t].sig - B - set(ext))))
 
+    if promote_private:
+        # the automatic split of a slow piece (carve_pipeline calibrate_pieces) may promote these
+        # private lemmas as well, as a `forced` private node name is: published under their public
+        # name, deprivatized in the stub (oaiq-091: pieces of 60 and 394 private lemmas, forced by hand)
+        public_ok, allowed = ok_node, set(promote_private)
+
+        def ok_node(k):
+            nd = g.nodes[k]
+            return public_ok(k) or (k in allowed and nd.private and nd.theorem and ascii_ok(k)
+                                    and nd.sig <= B | set(ext) and k not in renames)
+
     def fresh(n):
         s, todo = set(), [n]
         while todo:
@@ -1777,10 +1789,17 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             used.add(names[j])
     bidx = {k: j for j, ch in enumerate(chunks) for k in ch}
     bimp = [set() for _ in chunks]
+    nfz = len(fz_chunks)
     for j, ch in enumerate(chunks):
+        if j < nfz and 'imports' in byname[names[j]]:
+            # a published bundle imports what it was published with, never a new bundle: what its
+            # members seem to need beyond that is inferred by newer graph rules (oaiq-120: the
+            # published B000 "needed" 37 declarations of new bundles, and two import cycles)
+            bimp[j] = {names.index(x) for x in byname[names[j]]['imports'] if x in names[:nfz]}
+            continue
         for k in ch:
             for d in g.nodes[k].deps | extra.get(k, set()):
-                if d in bidx and bidx[d] != j:
+                if d in bidx and bidx[d] != j and not (j < nfz and bidx[d] >= nfz):
                     bimp[j].add(bidx[d])
     red = [_reduce(bimp, bimp[j]) for j in range(len(chunks))]
     bundles = [{'name': names[j], 'nodes': chunks[j], 'imports': [names[i] for i in sorted(red[j])],
@@ -1815,6 +1834,8 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             'external_defs': dict(sorted(ext.items())), 'statement_suffix': statement_suffix,
             'external': sorted(external),
             'sorry': sorted(k for k in reach | B if g.nodes[k].sorry and k not in ext)}
+    if frozen:
+        plan['frozen'] = list(frozen[1])
     if frozen and conflicts:
         plan['frozen_external_conflicts'] = {m: sorted(v) for m, v in sorted(conflicts.items())}
     if stmts:
@@ -2119,8 +2140,16 @@ def bundle_cycles(g, plan):
     bundle missed one dependency, and the check said only "not imported")."""
     names = [b['name'] for b in plan['bundles']]
     where = {k: i for i, b in enumerate(plan['bundles']) for k in b['nodes']}
+    pos = {n: i for i, n in enumerate(names)}
+    frozen = _frozen_bundles(plan)
     why = {}
     for i, b in enumerate(plan['bundles']):
+        if b['name'] in frozen:
+            # published: its imports are what it was compiled with, its members' needs are inferred
+            for x in b['imports']:
+                if x in pos:
+                    why.setdefault((i, pos[x]), ('(published imports)', x))
+            continue
         for k in b['nodes']:
             for d in sorted(g.nodes[k].deps):
                 j = where.get(d)
@@ -2191,13 +2220,25 @@ def bundle_cycles(g, plan):
     return out
 
 
+def _frozen_bundles(plan):
+    """The plan's frozen (published, compiled) bundles whose members' needs are not checked: all of
+    `plan['frozen']`, unless the frozen carve took declarations from another external bundle than
+    this one (`frozen_external_conflicts`): then a need is real, and reported with that."""
+    if plan.get('frozen_external_conflicts'):
+        return set()
+    return set(plan.get('frozen') or ())
+
+
 def check_plan(g, plan):
     """What would not compile: every dependency of a bundle member in its bundle or one it
     imports; of a piece, in the piece, an imported statement or its bundles; of a statement, in
     its bundles. A missing definition is Erdős 3 B006 ("Unknown identifier `A.space`"). The plan's
-    `external_defs` (someone else's published bundle) are available to every file. Returns a list
+    `external_defs` (someone else's published bundle) are available to every file. A frozen bundle
+    (`plan['frozen']`, published and compiled) is not checked: what its members seem to need beyond
+    its published imports is inferred by newer graph rules, not real (oaiq-120). Returns a list
     of problems (empty: the plan is consistent)."""
     pos, bimp, bidx = _plan_index(plan)
+    frozen = _frozen_bundles(plan)
     ext = set(plan.get('external_defs') or {})
     probs = []
     # a bundle or a proof piece may not rest on `sorry` (Erdős 3 B022: a port's stubbed proof in a
@@ -2232,6 +2273,8 @@ def check_plan(g, plan):
         sts = set(b.get('statements', ()))
         for st in sts:
             cl |= _bundle_closure(bimp, [pos[x] for x in plan['stubs'].get(st, {}).get('bundles', ())])
+        if b['name'] in frozen:
+            continue
         for k in b['nodes']:
             for d in sorted(g.nodes[k].deps - ext - sts):
                 if d not in bidx:

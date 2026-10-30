@@ -63,6 +63,9 @@ CONFIG.json (paths may use ~):
    "cost_factors": {"OAI.X.lemma": 4.0},      # a declaration's cost times this (carve_pipeline:
                                               # the declarations of a piece measured over its
                                               # plan, by that ratio, for a frozen re-plan)
+   "promote_private": ["_private.M.0.OAI.X.lemma"],  # private theorems (graph node names) the
+                                              # plan may promote to statements like public ones
+                                              # (carve_pipeline: the private lemmas of a slow piece)
    "folded": ["OAI.X.lemma"],                 # statements merged into their importers' pieces after
                                               # planning (carve.fold_statements; e.g. a polymorphic
                                               # statement the verifier's CoeT fallback rejects)
@@ -222,6 +225,13 @@ def bundles_to_split(bundles, times, limit, only=None):
     return [n for n in slow if n in only] if only else slow
 
 
+def unused_patches(patches, unused):
+    """One line per post-carve patch (config `patches`) that matched no generated file."""
+    return ['PATCH MATCHING NO GENERATED FILE: %r%s' % (
+        pt['literal_old'][:160], ' -- ' + pt['why'] if pt.get('why') else '')
+        for pt in patches if pt['literal_old'] in unused]
+
+
 def report_fallbacks(g, limit=10):
     """Identifiers read from text because the elaborated port recorded nothing for them (a module
     with errors, a notation body): the text reading is a guess (p2mlib.carve.Graph.reading)."""
@@ -313,7 +323,8 @@ def main(argv):
                         external=cfg.get('external', ()),
                         chunker=cfg.get('chunker', 'bands'),
                         pinned=cfg.get('pinned'),
-                        bundles_import_statements=cfg.get('bundles_import_statements', True))
+                        bundles_import_statements=cfg.get('bundles_import_statements', True),
+                        promote_private=cfg.get('promote_private', ()))
         if cfg.get('folded'):
             P = C.fold_statements(P, cfg['folded'])
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)
@@ -355,10 +366,10 @@ def main(argv):
         names = set(rest[1:] if rest and rest[0] == what else rest) or None
         kinds = ('bundles', 'stubs', 'pieces') if what == 'all' else (what,)
         frozen_text = published_frozen(cfg, P, names) if 'bundles' in kinds else {}
+        patches = json.load(open(os.path.expanduser(cfg['patches']))) if cfg.get('patches') else ()
         r = C.generate(g, P, cfg['out'], kinds,
                        names, cfg.get('external', ()), cfg.get('collapse_mathlib', True),
-                       json.load(open(os.path.expanduser(cfg['patches']))) if cfg.get('patches') else (),
-                       repairs=recorded_repairs(cfg), frozen_text=frozen_text)
+                       patches, repairs=recorded_repairs(cfg), frozen_text=frozen_text)
         for f in r['files']:
             print('%9d  %s' % (r['sizes'][f], f))
         for f, c in r['stale_repairs']:
@@ -370,9 +381,13 @@ def main(argv):
         report_fallbacks(g)
         for f in r['over_cap']:
             print('OVER 1 MiB', f)
-        if r['patches_unused'] and names is None:
-            print('patches matching no generated file:', r['patches_unused'])
-        if r['over_cap']:
+        # a patch no generated file contains is stale (a collision suffix `_r<hex>_<n>` that changed
+        # with the snapshot, a statement folded away): a full gen fails on it, as filter_patches does
+        # for port patches (oaiq-123); a partial gen cannot tell
+        stale = unused_patches(patches, r['patches_unused']) if names is None and what == 'all' else []
+        for line in stale:
+            print(line)
+        if r['over_cap'] or stale:
             sys.exit(1)
     elif cmd == 'order':
         order = C.publish_order(json.load(open(plan_path(cfg))), cfg.get('external', ()))
