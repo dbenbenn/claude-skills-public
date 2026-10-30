@@ -447,11 +447,45 @@ class Reading:
 def _alternative_name(info, idn):
     """Is identifier idn the name of a case alternative (`| zero =>` or `| @inv h … =>` of
     `induction … with`, `case succ =>`), where Lean accepts no qualified name ("Invalid
-    alternative name")? Also true of a `match` pattern's constructor, where a pin is never needed."""
+    alternative name")? Also true of a `match` pattern's head, which `_match_pattern_head` tells apart."""
     before = info.text_bytes[max(0, idn['start'] - 40):idn['start']].rstrip()
     if before.endswith(b'@'):          # `| @inv h a … =>` (RationalHitting list_hits)
         before = before[:-1].rstrip()
     return before.endswith(b'|') or re.search(rb'(?:^|\s)(?:case|next)$', before) is not None
+
+
+_ALT_HEAD = re.compile(rb"(?<![\w.'])(match|fun|induction|cases|rcases|induction'|cases')(?![\w.'])")
+
+
+def _match_pattern_head(info, idn):
+    """Is identifier idn the head of a `match` (or `fun`) alternative's pattern, `| some s =>`, rather
+    than a tactic's case name (`induction … with | some s`)? A pattern is read by name resolution, so
+    a shadowing declaration captures it and a pin is needed (q135 VertexCover: `| some s` in
+    `def Poly.finite` read `Poly.some`, "Invalid pattern"); a case name takes only the constructor's
+    short name. Decided by the keyword before the `with` that opens the alternatives: on the `|`'s
+    own line, else on the first line above at a smaller indent (or the same, not an alternative)."""
+    t = info.text_bytes
+    ls = t.rfind(b'\n', 0, idn['start']) + 1
+    bar = t.rfind(b'|', ls, idn['start'])
+    if bar < 0:
+        return False
+    head = t[ls:bar]
+    if not head.strip():
+        col, end, head = bar - ls, ls - 1, b''
+        while end > 0:
+            start = t.rfind(b'\n', 0, end) + 1
+            line, end = t[start:end], start - 1
+            body = line.lstrip()
+            ind = len(line) - len(body)
+            if not body or ind > col or (ind == col and body.startswith(b'|')):
+                continue
+            head = line
+            break
+    w = list(re.finditer(rb"(?<![\w.])with(?![\w.'])", head))
+    if not w:
+        return False
+    kws = _ALT_HEAD.findall(head[:w[-1].start()])
+    return bool(kws) and kws[-1] in (b'match', b'fun')
 
 
 def last_component(text_bytes, a, b):
@@ -3799,6 +3833,11 @@ class Carver:
         HeckeInverseAmplification`; a piece: `sourceRowSeries` in namespace ProbePhysical meant the
         opened ProbeEuler's, before a later module declared ProbePhysical.sourceRowSeries)."""
         g = self.g
+        # names are read from the declaration's namespace: `def Poly.finite` opens `Poly` (q135)
+        ns = decl_ns(c)
+        # nor can a command's text name the declarations it declares, which do not exist yet there
+        # (CarveDev.Fields: `theorem Outer.cp … : cp …` reads `CD.cp`, never itself)
+        own = set(c.names or ())
         binders = {i['name'] for i in c.idents or [] if i['role'] == 'binder'}
         out = []
         for i in c.idents or []:
@@ -3814,7 +3853,8 @@ class Carver:
                 # a project `CD.Finset.foo` in the file would capture `Finset.foo`)
                 if len(r.head) != 1 or r.field or r.binder or is_field(info, i) or \
                         r.head[0].startswith('_private.') or \
-                        r.head[0] in self.rename or _alternative_name(info, i):
+                        r.head[0] in self.rename or \
+                        (_alternative_name(info, i) and not _match_pattern_head(info, i)):
                     continue      # a field, a declared name, a case name (`| zero =>`): not a reference
                 orig = r.head[0]
                 a, b = r.span
@@ -3824,34 +3864,36 @@ class Carver:
                 if not g.is_project(orig):
                     # a library constant: pinned only when a project declaration the module did not
                     # see would capture the text in the carved file (oaiq-096: project `norm_nonneg`
-                    # over Mathlib's); a local or an unresolvable name is left alone
-                    if not orig or orig != htxt:
+                    # over Mathlib's); a local or an unresolvable name is left alone. The text may be
+                    # a suffix of the name, reached by an export or an `open` (`some` is
+                    # `Option.some`; q135 VertexCover)
+                    if not orig or not (orig == htxt or orig.endswith('.' + htxt)):
                         continue
-                    now, k2 = g.lean_hits(htxt, c.namespace, opens, lambda n: pubname(n) in have)
+                    now, k2 = g.lean_hits(htxt, ns, opens, lambda n: pubname(n) in have and n not in own)
                     if k2 or not now:
                         continue
-                    src, k = g.lean_hits(htxt, c.namespace, opens, lambda n: self._seen_at(n, m, c))
+                    src, k = g.lean_hits(htxt, ns, opens, lambda n: self._seen_at(n, m, c))
                     if k == 0 and {pubname(n) for n in src} == {pubname(n) for n in now}:
                         continue
                     out.append((a, b, '_root_.' + orig))
                     continue
-                now, k2 = g.lean_hits(htxt, c.namespace, opens, lambda n: pubname(n) in have)
+                now, k2 = g.lean_hits(htxt, ns, opens, lambda n: pubname(n) in have and n not in own)
                 if k2 or not now or {pubname(n) for n in now} == {pubname(orig)}:
                     continue
                 # the same candidates the original module saw: Lean chose among them there and
                 # will choose the same way here (PermanentBorder: `Plane` read both
                 # FrobeniusPlane.Plane and another, in the port too)
-                src, k = g.lean_hits(htxt, c.namespace, opens, lambda n: self._seen_at(n, m, c))
+                src, k = g.lean_hits(htxt, ns, opens, lambda n: self._seen_at(n, m, c))
                 if k == 0 and {pubname(n) for n in src} == {pubname(n) for n in now}:
                     continue
                 out.append((a, b, '_root_.' + pubname(orig)))
                 continue
             if tok.split('.')[0] in binders:
                 continue
-            src, k = g.lean_hits(tok, c.namespace, opens, lambda n: self._seen_at(n, m, c))
+            src, k = g.lean_hits(tok, ns, opens, lambda n: self._seen_at(n, m, c))
             if len(src) != 1 or k:
                 continue
-            now, k2 = g.lean_hits(tok, c.namespace, opens, lambda n: pubname(n) in have)
+            now, k2 = g.lean_hits(tok, ns, opens, lambda n: pubname(n) in have and n not in own)
             if k2 == 0 and now and {pubname(n) for n in now} != {pubname(src[0])}:
                 out.append((i['start'], i['end'], '_root_.' + pubname(src[0])))
         return out

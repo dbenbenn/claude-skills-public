@@ -1955,6 +1955,26 @@ def test_a_library_name_a_project_declaration_shadows_is_pinned(g):
     assert '_root_.Nat.le_refl' not in sec, sec
 
 
+def test_a_name_a_dotted_declarations_namespace_shadows_is_pinned(g):
+    # q135 (VertexCover, 2026-10-31): `def Poly.finite` reads its body with namespace `Poly` open, and
+    # its bundle also held `Poly.some` from a module it never imported: `| some s =>` read
+    # `Poly.some` ("Invalid pattern"), and so did `Stream.poly (some …)`. The pin looks names up
+    # from the declaration's own namespace, takes a library constant written by a suffix of its
+    # name (`some` is `Option.some` by export), and covers a `match` pattern, never a tactic
+    # alternative (`cases q with | some n`, where only the constructor's short name parses).
+    keep = {'CD.Sh.Pk.some', 'CD.Sh.Pk.fin', 'CD.Sh.Pk.mk', 'CD.Sh.Pk.fin_le'}
+    txt = C.Carver(g).carve(keep, g.have_names(keep))
+    sec = _section(txt, 'CarveDev.ShadowD')
+    assert '| _root_.Option.some n => n' in sec, sec
+    assert 'Option Nat := _root_.Option.some 3' in sec, sec
+    assert '  | none => 0' in sec, sec                     # nothing captures `none`
+    assert '  | some n => exact' in sec and '  | none => exact' in sec, sec
+    # alone, nothing shadows them: no pin
+    keep = {'CD.Sh.Pk.fin', 'CD.Sh.Pk.mk'}
+    sec = _section(C.Carver(g).carve(keep, g.have_names(keep)), 'CarveDev.ShadowD')
+    assert '_root_.Option' not in sec, sec
+
+
 def test_a_collided_instance_of_an_unimported_copy_is_not_hidden(g, monkeypatch):
     # oaiq-096 (CubicMoment, 2026-10-29): bundle A018 hid `instFinite…_p0` and `_p1`, copies of one
     # anonymous instance declared in the later bundles A019/A021: "Unknown constant". The check
