@@ -672,9 +672,38 @@ def cmd_check_text(argv):
     sys.exit(1 if bad else 0)
 
 
+NAME_CHECK_WORKERS = 4     # concurrent read-only lookups (a small pool: the platform is shared)
+
+
+def prefetch_names(lookup, keys, workers=NAME_CHECK_WORKERS, say=None, every=10.0):
+    """{(kind, name): lookup(kind, name)} for every key, `workers` lookups at a time, with a progress
+    line about every `every` seconds and a last one (oaiq-088: ~110 names one at a time took 30 min
+    with no output). A failed lookup is left out (reconcile asks for it again and reports it)."""
+    import concurrent.futures as cf
+    import time
+    say = say or (lambda m: print(m, flush=True))
+    keys = list(dict.fromkeys(keys))
+    got, t0, last = {}, time.time(), time.time()
+    if not keys:
+        return got
+    say('names: looking up %d planned bundle and statement names, %d at a time' % (len(keys), workers))
+    with cf.ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {ex.submit(lookup, k, n): (k, n) for k, n in keys}
+        for i, f in enumerate(cf.as_completed(futs), 1):
+            try:
+                got[futs[f]] = f.result()
+            except Exception as e:          # noqa: BLE001 -- reconcile looks it up again
+                say('names: lookup of %s %s failed (%s); asked again below' % (futs[f][0], futs[f][1], e))
+            if time.time() - last >= every or i == len(keys):
+                last = time.time()
+                say('names: %d/%d looked up (%.0f s)' % (i, len(keys), last - t0))
+    return got
+
+
 def name_check(cfg):
     """(ok, message): the carve's planned bundles and statements against what is live under their
-    names, by splitrun's own reconcile (read-only, nothing written)."""
+    names, by splitrun's own reconcile (read-only, nothing written). The lookups run first, a few at
+    a time with progress lines (prefetch_names); reconcile then reads them."""
     import tempfile
     from p2mlib import splitrun as R
     tmp = tempfile.mkdtemp(prefix='name-check-')
@@ -684,12 +713,23 @@ def name_check(cfg):
            'explanations': os.path.join(tmp, 'explanations'), 'state': os.path.join(tmp, 'state.json'),
            'log': os.path.join(tmp, 'log')}
     live = R.LiveApi()
+    known = {}
 
     class Names:   # names only: without live_proofs, reconcile skips the pieces (one lookup each, minutes)
         def existing(self, kind, name):
+            if (kind, name) in known:
+                return known[(kind, name)]
             return live.existing(kind, name)
     api = R.ReadOnly(Names())
-    adopted, bad = R.Runner(run, api).reconcile(write=False)
+    runner = R.Runner(run, api)
+    keys = []
+    for x in getattr(runner, 'items', None) or ():
+        if x.split(':', 1)[0] in ('bundle', 'statement'):
+            f = runner.info(x)
+            if os.path.exists(f['file']):
+                keys.append((f['kind'], f['name']))
+    known.update(prefetch_names(lambda k, n: live.existing(k, n), keys))
+    adopted, bad = runner.reconcile(write=False)
     if bad:
         return False, ('%d planned name(s) are live on prove2.me with other text:\n%s\nFresh names: pipeline.json '
                        'config_set {"statement_suffix": "_sNN"} then --from plan; or extend the earlier carve '

@@ -730,3 +730,51 @@ def test_profile_diagnoses_serialization_kernel_and_elaboration():
     el = '[Elab.command] [80.0] ✅️ theorem slow : x := by fun_prop\ncumulative profiling times:\n\telaboration 80s\n'
     kind, msg = M.diagnose_profile(M.parse_profile(el), 85.0, ['slow'])
     assert kind == 'elaboration' and 'theorem slow' in msg
+
+
+def test_name_check_lookups_run_a_few_at_a_time_with_progress(tmp_path, monkeypatch):
+    # oaiq-088: `names` took 30 min for ~110 planned names, one lookup at a time, with no output
+    import threading
+    import time
+    lock, live, peak = threading.Lock(), [0], [0]
+
+    def lookup(kind, name):
+        with lock:
+            live[0] += 1
+            peak[0] = max(peak[0], live[0])
+        time.sleep(0.02)
+        with lock:
+            live[0] -= 1
+        if name == 'bad':
+            raise RuntimeError('503')
+        return {'id': name} if name.startswith('L') else None
+    said = []
+    keys = [('statement', 'S%d' % i) for i in range(20)] + [('bundle', 'L0'), ('bundle', 'bad')]
+    got = CP.prefetch_names(lookup, keys, say=said.append, every=0.0)
+    assert peak[0] <= CP.NAME_CHECK_WORKERS and peak[0] > 1
+    assert got[('bundle', 'L0')] == {'id': 'L0'} and got[('statement', 'S3')] is None
+    assert ('bundle', 'bad') not in got
+    assert said[0].startswith('names: looking up 22') and said[-1].startswith('names: 22/22 looked up')
+    assert any('bad' in s and 'failed' in s for s in said)
+
+
+def test_name_check_reconciles_from_the_prefetched_lookups(tmp_path, monkeypatch):
+    from p2mlib import splitrun as R
+    out, work = tmp_path / 'out', tmp_path / 'work'
+    (out / 'lib').mkdir(parents=True)
+    work.mkdir()
+    (out / 'lib' / 'Def_B0.lean').write_text('def b := 1\n')
+    (out / 'lib' / 'Thm_A_t.lean').write_text('theorem A.t : True := trivial\n')
+    plan = {'bundles': [{'name': 'B0', 'imports': [], 'nodes': ['b']}], 'stubs': {'A.t': {'bundles': ['B0']}},
+            'pieces': {'A.t': {'bundles': ['B0'], 'imports': []}}, 'external': []}
+    (work / 'plan.json').write_text(json.dumps(plan))
+    asked = []
+
+    class Live:
+        def existing(self, kind, name):
+            asked.append((kind, name))
+            return None
+    monkeypatch.setattr(R, 'LiveApi', Live)
+    ok, msg = CP.name_check({'out': str(out), 'work': str(work)})
+    assert ok, msg
+    assert sorted(asked) == [('bundle', 'B0'), ('statement', 'A.t')]          # once each, prefetched
