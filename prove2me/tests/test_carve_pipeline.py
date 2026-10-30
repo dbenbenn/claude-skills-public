@@ -1653,3 +1653,51 @@ def test_a_config_on_another_workspace_is_refused(env):
     cfg['src'] = str(env.ws)
     json.dump(cfg, open(env.dir / 'config.json', 'w'))
     assert run(env, '--redo', 'gen').returncode == 0
+
+
+# ---- a re-run graph whose output changed re-plans (oaiq-123) -------------------------------------------
+
+GRAPH_HOOK = ("w = json.load(open('config.json'))['work']; os.makedirs(w, exist_ok=True); "
+              "open(os.path.join(w, 'decl_graph.jsonl'), 'w').write(os.environ.get('GRAPH_TEXT', 'g1'))")
+
+
+def _graph_carve(env, monkeypatch):
+    monkeypatch.setenv('STUB_HOOK_carve_graph', GRAPH_HOOK)
+    _commit(env, 'lean/LeanInfo.lean', '-- v1\n')
+    r = run(env, *ARGS, '--config-set', json.dumps({'work': str(env.tmp / 'work')}), '--stop-after', 'plan')
+    assert r.returncode == 0, r.stdout + r.stderr
+    _commit(env, 'lean/LeanInfo.lean', '-- v2\n')
+    env.log.write_text('')
+
+
+def test_a_rerun_graph_with_new_output_reruns_extdefs_and_plan(env, monkeypatch):
+    # oaiq-123: an --upgrade across a LeanInfo change re-ran `graph` (gen still to run), whose new edges
+    # (830d195: a default-simp call depends on its module's earlier rfl simp lemmas) ran backwards across
+    # the old plan's bundles; `plan` stayed done, and calibrate's bundle split died on an import cycle
+    _graph_carve(env, monkeypatch)
+    monkeypatch.setenv('GRAPH_TEXT', 'g2')
+    r = run(env, '--upgrade', '--stop-after', 'plan')
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert seq.index(('carve', 'graph')) < seq.index(('carve_prep', 'ext-defs')) < seq.index(('carve', 'plan')), seq
+
+
+def test_a_rerun_graph_with_the_same_output_keeps_the_plan(env, monkeypatch):
+    _graph_carve(env, monkeypatch)
+    r = run(env, '--upgrade', '--stop-after', 'plan')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert tools_called(env) == [('carve', 'graph')], tools_called(env)
+
+
+def test_a_plan_from_before_the_graph_hash_is_stale_when_graph_ran_after_it(env, monkeypatch):
+    # oaiq-019's state: plan recorded no graph hash; graph re-ran (finished later than plan)
+    _graph_carve(env, monkeypatch)
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    for s in ('extdefs', 'plan'):
+        st['steps'][s].pop('in', None)
+        st['steps'][s]['finished'] = '2026-10-26T19:03:20'
+    st['steps']['graph']['finished'] = '2026-10-30T05:38:32'
+    json.dump(st, open(env.dir / 'pipeline_state.json', 'w'))
+    r = run(env, '--stop-after', 'plan')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert ('carve', 'plan') in tools_called(env), tools_called(env)

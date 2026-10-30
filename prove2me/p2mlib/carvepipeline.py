@@ -425,12 +425,21 @@ class Pipeline:
             'config': {'port': port_out},
             'gen': {'carve patches': hash_paths([cp] if (cp := self.carve_patches_path()) else [])},
         }.get(s, {})
+        if s in GRAPH_READERS and (gp := self.graph_path()):
+            # oaiq-123: a `graph` re-run by a LeanInfo change is popped alone, "its consumers check its
+            # output": without this, a changed graph left the old plan in place
+            h['graph output'] = hash_paths([gp])
         if s == 'filter_patches' and pp:           # a skipped filter_patches reads no rules
             h['port options'] = opts
         rule = SNAPSHOT_RULES.get(s)
         if rule and (s != 'filter_patches' or pp):
             h[rule[0]] = rules_hash(self.snap, rule[1])
         return h
+
+    def graph_path(self):
+        """The declaration graph `carve.py graph` writes (config `work`/decl_graph.jsonl), or None."""
+        w = (self.read_config() or {}).get('work')
+        return os.path.join(self.d, os.path.expanduser(w), 'decl_graph.jsonl') if w else None
 
     def carve_patches_path(self):
         """The post-carve patches file `carve.py gen` applies (config `patches`), or None. Its text is an input
@@ -462,6 +471,11 @@ class Pipeline:
             for k, old in had.items():
                 if k in now and now[k] != old and (k not in self.RULE_KEYS or self._rule_matters(s)):
                     return s, k
+            g = self.state['steps'].get('graph') or {}
+            if (s in GRAPH_READERS and 'graph output' not in had and rec['status'] == 'done'
+                    and g.get('status') == 'done' and g.get('finished', '') > rec.get('finished', '~')):
+                # a record from before the graph hash: `graph` ran again after it (oaiq-019/oaiq-123)
+                return s, 'graph output'
             rule = SNAPSHOT_RULES.get(s)
             if rule and rule[0] in now and rule[0] not in had and rec['status'] == 'done' and self._rule_matters(s):
                 then = logged_snapshot(os.path.join(self.d, 'logs', s + '.log'))
