@@ -2509,3 +2509,12 @@ def test_stub_and_piece_imports_restore_a_bundle_edge_the_real_text_lacks():
     need = lambda kind, n: {'B008'} if kind == 'pieces' else {'B004', 'B008'}
     new = C.restore_cut_bundle_imports(plan, real, need)
     assert new['stubs']['s']['bundles'] == ['B004', 'B008'] and new['pieces']['s']['bundles'] == ['B008']
+
+
+def test_make_plan_builds_the_available_name_set_once():
+    # oaiq-098 (PlanarPacking, 564k declarations): `ok_node` rebuilt `B | set(ext)` on every call, an O(|B|)
+    # union inside the promotion loop, and `plan` ran for over 5 hours. The set is built once, outside it.
+    import inspect
+    src = inspect.getsource(C.make_plan)
+    inner = src[src.index('def ok_node'):src.index('def fresh')]
+    assert 'B | set(ext)' not in inner and '| set(' not in inner

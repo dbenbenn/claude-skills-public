@@ -1718,9 +1718,11 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     nodes = set(targets) | set(forced)
     renames = collision_renames(g)
 
+    b_or_ext = B | set(ext)
+
     def ok_node(k):
         nd = g.nodes[k]
-        return nd.theorem and not nd.private and ascii_ok(k) and nd.sig <= B | set(ext) and k not in renames
+        return nd.theorem and not nd.private and ascii_ok(k) and nd.sig <= b_or_ext and k not in renames
 
     for t in sorted(nodes):
         if not g.nodes[t].theorem or g.nodes[t].sig - B - set(ext):
