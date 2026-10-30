@@ -462,8 +462,11 @@ noncomputable def IsUnital.toNormedRing {A : Type*} [NonUnitalNormedRing A] [h :
     intCast_ofNat := fun n => rfl
     intCast_negSucc := fun n => rfl }
 /-- A closed commutative ⋆-subalgebra of a C⋆-algebra is a commutative C⋆-algebra, found by instance search
-in d13f23b (Kadison similarity, oaiq-075). -/
-noncomputable instance starSubalgebraCommCStarAlgebra {B : Type*} [CStarAlgebra B] (A : StarSubalgebra ℂ B)
+in d13f23b (Kadison similarity, oaiq-075). A def, made a local instance by the port only in modules naming
+`CommCStarAlgebra` or `IsMulCommutative` (`oaiport.comm_cstar_line`): as a global instance it made `whnf` time out in
+FactorGeneration modules with their own `CStarAlgebra` instances on a subalgebra (oaiq-122). -/
+@[reducible]
+noncomputable def starSubalgebraCommCStarAlgebra {B : Type*} [CStarAlgebra B] (A : StarSubalgebra ℂ B)
     [IsClosed (A : Set B)] [IsMulCommutative A] : CommCStarAlgebra A :=
   { StarSubalgebra.cstarAlgebra A with
     mul_comm := fun a b => IsMulCommutative.is_comm.comm a b }

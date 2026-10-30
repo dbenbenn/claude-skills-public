@@ -1787,9 +1787,27 @@ def test_the_compat_block_declares_is_unital():
 
 
 def test_the_compat_block_declares_comm_cstar_subalgebra_instance():
-    # a closed commutative star subalgebra is a `CommCStarAlgebra` (Kadison similarity, oaiq-075)
+    # a closed commutative star subalgebra is a `CommCStarAlgebra` (Kadison similarity, oaiq-075); a def, not a
+    # global instance: as one it made `whnf` time out in three FactorGeneration modules that never use it (oaiq-122)
     block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
-    assert re.search(r'^noncomputable instance starSubalgebraCommCStarAlgebra\b', block, re.M)
+    assert re.search(r'^noncomputable def starSubalgebraCommCStarAlgebra\b', block, re.M)
+    assert not re.search(r'^(noncomputable )?instance starSubalgebraCommCStarAlgebra\b', block, re.M)
+
+
+def test_comm_cstar_modules_get_the_subalgebra_instance_locally():
+    # oaiq-122: only modules naming `CommCStarAlgebra` or `IsMulCommutative` (Kadison similarity's) turn it on
+    line = 'attribute [local instance] OAI.starSubalgebraCommCStarAlgebra'
+    srcs = {'OAI.A': ('A', 'import Mathlib\n\nvariable {A : Type*} [CommCStarAlgebra A]\ntheorem a : True := trivial\n'),
+            'OAI.B': ('B', 'import OAI.A\ntheorem b (S : StarSubalgebra ℂ ℂ) [IsMulCommutative S] : True := trivial\n'),
+            'OAI.D': ('D', 'import OAI.A\ntheorem d (S : StarSubalgebra ℂ ℂ) : True := trivial\n')}
+    files = O.module_texts(srcs, 'Solutions.X')
+    a = files['A.lean']
+    assert a.count(line) == 1 and a.index('set_option linter.unreachableTactic false\n') < a.index(line) < a.index('variable')
+    assert line in files['B.lean'] and line not in files['D.lean']
+    assert O.comm_cstar_line('theorem t [IsMulCommutative S] : True := trivial\n') == line + '\n'
+    assert O.comm_cstar_line('theorem t : True := trivial\n') == ''
+    assert O.comm_cstar_line('theorem t [CommCStarAlgebra A] : True := trivial\n', None) == \
+        'attribute [local instance] starSubalgebraCommCStarAlgebra\n'
 
 
 # ---------------------------------------------------------------- the map fallback names its measurability first

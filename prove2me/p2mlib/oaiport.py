@@ -1781,6 +1781,21 @@ def names_matrix(text):
     return bool(_MATRIX_WORD.search(text, header_end(text)))
 
 
+# The compat block's `starSubalgebraCommCStarAlgebra` (a closed commutative ⋆-subalgebra is a CommCStarAlgebra, found by
+# instance search in d13f23b; Kadison similarity, oaiq-075) is a def: as a global instance it made `whnf` time out in
+# three FactorGeneration modules that build their own CStarAlgebra instances on `M.toStarSubalgebra` (oaiq-122).
+# A module naming `CommCStarAlgebra` or `IsMulCommutative` turns it on as a local instance.
+_COMM_CSTAR_WORD = re.compile(r"(?<![\w.'])(CommCStarAlgebra|IsMulCommutative)(?![\w'])")
+
+
+def comm_cstar_line(text, compat_ns='OAI'):
+    """The `attribute [local instance]` line for the compat subalgebra instance when the body of `text` (after its
+    imports) names `CommCStarAlgebra` or `IsMulCommutative`, else ''."""
+    if not _COMM_CSTAR_WORD.search(text, header_end(text)):
+        return ''
+    return 'attribute [local instance] %sstarSubalgebraCommCStarAlgebra\n' % (compat_ns + '.' if compat_ns else '')
+
+
 def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsimplex='auto',
                  matrix_default_instance=False):
     """The workspace modules of a module-route port before the patches: {file name: text} under
@@ -1803,7 +1818,7 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
     cstar = not matrix_default_instance or any('CStarMatrix' in x for _, x in sources.values())
     files, missing = {}, set()
     for oai, (short, t) in sources.items():
-        mx = MATRIX_DEFAULT_INSTANCE if not cstar and names_matrix(t) else ''
+        mx = (MATRIX_DEFAULT_INSTANCE if not cstar and names_matrix(t) else '') + comm_cstar_line(t, compat_ns)
         def rep(m):
             n = m.group(1)
             if n in names:

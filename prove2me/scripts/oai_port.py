@@ -91,7 +91,8 @@ def port_text(target, root, src, bundles, patches=(), compat_ns='OAI', ws=None, 
     if 'import Mathlib' not in pre:
         pre = ['import Mathlib'] + pre
     pre += [l for l in shim_imports if l not in pre]
-    sol = ('\n'.join(pre) + '\n\n' + (shim + '\n' if shim else '') + block + '\n' + text.rstrip() + '\n\n'
+    sol = ('\n'.join(pre) + '\n\n' + (shim + '\n' if shim else '') + block + '\n'
+           + O.comm_cstar_line(text, compat_ns) + text.rstrip() + '\n\n'
            # no `open X in`: type_of% needs none, and a relative X fails at root level
            + 'theorem solution : type_of%% @%s_oai := @%s_oai\n' % (target, target))
     return sol, pre, len(mods), dropped
