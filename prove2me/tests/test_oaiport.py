@@ -2180,7 +2180,7 @@ def test_convert_funext_rfl_becomes_congr_deriv():
            '    rfl\n'
            '  · ring\n')
     out = O.core_rewrites(src)
-    assert 'refine h.congr_deriv ?_\n  · ring\n' in out
+    assert 'refine h.congr_deriv (Eq.symm ?_)\n  · ring\n' in out
     assert 'funext' not in out
     # the first-bullet-only form, and a multi-line term
     src2 = ('theorem foo : HasFDerivAt f f\' x := by\n'
@@ -2188,7 +2188,7 @@ def test_convert_funext_rfl_becomes_congr_deriv():
             '  · rfl\n'
             '  · ext v\n    simp\n')
     out2 = O.core_rewrites(src2)
-    assert 'refine (a.sub\n      b).congr_fderiv ?_\n  · ext v\n    simp\n' in out2
+    assert 'refine (a.sub\n      b).congr_fderiv (Eq.symm ?_)\n  · ext v\n    simp\n' in out2
     # a function bullet that does real work is not the rfl rule's (the ext rule keeps its body)
     src3 = ('theorem foo : HasDerivAt f (g x) x := by\n'
             '  convert h using 1\n'
@@ -2212,7 +2212,7 @@ def test_convert_rfl_rewrite_does_not_swallow_an_earlier_convert():
     out = O.core_rewrites(src)
     assert '  convert h1 using 1\n' in out and 'refine h1' not in out
     assert 'all_goals first | rfl | ring' in out
-    assert 'refine h2.congr_deriv ?_\n  · ring\n' in out
+    assert 'refine h2.congr_deriv (Eq.symm ?_)\n  · ring\n' in out
 
 
 def test_convert_ext_bullet_becomes_congr_of_eventuallyEq():
@@ -2229,7 +2229,7 @@ def test_convert_ext_bullet_becomes_congr_of_eventuallyEq():
            '  · unfold kappaV\n'
            '    ring\n')
     out = O.core_rewrites(src)
-    assert ('  refine (h.congr_of_eventuallyEq (Filter.Eventually.of_forall fun x => ?_)).congr_deriv ?_\n'
+    assert ('  refine (h.congr_of_eventuallyEq (Filter.Eventually.of_forall fun x => ?_)).congr_deriv (Eq.symm ?_)\n'
             '  · beta_reduce\n'
             '    unfold kappa\n'
             '    ring\n'
@@ -2237,6 +2237,29 @@ def test_convert_ext_bullet_becomes_congr_of_eventuallyEq():
     # an fderiv goal is left alone
     src2 = src.replace('HasDerivAt', 'HasFDerivAt')
     assert O.core_rewrites(src2) == src2
+
+
+def test_congr_deriv_rules_keep_converts_orientation():
+    # `convert h using 1` leaves the value goal as `goal' = h'`; `h.congr_deriv ?_` leaves `h' = goal'`, which
+    # broke the kept bullet wherever it was not symmetric (`change A = B`, `rw` of the unfolded left side,
+    # `exact foo.symm`: oaiq-090, oaiq-091 item 11, 4 sites). `Eq.symm ?_` puts the goal back as convert had it.
+    src = ('theorem foo : HasDerivAt f (g x) x := by\n'
+           '  convert h using 1\n'
+           '  · rfl\n'
+           '  · change g x = 1\n'
+           '    simp\n')
+    out = O.core_rewrites(src)
+    assert '  refine h.congr_deriv (Eq.symm ?_)\n  · change g x = 1\n' in out
+    src2 = ('theorem foo : HasDerivAt (fun x => k x) (g x) x := by\n'
+            '  convert h using 1\n'
+            '  · ext y\n'
+            '    rfl\n'
+            '  · exact hg.symm\n')
+    out2 = O.core_rewrites(src2)
+    assert '.congr_deriv (Eq.symm ?_)\n' in out2 and '  · exact hg.symm\n' in out2
+    assert 'congr_deriv ?_' not in out + out2
+    # a second pass leaves the output alone
+    assert O.core_rewrites(out) == out and O.core_rewrites(out2) == out2
 
 
 def test_compat_ite_lemmas_name_the_proposition_c():

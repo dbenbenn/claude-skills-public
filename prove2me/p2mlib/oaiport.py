@@ -1092,8 +1092,10 @@ def convert_funext_rfl_to_congr_deriv(text):
     """OpenAI's `HasDerivAt.add/sub/mul/…` conclude lambdas, ours Pi-form sums (and instance diamonds
     on `EuclideanSpace`), so `convert h using 1` leaves a function goal that only `funext x; rfl`
     (or `rfl`) closes and sometimes `funext` cannot even apply. The function equality is
-    definitional: `refine h.congr_deriv ?_` (`congr_fderiv` for `HasFDerivAt`) leaves just the
-    derivative-value goal, whose bullet is kept. The conclusion's kind is read from the nearest
+    definitional: `refine h.congr_deriv (Eq.symm ?_)` (`congr_fderiv` for `HasFDerivAt`) leaves just the
+    derivative-value goal, whose bullet is kept. `Eq.symm` keeps convert's orientation `goal' = h'`
+    (a bare `?_` is `h' = goal'`, which broke kept `change`/`rw`/`exact foo.symm` bullets: oaiq-090,
+    oaiq-091). The conclusion's kind is read from the nearest
     preceding `theorem`/`lemma`/`have` header; an unknown kind or a `…Within…` goal is left alone
     (oaiq-080, Boltzmann: 14 sites)."""
     def kind(pos, ind):
@@ -1120,7 +1122,7 @@ def convert_funext_rfl_to_congr_deriv(text):
                 whole = False
                 break
         e = e if whole or re.fullmatch(r"[\w.']+", e) else '(' + e + ')'
-        return '%srefine %s.%s ?_\n%s· ' % (m.group('ind'), e, k, m.group('ind'))
+        return '%srefine %s.%s (Eq.symm ?_)\n%s· ' % (m.group('ind'), e, k, m.group('ind'))
     return _CONVERT_RFL.sub(sub, text)
 
 
@@ -1133,8 +1135,9 @@ def convert_ext_to_congr_of_eventually_eq(text):
     """`convert h using 1` + `· ext x; BODY` + `· DERIV` on a `HasDerivAt` goal: ours leaves instance-diamond
     goals the function bullet cannot touch (`unfold F` fails in `x + x✝ = x + x✝`, oaiq-091). The function
     bullet is a pointwise equality, so it becomes
-    `refine (h.congr_of_eventuallyEq (Filter.Eventually.of_forall fun x => ?_)).congr_deriv ?_`, the body
-    kept under `beta_reduce`. Only `HasDerivAt` conclusions (read as in the rfl rule)."""
+    `refine (h.congr_of_eventuallyEq (Filter.Eventually.of_forall fun x => ?_)).congr_deriv (Eq.symm ?_)`,
+    the body kept under `beta_reduce`. Both goals keep convert's orientation (goal's side on the left; the
+    eventual equality is `goal_f x = h_f x` already). Only `HasDerivAt` conclusions (read as in the rfl rule)."""
     def kind(pos, ind):
         for m in reversed(list(re.finditer(r"(?m)^([ \t]*)(?:theorem|lemma|have)\b", text[:pos]))):
             if len(m.group(1).expandtabs()) >= len(ind.expandtabs()):
@@ -1157,7 +1160,7 @@ def convert_ext_to_congr_of_eventually_eq(text):
                 break
         e = e if whole or re.fullmatch(r"[\w.']+", e) else '(' + e + ')'
         body = m.group('body')
-        return ('%srefine (%s.congr_of_eventuallyEq (Filter.Eventually.of_forall fun %s => ?_)).congr_deriv ?_\n'
+        return ('%srefine (%s.congr_of_eventuallyEq (Filter.Eventually.of_forall fun %s => ?_)).congr_deriv (Eq.symm ?_)\n'
                 '%s· beta_reduce\n%s%s· ') % (ind, e, m.group('v'), ind, body, ind)
     return _CONVERT_EXT.sub(sub, text)
 
