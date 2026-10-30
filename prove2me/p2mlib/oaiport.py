@@ -18,6 +18,8 @@ Every function here pins a behaviour that went wrong on a live port (2026-10-18)
 * `classify_attempt` / `state_from_log`: the submit queue rebuilds each goal from its log, so a
   restart neither repeats nor loses an attempt.
 """
+import collections
+import difflib
 import os
 import re
 
@@ -1165,6 +1167,80 @@ def convert_ext_to_congr_of_eventually_eq(text):
     return _CONVERT_EXT.sub(sub, text)
 
 
+_FIN_NORM_NUM = re.compile(r"(?P<lead><;>[ \t]*|^[ \t]*(?:·[ \t]+)?|(?<![\w'.])by[ \t]+)norm_num(?![\w'?!])", re.M)
+
+
+def fin_norm_num(text):
+    """This Mathlib's `norm_num` runs no simprocs: it leaves `(1 : Fin 4) < 2`, `Fin.succ 2 = 3`, `(0 : Fin 7) ≠ 5`,
+    `(190 : Fin 768) ∉ [..]`, `![..] 3` that `simp` decides (oaiq-081, oaiq-091, oaiq-092: ~250 hand patches,
+    mostly `fin_cases … <;> norm_num [L]` -> `simp [L] <;> norm_num`). A terminal `norm_num[ [L]][ at locs]`
+    (the last tactic of a line holding `fin_cases` before it, or one whose list names a `Fin.` lemma)
+    becomes `first | (simp …; all_goals first | (norm_num …; done) | rfl | decide) | (norm_num …; done) |
+    norm_num …` (parenthesized after `<;>`): a goal norm_num closed and simp + norm_num does not still closes
+    by the second alternative, and the last gives norm_num's own error when nothing does. simp goes first as in
+    the hand patches: a norm_num failing first on each of 144 `fin_cases` goals hit the 200000-heartbeat limit
+    (oaiq-091 AngularClifford). Terminal: nothing follows on the line and the
+    next line is indented less than the site's tactic block (a following line of the same block may expect
+    the goals norm_num leaves), or a `(by norm_num …)` term. A multi-line list is joined onto one line (a
+    `; done)` after a continuation line fails the tactic-block column check); a list with a comment,
+    `norm_num only`, `norm_num1` and `norm_num … <;> tac` are left alone. Idempotent: the output's norm_nums
+    follow `(` or `| `, which no lead matches."""
+    out, i = [], 0
+    for m in _FIN_NORM_NUM.finditer(text):
+        if m.start() < i:
+            continue
+        k = q = m.end()
+        while q < len(text) and text[q] in ' \t':
+            q += 1
+        lst = ''
+        if text.startswith('[', q):
+            k = q
+            e = _balanced_end(text, k)
+            if e is None or '--' in text[k:e] or '/-' in text[k:e]:
+                continue
+            lst = ' ' + ' '.join(x.strip() for x in text[k:e].split('\n'))
+            k = e
+        loc = re.match(r"[ \t]+at(?:[ \t]+(?:[\w.'✝]+|⊢|\*))+", text[k:])
+        loc_s = ' at ' + ' '.join(loc.group(0).split()[1:]) if loc else ''
+        k += loc.end() if loc else 0
+        rest = re.match(r"[ \t]*(\)|\n|$)", text[k:])
+        if not rest:
+            continue
+        line_start = text.rfind('\n', 0, m.start()) + 1
+        lead = m.group('lead')
+        # a `<;>` chain continued from the lines before (`fin_cases i <;> fin_cases j <;>` / `norm_num [L]`)
+        chain = line_start
+        while not lead.startswith('by') and chain > 0 and text[:chain - 1].rstrip(' \t').endswith('<;>'):
+            chain = text.rfind('\n', 0, chain - 1) + 1
+        chained = chain < line_start and not lead.startswith('by')
+        head = text[chain:m.start()]
+        if not (re.search(r"(?<![\w'])fin_cases(?![\w'])", head) or re.search(r"(?<![\w.'])Fin\.", lst)):
+            continue
+        if rest.group(1) == ')':
+            if not lead.startswith('by'):
+                continue
+        else:
+            # the tactic block's column: the site's own after an inline `by`, else after the chain's first line's
+            # last `by `, else that line's first tactic (after any bullet)
+            first = text[chain:].split('\n', 1)[0]
+            bys = [b.end() for b in re.finditer(r"(?<![\w'.])by[ \t]+", first[:m.start() - chain])]
+            if lead.startswith('by'):
+                col = m.start() - line_start + len(lead)
+            elif bys:
+                col = bys[-1]
+            else:
+                col = len(re.match(r"[ \t]*(?:·[ \t]+)?", first).group(0))
+            nxt = re.search(r"\n([ \t]*)\S", text[k:])
+            if nxt and len(nxt.group(1).expandtabs()) >= col:
+                continue
+        a = lst + loc_s
+        wrapped = ('first | (simp%s; all_goals first | (norm_num%s; done) | rfl | decide) | (norm_num%s; done) '
+                   '| norm_num%s') % (a, a, a, a)
+        out.append(text[i:m.start()] + lead + ('(%s)' % wrapped if lead.startswith('<;>') or chained else wrapped))
+        i = k
+    return ''.join(out) + text[i:]
+
+
 def core_rewrites(text, compat_ns='OAI', known=None):
     """Lean core/Mathlib renames every port needs. OpenAI's `TensorProduct.inductionOn z tmul add`
     (Mathlib d13f23b) takes its zero case from `tmul 0 0`; ours has only `induction_on`, which
@@ -1179,6 +1255,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     pre = compat_ns + '.' if compat_ns else ''
     text = convert_funext_rfl_to_congr_deriv(text)
     text = convert_ext_to_congr_of_eventually_eq(text)
+    text = fin_norm_num(text)     # `norm_num` leaves Fin literals that `simp` decides (oaiq-081/091/092)
     # `convert h using 1 <;> ring` on an inequality leaves an `instLE` diamond ring cannot see through
     text = re.sub(r"(?m)^([ \t]*)convert ([^\n]+?) using 1 <;> ring[ \t]*$",
                   lambda m: ('%sfirst | (convert %s using 1 <;> ring) | exact (le_of_eq (by ring)).trans (%s.trans '
@@ -1287,8 +1364,8 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # (SingleLatticeCovering 2026-10-25)
     text = re.sub(r"(?<=\.)isClosed_of_discreteTopology(?![\w'])( \(U :=)?",
                   lambda m: 'isClosed_of_discrete' + (' (H :=' if m.group(1) else ''), text)
-    # d13f23b's `RKHS.posSemidef_tfae` has a fourth item; its `.out 1 3).mpr` is our `.out 2 0).mp`
-    # (HotSpots Reciprocal, 2026-10-26)
+    # d13f23b's `RKHS.posSemidef_tfae.out 1 3).mpr` is our `.out 2 0).mp` (HotSpots Reciprocal, 2026-10-26); not a
+    # changed list but the 1-based `List.TFAE.out` below (items 0 and 2 either way), kept as it was verified
     text = re.sub(r"\(RKHS\.posSemidef_tfae\.out 1 3\)\.mpr", "(RKHS.posSemidef_tfae.out 2 0).mp", text)
     # d13f23b's `List.TFAE.out i j` counts from 1, ours from 0: `.out N M` (both >= 1, so not already ours)
     # becomes `.out (N-1) (M-1)`, which a second pass leaves alone (Tachikawa, oaiq-116)
@@ -1800,7 +1877,7 @@ def comm_cstar_line(text, compat_ns='OAI'):
 
 
 def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsimplex='auto',
-                 matrix_default_instance=False):
+                 matrix_default_instance=False, pre=None):
     """The workspace modules of a module-route port before the patches: {file name: text} under
     Lean prefix `mod` (e.g. Solutions.OAIQW_X), Compat.lean not included. `sources` as
     module_sources returns. Each module's OAI imports are rewritten to the ported copies (an import
@@ -1810,7 +1887,8 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
     shim (stdsimplex_mode over all modules: each module that needs it imports `<mod>.StdSimplexCompat`,
     stdsimplex_rewrite). This is the text the patches are counted against
     (carve_prep.py filter-patches; ComparatorModel 2026-10-24: counted against the raw source, a
-    patch of what core_rewrites had inserted counted 0)."""
+    patch of what core_rewrites had inserted counted 0). `pre`, a dict, gets each module's text as it
+    went into the core rewrites (for patch_drop_note)."""
     names = {k: v[0] for k, v in sources.items()}
     block, rewrites = compat_block(compat_text, compat_ns)
     sources = inline_module_macros(sources)
@@ -1850,10 +1928,61 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
         ls = t.split('\n')
         k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
         t = '\n'.join(ls[:k] + [''] + (LINT + mx + header).rstrip().split('\n') + ls[k:])
+        if pre is not None:
+            pre[short + '.lean'] = t
         files[short + '.lean'] = guard_renames(apply_rewrites(core_rewrites(t, compat_ns, known), rewrites))
     if missing:
         raise PortError('imports of OpenAI modules that are not ported:\n  ' + '\n  '.join(sorted(missing)))
     return files
+
+
+# the core rewrites that are functions of the text alone, by name: patch_drop_note tries each on its own
+NAMED_RULES = ('convert_funext_rfl_to_congr_deriv', 'convert_ext_to_congr_of_eventually_eq', 'fin_norm_num',
+               '_convert_close_diamonds', '_simp_lists_add_if_true', 'mathlib_token_idents', '_finset_antidiagonal',
+               '_memlp_mul_swap', '_mgf_gaussian_real_map_eq', '_drop_map_smul_proof', 'guard_renames')
+
+
+def patch_drop_note(old, pre, post):
+    """Why a patch's `old` occurs fewer times in the port's output than it says, for filter-patches (oaiq-090:
+    a newer port rule rewrote the sites of three hand patches, which then counted 0, and the worker had to
+    find out by hand that the rule had made them unnecessary). `pre`/`post`: {module: text} going into and
+    coming out of the core and compat rewrites (module_texts(pre=…) and its result). Names the rule(s) of
+    NAMED_RULES that rewrite the site on their own, else says another core/compat rewrite did, and shows
+    what the port writes there now; or says the site is not in the port's input at all (the source or an
+    earlier step changed)."""
+    n_pre = sum(t.count(old) for t in pre.values())
+    if not n_pre:
+        return 'not in the port\'s input either: the OpenAI source (or the import/macro step) changed this text'
+    names = []
+    for name in NAMED_RULES:
+        fn = globals()[name]
+        if any(t.count(old) and fn(t).count(old) < t.count(old) for t in pre.values()):
+            names.append(name)
+    who = ('the port rule %s rewrites it' % ' / '.join(names) if names else
+           'a core or compat rewrite (not one of the named rules) rewrites it')
+    now = ''
+    for k, t in pre.items():
+        i = t.find(old)
+        if i < 0 or k not in post:
+            continue
+        # the output's lines that replace the site's lines
+        a = t[:i].count('\n')
+        b = a + old.count('\n') + 1
+        pl, ql = t.split('\n'), post[k].split('\n')
+        # diff only between two lines unique in both texts around the site (a module can have 10,000s of lines)
+        pc, qc = collections.Counter(pl), collections.Counter(ql)
+        uniq = lambda x: x.strip() and pc[x] == 1 and qc[x] == 1
+        lo = next((r for r in range(a - 1, max(a - 60, -1), -1) if uniq(pl[r])), None)
+        hi = next((r for r in range(b, min(b + 60, len(pl))) if uniq(pl[r])), None)
+        p0, p1 = (lo + 1 if lo is not None else 0), (hi if hi is not None else len(pl))
+        q0, q1 = (ql.index(pl[lo]) + 1 if lo is not None else 0), (ql.index(pl[hi]) if hi is not None else len(ql))
+        for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, pl[p0:p1], ql[q0:q1], autojunk=False).get_opcodes():
+            if tag != 'equal' and p0 + i1 < b and p0 + i2 > a:
+                now = '; the port now writes (%s): %s' % (k, ' / '.join(x.strip() for x in ql[q0 + j1:q0 + j2])[:300])
+                break
+        break
+    return '%d occurrence(s) in the port\'s input: %s, so the patch may be unnecessary (check, then drop it)%s' % (
+        n_pre, who, now)
 
 
 # the Mathlib files the compat block's declarations need, for `module_files(compat_imports=…)`

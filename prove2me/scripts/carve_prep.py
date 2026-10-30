@@ -369,16 +369,24 @@ def filter_patches(patches, texts, detail=None):
 
 
 def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='', stdsimplex='auto', detail=None,
-                        folder='FilterPatches'):
+                        folder='FilterPatches', notes=None):
     """filter_patches against the text oai_port_modules.py patches: the modules after its import,
     header, core and compat rewrites (oaiport.module_texts), never OpenAI's raw source
     (ComparatorModel 2026-10-24: the `| zero` case core_rewrites then added counted 0 there and was
     dropped; CubeShuffle: a patch the compat aliases made redundant was kept). `folder` is the port's
     Solutions folder: the rewritten imports name it, and a patch mkpatches anchored on the header
-    (`import Solutions.<FOLDER>.X` + the linter lines) counted 0 under a placeholder (oaiq-116)."""
-    return filter_patches(patches, O.module_texts(sources, 'Solutions.' + folder, compat_text,
-                                                  compat_ns, header, stdsimplex),
-                          detail)
+    (`import Solutions.<FOLDER>.X` + the linter lines) counted 0 under a placeholder (oaiq-116). `notes`, a dict,
+    gets {patch old: oaiport.patch_drop_note} for each patch dropped for its count with fewer occurrences
+    than it says (oaiq-090: which port rule now rewrites its site, or that the site's text changed)."""
+    pre = {}
+    texts = O.module_texts(sources, 'Solutions.' + folder, compat_text, compat_ns, header, stdsimplex, pre=pre)
+    det = [] if detail is None else detail
+    keep, drop = filter_patches(patches, texts, det)
+    if notes is not None:
+        for p, per in det:
+            if sum(per.values()) < p.get('count', 1):
+                notes[p['old']] = O.patch_drop_note(p['old'], pre, texts)
+    return keep, drop
 
 
 def cmd_filter_patches(argv):
@@ -390,15 +398,17 @@ def cmd_filter_patches(argv):
     compat = open(opt(argv, '--compat', COMPAT), encoding='utf-8').read()
     ns = None if '--root-compat' in argv else opt(argv, '--compat-ns', 'OAI')
     header = open(opt(argv, '--header'), encoding='utf-8').read() if '--header' in argv else ''
-    detail = []
+    detail, notes = [], {}
     try:
         keep, drop = port_filter_patches(json.load(open(src)), srcs, compat, ns, header,
                                          opt(argv, '--stdsimplex', 'auto'), detail,
-                                         opt(argv, '--folder', 'FilterPatches'))
+                                         opt(argv, '--folder', 'FilterPatches'), notes)
     except O.PortError as e:
         sys.exit(str(e))
     for n, p in drop:
         print('dropped (%s): %r' % (n if isinstance(n, str) else '%d occurrences' % n, p['old'][:70]))
+        if p['old'] in notes:
+            print('  why: ' + notes[p['old']])
     print('kept', len(keep), 'of', len(keep) + len(drop))
     # a patch dropped for its count is a patch the port would silently lack (six batches ran an
     # unpatched port that way): fail unless the patch says it may drop ("allow_drop": true).
@@ -411,9 +421,10 @@ def cmd_filter_patches(argv):
         sys.exit('%d patch(es) would rewrite part of a longer identifier. Nothing written.' % len(cuts))
     if bad:
         for p, per in bad:
-            print('PATCH DROPPED: %r\n  expected count %s, found %s\n  occurrences per module: %s' % (
+            print('PATCH DROPPED: %r\n  expected count %s, found %s\n  occurrences per module: %s%s' % (
                 p['old'][:200], p.get('count', 1), sum(per.values()),
-                ', '.join('%s: %d' % kv for kv in sorted(per.items())) or 'none in any module'), file=sys.stderr)
+                ', '.join('%s: %d' % kv for kv in sorted(per.items())) or 'none in any module',
+                '\n  why: ' + notes[p['old']] if p['old'] in notes else ''), file=sys.stderr)
         sys.exit('%d patch(es) dropped for their count; fix the patch (old/count) or mark it "allow_drop": true. '
                  'Nothing written.' % len(bad))
     json.dump(keep, open(out, 'w'), ensure_ascii=False, indent=1)

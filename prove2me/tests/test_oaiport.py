@@ -2500,3 +2500,99 @@ def test_convert_wrapped_sequence_trailing_rfl_is_optional():
                    "(simp only [List.nil_append,hd] ; try rfl)\n")
     # a lone `rfl` after convert is left alone, as before
     assert "using 1; rfl\n" in O.core_rewrites("  convert h using 1; rfl\n")
+
+
+# ---------------------------------------------------------------- norm_num on Fin literals
+# This Mathlib's `norm_num` runs no simprocs: it leaves `(1 : Fin 4) < 2`, `Fin.succ 2 = 3`, `(0 : Fin 7) ≠ 5`,
+# `(190 : Fin 768) ∉ [..]` and `![..] 3` that `simp` decides (oaiq-081, oaiq-091 item 13, oaiq-092: ~250 hand
+# patches, mostly `fin_cases … <;> norm_num [L]` -> `simp [L] <;> norm_num`). A terminal `norm_num` after
+# `fin_cases`, or one whose list names a `Fin.` lemma, tries simp + norm_num/rfl/decide first (norm_num first
+# hit the heartbeat limit on 144 goals), then norm_num alone, then norm_num again (its error if nothing closes it).
+
+def _fin_wrap(args):
+    return ('first | (simp%s; all_goals first | (norm_num%s; done) | rfl | decide) | (norm_num%s; done) | norm_num%s'
+            % (args, args, args, args))
+
+
+def test_fin_cases_norm_num_tries_simp():
+    src = ('theorem t (i : Fin 6) : tbl i ≤ 7 := by\n'
+           '  fin_cases i <;> norm_num [tbl]\n'
+           '\n'
+           'theorem u (i : Fin 4) (h : i ≠ 0) : (i : ℕ) ≠ 0 := by\n'
+           '  · fin_cases i <;> fin_cases j <;> norm_num at h ⊢\n')
+    out = O.core_rewrites(src)
+    assert '  fin_cases i <;> (%s)\n' % _fin_wrap(' [tbl]') in out
+    assert '  · fin_cases i <;> fin_cases j <;> (%s)\n' % _fin_wrap(' at h ⊢') in out
+    assert O.core_rewrites(out) == out
+
+
+def test_fin_norm_num_multiline_list_is_joined():
+    src = ('theorem t (i : Fin 6) : tbl i ≤ 7 := by\n'
+           '  fin_cases i <;> norm_num [tbl,\n'
+           '      Matrix.cons_val]\n'
+           'theorem u : True := trivial\n')
+    out = O.core_rewrites(src)
+    assert '  fin_cases i <;> (%s)\ntheorem u' % _fin_wrap(' [tbl, Matrix.cons_val]') in out
+    # a comment inside the list: left alone
+    src2 = src.replace('[tbl,\n', '[tbl, -- the table\n')
+    assert O.core_rewrites(src2) == src2
+
+
+def test_fin_norm_num_only_when_terminal():
+    # more tactics follow at the same indentation: they may expect the goals norm_num leaves
+    src = ('theorem t (i : Fin 6) : tbl i ≤ 7 := by\n'
+           '  fin_cases i <;> norm_num [tbl]\n'
+           '  all_goals linarith\n')
+    assert O.core_rewrites(src) == src
+    # the bullet's block ends at the next bullet: terminal
+    src2 = ('theorem t : P ∧ Q := by\n'
+            '  constructor\n'
+            '  · norm_num [Fin.sum_univ_succ, f]\n'
+            '  · fin_cases i <;> norm_num\n')
+    out2 = O.core_rewrites(src2)
+    assert '  · %s\n' % _fin_wrap(' [Fin.sum_univ_succ, f]') in out2
+    assert '  · fin_cases i <;> (%s)\n' % _fin_wrap('') in out2
+    # an inline `by` ending the line, and a `(by norm_num [Fin.…])` term
+    src3 = ('theorem t : P := by\n'
+            '  have h : Q := by fin_cases i <;> norm_num\n'
+            '  exact foo h (by norm_num [Fin.sum_univ_three]) (by norm_num)\n')
+    out3 = O.core_rewrites(src3)
+    assert '  have h : Q := by fin_cases i <;> (%s)\n' % _fin_wrap('') in out3
+    assert '(by %s) (by norm_num)\n' % _fin_wrap(' [Fin.sum_univ_three]') in out3
+    assert O.core_rewrites(out3) == out3
+
+
+def test_fin_norm_num_leaves_other_norm_num_alone():
+    src = ('theorem t : P := by\n'
+           '  fin_cases i <;> norm_num only [tbl]\n'
+           '  fin_cases i <;> norm_num [tbl] <;> ring\n'
+           '  norm_num [foo, bar]\n'
+           '  exact (by norm_num)\n'
+           '  fin_cases i <;> norm_num1\n')
+    assert O.core_rewrites(src) == src
+
+
+def test_fin_norm_num_chain_continued_on_next_line():
+    # `fin_cases i <;> fin_cases j <;>` / `  norm_num [L]` (359 sites in openai/math); a three-line chain too
+    src = ('theorem t : P := by\n'
+           '  fin_cases i <;> fin_cases j <;>\n'
+           '    norm_num [e, Matrix.mul_apply]\n'
+           '\n'
+           'theorem u : P := by\n'
+           '  fin_cases g <;> cases b <;>\n'
+           '    norm_num [beta] at hne <;>\n'
+           '    norm_num [beta] at *\n'
+           '  done\n'
+           'theorem v : P := by\n'
+           '  fin_cases g <;> cases b <;>\n'
+           '    norm_num [beta]\n'
+           '  linarith\n')
+    out = O.core_rewrites(src)
+    assert '  fin_cases i <;> fin_cases j <;>\n    (%s)\n' % _fin_wrap(' [e, Matrix.mul_apply]') in out
+    # u: the chain's block continues (`done` at the chain's column): not terminal; v likewise
+    assert '    norm_num [beta] at *\n  done\n' in out
+    assert '    norm_num [beta]\n  linarith\n' in out
+    src2 = src.replace('  done\n', '')
+    out2 = O.core_rewrites(src2)
+    assert '    norm_num [beta] at hne <;>\n    (%s)\ntheorem v' % _fin_wrap(' [beta] at *') in out2
+    assert O.core_rewrites(out2) == out2
