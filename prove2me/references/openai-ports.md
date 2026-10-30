@@ -257,6 +257,13 @@ and new `carve.py` inside one carve. So:
   still to run; a `config.json` that `--redo config` changed re-runs from `extdefs`. A rebuild keeps the replayed
   modules' times in `build_elab.log`: carves built before 2026-10-29 can have a log missing most modules (oaiq-047:
   37 of 1,259), which costs each at a default 2 s, so run `--redo build` once before planning such a carve again.
+  The build depends on nothing of the skill snapshot (not LeanInfo, not the snapshot path): an unchanged port
+  replays. What rebuilds everything is a changed `lean/compat_4_34.lean` (44 changes since 2026-10-20): a re-port
+  rewrites `Compat.lean`, which every module imports (oaiq-088: four full rebuilds of 2,385 modules, each starting
+  `Built …Compat`). The driver warns when a re-port would do that; on a built carve use `--upgrade --keep-port`
+  unless the new shims are needed (df97e19). `names` prints progress and runs four lookups at a time. A
+  kinds-limited `measure` judges only its kinds' edge records (oaiq-081), and a cached ok is reused only while its
+  `.olean` exists, so a repair cut needs no `times.json` edit (oaiq-096; 17b6d76).
 - **The port folder has an owner; rehearse on a copy only with its own workspace** (2026-10-29). The port writes
   `WORKSPACE/Solutions/FOLDER`, outside the carve dir, and a `cp -a` copy of oaiq-081 still on the shared
   workspace re-ported and rewrote 228 files of the live carve's folder (its config.json also named the original's
@@ -619,6 +626,13 @@ back WA. The lessons:
      evenly spaced: `~/claude/p2m-standalone/openai-ports/oaiq-047/resplit_prep.py`) brought them to 85-97 s and all passed first time. In a
      kernel-heavy carve, force them at the first plan rather than after the verifier's timeouts. Big carves take
      time: a 1,300-module carve took about 20 driver restarts and two days at load 15-22 (oaiq-050).
+- **Calibrate stops on a bundle splitting cannot shrink** (df97e19): a slow bundle down to one declaration, or one a
+  split round returned unchanged, is not split again; once only such bundles are over, calibrate profiles each once
+  (`carve_measure.py CONFIG --profile bundle:NAME`; `work/profiles.json`, `work/profile_<name>.log`) and stops with
+  the diagnosis naming the declaration: serialization-bound (name the type's large sides with `abbrev`s by post-carve
+  patch, oaiq-124), kernel-bound (rewrite it, or `cost_factors` + `accept_over`, oaiq-092) or elaboration-bound. The
+  automatic frozen split of a slow piece also promotes its private lemmas (config `promote_private`, graph node
+  names), so no hand `forced` entry is needed for them (oaiq-091).
 - **Kernel time is invisible to the cost model** (oaiq-092, oaiq-114). `lean -Dtrace.profiler=true
   -Dtrace.profiler.threshold=4000 FILE` prints `[Kernel] typechecking declarations [X]` lines: single opaque
   `Procedure …` defs and one `structure … : Prop` took 23-474 s in oaiq-092, and splitting a bundle cannot get
