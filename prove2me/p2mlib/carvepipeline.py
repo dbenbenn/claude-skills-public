@@ -302,6 +302,14 @@ def _now():
     return time.strftime('%Y-%m-%dT%H:%M:%S')
 
 
+def _epoch(stamp):
+    """Seconds since the epoch of a `_now()` stamp (local time); infinity when missing or unreadable."""
+    try:
+        return int(time.mktime(time.strptime(stamp, '%Y-%m-%dT%H:%M:%S')))
+    except (TypeError, ValueError):
+        return float('inf')
+
+
 # What in the running skill snapshot decides a step's output, beside what it reads from other steps:
 # {step: (input name, files relative to the snapshot's prove2me/)}. oaiq-085/092: after a fix to an
 # oaiport rewrite, `--upgrade` kept the old ported text (it took `--redo port`). oaiq-047: an upgrade
@@ -476,6 +484,11 @@ class Pipeline:
                     and g.get('status') == 'done' and g.get('finished', '') > rec.get('finished', '~')):
                 # a record from before the graph hash: `graph` ran again after it (oaiq-019/oaiq-123)
                 return s, 'graph output'
+            if (s in ('build', 'config') and 'port' not in had and rec['status'] == 'done'
+                    and self.newest_ported_mtime() > _epoch(rec.get('finished'))):
+                # a record from before the port hash, and the port rewrote a module after it (oaiq-122: an
+                # --upgrade grew Compat.lean, build was skipped, graph read stale .olean ranges)
+                return s, 'port'
             rule = SNAPSHOT_RULES.get(s)
             if rule and rule[0] in now and rule[0] not in had and rec['status'] == 'done' and self._rule_matters(s):
                 then = logged_snapshot(os.path.join(self.d, 'logs', s + '.log'))
@@ -689,6 +702,12 @@ class Pipeline:
     def steps(self):
         """The steps this carve runs: every one in overlap mode, else the classic list."""
         return list(STEPS) if self.overlap() else [x for x in STEPS if x not in OVERLAP_ONLY]
+
+    def newest_ported_mtime(self):
+        """Whole seconds of the newest ported .lean file's mtime (0 when there is none)."""
+        d = self.folder_dir()
+        return max((int(os.path.getmtime(os.path.join(dp, f))) for dp, _, fs in os.walk(d) for f in fs
+                    if f.endswith('.lean')), default=0) if os.path.isdir(d) else 0
 
     def ported_modules(self):
         d = self.folder_dir()

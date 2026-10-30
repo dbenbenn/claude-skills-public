@@ -516,6 +516,24 @@ def test_state_from_before_hashes_existed_is_not_called_stale(env):
     assert run(env).returncode == 0 and tools_called(env) == []
 
 
+def test_a_build_from_before_hashes_is_stale_when_a_ported_file_is_newer(env):
+    # oaiq-122: oaiq-011's state (snapshot 59dd682) had no input hashes on build/config; --upgrade re-ported and
+    # rewrote Compat.lean (the compat shim grew), build was skipped, and graph paired the old .olean's
+    # declaration ranges with the new text: bundle 000 carved `Finset.equivOfEq` for a compat lemma
+    assert run(env, *ARGS).returncode == 0
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    for rec in st['steps'].values():
+        rec.pop('in', None)
+    for s in ('build', 'wsbuild', 'config'):
+        st['steps'][s]['finished'] = '2026-10-26T13:02:44'
+    json.dump(st, open(env.dir / 'pipeline_state.json', 'w'))
+    (env.ws / 'Solutions' / 'F' / 'Compat.lean').write_text('-- grown\n')
+    env.log.write_text('')
+    r = run(env, '--stop-after', 'build')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert any(c[0] == 'oai_build_modules' for c in tools_called(env)) and 'stale: build' in r.stdout, (tools_called(env), r.stdout)
+
+
 def test_patches_added_to_a_state_from_before_hashes_existed_reruns_filter_patches(env):
     # oaiq-119: a carve from before input hashes, run without patches (filter_patches `skipped`, no `in`),
     # got a patches file in pipeline.json; the resume went straight to `measure` on the unpatched port
