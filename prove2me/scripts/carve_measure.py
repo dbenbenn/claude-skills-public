@@ -529,7 +529,7 @@ def edge_report(plan, edges):
     by_module = {}
     for n in list(plan.get('stubs', {})) + list(plan.get('external', [])):
         by_module['Theorems.Thm_' + C.slug(C.statement_name(plan, n))] = n
-    out, dead, imported = [], [], set()
+    out, dead, importers = [], [], {}
     for item in sorted(edges):
         e = edges[item]
         for m, v in e.get('imports', {}).items():
@@ -543,13 +543,25 @@ def edge_report(plan, edges):
                             'statement': by_module.get(m), 'restore': e.get('restore', {}).get(m, []),
                             'fix': fix, 'graph_edge': graph})
             else:
-                imported.add(m)
+                importers.setdefault(m, set()).add(item)
                 if v == 'dead':
                     dead.append({'item': item, 'file': e.get('file'), 'import': m,
                                  'statement': by_module.get(m)})
     keep = set(plan.get('targets', [])) | set(plan.get('forced', [])) | set(plan.get('external', []))
-    orphans = sorted(n for n in plan.get('stubs', {})
-                     if n not in keep and 'Theorems.Thm_' + C.slug(C.statement_name(plan, n)) not in imported)
+    # live: kept, or imported by a file that is not a statement's own (a bundle) or by a live
+    # statement's statement or piece file; the rest is orphaned, chains included (q129: orphans
+    # used to surface one measure round at a time)
+    stubs = list(plan.get('stubs', {}))
+    owner = lambda item: item.split(':', 1)[1] if item.split(':', 1)[0] in ('piece', 'statement') else None
+    live, grew = set(keep), True
+    while grew:
+        grew = False
+        for n in stubs:
+            if n not in live and any(owner(i) is None or owner(i) in live for i in
+                                     importers.get('Theorems.Thm_' + C.slug(C.statement_name(plan, n)), ())):
+                live.add(n)
+                grew = True
+    orphans = sorted(n for n in stubs if n not in live)
     return {'false_edges': out, 'dead_imports': dead, 'orphaned_statements': orphans}
 
 

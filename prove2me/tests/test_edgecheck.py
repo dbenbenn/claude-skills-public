@@ -110,6 +110,22 @@ def test_measure_reports_false_edges_and_orphaned_statements():
     assert rep['orphaned_statements'] == ['A.u']
 
 
+def test_a_statement_imported_only_by_orphans_is_orphaned_in_the_same_report():
+    # q129 (2026-10-30): orphans came one per measure round (3, then the statement only they imported),
+    # each round a re-plan and a re-measure; report the whole chain at once.
+    import carve_measure as M
+    plan = {'stubs': {'A.t': {}, 'A.u': {}, 'A.v': {}, 'A.w': {}}, 'targets': ['A.main'],
+            'forced': [], 'external': ['A.main'], 'statement_suffix': ''}
+    edges = {'piece:A.main': {'file': 'Sol_A_main.lean', 'false': [],
+                              'imports': {'Theorems.Thm_A_t': 'used'}, 'restore': {}},
+             'piece:A.t': {'file': 'Sol_A_t.lean', 'false': [], 'imports': {}, 'restore': {}},
+             'piece:A.u': {'file': 'Sol_A_u.lean', 'false': [],
+                           'imports': {'Theorems.Thm_A_v': 'used'}, 'restore': {}},
+             'piece:A.v': {'file': 'Sol_A_v.lean', 'false': [],
+                           'imports': {'Theorems.Thm_A_w': 'used'}, 'restore': {}}}
+    assert M.edge_report(plan, edges)['orphaned_statements'] == ['A.u', 'A.v', 'A.w']
+
+
 def test_drop_records_the_cut_so_it_survives_gen(tmp_path):
     import carve_measure as M
     from p2mlib import repair as RP
