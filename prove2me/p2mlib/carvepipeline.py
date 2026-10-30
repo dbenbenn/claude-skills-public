@@ -455,6 +455,10 @@ class Pipeline:
                 continue
             now = self.step_inputs_hash(s)
             had = rec.get('in') or {}
+            if s == 'filter_patches' and not had and (rec['status'] == 'skipped') == bool(self.p.get('patches')):
+                # a record from before hashes: no hash to compare, but whether the step is skipped at all changed
+                # (oaiq-119: patches added to pipeline.json, and the resume measured the unpatched port)
+                return s, 'patches file'
             for k, old in had.items():
                 if k in now and now[k] != old and (k not in self.RULE_KEYS or self._rule_matters(s)):
                     return s, k

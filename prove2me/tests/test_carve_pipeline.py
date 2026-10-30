@@ -516,6 +516,28 @@ def test_state_from_before_hashes_existed_is_not_called_stale(env):
     assert run(env).returncode == 0 and tools_called(env) == []
 
 
+def test_patches_added_to_a_state_from_before_hashes_existed_reruns_filter_patches(env):
+    # oaiq-119: a carve from before input hashes, run without patches (filter_patches `skipped`, no `in`),
+    # got a patches file in pipeline.json; the resume went straight to `measure` on the unpatched port
+    assert run(env, *ARGS).returncode == 0
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['steps']['filter_patches']['status'] == 'skipped'
+    for rec in st['steps'].values():
+        rec.pop('in', None)
+    json.dump(st, open(env.dir / 'pipeline_state.json', 'w'))
+    (env.tmp / 'patches.json').write_text('[{"old": "a", "new": "b"}]')
+    pj = json.load(open(env.dir / 'pipeline.json'))
+    pj['patches'] = str(env.tmp / 'patches.json')
+    json.dump(pj, open(env.dir / 'pipeline.json', 'w'))
+    (env.dir / 'port_patches.json').write_text('[{"old": "a", "new": "b"}]')
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert seq and seq[0] == ('carve_prep', 'filter-patches') and 'stale' in r.stdout, (seq, r.stdout)
+    assert any(c[0] == 'oai_port_modules' for c in seq) and ('carve', 'plan') in seq
+
+
 def test_from_still_forgets_the_step_and_everything_after(env):
     assert run(env, *ARGS).returncode == 0
     env.log.write_text('')
