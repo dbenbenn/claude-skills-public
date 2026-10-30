@@ -3273,6 +3273,8 @@ class Carver:
             chain = tuple(o for o, _ in c.context)
         out = []
         used = self._used_instances(info, c, m, sorried)
+        if used is not None:
+            used = used | self._foreign_local_keys(used, m)
         for vi in sorted(drop):
             if vi >= c.index or (vi, chain) in done or not _in_scope(info, vi, c):
                 continue
@@ -3383,6 +3385,23 @@ class Carver:
                 out.append('attribute [local %s] _root_.%s\n' % (', local '.join(want),
                                                                 instance_ref(k, {}, self.rename)))
         return ''.join(out)
+
+    def _foreign_local_keys(self, used, m):
+        """The class keys ('key:Class Head…') of the local instances of other modules that `used`
+        names. Such an instance was out of force in module m, so no instance search there found
+        it: it reached the term by unification (through an imported abbrev whose body names it),
+        and the problem was answered by a local instance of m of the same class and heads, which
+        left no record (Finitistic, q128-finitistic-retry: `HasDerivedCategory (ModuleCat D)`)."""
+        g = self.g
+        out = set()
+        for n in used:
+            o = g.owner.get(n)
+            if not o or o not in g.nodes or g.nodes[o].module == m or not g.is_local_instance(o):
+                continue
+            cls = g.instance_class(o)
+            if cls:
+                out.add('key:' + ' '.join([cls[0]] + list(cls[1])))
+        return out
 
     def _sibling_used(self, info, vc, c, used):
         """Did command c use another local instance of its module, in scope at c, of another class

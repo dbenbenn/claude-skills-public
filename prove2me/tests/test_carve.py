@@ -2259,6 +2259,30 @@ def test_a_used_local_instance_brings_its_same_class_siblings_in_source_order():
     assert 'dqPair' not in sec and re.search(r'^local instance dqW_r', sec, re.M), sec
 
 
+def test_a_local_instance_comes_back_when_the_record_names_a_foreign_one_of_its_class():
+    # Finitistic (q128-finitistic-retry): `resolvedModelIso`'s module declared `local instance :
+    # HasDerivedCategory (ModuleCat D)`, which answered its instance problem, but the record named
+    # only another module's defeq local instance (reached by unification through an imported
+    # abbrev), and the bundle dropped the module's own one ("failed to synthesize"). Here dq_for's
+    # record is edited to name LocalCtx's dqPair instead of LocalFor's anonymous instance; the
+    # carrier is a library type, so no project declaration of its type ties it to dq_for.
+    g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    user = g.nodes['CD.LF.dq_for']
+    c = g.infos[user.module].commands[user.cmd]
+    c.insts = c.sig_insts = []
+    for f in ('inst_keys', 'used_keys', 'sig_used_keys'):
+        setattr(c, f, [x for x in getattr(c, f) or () if not x.startswith('CD.LC.Dq')])
+    for n in user.names:
+        for f in ('t', 'v'):
+            g.consts[n][f] = ['CD.LC.dqPair' if x == 'CD.LF.instDqProdNatBool' else x
+                              for x in g.consts[n][f]]
+    keep = {'CD.LC.Dq', 'CD.LF.dq_for'}
+    for sorry in ({'CD.LF.dq_for'}, set()):
+        sec = _section(C.Carver(g).carve(keep, g.have_names(keep), sorry=sorry), 'CarveDev.LocalFor')
+        s = re.search(r'^local instance instDqProdNatBool_r\w+ : Dq \(Nat × Bool\)', sec, re.M)
+        assert s and s.start() < sec.index('theorem dq_for'), sec
+
+
 def test_a_local_instance_on_a_type_a_declaration_uses_comes_back_though_nothing_records_its_use(g):
     # oaiq-066 (and oaiq-043): a `local instance : CoeFun (FunctionalTree.diagonalRep A) …` is
     # unfolded by coercion elaboration, so no constant, `insts` or `inst_keys` entry of its users

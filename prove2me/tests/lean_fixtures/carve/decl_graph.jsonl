@@ -226,6 +226,7 @@
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"_private.CarveDev.LocalCtx.0.CD.LC.termC","p":false,"r":[30,0,30,26],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"_private.CarveDev.LocalCtx.0.CD.LC.«_aux_CarveDev_LocalCtx___macroRules__private_CarveDev_LocalCtx_0_CD_LC_term_ᵒᵖ_1»","p":false,"r":[29,0,29,29],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.LocalCtx","n":"_private.CarveDev.LocalCtx.0.CD.LC.«term_ᵒᵖ»","p":false,"r":[29,0,29,29],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.LocalFor","n":"CD.LF.instDqProdNatBool","p":false,"r":[16,0,16,39],"s":false,"t":["CD.LC.Dq"],"u":[],"v":["CD.LC.Dq.mk"]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.Nat.cdTwice","p":false,"r":[77,0,78,36],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.NoteNs.keptHere","p":false,"r":[153,0,154,23],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"CD.NoteNs.xInst","p":false,"r":[162,0,162,99],"s":false,"t":["CD.Wide","CD.double","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.double","CD.double_zero","CD.Wide.w"]}
@@ -410,6 +411,7 @@
 {"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.towerHi","p":true,"r":[43,0,43,69],"s":false,"t":["CD.LC.Tower","CD.LC.Wc","CD.LC.actHi"],"u":[],"v":["CD.LC.Wc","CD.LC.actHi","CD.LC.Act.act","CD.LC.Tower.mk"]}
 {"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.tower_use","p":true,"r":[45,0,45,94],"s":false,"t":["CD.LC.Wc","CD.LC.actHi","CD.LC.needsTower","CD.LC.towerHi","CD.LC.Act.act"],"u":[],"v":["CD.LC.Wc","CD.LC.actHi","CD.LC.needsTower","CD.LC.towerHi","CD.LC.Act.act"]}
 {"i":false,"k":"theorem","m":"CarveDev.LocalCtx","n":"CD.LC.wcfn_apply","p":true,"r":[70,0,70,67],"s":false,"t":["CD.LC.WcFn","CD.LC.Wc.x"],"u":[],"v":["CD.LC.WcFn","CD.LC.Wc.x"]}
+{"i":false,"k":"theorem","m":"CarveDev.LocalFor","n":"CD.LF.dq_for","p":true,"r":[18,0,18,45],"s":false,"t":["CD.LF.instDqProdNatBool","CD.LC.Dq.d"],"u":[],"v":["CD.LF.instDqProdNatBool","CD.LC.Dq.d"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.NoteNs.uses_x","p":true,"r":[164,0,164,33],"s":false,"t":["CD.Wide","CD.Wide.w"],"u":[],"v":["CD.Wide","CD.Wide.w"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.Space.cd_unused_simp","p":true,"r":[120,0,124,21],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.Space.coord_eq","p":true,"r":[12,0,12,55],"s":false,"t":["CD.Space","CD.Space.coord"],"u":[],"v":["CD.Space","CD.Space.coord"]}
@@ -477,6 +479,7 @@
 {"imports":["Init","Init","CarveDev.InstBase"],"module":"CarveDev.InstB"}
 {"imports":["Init","Init","CarveDev.InstBase"],"module":"CarveDev.InstLate"}
 {"imports":["Init","Init","CarveDev.InstColA"],"module":"CarveDev.InstColB"}
+{"imports":["Init","Init","CarveDev.LocalCtx"],"module":"CarveDev.LocalFor"}
 {"imports":["Init","Init","CarveDev.Mid","CarveDev.Alt","CarveDev.Fields","CarveDev.InstA","CarveDev.InstB","CarveDev.InstLate","CarveDev.Coer","CarveDev.InstColB","CarveDev.LocalCtx"],"module":"CarveDev.Top"}
 {"imports":["Init","Init","CarveDev.SimpBase"],"module":"CarveDev.SimpLate"}
 {"imports":["Init","Init","CarveDev.SimpBase"],"module":"CarveDev.SimpUse"}
