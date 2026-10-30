@@ -777,7 +777,8 @@ class Pipeline:
             return 'skipped'
         self.check_closure('filter_patches')
         self.run_cmds('filter_patches', [self.tool('carve_prep', 'filter-patches', os.path.expanduser(self.p['patches']),
-                                                   self.lean_src, self.port_patches(), *self.prefixes(), *self.compat_args())])
+                                                   self.lean_src, self.port_patches(), *self.prefixes(), *self.compat_args(),
+                                                   '--folder', self.p['folder'])])
 
     def step_port(self):
         self.check_closure('port')

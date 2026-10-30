@@ -257,6 +257,8 @@ def test_options_reach_the_tools(env):
     assert '--drop-false-edges' in by[('carve_measure', 'config.json')]
     assert json.load(open(env.dir / 'config.json'))['collapse_mathlib'] is False
     assert ('carve_prep', 'filter-patches') in by
+    fp = by[('carve_prep', 'filter-patches')]
+    assert fp[fp.index('--folder') + 1] == json.load(open(env.dir / 'pipeline.json'))['folder']
 
 
 def test_defs_derived_from_the_targets_statement_imports(env):

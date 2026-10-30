@@ -24,13 +24,15 @@ usage:
       for a bundle that has an anonymous instance (its name is Lean's to generate).
   carve_prep.py filter-patches PATCHES.json LEAN_ROOT OUT.json PREFIX [PREFIX ...]
                        [--compat-ns NS | --root-compat] [--compat FILE] [--header H.lean]
-                       [--stdsimplex auto|structure|subtype|off]
+                       [--stdsimplex auto|structure|subtype|off] [--folder FOLDER]
       keep the single-file patches (oai_port.py) whose `old` occurs exactly `count` times over the
       modules under the prefixes AS oai_port_modules.py PATCHES THEM (after its import, header,
       core and compat rewrites, macro inlining and guard renames: pass it the same options), for
       oai_port_modules.py; lists the others. Single-file-only patches go too: `"route": "single"`
       or a universe-list reordering (merge.py's `universe` line; a module has its own). Mark a
-      patch `"route": "modules"` to keep oai_port.py from applying it.
+      patch `"route": "modules"` to keep oai_port.py from applying it. --folder: the port's
+      Solutions folder, which the rewritten imports name (mkpatches anchors a header hunk on them;
+      oaiq-116); default FilterPatches.
   carve_prep.py publish-prep DIR SOURCE TAG[,TAG...] [--sync]
       DIR/publish/: out/ and work/{plan,order,times}.json copied, run.json,
       run_{1_bundles,2_statements,3_pieces}.json and run_early.json (run.json with the pieces gated
@@ -366,18 +368,21 @@ def filter_patches(patches, texts, detail=None):
     return keep, drop
 
 
-def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='', stdsimplex='auto', detail=None):
+def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='', stdsimplex='auto', detail=None,
+                        folder='FilterPatches'):
     """filter_patches against the text oai_port_modules.py patches: the modules after its import,
     header, core and compat rewrites (oaiport.module_texts), never OpenAI's raw source
     (ComparatorModel 2026-10-24: the `| zero` case core_rewrites then added counted 0 there and was
-    dropped; CubeShuffle: a patch the compat aliases made redundant was kept)."""
-    return filter_patches(patches, O.module_texts(sources, 'Solutions.FilterPatches', compat_text,
+    dropped; CubeShuffle: a patch the compat aliases made redundant was kept). `folder` is the port's
+    Solutions folder: the rewritten imports name it, and a patch mkpatches anchored on the header
+    (`import Solutions.<FOLDER>.X` + the linter lines) counted 0 under a placeholder (oaiq-116)."""
+    return filter_patches(patches, O.module_texts(sources, 'Solutions.' + folder, compat_text,
                                                   compat_ns, header, stdsimplex),
                           detail)
 
 
 def cmd_filter_patches(argv):
-    pos = positional(argv, ('--compat-ns', '--compat', '--header', '--stdsimplex', '--compat-imports'))
+    pos = positional(argv, ('--compat-ns', '--compat', '--header', '--stdsimplex', '--compat-imports', '--folder'))
     if len(pos) < 4:
         sys.exit(__doc__)
     src, lean_root, out, prefixes = pos[0], pos[1], pos[2], pos[3:]
@@ -388,7 +393,8 @@ def cmd_filter_patches(argv):
     detail = []
     try:
         keep, drop = port_filter_patches(json.load(open(src)), srcs, compat, ns, header,
-                                         opt(argv, '--stdsimplex', 'auto'), detail)
+                                         opt(argv, '--stdsimplex', 'auto'), detail,
+                                         opt(argv, '--folder', 'FilterPatches'))
     except O.PortError as e:
         sys.exit(str(e))
     for n, p in drop:

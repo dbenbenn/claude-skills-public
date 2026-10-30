@@ -254,6 +254,18 @@ def test_filter_patches_counts_against_the_text_the_module_port_patches():
     O.module_files(_sources(), 'Solutions.F', keep, COMPAT)
 
 
+def test_filter_patches_counts_with_the_real_folder_name():
+    # oaiq-116 (Tachikawa): mkpatches diffs the port's output, so a hunk inserting a line after the
+    # linter-off header is anchored on `import Solutions.<FOLDER>.<Module>`. filter-patches built its
+    # texts under the placeholder folder `Solutions.FilterPatches`, counted 0 and dropped all five.
+    hdr = {'old': 'import Solutions.Real.Compat\n', 'new': 'import Solutions.Real.Compat\n-- x\n',
+           'count': 3}
+    keep, drop = CP.port_filter_patches([hdr], _sources(), COMPAT, 'OAI', folder='Real')
+    assert keep == [hdr] and drop == []
+    out = O.module_files(_sources(), 'Solutions.Real', keep, COMPAT)
+    assert sum(t.count('-- x') for t in out.values()) == 3
+
+
 def test_filter_patches_drops_single_file_only_patches():
     # WLTime (2026-10-23): merge.py's single `universe` line orders a declaration's universe
     # parameters, so the single-file port needed `Sys.{uA, uB}` -> `Sys.{uB, uA}`; in a module the
