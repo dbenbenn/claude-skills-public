@@ -1313,6 +1313,7 @@ script prints its usage when run with no arguments.
 | `prune_solution.py` | Delete the declarations an assembled solution never uses, before submitting it. |
 | `publish_standalone.py` | Publish a folder's standalone statements (POST /submit-problem), wait for the jobs, record ids in published_ids.json, and verify every published field against the folder. |
 | `publish_status.py` | Where has a Submit got to? |
+| `push_records.py` | Commit and push records from the shared p2m-standalone checkout onto origin/main without touching anyone else's state. |
 | `resolve_imports.py` | Make a merged solution file self-contained: import what is published, inline what is not. |
 | `rewire.py` | Make a solution import the published theorems it re-derives, so each is a graph edge. |
 | `skill_snapshot.py` | Materialise the skill at a commit as a read-only snapshot and print its path. |
@@ -1324,6 +1325,7 @@ script prints its usage when run with no arguments.
 | `submit_solution.py` | Submit a solution, check the graph shows exactly its imports, then retire what it replaces. |
 | `submit_verify.py` | Submit a solution file to POST /verify (multipart) and poll for the verdict. |
 | `sync_workspace.py` | Session start: sync the platform's rulebook and workspace to upstream head, then check that the live platform still behaves as our scripts assume. |
+| `try_module.py` | Compile one ported module as is and with the transparency option, and list the errors of each. |
 | `wait_published.py` | Wait until named statements or definitions are published, or until a proposal's queue drains. |
 | `watch_proposal.py` | Watch mission proposals until their status changes (e.g. `In review` -> approved). |
 | `watch_targets.py` | Watch published theorems you are about to prove, or are proving, and report status changes. |
