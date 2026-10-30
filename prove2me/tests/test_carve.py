@@ -2815,3 +2815,11 @@ def test_duplicates_simp_leaks_notations_coercions_and_local_attributes_compile(
     assert 'CD.UM.maxOnly' not in p['nodes']
     with pytest.raises(C.CarveError, match=r'(?s)Chk_CD_UM_umTop.*oaiq-124'):
         _compile_in_publish_order(g, p, d)
+
+
+def test_make_plan_computes_each_pieces_bundle_closure_once():
+    # oaiq-098: `{k for k in B if bidx[k] in _bundle_closure(bimp, bks)}` ran the closure once per element of B
+    # (564k) for every statement; `plan` then ran for hours. The closure is computed once per piece.
+    import inspect
+    src = inspect.getsource(C.make_plan)
+    assert 'in _bundle_closure(' not in src
