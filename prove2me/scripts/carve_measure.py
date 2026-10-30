@@ -24,7 +24,7 @@ core split, measured first into the same D/olean).
 A file that fails on a context command (a `variable` binder, `open`, `include`, ...) is repaired by
 cutting it (p2mlib.repair, up to 20 cuts); the cuts are recorded in <work>/repairs.json and
 re-applied on every later run, since `carve.py gen` rewrites the files. A result is reused while the
-file's text (sha1) is unchanged and it passed. Stops at the first failure unless --keep-going.
+file's text (sha1), and that of every carve module it imports (transitively), is unchanged and it passed. Stops at the first failure unless --keep-going.
 
 The edge check (on by default; --no-edge-check skips it) runs after each file compiles: every
 `import Theorems.*` of a bundle, statement or piece, and every `import Definitions.*` of a bundle
@@ -51,6 +51,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import resource
 import shutil
 import subprocess
@@ -190,6 +191,26 @@ class Measure:
             return os.path.join(self.lib, 'Thm_%s.lean' % s), 'Theorems.Thm_' + s
         return os.path.join(self.sol, 'Sol_%s.lean' % s), None
 
+    def cache_key(self, path, seen=None):
+        """sha1 of the file and, transitively, of the carve's own modules it imports (out/lib): a re-plan
+        that changes an imported bundle invalidates the cached result (oaiq-010: `holderShift` moved out
+        of a bundle's reach, three statements kept their old "ok" and failed to publish)."""
+        seen = {} if seen is None else seen
+        if path in seen:
+            return seen[path]
+        seen[path] = ''
+        text = open(path, 'rb').read()
+        parts = [hashlib.sha1(text).hexdigest()]
+        for line in text.decode('utf-8', 'replace').split('\n'):
+            mm = re.match(r'import\s+(?:Definitions|Theorems)\.(\S+)\s*$', line)
+            if mm:
+                dep = os.path.join(self.lib, mm.group(1) + '.lean')
+                if os.path.exists(dep):
+                    parts.append(self.cache_key(dep, seen))
+        k = parts[0] if len(parts) == 1 else hashlib.sha1('\0'.join(parts).encode()).hexdigest()
+        seen[path] = k
+        return k
+
     def measure(self, item, env, force=False, repair=True):
         kind, n = item.split(':', 1)
         src, mod = self.item_files(kind, n)
@@ -201,7 +222,7 @@ class Measure:
             else:
                 path = os.path.join(self.chk, 'Chk_%s.lean' % C.slug(C.statement_name(self.plan, n)))
                 open(path, 'w', encoding='utf-8').write(self.chk_text(n))
-            k = hashlib.sha1(open(path, 'rb').read()).hexdigest()
+            k = self.cache_key(path)
             old = self.times.get(item)
             if old and old.get('key') == k and old.get('ok') and not force:
                 return old

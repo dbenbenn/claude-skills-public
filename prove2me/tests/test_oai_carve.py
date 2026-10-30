@@ -578,3 +578,34 @@ def test_publish_prep_sync_updates_pieces_and_adds_items_but_never_changes_a_pub
     assert (P / 'out/lib/Def_A.lean').read_text() == 'a'
     assert (P / 'out/solutions/Sol_S.lean').read_text() == 'p2'
     assert CP.published_drift(str(tmp_path / 'out' / 'lib'), str(P / 'out' / 'lib')) == ['Def_A.lean']
+
+
+def test_measure_cache_key_covers_the_imported_carve_modules(tmp_path, monkeypatch):
+    # oaiq-010/oaiq-120: a statement measured ok against bundle B008, then a re-plan moved `holderShift`
+    # out of B008's reach; the statement's text was unchanged, so its cached "ok" was reused, and three
+    # statements failed to publish with "Unknown identifier `holderShift`" (and a piece came back SORRY).
+    # The key covers the carve's own imported modules, transitively.
+    import carve_measure as M
+    m = object.__new__(M.Measure)
+    lib = tmp_path / 'lib'
+    lib.mkdir()
+    m.lib, m.ws, m.times, m.repairs = str(lib), str(tmp_path / 'ws'), {}, {}
+    m.plan, m.ext = {}, set()
+    (lib / 'Def_B004.lean').write_text('import Mathlib\ndef h := 1\n')
+    (lib / 'Def_B008.lean').write_text('import Mathlib\nimport Definitions.Def_B004\n')
+    st = lib / 'Thm_S.lean'
+    st.write_text('import Mathlib\nimport Definitions.Def_B008\ntheorem s : h = h := sorry\n')
+    m.item_files = lambda kind, n: (str(st), 'Theorems.Thm_S')
+    m.apply_recorded = lambda src: None
+    calls = []
+
+    def run(path, module, env):
+        calls.append(module)
+        return {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}, ''
+    m.run = run
+    m.times['statement:S'] = m.measure('statement:S', {})
+    m.measure('statement:S', {})
+    assert len(calls) == 1                      # unchanged: cached
+    (lib / 'Def_B004.lean').write_text('import Mathlib\n')   # a transitive import changes
+    m.measure('statement:S', {})
+    assert len(calls) == 2
