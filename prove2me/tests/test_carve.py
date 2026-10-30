@@ -117,8 +117,10 @@ def test_private_names_are_per_module(g):
 
 def test_attributed_theorem_is_an_extra_root(g):
     # `size_zero` is `by simp` with the rfl simp lemma Space.size_eq: no trace in the term, so the
-    # simp lemma comes in as an attributed root whenever its dependencies are present
-    assert 'CD.Space.size_eq' not in g.nodes['CD.size_zero'].deps
+    # simp lemma comes in as an attributed root whenever its dependencies are present; and since
+    # q135 as a dependency of the simp call too (it mentions `Space.size`, which size_zero does)
+    assert 'CD.Space.size_eq' not in g.nodes['CD.size_zero'].term
+    assert 'CD.Space.size_eq' in g.nodes['CD.size_zero'].deps
     assert g.nodes['CD.Space.size_eq'].attributed
     assert 'CD.Space.size_eq' in g.extra_roots({'CD.Space', 'CD.Space.size', 'CD.size_zero'}, set())
 
@@ -2378,6 +2380,19 @@ def test_a_default_simp_call_depends_on_its_modules_earlier_rfl_simp_lemmas(g):
     # an attributed declaration of the bundle material: the piece imports its bundle
     b = next(b['name'] for b in p['bundles'] if 'CD.lcm23' in b['nodes'])
     assert b in pc['bundles'], pc
+
+
+def test_a_default_simp_call_depends_on_imported_rfl_simp_lemmas_about_what_it_mentions(g):
+    # q135 (VertexCover, 2026-10-31): `@[simp] tableGraph_tail … := rfl` of an imported module closed
+    # `queryName_correct`'s `simp [...]`, by definitional rewriting, so no constant recorded it, and
+    # its carved bundle lacked the lemma ("unsolved goals"). An imported rfl simp lemma counts when
+    # its statement mentions a project definition the calling declaration mentions (f_eq: `f`), not
+    # otherwise (other_eq: `g`), and never for `simp only`.
+    deps = g.nodes['CD.SR.useF'].deps
+    assert 'CD.SR.f_eq' not in g.nodes['CD.SR.useF'].term
+    assert 'CD.SR.f_eq' in deps, deps
+    assert 'CD.SR.other_eq' not in deps, deps
+    assert 'CD.SR.f_eq' not in g.nodes['CD.SR.useF_only'].deps
 
 
 @pytest.mark.lean

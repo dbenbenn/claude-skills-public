@@ -1,0 +1,436 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 41,
+    "col": 15,
+    "line": 3
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 41,
+     "name": "CD.SR",
+     "role": "scope",
+     "start": 36
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 26,
+    "col": 0,
+    "line": 3
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.SR.useF",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 92,
+    "col": 6,
+    "line": 6
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 55,
+     "name": "useF",
+     "role": "decl",
+     "start": 51
+    },
+    {
+     "end": 58,
+     "name": "n",
+     "role": "binder",
+     "start": 57
+    },
+    {
+     "end": 64,
+     "name": "Nat",
+     "role": "ref",
+     "start": 61
+    },
+    {
+     "end": 69,
+     "name": "f",
+     "role": "ref",
+     "start": 68
+    },
+    {
+     "end": 71,
+     "name": "n",
+     "role": "ref",
+     "start": 70
+    },
+    {
+     "end": 75,
+     "name": "n",
+     "role": "ref",
+     "start": 74
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 55,
+      "col": 12,
+      "line": 5
+     },
+     "start": {
+      "byte": 51,
+      "col": 8,
+      "line": 5
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.SR.useF"
+   ],
+   "namespace": "CD.SR",
+   "opens": [],
+   "resolved": [
+    [
+     51,
+     55,
+     "CD.SR.useF",
+     "b"
+    ],
+    [
+     51,
+     55,
+     "",
+     "b"
+    ],
+    [
+     57,
+     58,
+     "",
+     "b"
+    ],
+    [
+     61,
+     64,
+     "Nat"
+    ],
+    [
+     68,
+     69,
+     "CD.SR.f"
+    ],
+    [
+     70,
+     71,
+     ""
+    ],
+    [
+     74,
+     75,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 43,
+    "col": 0,
+    "line": 5
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 80,
+    "col": 37,
+    "line": 5
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.SR.useF_only",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 157,
+    "col": 15,
+    "line": 9
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 111,
+     "name": "useF_only",
+     "role": "decl",
+     "start": 102
+    },
+    {
+     "end": 114,
+     "name": "n",
+     "role": "binder",
+     "start": 113
+    },
+    {
+     "end": 120,
+     "name": "Nat",
+     "role": "ref",
+     "start": 117
+    },
+    {
+     "end": 125,
+     "name": "f",
+     "role": "ref",
+     "start": 124
+    },
+    {
+     "end": 127,
+     "name": "n",
+     "role": "ref",
+     "start": 126
+    },
+    {
+     "end": 131,
+     "name": "n",
+     "role": "ref",
+     "start": 130
+    },
+    {
+     "end": 156,
+     "name": "f",
+     "role": "ref",
+     "start": 155
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 111,
+      "col": 17,
+      "line": 8
+     },
+     "start": {
+      "byte": 102,
+      "col": 8,
+      "line": 8
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.SR.useF_only"
+   ],
+   "namespace": "CD.SR",
+   "opens": [],
+   "resolved": [
+    [
+     102,
+     111,
+     "CD.SR.useF_only",
+     "b"
+    ],
+    [
+     102,
+     111,
+     "",
+     "b"
+    ],
+    [
+     113,
+     114,
+     "",
+     "b"
+    ],
+    [
+     117,
+     120,
+     "Nat"
+    ],
+    [
+     124,
+     125,
+     "CD.SR.f"
+    ],
+    [
+     126,
+     127,
+     ""
+    ],
+    [
+     130,
+     131,
+     ""
+    ],
+    [
+     155,
+     156,
+     "CD.SR.f"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 94,
+    "col": 0,
+    "line": 8
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 136,
+    "col": 42,
+    "line": 8
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 168,
+    "col": 9,
+    "line": 11
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 168,
+     "name": "CD.SR",
+     "role": "scope",
+     "start": 163
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.SR",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 159,
+    "col": 0,
+    "line": 11
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 169,
+    "col": 0,
+    "line": 12
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 169,
+    "col": 0,
+    "line": 12
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/SimpRflB.lean",
+ "messages": [],
+ "mode": "elaborate"
+}

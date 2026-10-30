@@ -1114,7 +1114,14 @@ class Graph:
         oaiq-067: `@[simp] encode_int_ofNat : encode (n : ℤ) = 2 * n := rfl` (library constants
         only, so no implicit_deps link either) and `simp [Nat.bodd]` proofs, carved into a bundle
         that did not import the lemmas ("unsolved goals"). An over-estimate: every such lemma of
-        the module counts for every such call after it."""
+        the module counts for every such call after it.
+
+        Such a lemma of an imported module counts when its statement mentions a project definition
+        the calling declaration mentions (its type or value): q135 VertexCover, `@[simp]
+        tableGraph_tail … := rfl` of Encoding/FinalCNFPattern closed `queryName_correct`'s
+        `simp [...]` in Machines/FinalCNFBase, and the carved bundle lacked it."""
+        calls = []                       # (module, command index, node) of each default simp call
+        by_def = collections.defaultdict(set)   # project definition -> (module, rfl simp lemma)
         for m, info in self.infos.items():
             lemmas = []                  # (command index from which it is a simp lemma, node)
             for c in info.commands:
@@ -1129,8 +1136,27 @@ class Graph:
                 nd = self.nodes[k]
                 if any(_SIMP_ATTR.match(a) for a in c.attrs or ()) and self._rfl_theorem(k):
                     lemmas.append((c.index, k))
-                if lemmas and _default_simp_call(strip(leanedit.text(info, c.index))):
-                    nd.sdeps |= {o for i, o in lemmas if i < c.index and o != k}
+                if _default_simp_call(strip(leanedit.text(info, c.index))):
+                    calls.append((m, k))
+                    if lemmas:
+                        nd.sdeps |= {o for i, o in lemmas if i < c.index and o != k}
+            for _, o in lemmas:
+                for d in self._mentioned(o, ('t',)):
+                    by_def[d].add((m, o))
+        for m, k in calls:
+            nd = self.nodes[k]
+            for d in self._mentioned(k, ('t', 'v')):
+                nd.sdeps |= {o for lm, o in by_def.get(d, ()) if lm != m and o != k and self.sees(m, lm)}
+
+    def _mentioned(self, k, fields):
+        """The project definitions (kind def/opaque) that node k's declarations mention in the
+        decl-graph fields given ('t' type, 'v' value)."""
+        out = set()
+        for n in self.nodes[k].names:
+            for f in fields:
+                out.update(x for x in (self.consts.get(n) or {}).get(f, ())
+                           if (self.consts.get(x) or {}).get('k') in ('def', 'opaque'))
+        return out
 
     def _rfl_theorem(self, k):
         """Is node k a theorem whose proof is `rfl` (simp then uses it as a dsimp lemma)?"""
