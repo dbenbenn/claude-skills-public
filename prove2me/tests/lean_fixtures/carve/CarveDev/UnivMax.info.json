@@ -1,0 +1,919 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 436,
+    "col": 80,
+    "line": 6
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 450,
+    "col": 12,
+    "line": 8
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 448,
+     "name": "u",
+     "role": "univ",
+     "start": 447
+    },
+    {
+     "end": 450,
+     "name": "v",
+     "role": "univ",
+     "start": 449
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.universe",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 438,
+    "col": 0,
+    "line": 8
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 467,
+    "col": 15,
+    "line": 10
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 467,
+     "name": "CD.UM",
+     "role": "scope",
+     "start": 462
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 452,
+    "col": 0,
+    "line": 10
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 2
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.UM.maxOnly",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 554,
+    "col": 77,
+    "line": 12
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 484,
+     "name": "maxOnly",
+     "role": "decl",
+     "start": 477
+    },
+    {
+     "end": 488,
+     "name": "σ",
+     "role": "binder",
+     "start": 486
+    },
+    {
+     "end": 502,
+     "name": "u",
+     "role": "ref",
+     "start": 501
+    },
+    {
+     "end": 504,
+     "name": "v",
+     "role": "ref",
+     "start": 503
+    },
+    {
+     "end": 509,
+     "name": "x",
+     "role": "binder",
+     "start": 508
+    },
+    {
+     "end": 514,
+     "name": "σ",
+     "role": "ref",
+     "start": 512
+    },
+    {
+     "end": 519,
+     "name": "x",
+     "role": "ref",
+     "start": 518
+    },
+    {
+     "end": 523,
+     "name": "x",
+     "role": "ref",
+     "start": 522
+    },
+    {
+     "end": 532,
+     "name": "True",
+     "role": "ref",
+     "start": 528
+    },
+    {
+     "end": 542,
+     "name": "rfl",
+     "role": "ref",
+     "start": 539
+    },
+    {
+     "end": 551,
+     "name": "trivial",
+     "role": "ref",
+     "start": 544
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 484,
+      "col": 15,
+      "line": 12
+     },
+     "start": {
+      "byte": 477,
+      "col": 8,
+      "line": 12
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.UM.maxOnly"
+   ],
+   "namespace": "CD.UM",
+   "opens": [],
+   "resolved": [
+    [
+     477,
+     484,
+     "CD.UM.maxOnly",
+     "b"
+    ],
+    [
+     477,
+     484,
+     "",
+     "b"
+    ],
+    [
+     486,
+     488,
+     "",
+     "b"
+    ],
+    [
+     508,
+     509,
+     "",
+     "b"
+    ],
+    [
+     512,
+     514,
+     ""
+    ],
+    [
+     518,
+     519,
+     ""
+    ],
+    [
+     522,
+     523,
+     ""
+    ],
+    [
+     528,
+     532,
+     "True"
+    ],
+    [
+     539,
+     542,
+     "rfl"
+    ],
+    [
+     544,
+     551,
+     "trivial"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 469,
+    "col": 0,
+    "line": 12
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 533,
+    "col": 60,
+    "line": 12
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 2
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.UM.bare",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 630,
+    "col": 66,
+    "line": 14
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 568,
+     "name": "bare",
+     "role": "decl",
+     "start": 564
+    },
+    {
+     "end": 572,
+     "name": "α",
+     "role": "binder",
+     "start": 570
+    },
+    {
+     "end": 581,
+     "name": "u",
+     "role": "ref",
+     "start": 580
+    },
+    {
+     "end": 585,
+     "name": "x",
+     "role": "binder",
+     "start": 584
+    },
+    {
+     "end": 590,
+     "name": "α",
+     "role": "ref",
+     "start": 588
+    },
+    {
+     "end": 595,
+     "name": "x",
+     "role": "ref",
+     "start": 594
+    },
+    {
+     "end": 599,
+     "name": "x",
+     "role": "ref",
+     "start": 598
+    },
+    {
+     "end": 608,
+     "name": "True",
+     "role": "ref",
+     "start": 604
+    },
+    {
+     "end": 618,
+     "name": "rfl",
+     "role": "ref",
+     "start": 615
+    },
+    {
+     "end": 627,
+     "name": "trivial",
+     "role": "ref",
+     "start": 620
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 568,
+      "col": 12,
+      "line": 14
+     },
+     "start": {
+      "byte": 564,
+      "col": 8,
+      "line": 14
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.UM.bare"
+   ],
+   "namespace": "CD.UM",
+   "opens": [],
+   "resolved": [
+    [
+     564,
+     568,
+     "CD.UM.bare",
+     "b"
+    ],
+    [
+     564,
+     568,
+     "",
+     "b"
+    ],
+    [
+     570,
+     572,
+     "",
+     "b"
+    ],
+    [
+     584,
+     585,
+     "",
+     "b"
+    ],
+    [
+     588,
+     590,
+     ""
+    ],
+    [
+     594,
+     595,
+     ""
+    ],
+    [
+     598,
+     599,
+     ""
+    ],
+    [
+     604,
+     608,
+     "True"
+    ],
+    [
+     615,
+     618,
+     "rfl"
+    ],
+    [
+     620,
+     627,
+     "trivial"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 556,
+    "col": 0,
+    "line": 14
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 609,
+    "col": 49,
+    "line": 14
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 2
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.UM.umTop",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 920,
+    "col": 28,
+    "line": 19
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 645,
+     "name": "umTop",
+     "role": "decl",
+     "start": 640
+    },
+    {
+     "end": 649,
+     "name": "σ",
+     "role": "binder",
+     "start": 647
+    },
+    {
+     "end": 663,
+     "name": "u",
+     "role": "ref",
+     "start": 662
+    },
+    {
+     "end": 665,
+     "name": "v",
+     "role": "ref",
+     "start": 664
+    },
+    {
+     "end": 671,
+     "name": "α",
+     "role": "binder",
+     "start": 669
+    },
+    {
+     "end": 680,
+     "name": "u",
+     "role": "ref",
+     "start": 679
+    },
+    {
+     "end": 684,
+     "name": "x",
+     "role": "binder",
+     "start": 683
+    },
+    {
+     "end": 689,
+     "name": "σ",
+     "role": "ref",
+     "start": 687
+    },
+    {
+     "end": 693,
+     "name": "a",
+     "role": "binder",
+     "start": 692
+    },
+    {
+     "end": 698,
+     "name": "α",
+     "role": "ref",
+     "start": 696
+    },
+    {
+     "end": 703,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 703
+    },
+    {
+     "end": 704,
+     "name": "x",
+     "role": "ref",
+     "start": 703
+    },
+    {
+     "end": 708,
+     "name": "x",
+     "role": "ref",
+     "start": 707
+    },
+    {
+     "end": 717,
+     "name": "True",
+     "role": "ref",
+     "start": 713
+    },
+    {
+     "end": 724,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 724
+    },
+    {
+     "end": 725,
+     "name": "a",
+     "role": "ref",
+     "start": 724
+    },
+    {
+     "end": 729,
+     "name": "a",
+     "role": "ref",
+     "start": 728
+    },
+    {
+     "end": 738,
+     "name": "True",
+     "role": "ref",
+     "start": 734
+    },
+    {
+     "end": 900,
+     "name": "maxOnly",
+     "role": "ref",
+     "start": 893
+    },
+    {
+     "end": 903,
+     "name": "u",
+     "role": "ref",
+     "start": 902
+    },
+    {
+     "end": 906,
+     "name": "v",
+     "role": "ref",
+     "start": 905
+    },
+    {
+     "end": 909,
+     "name": "x",
+     "role": "ref",
+     "start": 908
+    },
+    {
+     "end": 915,
+     "name": "bare",
+     "role": "ref",
+     "start": 911
+    },
+    {
+     "end": 917,
+     "name": "a",
+     "role": "ref",
+     "start": 916
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 645,
+      "col": 13,
+      "line": 16
+     },
+     "start": {
+      "byte": 640,
+      "col": 8,
+      "line": 16
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.UM.umTop"
+   ],
+   "namespace": "CD.UM",
+   "opens": [],
+   "resolved": [
+    [
+     640,
+     645,
+     "CD.UM.umTop",
+     "b"
+    ],
+    [
+     640,
+     645,
+     "",
+     "b"
+    ],
+    [
+     647,
+     649,
+     "",
+     "b"
+    ],
+    [
+     669,
+     671,
+     "",
+     "b"
+    ],
+    [
+     683,
+     684,
+     "",
+     "b"
+    ],
+    [
+     687,
+     689,
+     ""
+    ],
+    [
+     692,
+     693,
+     "",
+     "b"
+    ],
+    [
+     696,
+     698,
+     ""
+    ],
+    [
+     703,
+     704,
+     ""
+    ],
+    [
+     707,
+     708,
+     ""
+    ],
+    [
+     713,
+     717,
+     "True"
+    ],
+    [
+     724,
+     725,
+     ""
+    ],
+    [
+     728,
+     729,
+     ""
+    ],
+    [
+     734,
+     738,
+     "True"
+    ],
+    [
+     893,
+     900,
+     "CD.UM.maxOnly"
+    ],
+    [
+     908,
+     909,
+     ""
+    ],
+    [
+     911,
+     915,
+     "CD.UM.bare"
+    ],
+    [
+     916,
+     917,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 632,
+    "col": 0,
+    "line": 16
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 740,
+    "col": 98,
+    "line": 16
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 2
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 931,
+    "col": 9,
+    "line": 21
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 931,
+     "name": "CD.UM",
+     "role": "scope",
+     "start": 926
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.UM",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 922,
+    "col": 0,
+    "line": 21
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [
+      1
+     ],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 932,
+    "col": 0,
+    "line": 22
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 932,
+    "col": 0,
+    "line": 22
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/UnivMax.lean",
+ "messages": [
+  {
+   "end": {
+    "byte": 554,
+    "col": 77,
+    "line": 12
+   },
+   "severity": "warning",
+   "start": {
+    "byte": 469,
+    "col": 0,
+    "line": 12
+   },
+   "text": "`maxOnly`: universes `u`, `v` only occur together. This usually means there is a `max` expression in the type where none of these universes appear on their own.\n\nNote: This linter can be disabled with `set_option linter.checkUnivs false`"
+  }
+ ],
+ "mode": "elaborate"
+}

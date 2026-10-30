@@ -1,0 +1,361 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 65,
+    "col": 15,
+    "line": 4
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 65,
+     "name": "CD.Sp",
+     "role": "scope",
+     "start": 60
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 50,
+    "col": 0,
+    "line": 4
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Sp.simpTop",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 143,
+    "col": 70,
+    "line": 6
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 82,
+     "name": "simpTop",
+     "role": "decl",
+     "start": 75
+    },
+    {
+     "end": 85,
+     "name": "n",
+     "role": "binder",
+     "start": 84
+    },
+    {
+     "end": 91,
+     "name": "Nat",
+     "role": "ref",
+     "start": 88
+    },
+    {
+     "end": 96,
+     "name": "h",
+     "role": "ref",
+     "start": 95
+    },
+    {
+     "end": 98,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 98
+    },
+    {
+     "end": 99,
+     "name": "n",
+     "role": "ref",
+     "start": 98
+    },
+    {
+     "end": 108,
+     "name": "n",
+     "role": "ref",
+     "start": 107
+    },
+    {
+     "end": 114,
+     "name": "h",
+     "role": "ref",
+     "start": 113
+    },
+    {
+     "end": 116,
+     "name": "n",
+     "role": "ref",
+     "start": 115
+    },
+    {
+     "end": 120,
+     "name": "n",
+     "role": "ref",
+     "start": 119
+    },
+    {
+     "end": 130,
+     "name": "use",
+     "role": "ref",
+     "start": 127
+    },
+    {
+     "end": 132,
+     "name": "n",
+     "role": "ref",
+     "start": 131
+    },
+    {
+     "end": 138,
+     "name": "late",
+     "role": "ref",
+     "start": 134
+    },
+    {
+     "end": 140,
+     "name": "n",
+     "role": "ref",
+     "start": 139
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 82,
+      "col": 15,
+      "line": 6
+     },
+     "start": {
+      "byte": 75,
+      "col": 8,
+      "line": 6
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Sp.simpTop"
+   ],
+   "namespace": "CD.Sp",
+   "opens": [],
+   "resolved": [
+    [
+     75,
+     82,
+     "CD.Sp.simpTop",
+     "b"
+    ],
+    [
+     75,
+     82,
+     "",
+     "b"
+    ],
+    [
+     84,
+     85,
+     "",
+     "b"
+    ],
+    [
+     88,
+     91,
+     "Nat"
+    ],
+    [
+     95,
+     96,
+     "CD.Sp.h"
+    ],
+    [
+     98,
+     99,
+     ""
+    ],
+    [
+     107,
+     108,
+     ""
+    ],
+    [
+     113,
+     114,
+     "CD.Sp.h"
+    ],
+    [
+     115,
+     116,
+     ""
+    ],
+    [
+     119,
+     120,
+     ""
+    ],
+    [
+     127,
+     130,
+     "CD.Sp.use"
+    ],
+    [
+     131,
+     132,
+     ""
+    ],
+    [
+     134,
+     138,
+     "CD.Sp.late"
+    ],
+    [
+     139,
+     140,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 67,
+    "col": 0,
+    "line": 6
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 121,
+    "col": 52,
+    "line": 6
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 154,
+    "col": 9,
+    "line": 8
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 154,
+     "name": "CD.Sp",
+     "role": "scope",
+     "start": 149
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.Sp",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 145,
+    "col": 0,
+    "line": 8
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 155,
+    "col": 0,
+    "line": 9
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 155,
+    "col": 0,
+    "line": 9
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/SimpTop.lean",
+ "messages": [],
+ "mode": "elaborate"
+}

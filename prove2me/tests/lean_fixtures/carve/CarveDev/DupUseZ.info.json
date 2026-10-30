@@ -1,0 +1,455 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 38,
+    "col": 16,
+    "line": 3
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 38,
+     "name": "CD.Dup",
+     "role": "scope",
+     "start": 32
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 22,
+    "col": 0,
+    "line": 3
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Dup.useZ",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 87,
+    "col": 45,
+    "line": 5
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 52,
+     "name": "useZ",
+     "role": "decl",
+     "start": 48
+    },
+    {
+     "end": 55,
+     "name": "n",
+     "role": "binder",
+     "start": 54
+    },
+    {
+     "end": 61,
+     "name": "Nat",
+     "role": "ref",
+     "start": 58
+    },
+    {
+     "end": 66,
+     "name": "n",
+     "role": "ref",
+     "start": 65
+    },
+    {
+     "end": 72,
+     "name": "n",
+     "role": "ref",
+     "start": 71
+    },
+    {
+     "end": 85,
+     "name": "bound",
+     "role": "ref",
+     "start": 80
+    },
+    {
+     "end": 87,
+     "name": "n",
+     "role": "ref",
+     "start": 86
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 52,
+      "col": 12,
+      "line": 5
+     },
+     "start": {
+      "byte": 48,
+      "col": 8,
+      "line": 5
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "LE Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Dup.useZ"
+   ],
+   "namespace": "CD.Dup",
+   "opens": [],
+   "resolved": [
+    [
+     48,
+     52,
+     "CD.Dup.useZ",
+     "b"
+    ],
+    [
+     48,
+     52,
+     "",
+     "b"
+    ],
+    [
+     54,
+     55,
+     "",
+     "b"
+    ],
+    [
+     58,
+     61,
+     "Nat"
+    ],
+    [
+     65,
+     66,
+     ""
+    ],
+    [
+     71,
+     72,
+     ""
+    ],
+    [
+     80,
+     85,
+     "CD.Dup.bound"
+    ],
+    [
+     86,
+     87,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 40,
+    "col": 0,
+    "line": 5
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 77,
+    "col": 35,
+    "line": 5
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Dup.useZ'",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 158,
+    "col": 67,
+    "line": 7
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 102,
+     "name": "useZ'",
+     "role": "decl",
+     "start": 97
+    },
+    {
+     "end": 105,
+     "name": "n",
+     "role": "binder",
+     "start": 104
+    },
+    {
+     "end": 111,
+     "name": "Nat",
+     "role": "ref",
+     "start": 108
+    },
+    {
+     "end": 116,
+     "name": "n",
+     "role": "ref",
+     "start": 115
+    },
+    {
+     "end": 126,
+     "name": "n",
+     "role": "ref",
+     "start": 125
+    },
+    {
+     "end": 150,
+     "name": "CD.Dup.bound",
+     "role": "ref",
+     "start": 138
+    },
+    {
+     "end": 152,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 152
+    },
+    {
+     "end": 153,
+     "name": "n",
+     "role": "ref",
+     "start": 152
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 102,
+      "col": 13,
+      "line": 7
+     },
+     "start": {
+      "byte": 97,
+      "col": 8,
+      "line": 7
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "LE Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Dup.useZ'"
+   ],
+   "namespace": "CD.Dup",
+   "opens": [],
+   "resolved": [
+    [
+     97,
+     102,
+     "CD.Dup.useZ'",
+     "b"
+    ],
+    [
+     97,
+     102,
+     "",
+     "b"
+    ],
+    [
+     104,
+     105,
+     "",
+     "b"
+    ],
+    [
+     108,
+     111,
+     "Nat"
+    ],
+    [
+     115,
+     116,
+     ""
+    ],
+    [
+     125,
+     126,
+     ""
+    ],
+    [
+     138,
+     150,
+     "CD.Dup.bound"
+    ],
+    [
+     152,
+     153,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 89,
+    "col": 0,
+    "line": 7
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 135,
+    "col": 44,
+    "line": 7
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 170,
+    "col": 10,
+    "line": 9
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 170,
+     "name": "CD.Dup",
+     "role": "scope",
+     "start": 164
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.Dup",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 160,
+    "col": 0,
+    "line": 9
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 171,
+    "col": 0,
+    "line": 10
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 171,
+    "col": 0,
+    "line": 10
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/DupUseZ.lean",
+ "messages": [],
+ "mode": "elaborate"
+}

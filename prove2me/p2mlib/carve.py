@@ -285,13 +285,19 @@ class Node:
     deps: set = field(default_factory=set)    # term | sdeps | ndeps | ideps
 
 
-def load_decl_graph(path):
+def load_decl_graph(path, dups=None):
+    """(constants, module imports, external namespaces) of a DeclGraph recording. A `dup` record
+    (another module's copy of a theorem two modules declare) goes into the list `dups` if given,
+    never over the environment's record of the name."""
     consts, imports, ext = {}, {}, set()
     for line in open(path, encoding='utf-8'):
         if not line.strip():
             continue
         x = json.loads(line)
-        if 'n' in x:
+        if x.get('dup'):
+            if dups is not None:
+                dups.append(x)
+        elif 'n' in x:
             consts[x['n']] = x
         elif 'module' in x:
             imports[x['module']] = list(dict.fromkeys(x['imports']))
@@ -462,7 +468,7 @@ class Graph:
     resolution. `Graph.load(decl_graph.jsonl, src_root)` reads the module infos (recorded
     `<module>.parse.json` beside the source if present, else LeanInfo, cached)."""
 
-    def __init__(self, consts, imports, ext_ns, infos):
+    def __init__(self, consts, imports, ext_ns, infos, dups=()):
         self.consts, self.imports, self.ext_ns, self.infos = consts, imports, ext_ns, infos
         self.modules = sorted(infos)
         self._closure_cache = {}
@@ -474,6 +480,7 @@ class Graph:
         # text-based reading took for project constants: (module, line, token)
         self.fallbacks = []
         self._build_modules()
+        self._split_duplicates(dups)
         self._build_nodes()
         self._build_names()
         self._add_coercion_instances()
@@ -481,7 +488,8 @@ class Graph:
 
     @classmethod
     def load(cls, decl_graph, src_root, ws=None):
-        consts, imports, ext = load_decl_graph(decl_graph)
+        dups = []
+        consts, imports, ext = load_decl_graph(decl_graph, dups)
         infos = {}
         todo = [m for m in imports if not os.path.exists(module_path(src_root, m)[:-5] + '.info.json')]
         # oaiq-047: after LeanInfo.lean changed (the cache is keyed by it), loading the graph re-ran
@@ -502,7 +510,7 @@ class Graph:
                 if m in miss:
                     done += 1
                     print('LeanInfo %d/%d %s' % (done, len(miss), m), file=sys.stderr, flush=True)
-        return cls(consts, imports, ext, infos)
+        return cls(consts, imports, ext, infos, dups)
 
     # ---------------------------------------------------------- modules
     def _build_modules(self):
@@ -516,6 +524,120 @@ class Graph:
                     k |= mask[imp]
             mask[m] = k
         self.closure_mask = mask
+
+    def importers(self, d):
+        """How many project modules see module d (d included)."""
+        bit = self.mod_index[d]
+        return sum(1 for m in self.modules if self.closure_mask[m] >> bit & 1)
+
+    def _split_duplicates(self, dups):
+        """A theorem two modules declare under the same full name: Lean imports both into the root
+        when their types agree, and keeps one constant, so DeclGraph saw one, and a carved piece
+        holding modules that used the other copy failed "Unknown identifier" at measure (oaiq-088
+        `blockSlope_mul_gap`, oaiq-090 `lineConvolution_bound`, oaiq-095 `additiveFourier_conj`,
+        oaiq-096: three more; each renamed by a port patch, hours later). Each copy becomes a node:
+        the one most modules see keeps the name, every other one is `<name>_dup<i>` (DeclGraph's
+        `dup` records give its own value's dependencies; a recording without them is read from the
+        commands, value dependencies unknown), and in a module that sees a renamed copy but not the
+        kept one, what Lean resolved to the name means the renamed copy (its references, its
+        constants' dependencies, its instance records). `collision_renames` renames the declaration
+        and those references in every carved file. Sets `duplicates` [(name, kept module,
+        [(module, new name)], guessed modules)] and `dup_alias` {module: {name: new name}}."""
+        self.duplicates, self.dup_alias = [], {}
+        copies = collections.defaultdict(dict)       # name -> {module: record}
+        for x in dups or ():
+            if x['m'] in self.infos and x['n'] in self.consts and x['m'] != self.consts[x['n']]['m']:
+                copies[x['n']][x['m']] = dict(x)
+        guessed = collections.defaultdict(list)
+        for m, info in self.infos.items():
+            for c in info.commands:
+                if not _is_decl_command(c) or c.private:
+                    continue
+                for nm in c.names or ():
+                    x = self.consts.get(nm)
+                    if x and x['m'] != m and x['m'] in self.infos and x['k'] in ('theorem', 'axiom') \
+                            and m not in copies.get(nm, {}):
+                        copies[nm][m] = dict(x, m=m, v=[], r=None, dup=True)
+                        guessed[nm].append(m)
+        renamed = {}                                 # name -> {module: new name}
+        for nm in sorted(copies):
+            env_m = self.consts[nm]['m']
+            # only theorems a command declares by name: identical anonymous (or named) local
+            # instances of a Prop class in sibling modules share one constant too (Problem340:
+            # `local instance : Fact ((0 : ℝ) < 100)` in 28 modules), and the carver emits another
+            # module's copy again where it is used (Carver._reactivate), so they stay one node
+            if not all(self._declaring_command(d, nm) for d in set(copies[nm]) | {env_m}):
+                continue
+            mods = sorted(set(copies[nm]) | {env_m},
+                          key=lambda d: (-self.importers(d), d != env_m, d))
+            keep, others = mods[0], mods[1:]
+            recs = dict(copies[nm])
+            recs[env_m] = self.consts[nm]
+            if keep != env_m:
+                self.consts[nm] = self._dup_record(recs[keep], nm, keep, nm)
+            new, i = {}, 1
+            for d in others:
+                while nm + '_dup%d' % i in self.consts:
+                    i += 1
+                new[d] = nm + '_dup%d' % i
+                self.consts[new[d]] = self._dup_record(recs[d], new[d], d, nm)
+                i += 1
+            renamed[nm] = new
+            self.duplicates.append((nm, keep, sorted(new.items()), sorted(guessed.get(nm, ()))))
+        if not renamed:
+            return
+        for m in self.infos:
+            alias = {}
+            for nm, new in renamed.items():
+                keep = self.consts[nm]['m']
+                if m == keep or self.sees(m, keep):
+                    continue
+                seen = [d for d in sorted(new) if d == m or self.sees(m, d)]
+                if seen:
+                    alias[nm] = new[seen[0]]
+            if alias:
+                self.dup_alias[m] = alias
+        by_m = collections.defaultdict(list)
+        for x in self.consts.values():
+            if x['m'] in self.dup_alias:
+                by_m[x['m']].append(x)
+        for m, alias in self.dup_alias.items():
+            a = lambda n, alias=alias: alias.get(n, n)
+            for x in by_m[m]:
+                x['t'] = [a(y) for y in x['t']]
+                x['v'] = [a(y) for y in x['v']]
+            for c in self.infos[m].commands:
+                c.names = [a(n) for n in c.names or ()]
+                if c.resolved:
+                    c.resolved = [[x[0], x[1], a(x[2])] + list(x[3:]) for x in c.resolved]
+                if c.insts:
+                    c.insts = [a(n) for n in c.insts]
+                if c.sig_insts:
+                    c.sig_insts = [a(n) for n in c.sig_insts]
+                if c.declares:
+                    c.declares = [[a(x[0])] + list(x[1:]) for x in c.declares]
+
+    def _declaring_command(self, m, nm):
+        """The declaration command of module m that declares `nm` by name and is not an instance."""
+        info = self.infos[m]
+        for c in info.commands:
+            if _is_decl_command(c) and nm in (c.names or ()):
+                if c.decl_kind == 'instance' or ANY_INSTANCE.match(info.text_bytes, c.start.byte, c.end.byte):
+                    return None
+                return c
+        return None
+
+    def _dup_record(self, rec, name, m, orig):
+        """Copy `rec` of a duplicated theorem `orig` as constant `name` of module m, its range that of
+        the command of m declaring `orig` when the recording has none for this copy."""
+        rec = dict(rec, n=name, m=m)
+        rec.pop('dup', None)
+        if not rec.get('r'):
+            for c in self.infos[m].commands:
+                if _is_decl_command(c) and orig in (c.names or ()):
+                    rec['r'] = [c.start.line, c.start.col, c.end.line, c.end.col]
+                    break
+        return rec
 
     def project_imports(self, m):
         return [x for x in self.imports.get(m, []) if x in self.infos]
@@ -710,12 +832,32 @@ class Graph:
                         out += self.open_targets(idn['name'], c.namespace, m)
         return list(dict.fromkeys(out))
 
+    def scope_vars(self, info, c):
+        """The names the `variable` commands in force at command c bind."""
+        key = ('vars', info.path, c.index)
+        if key not in self._readings:
+            out = set()
+            for _, cs in c.context:
+                for vi in cs:
+                    vc = info.commands[vi]
+                    if vc.short_kind == 'variable':
+                        out.update(n for grp in vc.binders or () for n in grp['names'])
+            self._readings[key] = out
+        return self._readings[key]
+
     def reading(self, info, c, idn):
         """What Lean resolved identifier idn of command c to (a Reading), or None when the
         elaborated port recorded nothing there (a module read without elaborating, a command
-        that failed, a token that is not a term: then the text-based reading is the fallback)."""
+        that failed, a token that is not a term: then the text-based reading is the fallback).
+        In a notation's body, a token whose head is a section variable in force is that local:
+        LeanInfo resolves the body without the section's variables (oaiq-081: `local notation
+        "seeded" => … run.output`, recorded as the theorem `run` of an opened namespace, so the
+        statement's stub dropped the notation and the `run_oai` rename gave `run.run_oai`)."""
         if c.resolved is None:
             return None
+        if c.short_kind in NOTATION and idn['name'].split('.')[0] in self.scope_vars(info, c):
+            a = idn['start']
+            return Reading((), (a, a + len(idn['name'].split('.')[0].encode('utf-8'))), set(), [])
         key = (info.path, c.index)
         idx = self._readings.get(key)
         if idx is None:
@@ -767,7 +909,8 @@ class Graph:
                 break
             t = '.'.join(parts[:len(parts) - strip])
             cands = [t] if root else [join(p, t) for p in prefixes(ns)] + [join(o, t) for o in opens]
-            hits = [n for c in cands for n in self.pub.get(c, ()) if self.visible(n, m)]
+            alias = self.dup_alias.get(m, {})
+            hits = [n for c in cands for n in self.pub.get(alias.get(c, c), ()) if self.visible(n, m)]
             if hits:
                 return list(dict.fromkeys(hits))
         # dot notation on a local (`A.coord_eq` with `A : Space`, Erdős 3 B024), or a field
@@ -1203,8 +1346,13 @@ def instance_imported(ik, have, rename):
 
 def collision_renames(g):
     """Private declarations whose public names collide (two modules' `private theorem helper`, in
-    one carved file or deprivatized): {env name: new short name}, the same in every file."""
+    one carved file or deprivatized): {env name: new short name}, the same in every file. Also each
+    renamed copy of a theorem two modules declare (`Graph._split_duplicates`): its declaration and
+    the references meaning it get its new name (`bound_dup1`)."""
     out = {}
+    for _, _, new, _ in getattr(g, 'duplicates', ()):
+        for _, n in new:
+            out[n] = n.rsplit('.', 1)[-1]
     for p, ns in g.pub.items():
         decl = sorted({g.owner[n] for n in ns if n == g.owner[n]})
         if len(decl) > 1 and any(n.startswith('_private.') for n in decl):
@@ -1723,7 +1871,11 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
 
     def ok_node(k):
         nd = g.nodes[k]
-        return nd.theorem and not nd.private and ascii_ok(k) and nd.sig <= b_or_ext and k not in renames
+        # not a statement whose universes occur only under `max`: the verifier's statement check can
+        # get "stuck at solving universe constraint" there (oaiq-124); it stays in its importers'
+        # pieces, as `fold` would put it
+        return nd.theorem and not nd.private and ascii_ok(k) and nd.sig <= b_or_ext and \
+            k not in renames and not max_only_universes(g, k)
 
     for t in sorted(nodes):
         if not g.nodes[t].theorem or g.nodes[t].sig - B - set(ext):
@@ -1740,7 +1892,8 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         def ok_node(k):
             nd = g.nodes[k]
             return public_ok(k) or (k in allowed and nd.private and nd.theorem and ascii_ok(k)
-                                    and nd.sig <= b_or_ext and k not in renames)
+                                    and nd.sig <= b_or_ext and k not in renames
+                                    and not max_only_universes(g, k))
 
     def fresh(n):
         s, todo = set(), [n]
@@ -1836,12 +1989,22 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             'sorry': sorted(k for k in reach | B if g.nodes[k].sorry and k not in ext)}
     if frozen:
         plan['frozen'] = list(frozen[1])
+    mu = {n: max_only_universes(g, n) for n in sorted(nodes) if max_only_universes(g, n)}
+    if mu:
+        plan['max_only_universes'] = mu
     if frozen and conflicts:
         plan['frozen_external_conflicts'] = {m: sorted(v) for m, v in sorted(conflicts.items())}
     if stmts:
         for n in resolve_piece_cycles(g, plan):
             plan['pieces'][n]['cost'] = round(pcost(set(plan['pieces'][n]['keep'])), 2)
     return plan
+
+
+def max_only_universes(g, k):
+    """The universe parameters of theorem node k's statement that occur in it only under `max` or
+    `imax` (DeclGraph `mu`; oaiq-124: `{σ : Type (max us v)}`, WA "stuck at solving universe
+    constraint `max ?u.5 ?u.11 =?= max ?u.10 ?u.11`" though the piece measured ok locally)."""
+    return list((g.consts.get(k) or {}).get('mu') or ())
 
 
 def _needs_piece(plan, bimp, n):
@@ -2371,6 +2534,15 @@ def _could_answer(inst_cmd, c):
     return False
 
 
+def _global_simp(g, k):
+    """Is node k a declaration carrying a global `@[simp]` (not `local`/`scoped`) attribute of its own?"""
+    nd = g.nodes[k]
+    if k in g.scoped:
+        return False
+    c = g.infos[nd.module].commands[nd.cmd]
+    return any(re.match(r'simp(?![\w\-])', a.strip()) for a in c.attrs or ())
+
+
 def _global_instance(g, k):
     """Is node k an instance every importer of its file sees (not `local`/`scoped`)?"""
     nd = g.nodes[k]
@@ -2602,6 +2774,8 @@ class Carver:
         self.re_count = collections.Counter()
         rename = dict(rename or {})
         self.rename = rename
+        self.sorry, self.deprivatize = set(sorry), deprivatize
+        self._simp_in_file = None
         mods = g.topo({g.nodes[k].module for k in keep})
         kept_cmds = {m: {g.nodes[k].cmd for k in keep if g.nodes[k].module == m} for m in mods}
         # pass 1: what goes, per module (independent of namespaces)
@@ -2643,9 +2817,11 @@ class Carver:
             # an instance with no name this file can write is skipped: `attribute [-instance] `
             # with nothing after it does not parse (Heisenberg 2026-10-25)
             hide = [h for h in self._unseen_instances(m, have, earlier, rename) if h and h.strip()]
-            if hide:
+            simps = [h for h in self._unseen_simps(m, have, earlier, rename) if h and h.strip()]
+            if hide or simps:
                 head = 'section\n-- module %s\n' % m
-                sec = head + 'attribute [-instance] %s\n' % ' '.join(hide) + sec[len(head):]
+                sec = head + ('attribute [-instance] %s\n' % ' '.join(hide) if hide else '') + \
+                    ('attribute [-simp] %s\n' % ' '.join(simps) if simps else '') + sec[len(head):]
             out.append(sec)
             earlier |= {k for k in keep if g.nodes[k].module == m}
         # reducibility of an external declaration, once at the top: the port's attribute is global
@@ -2685,6 +2861,51 @@ class Carver:
                 full = pubname(i)
                 if i in rename:
                     full = full.rsplit('.', 1)[0] + '.' + rename[i] if '.' in full else rename[i]
+            out.append('_root_.' + full)
+        return out
+
+    def _unseen_simps(self, m, have, earlier, rename):
+        """The global `@[simp]` lemmas this file shows module m's section that m never saw (declared in
+        a module m does not import), by the names this file knows them by: `attribute [-simp]` at the
+        top of the section takes them out of the simp set until its `end`, as `_unseen_instances`
+        does for instances (oaiq-081 SubexponentialSAT: `status_read` of a later module fired in
+        modules that never imported it, `simp` closed goals early or left an opaque `status`, ~40
+        post-carve patches). Only when a kept declaration of the section calls the default simp set
+        (a stub: in its statement), and only lemmas whose statement mentions a project declaration
+        one of them uses, or only library ones. Never a library lemma: only this carve's
+        declarations, kept earlier in the file or imported from its bundles."""
+        g = self.g
+        if not hasattr(g, '_simp_lemmas'):
+            g._simp_lemmas = sorted(k for k in g.nodes if _global_simp(g, k))
+        info = g.infos[m]
+        mine = []
+        for k in self.keep:
+            nd = g.nodes[k]
+            if nd.module != m:
+                continue
+            c = info.commands[nd.cmd]
+            end = c.value_start.byte if k in self.sorry and c.value_start else c.end.byte
+            if _default_simp_call(strip(info.text_bytes[c.start.byte:end].decode('utf-8', 'replace'))):
+                mine.append(k)
+        if not mine:
+            return []
+        if self._simp_in_file is None:
+            # the simp lemmas this file has at all: kept, or imported
+            self._simp_in_file = [i for i in g._simp_lemmas
+                                  if (i in self.keep and not (g.nodes[i].private and not self.deprivatize))
+                                  or (i not in self.keep and instance_imported(i, have, rename))]
+        uses = set().union(*(g.nodes[k].deps | g.nodes[k].sig for k in mine))
+        out = []
+        for i in self._simp_in_file:
+            nd = g.nodes[i]
+            if nd.module == m or g.sees(m, nd.module) or (i in self.keep and i not in earlier):
+                continue
+            td = nd.tdeps - {i}
+            if td and not td & uses:
+                continue
+            full = pubname(i)
+            if i in rename:
+                full = full.rsplit('.', 1)[0] + '.' + rename[i] if '.' in full else rename[i]
             out.append('_root_.' + full)
         return out
 
@@ -2734,13 +2955,19 @@ class Carver:
             if c.short_kind in NOTATION or c.short_kind == 'attribute':
                 opens = g.scope_opens(info, c, m)
                 refs = [i for i in c.idents or [] if i['role'] == 'ref']
-                gone = [i for i in refs if self._gone(i['name'], c, m, have, opens, idn=i)]
+                bound = g.scope_vars(info, c) if c.short_kind in NOTATION else ()
+                gone = [i for i in refs if self._gone(i['name'], c, m, have, opens, bound, idn=i)]
                 if c.short_kind in NOTATION and gone:
                     drop.add(c.index)
                 elif c.short_kind == 'attribute' and refs and len(gone) == len(refs):
                     drop.add(c.index)
                 elif not _is_local(leanedit.text(info, c.index)):
                     keep_global.add(c.index)
+            elif c.short_kind == 'export' and self._export_alive(info, c, m, have):
+                # an export makes aliases that outlive its block (`namespace PA / export
+                # PolynomialAlgorithm (denote) / end PA`): with a name it exports still here, the
+                # block stays, though it holds no declaration (oaiq-081: the piece's `PA.denote`)
+                keep_global.add(c.index)
         # a local notation nothing kept in its scope uses goes: kept, it would keep the variables
         # it names (Erdős 3 v2 stub: `local notation "hamin" => … B` kept `variable (B :
         # LayerSamplerAxis I n → Type*)`), or name variables already gone (B169 "Unknown
@@ -2825,7 +3052,7 @@ class Carver:
         dead_tok = {c.index: _notation_tokens(leanedit.text(info, c.index)) for c in info.commands
                     if c.index in drop and c.short_kind in NOTATION}
         inst_names = getattr(g, 'instance_names', None) or {}
-        reactivated = set()
+        reactivated, local_attrs = set(), set()
         for c in info.commands:
             if c.index in drop:
                 continue
@@ -2875,7 +3102,13 @@ class Carver:
                     # PauliData.finite`, a bundle's declaration). The other attributes of the
                     # command stay on every target the file has.
                     mine = [i for i in refs if i not in gone and not self._gone(i['name'], c, m, keep_names, opens, idn=i)]
-                    names = lambda L: ' '.join(t[i['start']:i['end']].decode('utf-8') for i in L)
+                    ren_edits = self._rename_edits(info, c, m, opens, rename)
+
+                    def tok(i):
+                        mine_e = [e for e in ren_edits if i['start'] <= e[0] < i['end']]
+                        parts, cur = _apply(t, i['start'], mine_e)
+                        return (b''.join(parts) + t[cur:i['end']]).decode('utf-8')
+                    names = lambda L: ' '.join(tok(i) for i in L)
                     rest = [e for e in ents if not restricted_attribute('attribute [%s] x' % e)
                             and not generating_attribute('attribute [%s] x' % e)]
                     res = [e for e in ents if e not in rest and restricted_attribute('attribute [%s] x' % e)]
@@ -2911,13 +3144,20 @@ class Carver:
                     else:
                         drop.add(c.index)
                 elif gone:
-                    new_txt = _cmd_text(info, c, [(i['start'], _skip_ws(t, i['end']), '') for i in gone])
+                    new_txt = _cmd_text(info, c, [(i['start'], _skip_ws(t, i['end']), '') for i in gone] +
+                                        self._rename_edits(info, c, m, opens, rename))
                     # `attribute [-simp] a b` whose targets are all gone, though `simp` itself is a
                     # reference that stays: nothing left to apply it to (PeriodicGroups, 2026-10-26)
                     if re.fullmatch(r'\s*(?:local\s+|scoped\s+)?attribute\s*\[[^\]]*\]\s*', new_txt):
                         drop.add(c.index)
                     else:
                         reps[c.index] = new_txt
+                else:
+                    # a renamed target (a collided private declaration, a duplicate's renamed copy,
+                    # the `_oai` target) is named by its new name
+                    ren_edits = self._rename_edits(info, c, m, opens, rename)
+                    if ren_edits:
+                        reps[c.index] = _cmd_text(info, c, ren_edits)
                 continue
             if k == 'open':
                 r = self._open(info, c, m, alive, (c.start.byte, c.end.byte))
@@ -2962,6 +3202,7 @@ class Carver:
                     # modules' `private instance : Countable O` share one public name)
                     edits.append((at, at, ' ' + rename.get(key, pubname(key).rsplit('.', 1)[-1])))
                 pre = self._reactivate(info, c, m, drop, reactivated, inst_names, have, c.index in sorry)
+                pre += self._local_attrs(info, c, m, drop, local_attrs, have, c.index in sorry)
             elif c.short_kind in NOTATION:
                 edits += self._rename_edits(info, c, m, opens, rename)
             if edits or pre:
@@ -3044,7 +3285,8 @@ class Carver:
                 keys = {'key:' + ' '.join([x[1]] + list(x[2])) for x in vc.declares or () if x[1]}
                 if not (names | keys) & used and not (not sorried and _could_answer(vc, c)):
                     if not (self._sibling_used(info, vc, c, used) or
-                            self._carrier_used(info, vc, c, m, sorried)) or \
+                            self._carrier_used(info, vc, c, m, sorried) or
+                            self._library_coercion(vc, ik0)) or \
                             self._overtakes(info, vc, c, drop):
                         continue
                     sibling = True
@@ -3088,6 +3330,58 @@ class Carver:
             name = '%s_r%s_%d' % (short, self.tag, self.re_count[short])
             edit = (anon_at, anon_at, ' ' + name) if anon_at is not None else (decl['start'], decl['end'], name)
             out.append(_cmd_text(info, vc, [edit]).strip() + '\n')
+        return ''.join(out)
+
+    def _library_coercion(self, vc, ik):
+        """Is local instance vc a coercion between types that mention no project declaration
+        (`Coe (E → ℝ) (E → ℂ)`)? Its use unfolds to a lambda and leaves no constant, no instance
+        problem and no carrier to match (oaiq-096, the PNT module `Wiener`: "Application type
+        mismatch ℕ → ℝ vs ℕ → ℂ" in the piece), so it comes back for every kept declaration in its
+        scope, as it was in force there in the port. One over project types comes back by
+        `_carrier_used`."""
+        decl = [x for x in vc.declares or () if x[1]]
+        if not decl or not any(x[1] in COERCION_CLASSES for x in decl):
+            return False
+        g = self.g
+        if any(h in g.owner for x in decl for h in x[2] or ()):
+            return False
+        if ik and ik in g.nodes:
+            classes = {x[1] for x in decl}
+            if any(d in g.nodes and not g.nodes[d].instance and d not in classes
+                   for d in g.nodes[ik].tdeps - {ik}):
+                return False
+        return True
+
+    def _local_attrs(self, info, c, m, drop, done, have, sorried=False):
+        """`attribute [local X] N` before kept command c, for each declaration N of its module with a
+        `@[local X]` attribute in force at c that this file imports rather than declares: a local
+        attribute does not travel with the declaration into the bundle that holds it (oaiq-096:
+        `@[local gcongr] theorem norm_lt_norm_of_nonneg` in a bundle, `gcongr` in the piece "did not
+        make progress"). Only when c's text uses the attribute (`simp` by a default simp call, any
+        other by its name; `instance` always)."""
+        g = self.g
+        chain = tuple(o for o, _ in c.context)
+        end = c.value_start.byte if sorried and c.value_start else c.end.byte
+        text = strip(info.text_bytes[c.start.byte:end].decode('utf-8', 'replace'))
+        out = []
+        for vi in sorted(drop):
+            if vi >= c.index or (vi, chain) in done or not _in_scope(info, vi, c):
+                continue
+            vc = info.commands[vi]
+            locs = [a.split(None, 1)[1].strip() for a in vc.attrs or ()
+                    if a.split() and a.split()[0] == 'local' and len(a.split()) > 1]
+            if not locs or not _is_decl_command(vc) or vc.short_kind == 'attribute':
+                continue
+            k = g.cmd_node.get((m, vi))
+            if not k or k in self.keep or not instance_imported(k, have, self.rename):
+                continue
+            want = [x for x in locs if x.split()[0] == 'instance' or
+                    (x.split()[0] == 'simp' and _default_simp_call(text)) or
+                    _uses_token(text, x.split()[0]) or _uses_token(text, pubname(k).rsplit('.', 1)[-1])]
+            if want:
+                done.add((vi, chain))
+                out.append('attribute [local %s] _root_.%s\n' % (', local '.join(want),
+                                                                instance_ref(k, {}, self.rename)))
         return ''.join(out)
 
     def _sibling_used(self, info, vc, c, used):
@@ -3278,6 +3572,22 @@ class Carver:
             return None
         return [(i['start'], _skip_ws(t, i['end']), '') for i in gone]
 
+    def _export_alive(self, info, c, m, have):
+        """Does `export X (a b)` still export something the carved file has (or a library name)?"""
+        g = self.g
+        refs = [i for i in c.idents or [] if i['role'] == 'ref']
+        if len(refs) < 2:
+            return bool(refs)
+        tok = refs[0]['name']
+        opens = g.scope_opens(info, c, m)
+        cands = [tok[len('_root_.'):]] if tok.startswith('_root_.') else \
+            list(dict.fromkeys([join(p, tok) for p in prefixes(c.namespace)] + [join(o, tok) for o in opens]))
+        for i in refs[1:]:
+            proj = [n for x in cands for n in g.pub.get(join(x, i['name']), ())]
+            if not proj or any(pubname(n) in have for n in proj):
+                return True
+        return False
+
     def _hiding_edits(self, info, c, m, have):
         """Remove from an `open X hiding a b` / `open X (a b)` list the names that were project
         declarations of X and are not in the carved file ("Unknown constant `X.a`")."""
@@ -3366,10 +3676,15 @@ class Carver:
         k = g.cmd_node.get((m, c.index))
         own = set(g.nodes[k].names) | {k} if k else set()
         vs = c.value_start.byte if c.value_start else None
+        # a section variable or a binder of the command shadows any declaration of its name
+        bound = g.scope_vars(info, c) | {i['name'] for i in c.idents or [] if i['role'] == 'binder'}
         for i in idents:
+            if i['role'] == 'ref' and not is_field(info, i) and i['name'].split('.')[0] in bound:
+                continue
             if i['role'] == 'decl':
                 full = i['name'][len('_root_.'):] if i['name'].startswith('_root_.') else \
                     join(c.namespace, i['name'])
+                full = g.dup_alias.get(m, {}).get(full, full)
                 hits = [n for n in g.pub.get(full, ()) if g.consts[n]['m'] == m and n in rename]
             elif i['role'] == 'ref':
                 field = is_field(info, i)

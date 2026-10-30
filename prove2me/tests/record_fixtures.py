@@ -15,6 +15,9 @@ sys.path.insert(0, os.path.dirname(HERE))
 from p2mlib import leaninfo  # noqa: E402
 
 FIX = os.path.join(HERE, 'lean_fixtures')
+# the CarveDev development's root modules (test_carve.test_tools_reproduce_the_recordings uses them too)
+CARVE_ROOTS = ['CarveDev.Top', 'CarveDev.ShadowA', 'CarveDev.ShadowB', 'CarveDev.DupTop', 'CarveDev.SimpTop',
+               'CarveDev.NotaVar', 'CarveDev.CoeLocal', 'CarveDev.UnivMax']
 REPLAYED = ['Structure', 'Broken', 'Notation', 'Rewire', 'Audit', 'Scope', 'Alias', 'Variable', 'ScopedVariable']
 
 
@@ -36,7 +39,7 @@ def record_carve():
     from p2mlib import carve
     src = os.path.join(FIX, 'carve')
     with tempfile.TemporaryDirectory() as d:
-        for rel in carve.record_fixture(src, 'CarveDev', ['CarveDev.Top', 'CarveDev.ShadowA', 'CarveDev.ShadowB'], os.path.join(d, 'olean'), src):
+        for rel in carve.record_fixture(src, 'CarveDev', CARVE_ROOTS, os.path.join(d, 'olean'), src):
             print('recorded carve/' + rel)
 
 

@@ -1,0 +1,290 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 38,
+    "col": 16,
+    "line": 3
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 38,
+     "name": "CD.Dup",
+     "role": "scope",
+     "start": 32
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 22,
+    "col": 0,
+    "line": 3
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Dup.useA2",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 92,
+    "col": 50,
+    "line": 5
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 53,
+     "name": "useA2",
+     "role": "decl",
+     "start": 48
+    },
+    {
+     "end": 56,
+     "name": "n",
+     "role": "binder",
+     "start": 55
+    },
+    {
+     "end": 62,
+     "name": "Nat",
+     "role": "ref",
+     "start": 59
+    },
+    {
+     "end": 67,
+     "name": "n",
+     "role": "ref",
+     "start": 66
+    },
+    {
+     "end": 73,
+     "name": "n",
+     "role": "ref",
+     "start": 72
+    },
+    {
+     "end": 90,
+     "name": "bound",
+     "role": "ref",
+     "start": 85
+    },
+    {
+     "end": 92,
+     "name": "n",
+     "role": "ref",
+     "start": 91
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 53,
+      "col": 13,
+      "line": 5
+     },
+     "start": {
+      "byte": 48,
+      "col": 8,
+      "line": 5
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "LE Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Dup.useA2"
+   ],
+   "namespace": "CD.Dup",
+   "opens": [],
+   "resolved": [
+    [
+     48,
+     53,
+     "CD.Dup.useA2",
+     "b"
+    ],
+    [
+     48,
+     53,
+     "",
+     "b"
+    ],
+    [
+     55,
+     56,
+     "",
+     "b"
+    ],
+    [
+     59,
+     62,
+     "Nat"
+    ],
+    [
+     66,
+     67,
+     ""
+    ],
+    [
+     72,
+     73,
+     ""
+    ],
+    [
+     85,
+     90,
+     "CD.Dup.bound"
+    ],
+    [
+     91,
+     92,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 40,
+    "col": 0,
+    "line": 5
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 82,
+    "col": 40,
+    "line": 5
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 104,
+    "col": 10,
+    "line": 7
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 104,
+     "name": "CD.Dup",
+     "role": "scope",
+     "start": 98
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.Dup",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 94,
+    "col": 0,
+    "line": 7
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 105,
+    "col": 0,
+    "line": 8
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 105,
+    "col": 0,
+    "line": 8
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/DupUseA2.lean",
+ "messages": [],
+ "mode": "elaborate"
+}

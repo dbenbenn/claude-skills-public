@@ -111,7 +111,7 @@ def test_private_names_are_per_module(g):
     assert a in g.nodes and b in g.nodes
     assert a in g.nodes['CD.double_succ'].deps and b not in g.nodes['CD.double_succ'].deps
     assert b in g.nodes['CD.main'].deps
-    assert {k: v for k, v in C.collision_renames(g).items() if '.IC.' not in k} == \
+    assert {k: v for k, v in C.collision_renames(g).items() if '.IC.' not in k and '_dup' not in k} == \
         {a: 'helper_p0', b: 'helper_p1'}
 
 
@@ -588,8 +588,8 @@ def test_cost_from_build_log():
 
 @pytest.mark.lean
 def test_tools_reproduce_the_recordings(tmp_path):
-    rec = C.record_fixture(FIX, 'CarveDev', ['CarveDev.Top'], str(tmp_path / 'olean'),
-                           str(tmp_path / 'rec'))
+    from record_fixtures import CARVE_ROOTS
+    rec = C.record_fixture(FIX, 'CarveDev', CARVE_ROOTS, str(tmp_path / 'olean'), str(tmp_path / 'rec'))
     for rel in rec:
         new = open(os.path.join(tmp_path, 'rec', rel), encoding='utf-8').read()
         old = open(os.path.join(FIX, rel), encoding='utf-8').read()
@@ -2584,3 +2584,169 @@ def test_make_plan_builds_the_available_name_set_once():
     src = inspect.getsource(C.make_plan)
     inner = src[src.index('def ok_node'):src.index('def fresh')]
     assert 'B | set(ext)' not in inner and '| set(' not in inner
+
+
+# ---------------------------------------------------------------- oaiq-081..124 (2026-10-30)
+
+def _tiny_plan(g, targets, prefix, **kw):
+    """A plan of small bundles; `budget` large keeps each target's chain in one piece."""
+    args = dict(budget=0.05, piece_size=10**6, bundle_budget=0.005, bundle_size=10**6,
+                cost=C.size_costs(g, bytes_per_second=10000), bundle_prefix=prefix)
+    args.update(kw)
+    return C.make_plan(g, targets, **args)
+
+
+DUP, DUP1 = 'CD.Dup.bound', 'CD.Dup.bound_dup1'
+
+
+def test_a_theorem_two_modules_declare_is_one_node_per_copy(g):
+    # oaiq-088/090/095/096: Lean imports DupA's and DupZ's `CD.Dup.bound` together (same type) and
+    # keeps one constant (DupZ's: imported first); the name-keyed graph had one node, and a piece
+    # holding DupUseZ and DupA used DupA's copy before it was declared ("Unknown identifier").
+    # DeclGraph records the other module's copy (`dup`); DupA has more importers, so it keeps the
+    # name and DupZ's copy is renamed, with the references that mean it.
+    dups = []
+    consts, _, _ = C.load_decl_graph(os.path.join(FIX, 'decl_graph.jsonl'), dups)
+    assert consts[DUP]['m'] == 'CarveDev.DupZ'
+    # (InstB's anonymous `Prop` instance, identical to InstA's, is a `dup` record too; it stays one
+    # node, as before: Carver._reactivate emits another module's copy again where it is used)
+    assert sorted((x['n'], x['m']) for x in dups) == [(DUP, 'CarveDev.DupA'),
+                                                      ('CD.LI.instPropCOfNatNat', 'CarveDev.InstB')]
+    assert g.duplicates == [(DUP, 'CarveDev.DupA', [('CarveDev.DupZ', DUP1)], [])]
+    assert g.nodes[DUP].module == 'CarveDev.DupA' and g.nodes[DUP1].module == 'CarveDev.DupZ'
+    for user in ('CD.Dup.useZ', "CD.Dup.useZ'"):
+        assert DUP1 in g.nodes[user].deps and DUP not in g.nodes[user].deps
+    for user in ('CD.Dup.useA', 'CD.Dup.useA2'):
+        assert DUP in g.nodes[user].deps and DUP1 not in g.nodes[user].deps
+    assert C.collision_renames(g)[DUP1] == 'bound_dup1'
+    assert g.dup_alias == {'CarveDev.DupZ': {DUP: DUP1}, 'CarveDev.DupUseZ': {DUP: DUP1}}
+
+
+def test_a_piece_holding_both_copies_declares_each_under_its_own_name(g):
+    p = _tiny_plan(g, ['CD.Dup.dupMain'], 'DUP', budget=1000)
+    assert C.check_plan(g, p) == []
+    assert p['nodes'] == ['CD.Dup.dupMain']
+    txt = C.gen_piece(g, p, 'CD.Dup.dupMain')
+    z = _section(txt, 'CarveDev.DupZ')
+    assert 'theorem bound_dup1 (n : Nat)' in z, txt
+    assert 'CD.Dup.bound_dup1 (n + 1)' in _section(txt, 'CarveDev.DupUseZ'), txt
+    keep = {'CD.Dup.useZ', DUP1}
+    uz = _section(C.Carver(g).carve(keep, g.have_names(keep), rename=C.collision_renames(g)),
+                  'CarveDev.DupUseZ')
+    assert 'theorem useZ (n : Nat) : n ≤ n + 1 := bound_dup1 n' in uz, uz
+    # DupA's copy and its users keep the name, wherever they are carved
+    assert 'theorem bound (n : Nat) : n ≤ n + 1 := Nat.le_succ n' in _section(txt, 'CarveDev.DupA')
+    assert 'useA (n : Nat) : n ≤ n + 1 := bound n' in _section(txt, 'CarveDev.DupUseA')
+    # the topological order alone put DupUseA before DupZ, the environment's copy: the old failure
+    assert txt.index('-- module CarveDev.DupA') < txt.index('-- module CarveDev.DupUseA')
+
+
+def test_duplicates_without_dup_records_are_read_from_the_commands(tmp_path):
+    # a decl graph recorded before DeclGraph wrote `dup` records: the copy is found by its command
+    # (DupA's declares a name the environment puts in DupZ), its value's dependencies unknown
+    lines = [l for l in open(os.path.join(FIX, 'decl_graph.jsonl'), encoding='utf-8') if '"dup":true' not in l]
+    old = tmp_path / 'decl_graph.jsonl'
+    old.write_text(''.join(lines), encoding='utf-8')
+    g2 = C.Graph.load(str(old), FIX)
+    assert g2.duplicates == [(DUP, 'CarveDev.DupA', [('CarveDev.DupZ', DUP1)], ['CarveDev.DupA'])]
+    assert DUP1 in g2.nodes["CD.Dup.useZ'"].deps and DUP in g2.nodes['CD.Dup.useA2'].deps
+
+
+def test_a_simp_lemma_a_module_never_saw_is_hidden_in_its_section(g):
+    # oaiq-081 (SubexponentialSAT, ~40 hand patches): SimpLate's `@[simp] h_eq`, bundle material
+    # (attributed), closed SimpUse's `simp` early in a piece holding both; SimpUse never imported it
+    p = _tiny_plan(g, ['CD.Sp.simpTop'], 'SP', budget=1000)
+    files = [C.gen_piece(g, p, n) for n in p['nodes']] + [C.gen_bundle(g, p, b['name']) for b in p['bundles']]
+    use = [f for f in files if '-- module CarveDev.SimpUse' in f]
+    assert use
+    for f in use:
+        sec = _section(f, 'CarveDev.SimpUse')
+        assert 'attribute [-simp] _root_.CD.Sp.h_eq' in sec, f
+    for f in files:
+        if '-- module CarveDev.SimpLate' in f:
+            assert '[-simp]' not in _section(f, 'CarveDev.SimpLate')
+    # never a library lemma, and only where a kept declaration calls the default simp set
+    assert all(re.findall(r'\[-simp\] (.*)', f) in ([], ['_root_.CD.Sp.h_eq']) for f in files)
+    # imported (from a bundle) rather than kept earlier: hidden all the same
+    txt = C.Carver(g).carve({'CD.Sp.use'}, g.have_names({'CD.Sp.use', 'CD.Sp.h', 'CD.Sp.h_eq'}))
+    assert 'attribute [-simp] _root_.CD.Sp.h_eq' in _section(txt, 'CarveDev.SimpUse')
+    # not imported: nothing to hide (and naming it would be an unknown constant)
+    txt = C.Carver(g).carve({'CD.Sp.use'}, g.have_names({'CD.Sp.use', 'CD.Sp.h'}))
+    assert '[-simp]' not in txt
+
+
+def test_a_notation_written_with_a_section_variable_reads_it_as_the_variable(g):
+    # oaiq-081: `local notation "seeded" => … run.output`, `run` a section variable, recorded by
+    # LeanInfo as the theorem `run` of the namespace: the stub dropped `seeded` (and `both`, written
+    # with it), and the target `run` renamed `run_oai` turned the field into `run.run_oai`
+    assert 'CD.NV.run' not in g.nodes['CD.NV.uses'].deps
+    p = _tiny_plan(g, ['CD.NV.uses', 'CD.NV.both_run'], 'NV')
+    stub = C.gen_stub(g, p, 'CD.NV.uses')
+    assert 'local notation "seeded"' in stub and 'local notation "both"' in stub, stub
+    keep = set(p['pieces']['CD.NV.uses']['keep']) | {'CD.NV.run'}
+    txt = C.Carver(g).carve(keep, g.have_names(keep | {k for b in p['bundles'] for k in b['nodes']}),
+                            rename={'CD.NV.run': 'run_oai'})
+    from p2mlib.leantext import strip
+    body = strip(txt)
+    assert 'theorem run_oai' in body and 'run.run_oai' not in body and 'run.output' in body, txt
+
+
+def test_an_export_in_a_block_without_declarations_stays(g):
+    # oaiq-081: `namespace PA / export PolynomialAlgorithm (denote) / end PA` went with its block,
+    # which holds no declaration, and the piece's `PA.denote` was unknown
+    p = _tiny_plan(g, ['CD.NV.denote_zero'], 'EX')
+    for txt in (C.gen_piece(g, p, 'CD.NV.denote_zero'), C.gen_stub(g, p, 'CD.NV.denote_zero')):
+        assert 'export PolyAlg (denote)' in txt, txt
+
+
+def test_a_library_coercion_local_instance_comes_back(g):
+    # oaiq-096 (`Wiener`): `local instance : Coe (E → ℝ) (E → ℂ)` leaves no constant and no instance
+    # problem, so nothing brought it back; it was in force for every declaration of its section
+    p = _tiny_plan(g, ['CD.CL.coerced'], 'CO')
+    for txt in (C.gen_piece(g, p, 'CD.CL.coerced'), C.gen_stub(g, p, 'CD.CL.coerced')):
+        sec = _section(txt, 'CarveDev.CoeLocal') if '-- module' in txt else txt
+        m = re.search(r'local instance \S+ : Coe \(Nat → Nat\) \(Nat → Int\)', sec)
+        assert m and m.start() < sec.index('theorem coerced'), sec
+
+
+def test_a_local_attribute_of_an_imported_declaration_is_applied_again(g):
+    # oaiq-096: `@[local gcongr] theorem norm_lt_norm_of_nonneg` kept in a bundle; the attribute ends
+    # with the bundle's section, so `gcongr` in the piece "did not make progress". Here `@[local
+    # simp] k_eq` (attributed, so bundle material) and `uses_k := by simp`.
+    p = _tiny_plan(g, ['CD.CL.uses_k'], 'LA')
+    assert any('CD.CL.k_eq' in b['nodes'] for b in p['bundles'])
+    sec = _section(C.gen_piece(g, p, 'CD.CL.uses_k'), 'CarveDev.CoeLocal')
+    assert 'attribute [local simp] _root_.CD.CL.k_eq\ntheorem uses_k' in sec, sec
+    # the statement does not call simp: nothing to apply there
+    assert 'attribute [local simp]' not in C.gen_stub(g, p, 'CD.CL.uses_k')
+
+
+def test_a_theorem_with_universes_only_under_max_is_not_made_a_statement(g):
+    # oaiq-124: `{σ : Type (max us v)}` (`us` nowhere bare): WA "stuck at solving universe
+    # constraint"; the carver keeps such a theorem inside its importers' pieces
+    assert g.consts['CD.UM.maxOnly']['mu'] == ['u', 'v']
+    assert 'mu' not in g.consts['CD.UM.bare']
+    assert C.max_only_universes(g, 'CD.UM.umTop') == ['v']
+    p = C.make_plan(g, ['CD.UM.umTop'], budget=0.0001, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000), bundle_prefix='UM')
+    assert 'CD.UM.bare' in p['nodes'] and 'CD.UM.maxOnly' not in p['nodes']
+    assert p['max_only_universes'] == {'CD.UM.umTop': ['v']}
+
+
+@pytest.mark.lean
+def test_duplicates_simp_leaks_notations_coercions_and_local_attributes_compile(g, tmp_path):
+    for i, (targets, prefix) in enumerate([
+            (['CD.Dup.dupMain'], 'DUP'), (['CD.Sp.simpTop'], 'SP'),
+            (['CD.NV.uses', 'CD.NV.both_run'], 'NV'), (['CD.CL.coerced', 'CD.CL.uses_k'], 'CO')]):
+        d = tmp_path / str(i)
+        d.mkdir()
+        _compile_in_publish_order(g, _tiny_plan(g, targets, prefix), d)
+    # the max-only universes: every file compiles, and only the target umTop (its `v` only under
+    # `max`, which make_plan warns about) fails the verifier's check, as oaiq-124's statement did;
+    # maxOnly, never made a statement, does not
+    d = tmp_path / 'um'
+    d.mkdir()
+    p = _tiny_plan(g, ['CD.UM.umTop'], 'UM', budget=0.0001)
+    assert 'CD.UM.maxOnly' not in p['nodes']
+    with pytest.raises(C.CarveError, match=r'(?s)Chk_CD_UM_umTop.*oaiq-124'):
+        _compile_in_publish_order(g, p, d)

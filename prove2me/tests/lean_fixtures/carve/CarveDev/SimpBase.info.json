@@ -1,0 +1,297 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 484,
+    "col": 93,
+    "line": 6
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 501,
+    "col": 15,
+    "line": 8
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 501,
+     "name": "CD.Sp",
+     "role": "scope",
+     "start": 496
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 486,
+    "col": 0,
+    "line": 8
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.Sp.h",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 529,
+    "col": 26,
+    "line": 10
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 508,
+     "name": "h",
+     "role": "decl",
+     "start": 507
+    },
+    {
+     "end": 511,
+     "name": "n",
+     "role": "binder",
+     "start": 510
+    },
+    {
+     "end": 517,
+     "name": "Nat",
+     "role": "ref",
+     "start": 514
+    },
+    {
+     "end": 524,
+     "name": "Nat",
+     "role": "ref",
+     "start": 521
+    },
+    {
+     "end": 529,
+     "name": "n",
+     "role": "ref",
+     "start": 528
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 508,
+      "col": 5,
+      "line": 10
+     },
+     "start": {
+      "byte": 507,
+      "col": 4,
+      "line": 10
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Sp.h"
+   ],
+   "namespace": "CD.Sp",
+   "opens": [],
+   "resolved": [
+    [
+     507,
+     508,
+     "CD.Sp.h",
+     "b"
+    ],
+    [
+     507,
+     508,
+     "",
+     "b"
+    ],
+    [
+     510,
+     511,
+     "",
+     "b"
+    ],
+    [
+     514,
+     517,
+     "Nat"
+    ],
+    [
+     521,
+     524,
+     "Nat"
+    ],
+    [
+     528,
+     529,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 503,
+    "col": 0,
+    "line": 10
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 525,
+    "col": 22,
+    "line": 10
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 540,
+    "col": 9,
+    "line": 12
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 540,
+     "name": "CD.Sp",
+     "role": "scope",
+     "start": 535
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.Sp",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 531,
+    "col": 0,
+    "line": 12
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 541,
+    "col": 0,
+    "line": 13
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 541,
+    "col": 0,
+    "line": 13
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/SimpBase.lean",
+ "messages": [],
+ "mode": "elaborate"
+}

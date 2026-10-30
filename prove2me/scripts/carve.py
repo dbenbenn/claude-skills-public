@@ -246,6 +246,25 @@ def report_fallbacks(g, limit=10):
         print('%d local instances used but not re-emitted: %s' % (len(g.lost_instances), g.lost_instances[:limit]))
 
 
+def report_duplicates(g, limit=20):
+    """Theorems two modules declare under one full name (Lean imports both when the statements
+    agree; p2mlib.carve.Graph._split_duplicates): which module's copy keeps the name and how the
+    others are renamed in every carved file (oaiq-088/090/095/096: hand port patches before)."""
+    dups = getattr(g, 'duplicates', ())
+    if not dups:
+        return
+    print('%d theorem name(s) declared by more than one module; each copy is carved as its own '
+          'declaration, the one most modules see under the name:' % len(dups))
+    for nm, keep, new, guessed in dups[:limit]:
+        print('  DUPLICATE %s: %s keeps it; %s' % (nm, keep, '; '.join(
+            '%s renamed %s' % (m, n.rsplit('.', 1)[-1]) for m, n in new)))
+    if len(dups) > limit:
+        print('  ... %d more' % (len(dups) - limit))
+    if any(gs for _, _, _, gs in dups):
+        print('  (this decl graph predates DeclGraph\'s per-module copies: the other copies\' proofs '
+              'are read from their source only; re-run `carve.py graph` for their exact dependencies)')
+
+
 def warn_leaks(g, P, limit=30):
     """Instances a carved file shows a declaration its module never saw (C.instance_leaks): if a
     file then fails where the port compiled (a rewrite no longer matching, a different
@@ -282,6 +301,7 @@ def main(argv):
         g = load_graph(cfg)
         print('%d modules, %d declaration nodes' % (len(g.modules), len(g.nodes)))
         report_fallbacks(g)
+        report_duplicates(g)
     elif cmd == 'split':
         g = load_graph(cfg)
         P = json.load(open(plan_path(cfg)))
@@ -336,6 +356,11 @@ def main(argv):
             print('  %7.1f s  %s' % (c, n))
         probs = C.check_plan(g, P)
         warn_leaks(g, P)
+        report_duplicates(g)
+        for k, us in sorted((P.get('max_only_universes') or {}).items()):
+            print('WARNING: statement %s has universe(s) %s only under `max`: the verifier may answer '
+                  'WA "stuck at solving universe constraint" (oaiq-124); fold it (carve.py fold) if '
+                  'it is not a target, or restate it with every universe bare' % (k, ', '.join(us)))
         for p in probs[:40]:
             print('PROBLEM', p)
         if probs:

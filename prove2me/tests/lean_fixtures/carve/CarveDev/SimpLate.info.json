@@ -1,0 +1,428 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 41,
+    "col": 15,
+    "line": 3
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 41,
+     "name": "CD.Sp",
+     "role": "scope",
+     "start": 36
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 26,
+    "col": 0,
+    "line": 3
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [
+    "simp"
+   ],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Sp.h_eq",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 90,
+    "col": 47,
+    "line": 5
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 63,
+     "name": "h_eq",
+     "role": "decl",
+     "start": 59
+    },
+    {
+     "end": 66,
+     "name": "n",
+     "role": "binder",
+     "start": 65
+    },
+    {
+     "end": 72,
+     "name": "Nat",
+     "role": "ref",
+     "start": 69
+    },
+    {
+     "end": 77,
+     "name": "h",
+     "role": "ref",
+     "start": 76
+    },
+    {
+     "end": 79,
+     "name": "n",
+     "role": "ref",
+     "start": 78
+    },
+    {
+     "end": 83,
+     "name": "n",
+     "role": "ref",
+     "start": 82
+    },
+    {
+     "end": 90,
+     "name": "rfl",
+     "role": "ref",
+     "start": 87
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 63,
+      "col": 20,
+      "line": 5
+     },
+     "start": {
+      "byte": 59,
+      "col": 16,
+      "line": 5
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Sp.h_eq"
+   ],
+   "namespace": "CD.Sp",
+   "opens": [],
+   "resolved": [
+    [
+     59,
+     63,
+     "CD.Sp.h_eq",
+     "b"
+    ],
+    [
+     59,
+     63,
+     "",
+     "b"
+    ],
+    [
+     65,
+     66,
+     "",
+     "b"
+    ],
+    [
+     69,
+     72,
+     "Nat"
+    ],
+    [
+     76,
+     77,
+     "CD.Sp.h"
+    ],
+    [
+     78,
+     79,
+     ""
+    ],
+    [
+     82,
+     83,
+     ""
+    ],
+    [
+     87,
+     90,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 43,
+    "col": 0,
+    "line": 5
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 84,
+    "col": 41,
+    "line": 5
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Sp.late",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 135,
+    "col": 43,
+    "line": 7
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 104,
+     "name": "late",
+     "role": "decl",
+     "start": 100
+    },
+    {
+     "end": 107,
+     "name": "n",
+     "role": "binder",
+     "start": 106
+    },
+    {
+     "end": 113,
+     "name": "Nat",
+     "role": "ref",
+     "start": 110
+    },
+    {
+     "end": 118,
+     "name": "h",
+     "role": "ref",
+     "start": 117
+    },
+    {
+     "end": 120,
+     "name": "n",
+     "role": "ref",
+     "start": 119
+    },
+    {
+     "end": 124,
+     "name": "n",
+     "role": "ref",
+     "start": 123
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 104,
+      "col": 12,
+      "line": 7
+     },
+     "start": {
+      "byte": 100,
+      "col": 8,
+      "line": 7
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Sp.late"
+   ],
+   "namespace": "CD.Sp",
+   "opens": [],
+   "resolved": [
+    [
+     100,
+     104,
+     "CD.Sp.late",
+     "b"
+    ],
+    [
+     100,
+     104,
+     "",
+     "b"
+    ],
+    [
+     106,
+     107,
+     "",
+     "b"
+    ],
+    [
+     110,
+     113,
+     "Nat"
+    ],
+    [
+     117,
+     118,
+     "CD.Sp.h"
+    ],
+    [
+     119,
+     120,
+     ""
+    ],
+    [
+     123,
+     124,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 92,
+    "col": 0,
+    "line": 7
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 125,
+    "col": 33,
+    "line": 7
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 146,
+    "col": 9,
+    "line": 9
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 146,
+     "name": "CD.Sp",
+     "role": "scope",
+     "start": 141
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.Sp",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 137,
+    "col": 0,
+    "line": 9
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 147,
+    "col": 0,
+    "line": 10
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 147,
+    "col": 0,
+    "line": 10
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/SimpLate.lean",
+ "messages": [],
+ "mode": "elaborate"
+}
