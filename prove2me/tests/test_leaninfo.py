@@ -315,6 +315,61 @@ def test_build_module_reports_errors_like_lean(monkeypatch, tmp_path):
     assert not os.listdir(str(tmp_path / 'cache')) if os.path.isdir(str(tmp_path / 'cache')) else True
 
 
+HB = '(deterministic) timeout at `whnf`, maximum number of heartbeats (200000) has been reached'
+
+
+def _hb_fake(f, seen, lean_rc=0, lean_out=''):
+    """LeanInfo fails on heartbeats at the build's options and succeeds with them lifted; `lean -o` as given."""
+    def fake(args, **k):
+        seen.append(args)
+        if args[2] == 'lean':
+            if lean_rc == 0:
+                open(args[args.index('-o') + 1], 'w').close()
+                open(args[args.index('-i') + 1], 'w').close()
+            return _Done(rc=lean_rc, out=lean_out)
+        if '-DmaxHeartbeats=0' in args:
+            open(args[args.index('--olean') + 1], 'w').close()
+            return _Done(out=_info_json(str(f), build_ms=2500))
+        return _Done(out=_info_json(str(f), [(49, 0, HB), (373, 22, 'Invalid field `t`')]))
+    return fake
+
+
+def test_build_module_falls_back_to_lean_on_heartbeats(monkeypatch, tmp_path):
+    # oaiq-122: LeanInfo elaborates synchronously (Elab.async false), which spends more heartbeats than `lean`; a
+    # FactorGeneration structure timed out there (and its uses failed after it) but compiles with plain `lean`, as the
+    # verifier runs it. The olean is then `lean -o`'s, and the reading comes from LeanInfo with the limit lifted.
+    monkeypatch.setattr(LI, 'CACHE', str(tmp_path / 'cache'))
+    monkeypatch.setattr(LI, 'native_tool', lambda ws: '/bin/leaninfo')
+    ws = _ws(tmp_path)
+    f = tmp_path / 'ws' / 'M.lean'
+    f.write_text('structure S where\n')
+    seen = []
+    monkeypatch.setattr(LI.subprocess, 'run', _hb_fake(f, seen))
+    out = str(tmp_path / 'out' / 'M')
+    ok, secs, errs = LI.build_module(str(f), 'P.M', out + '.olean', out + '.ilean', ws=ws)
+    assert ok and errs == [] and secs == 2.5, (ok, errs, secs)
+    lean = [a for a in seen if a[2] == 'lean'][0]
+    assert lean[lean.index('-o') + 1] == out + '.olean' and '-DautoImplicit=false' in lean
+    assert os.path.exists(out + '.olean') and os.path.exists(out + '.ilean')
+    reading = seen[-1]
+    assert '-DmaxHeartbeats=0' in reading and out + '.olean' not in reading
+    assert os.listdir(str(tmp_path / 'cache'))
+
+
+def test_build_module_reports_lean_errors_when_lean_fails_too(monkeypatch, tmp_path):
+    monkeypatch.setattr(LI, 'CACHE', str(tmp_path / 'cache'))
+    monkeypatch.setattr(LI, 'native_tool', lambda ws: '/bin/leaninfo')
+    ws = _ws(tmp_path)
+    f = tmp_path / 'ws' / 'M.lean'
+    f.write_text('structure S where\n')
+    seen = []
+    monkeypatch.setattr(LI.subprocess, 'run', _hb_fake(f, seen, 1, '%s:49:0: error: %s\n' % (f, HB)))
+    ok, secs, errs = LI.build_module(str(f), 'P.M', str(tmp_path / 'M.olean'), str(tmp_path / 'M.ilean'), ws=ws)
+    assert not ok and errs == ['%s:49:0: error: %s' % (f, HB)]
+    assert not os.path.exists(str(tmp_path / 'M.olean'))
+    assert not any('-DmaxHeartbeats=0' in a for a in seen)
+
+
 def test_build_module_needs_the_native_tool(monkeypatch, tmp_path):
     monkeypatch.setattr(LI, 'native_tool', lambda ws: None)
     assert LI.build_module('M.lean', 'P.M', 'o', 'i', ws=_ws(tmp_path)) is None

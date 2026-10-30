@@ -363,26 +363,50 @@ def build_module(path, module, olean, ilean, options=BUILD_OPTIONS, ws=None, tim
     key = _key(path, False, ws, (), True, module, True, options)
     for f in (olean, ilean):
         os.makedirs(os.path.dirname(os.path.abspath(f)), exist_ok=True)
-    args = ['lake', 'env', exe, path, '--idents', '--module', module, '--no-decls'] + \
-        ['-D' + o for o in options] + ['--olean', olean, '--ilean', ilean]
     # build_ms is the cost model's input, planned against the verifier's single thread: pin one thread
     # (lean-cap gives untimed calls two since 2026-10-28)
     env = dict(os.environ, LEAN_NUM_THREADS='1')
-    r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout, env=env)
-    out = r.stdout.strip().split('\n')[-1] if r.stdout.strip() else ''
-    try:
-        data = json.loads(out)
-    except ValueError:
-        tail = (r.stdout + r.stderr)[-2000:]
-        return False, 0.0, ['%s:1:0: error: LeanInfo failed (exit %s): %s' % (path, r.returncode, tail)]
-    secs = data.get('build_ms', 0) / 1000.0
-    errs = ['%s:%d:%d: error: %s' % (path, m['start']['line'], m['start']['col'], m['text'])
-            for m in data['messages'] if m['severity'] == 'error']
-    if errs or r.returncode:
-        for f in (olean, ilean):
+
+    def info(extra, o, i):
+        args = ['lake', 'env', exe, path, '--idents', '--module', module, '--no-decls'] + \
+            ['-D' + x for x in tuple(options) + extra] + ['--olean', o, '--ilean', i]
+        r = subprocess.run(args, cwd=ws, capture_output=True, text=True, timeout=timeout, env=env)
+        out = r.stdout.strip().split('\n')[-1] if r.stdout.strip() else ''
+        try:
+            data = json.loads(out)
+        except ValueError:
+            tail = (r.stdout + r.stderr)[-2000:]
+            return None, 0.0, ['%s:1:0: error: LeanInfo failed (exit %s): %s' % (path, r.returncode, tail)]
+        errs = ['%s:%d:%d: error: %s' % (path, m['start']['line'], m['start']['col'], m['text'])
+                for m in data['messages'] if m['severity'] == 'error']
+        if not errs and r.returncode:
+            errs = ['%s:1:0: error: LeanInfo exit %s' % (path, r.returncode)]
+        return data, data.get('build_ms', 0) / 1000.0, errs
+
+    def drop(*fs):
+        for f in fs:
             if os.path.exists(f):
                 os.remove(f)
-        return False, secs, errs or ['%s:1:0: error: LeanInfo exit %s' % (path, r.returncode)]
+
+    data, secs, errs = info((), olean, ilean)
+    if errs:
+        drop(olean, ilean)
+        if data is None or not any('maximum number of heartbeats' in e for e in errs):
+            return False, secs, errs
+        # oaiq-122: LeanInfo elaborates synchronously (Elab.async false, to read every value), which spends more
+        # heartbeats than `lean`'s asynchronous proofs; a module the verifier would accept failed here. Build it as
+        # `lean` does, then take the reading with the limit lifted (written to scratch outputs, then dropped).
+        r = subprocess.run(['lake', 'env', 'lean', '-o', olean, '-i', ilean] + ['-D' + o for o in options] + [path],
+                           cwd=ws, capture_output=True, text=True, timeout=timeout, env=env)
+        if r.returncode:
+            drop(olean, ilean)
+            lerrs = [l for l in (r.stdout + r.stderr).split('\n') if re.match(r'\S.*:\d+:\d+: error', l)]
+            return False, secs, lerrs or ['%s:1:0: error: lean exit %s' % (path, r.returncode)]
+        o, i = olean + '.reading.olean', ilean + '.reading.ilean'
+        data, secs, errs = info(('maxHeartbeats=0',), o, i)
+        drop(o, i)
+        if errs:
+            return True, secs, []        # built; `carve.py graph` reads it itself
     os.makedirs(CACHE, exist_ok=True)
     with open(os.path.join(CACHE, key + '.json'), 'w') as f:
         json.dump(data, f)
