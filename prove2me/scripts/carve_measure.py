@@ -5,6 +5,7 @@ a time, -j1, in publish order (p2mlib.carve.publish_order), and record CPU secon
 usage: carve_measure.py CONFIG.json [--force] [--keep-going] [--dir D] [--no-repair]
                          [--no-edge-check] [--drop-false-edges] [--allow-false-edges]
                          [--kinds bundle,statement|piece]
+       carve_measure.py CONFIG.json --profile bundle:NAME[,statement:NAME ...] [--dir D]
   -> <work>/times.json, the input of `carve.py split CONFIG.json TIMES.json`,
      <work>/edges.json and <work>/false_edges.json (the edge check)
 
@@ -42,6 +43,10 @@ import (`import Theorems.*`, a theorem-graph edge) fails the run unless --allow-
 definitions import is reported and kept (cutting one broke dependants, oaiq-039/075).
 --drop-false-edges cuts each false theorem import that needs no replacement, records the cut in <work>/repairs.json (re-applied after every `carve.py gen`, like
 the context-command repairs) and re-measures the file.
+
+--profile bundle:NAME[,...] compiles each once more with Lean's profiler (into D/profile, not D/olean) and
+records the diagnosis (serialization-, kernel- or elaboration-bound, naming the declaration) in
+<work>/profiles.json: carve_pipeline's calibrate asks for it when splitting cannot shrink a bundle.
 
 --kinds measures only those items (carve_pipeline's overlap mode: bundles and statements first, which
 freeze at publish, then the pieces against their .olean files from the first run in D/olean). Without
@@ -211,6 +216,17 @@ class Measure:
         seen[path] = k
         return k
 
+    def olean_path(self, module):
+        return os.path.join(self.olean, *module.split('.')) + '.olean'
+
+    def has_olean(self, module):
+        """May a cached "ok" stand for a module (a bundle or statement)? Only while its .olean is there:
+        `run` deletes it before every compile, and a failed compile, a repair loop whose cut text
+        matches an earlier "ok" (oaiq-096: a bundle cut by a repair, the next run took it "ok" from
+        times.json), or a deleted olean/ dir leaves the entry without its output, and every importer
+        then fails "object file ... does not exist". A piece (module None) has no output of its own."""
+        return module is None or os.path.exists(self.olean_path(module))
+
     def measure(self, item, env, force=False, repair=True):
         kind, n = item.split(':', 1)
         src, mod = self.item_files(kind, n)
@@ -224,7 +240,7 @@ class Measure:
                 open(path, 'w', encoding='utf-8').write(self.chk_text(n))
             k = self.cache_key(path)
             old = self.times.get(item)
-            if old and old.get('key') == k and old.get('ok') and not force:
+            if old and old.get('key') == k and old.get('ok') and not force and self.has_olean(mod):
                 return old
             # a piece compiles to an .olean too (EdgeChk.*), which the edge check reads
             r, out = self.run(path, mod or self.chk_module(n), env)
@@ -324,17 +340,63 @@ class Measure:
         self.record(src, applied)
         return True
 
+    def scope(self, kinds=None):
+        """The items a run with these --kinds measures: the plan's, of those kinds, less the external
+        statements (someone else's)."""
+        out = set()
+        for wave in C.publish_order(self.plan, self.ext)['waves']:
+            for item in wave:
+                kind, n = item.split(':', 1)
+                if (kind == 'statement' and n in self.ext) or (kinds and kind not in kinds):
+                    continue
+                out.add(item)
+        return out
+
+    def profile(self, item, env, secs=None):
+        """Compile a bundle or statement once more with Lean's profiler (output to D/profile/, never the
+        measured .olean), and record {kind, message, profile} in <work>/profiles.json under `item`:
+        calibrate's diagnosis of a file that splitting cannot shrink (oaiq-124, oaiq-092)."""
+        kind, n = item.split(':', 1)
+        src, mod = self.item_files(kind, n)
+        if not mod:
+            sys.exit('--profile takes a bundle or a statement, not %s' % item)
+        sp = os.path.join(self.stage, *mod.split('.')) + '.lean'
+        os.makedirs(os.path.dirname(sp), exist_ok=True)
+        shutil.copy(src, sp)
+        out = os.path.join(self.d, 'profile', *mod.split('.'))
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        args = ['lean', '-j1', '-DautoImplicit=false', '-Dprofiler=true', '-Dtrace.profiler=true',
+                '-Dtrace.profiler.threshold=%d' % PROFILE_THRESHOLD_MS, '-R', self.stage,
+                '-o', out + '.olean', '-i', out + '.ilean', sp]
+        r = subprocess.run(args, cwd=self.lean_ws, env=env, capture_output=True, text=True)
+        text = r.stdout + r.stderr
+        log = os.path.join(self.cfg['work'], 'profile_%s.log' % C.slug(n))
+        open(log, 'w', encoding='utf-8').write(text)
+        prof = parse_profile(text)
+        nodes = []
+        if kind == 'bundle':
+            nodes = next((b.get('nodes') or [] for b in self.plan.get('bundles', []) if b['name'] == n), [])
+        if secs is None:
+            secs = (self.times.get(item) or {}).get('secs')
+        k, msg = diagnose_profile(prof, secs, nodes)
+        path = os.path.join(self.cfg['work'], 'profiles.json')
+        allp = json.load(open(path)) if os.path.exists(path) else {}
+        allp[item] = {'kind': k, 'message': msg, 'secs': secs, 'log': log, 'profile': prof,
+                      'key': self.cache_key(src)}
+        json.dump(allp, open(path, 'w'), indent=1)
+        print('%s: %s' % (item, msg), flush=True)
+        return allp[item]
+
     def run_all(self, force=False, keep_going=False, repair=True, edges=True, drop=False, kinds=None):
         copy_published(self.ws, self.olean, imported_modules(self.cfg, self.plan))
         env = self.env()
         ok = True
+        scope = self.scope(kinds)
         for wave in C.publish_order(self.plan, self.ext)['waves']:
             for item in wave:
+                if item not in scope:
+                    continue
                 kind, n = item.split(':', 1)
-                if kind == 'statement' and n in self.ext:
-                    continue
-                if kinds and kind not in kinds:
-                    continue
                 for attempt in range(2):
                     r = self.measure(item, env, force, repair)
                     self.times[item] = r
@@ -356,7 +418,10 @@ class Measure:
                     if not keep_going:
                         return False
         if edges:
-            rep = edge_report(self.plan, {i: e for i, e in self.edges.items() if i in self.times})
+            # only this run's items: with --kinds, another kind's records (a piece's, from an earlier
+            # full measure) are not this run's to judge (oaiq-081: phase 1 failed on stale piece edges)
+            rep = edge_report(self.plan, {i: e for i, e in self.edges.items()
+                                          if i in self.times and i in scope})
             if kinds and 'piece' not in kinds:
                 rep['orphaned_statements'] = []
             json.dump(rep, open(os.path.join(self.cfg['work'], 'false_edges.json'), 'w'), indent=1)
@@ -364,6 +429,74 @@ class Measure:
             if failing_false_edges(rep) and not self.allow_false:
                 ok = False
         return ok
+
+
+PROFILE_THRESHOLD_MS = 1000     # trace.profiler: the declarations and kernel checks over this
+
+
+def _secs(num, unit):
+    return float(num) * {'ns': 1e-9, 'us': 1e-6, '\u03bcs': 1e-6, 'ms': 1e-3, 's': 1.0, 'min': 60.0}[unit]
+
+
+def parse_profile(text):
+    """What `lean -o X.olean -Dprofiler=true -Dtrace.profiler=true` printed: {'categories': {name:
+    seconds} (the cumulative profile, `.olean serialization` and `type checking` among them),
+    'kernel': [[seconds, declarations]] (each `[Kernel] ... typechecking declarations [X]`), 'commands':
+    [[seconds, first line]] (each top-level `[Elab.command]`)}, the lists slowest first."""
+    cats, kernel, cmds = {}, [], []
+    in_cum = False
+    for line in text.split('\n'):
+        if line.startswith('cumulative profiling times'):
+            in_cum = True
+            continue
+        if in_cum:
+            m = re.match(r'^\t(.+?) ([\d.]+)(ns|us|\u03bcs|ms|s|min)\s*$', line)
+            if m:
+                cats[m.group(1)] = cats.get(m.group(1), 0.0) + _secs(m.group(2), m.group(3))
+                continue
+            in_cum = False
+        m = re.search(r'\[Kernel\] \[([\d.]+)\].*?typechecking declarations \[(.*)\]\s*$', line)
+        if m:
+            kernel.append([float(m.group(1)), m.group(2)])
+            continue
+        m = re.match(r'^\[Elab\.command\] \[([\d.]+)\]\s*(?:\S+\s+)?(.*)$', line)
+        if m:
+            cmds.append([float(m.group(1)), m.group(2).strip()[:120]])
+    return {'categories': cats, 'kernel': sorted(kernel, reverse=True), 'commands': sorted(cmds, reverse=True)}
+
+
+def diagnose_profile(prof, secs=None, nodes=()):
+    """(kind, message) for a file that splitting cannot shrink, from parse_profile's result: kind is
+    'serialization' (oaiq-124: one theorem whose type is huge, `.olean serialization` 91 s of 92),
+    'kernel' (oaiq-092: single declarations 23-474 s in the kernel) or 'elaboration'. `secs` is the
+    measured time (else the profile's total), `nodes` the file's declarations (named when one)."""
+    cats = prof.get('categories') or {}
+    total = secs or sum(cats.values()) or 1.0
+    ser = cats.get('.olean serialization', 0.0)
+    kern = cats.get('type checking', 0.0)
+    top_k = prof.get('kernel') or []
+    one = ' (its one declaration: %s)' % nodes[0] if len(nodes) == 1 else ''
+    if ser >= 0.4 * total:
+        return 'serialization', (
+            'serialization-bound: `.olean serialization` %.0f s of %.0f s%s. A declaration\'s type is huge '
+            '(Expr.sizeWithoutSharing): name the type\'s large sides with `abbrev`s in the same bundle and state it '
+            'with them (a post-carve patch, config_set.patches; only declaration types cost, a definition\'s value '
+            'is cheap; oaiq-124: 92 s -> 55 s)' % (ser, total, one))
+    if top_k and (kern >= 0.4 * total or top_k[0][0] >= 0.4 * total):
+        heavy = [k for k in top_k if k[0] >= 0.1 * total][:5] or top_k[:1]
+        return 'kernel', (
+            'kernel-bound declaration %s: %.0f s in the kernel (type checking %.0f s of %.0f s)%s. Splitting cannot '
+            'separate one declaration: rewrite it so the kernel has less to unify (state the function up front, '
+            'a post-port patch; oaiq-092), or accept it: pipeline.json `config_set.cost_factors` for it plus '
+            '`accept_over`' % (
+                heavy[0][1], heavy[0][0], kern, total,
+                ''.join('; %s: %.0f s' % (n, t) for t, n in heavy[1:])))
+    cmds = (prof.get('commands') or [])[:3]
+    return 'elaboration', (
+        'elaboration-bound (elaboration %.0f s, type checking %.0f s, serialization %.0f s of %.0f s)%s%s; '
+        'find the slow tactic with `-Dtrace.profiler=true -Dtrace.profiler.threshold=20000`' % (
+            cats.get('elaboration', 0.0), kern, ser, total, one,
+            ''.join('; %.0f s: %s' % (t, c) for t, c in cmds)))
 
 
 def drop_cuts(res):
@@ -434,12 +567,16 @@ def print_edge_report(rep):
 
 
 def main(argv):
-    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] not in ('--dir', '--kinds'))]
+    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] not in ('--dir', '--kinds', '--profile'))]
     if len(pos) != 1:
         sys.exit(__doc__)
     from p2mlib import runlock
     runlock.hold(runlock.dir_key('measure', pos[0]), 'carve_measure.py ' + ' '.join(argv))
     m = Measure(pos[0], opt(argv, '--dir'))
+    if '--profile' in argv:
+        for item in opt(argv, '--profile').split(','):
+            m.profile(item, m.env())
+        return
     m.allow_false = '--allow-false-edges' in argv
     kinds = [k for k in (opt(argv, '--kinds') or '').split(',') if k] or None
     ok = m.run_all('--force' in argv, '--keep-going' in argv, '--no-repair' not in argv,

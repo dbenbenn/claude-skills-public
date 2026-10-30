@@ -590,7 +590,7 @@ def test_measure_cache_key_covers_the_imported_carve_modules(tmp_path, monkeypat
     lib = tmp_path / 'lib'
     lib.mkdir()
     m.lib, m.ws, m.times, m.repairs = str(lib), str(tmp_path / 'ws'), {}, {}
-    m.plan, m.ext = {}, set()
+    m.plan, m.ext, m.olean = {}, set(), str(tmp_path / 'olean')
     (lib / 'Def_B004.lean').write_text('import Mathlib\ndef h := 1\n')
     (lib / 'Def_B008.lean').write_text('import Mathlib\nimport Definitions.Def_B004\n')
     st = lib / 'Thm_S.lean'
@@ -601,6 +601,8 @@ def test_measure_cache_key_covers_the_imported_carve_modules(tmp_path, monkeypat
 
     def run(path, module, env):
         calls.append(module)
+        os.makedirs(os.path.dirname(m.olean_path(module)), exist_ok=True)
+        open(m.olean_path(module), 'w').close()
         return {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}, ''
     m.run = run
     m.times['statement:S'] = m.measure('statement:S', {})
@@ -609,3 +611,122 @@ def test_measure_cache_key_covers_the_imported_carve_modules(tmp_path, monkeypat
     (lib / 'Def_B004.lean').write_text('import Mathlib\n')   # a transitive import changes
     m.measure('statement:S', {})
     assert len(calls) == 2
+
+
+def _measure_obj(tmp_path, plan):
+    import carve_measure as M
+    m = object.__new__(M.Measure)
+    for x in ('lib', 'sol', 'work', 'olean', 'stage', 'chk'):
+        (tmp_path / x).mkdir(exist_ok=True)
+    m.lib, m.sol, m.olean, m.stage, m.chk = (str(tmp_path / x) for x in ('lib', 'sol', 'olean', 'stage', 'chk'))
+    m.d, m.ws, m.lean_ws = str(tmp_path), str(tmp_path / 'ws'), str(tmp_path)
+    m.cfg = {'work': str(tmp_path / 'work')}
+    m.plan, m.ext, m.times, m.repairs, m.edges = plan, set(), {}, {}, {}
+    m.times_path = str(tmp_path / 'work' / 'times.json')
+    m.rp_path = str(tmp_path / 'work' / 'repairs.json')
+    m.bundle_names = [b['name'] for b in plan.get('bundles', [])]
+    m.allow_false = False
+    m.env = lambda: {}
+    return M, m
+
+
+def test_a_kinds_limited_measure_ignores_other_kinds_edge_records(tmp_path):
+    # oaiq-081: overlap mode's phase-1 `measure --kinds bundle,statement` failed on a piece's false edge
+    # recorded by an earlier full measure (work/edges.json): pieces are measured in the next phase
+    plan = {'bundles': [{'name': 'A', 'imports': [], 'nodes': ['x']}], 'stubs': {'S': {'bundles': ['A']}},
+            'pieces': {'S': {'bundles': ['A'], 'imports': []}}, 'external': []}
+    M, m = _measure_obj(tmp_path, plan)
+    ok = {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}
+    m.times = {'piece:S': ok, 'piece:Gone': ok}
+    stale = {'imports': {'Theorems.Thm_T': 'unused'}, 'false': ['Theorems.Thm_T'], 'restore': {}, 'file': 'Sol_S.lean'}
+    m.edges = {'piece:S': stale, 'piece:Gone': stale}
+    clean = {'imports': {}, 'false': [], 'restore': {}, 'file': 'f'}
+    measured = []
+    m.measure = lambda item, env, force, repair: measured.append(item) or ok
+    m.edge_check = lambda item, env, force: clean
+    assert m.run_all(kinds=['bundle', 'statement'])
+    assert sorted(measured) == ['bundle:A', 'statement:S']
+    rep = json.load(open(tmp_path / 'work' / 'false_edges.json'))
+    assert rep['false_edges'] == []
+    # a full measure still judges the piece's own record (and never one of an item no longer planned)
+    m.edge_check = lambda item, env, force: m.edges[item] if item.startswith('piece') else clean
+    assert not m.run_all()
+    rep = json.load(open(tmp_path / 'work' / 'false_edges.json'))
+    assert [f['item'] for f in rep['false_edges']] == ['piece:S']
+
+
+def test_a_cached_ok_needs_its_olean(tmp_path):
+    # oaiq-096: a repair cut a bundle; the next run took it "ok" from times.json although its .olean had
+    # been deleted before the repaired compile, and every importer failed "object file ... does not exist"
+    M, m = _measure_obj(tmp_path, {'bundles': [{'name': 'B', 'imports': [], 'nodes': ['x']}]})
+    src = tmp_path / 'lib' / 'Def_B.lean'
+    src.write_text('import Mathlib\ndef b := 1\n')
+    m.item_files = lambda kind, n: (str(src), 'Definitions.Def_B')
+    m.apply_recorded = lambda s: None
+    calls = []
+
+    def run(path, module, env):
+        calls.append(module)
+        o = m.olean_path(module)
+        os.makedirs(os.path.dirname(o), exist_ok=True)
+        open(o, 'w').close()
+        return {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}, ''
+    m.run = run
+    m.times['bundle:B'] = m.measure('bundle:B', {})
+    m.measure('bundle:B', {})
+    assert len(calls) == 1                                  # cached, its olean is there
+    os.remove(m.olean_path('Definitions.Def_B'))
+    m.measure('bundle:B', {})
+    assert len(calls) == 2 and os.path.exists(m.olean_path('Definitions.Def_B'))
+
+
+def test_a_repair_whose_cut_text_was_ok_before_compiles_it_again(tmp_path, monkeypatch):
+    # the repair loop: the regenerated text fails (its .olean deleted first), the recorded cut gives the
+    # text an earlier run measured "ok"; that entry has no .olean now, so the cut text is compiled
+    M, m = _measure_obj(tmp_path, {'bundles': [{'name': 'B', 'imports': [], 'nodes': ['x']}]})
+    src = tmp_path / 'lib' / 'Def_B.lean'
+    good = 'import Mathlib\ndef b := 1\n'
+    src.write_text(good)
+    m.times['bundle:B'] = {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': [], 'key': m.cache_key(str(src))}
+    src.write_text('import Mathlib\nvariable (h : Foo)\ndef b := 1\n')
+    m.item_files = lambda kind, n: (str(src), 'Definitions.Def_B')
+    m.apply_recorded = lambda s: None
+    m.record = lambda s, cut: None
+    compiled = []
+
+    def run(path, module, env):
+        text = open(path).read()
+        compiled.append(text)
+        o = m.olean_path(module)
+        if os.path.exists(o):
+            os.remove(o)
+        if 'Foo' in text:
+            return {'secs': 1.0, 'ok': False, 'errors': ['error: Foo'], 'axioms': []}, 'error'
+        os.makedirs(os.path.dirname(o), exist_ok=True)
+        open(o, 'w').close()
+        return {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}, ''
+    m.run = run
+    monkeypatch.setattr(M.RP, 'repair', lambda text, out, statement=False: (good, ['variable (h : Foo)']))
+    r = m.measure('bundle:B', {})
+    assert r['ok'] and compiled[-1] == good and os.path.exists(m.olean_path('Definitions.Def_B'))
+
+
+def test_profile_diagnoses_serialization_kernel_and_elaboration():
+    import carve_measure as M
+    ser = 'cumulative profiling times:\n\telaboration 102ms\n\t.olean serialization 91.2s\n\ttype checking 0.3s\n'
+    p = M.parse_profile(ser)
+    assert p['categories']['.olean serialization'] == 91.2 and abs(p['categories']['elaboration'] - 0.102) < 1e-9
+    kind, msg = M.diagnose_profile(p, 92.0, ['OAI.KL.bottInterKernelFirst_surjective'])
+    assert kind == 'serialization' and 'abbrev' in msg and 'bottInterKernelFirst_surjective' in msg
+    kern = ('[Elab.command] [130.5] ✅️ def ratAdd_comp := by exact Procedure.ratAdd.comp\n'
+            '  [Kernel] [123.4] ✅️ typechecking declarations [OAI.Procedure.ratAdd_comp]\n'
+            '  [Kernel] [2.0] ✅️ typechecking declarations [OAI.Procedure.small]\n'
+            'cumulative profiling times:\n\telaboration 4.1s\n\ttype checking 125.6s\n\t.olean serialization 1.2s\n')
+    p = M.parse_profile(kern)
+    assert p['kernel'][0] == [123.4, 'OAI.Procedure.ratAdd_comp']
+    kind, msg = M.diagnose_profile(p, 131.0, ['a', 'b'])
+    assert kind == 'kernel' and msg.startswith('kernel-bound declaration OAI.Procedure.ratAdd_comp: 123 s')
+    assert 'cost_factors' in msg and 'accept_over' in msg
+    el = '[Elab.command] [80.0] ✅️ theorem slow : x := by fun_prop\ncumulative profiling times:\n\telaboration 80s\n'
+    kind, msg = M.diagnose_profile(M.parse_profile(el), 85.0, ['slow'])
+    assert kind == 'elaboration' and 'theorem slow' in msg
