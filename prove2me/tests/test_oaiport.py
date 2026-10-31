@@ -1594,6 +1594,22 @@ def test_elpnorm_mono_enorm_and_nnnorm_ae_drop_their_measurability_argument():
         "  exact MeasureTheory.eLpNorm_mono_nnnorm_ae h\n")
 
 
+def test_elpnorm_add_and_sub_le_get_their_measurability_by_name():
+    # ours: `eLpNorm_add_le hf hg hp`, `eLpNorm_sub_le hf hg hp`, `eLpNorm_add_le' hf hg p`; d13f23b drops hf, hg
+    # (its eLpNorm is ∞ off measurable functions). Passed by name; a call already in our shape is left alone
+    # (Boltzmann q141: 26 modules)
+    src = ("  _ ≤ _ := eLpNorm_add_le (by norm_num)\n"
+           "  exact (eLpNorm_sub_le (by norm_num : (1:ℝ≥0∞) ≤ 1)).trans h\n"
+           "  exact (eLpNorm_add_le' p).trans h\n"
+           "  exact eLpNorm_add_le (hf.sub hg) (hg.sub hh) (by norm_num)\n")
+    out = O.core_rewrites(src)
+    tac = 'by ' + O.AESM_TAC
+    assert out == ("  _ ≤ _ := eLpNorm_add_le (hf := %s) (hg := %s) (by norm_num)\n"
+                   "  exact (eLpNorm_sub_le (hf := %s) (hg := %s) (by norm_num : (1:ℝ≥0∞) ≤ 1)).trans h\n"
+                   "  exact (eLpNorm_add_le' (hf := %s) (hg := %s) p).trans h\n"
+                   "  exact eLpNorm_add_le (hf.sub hg) (hg.sub hh) (by norm_num)\n") % ((tac,) * 6)
+
+
 def test_lp_elpnorm_le_of_ae_tendsto_drops_the_limit_measurability():
     src = ("  have he := Lp.eLpNorm_le_of_ae_tendsto (.of_forall hbound) hFm hmeas hlim\n"
            "  apply Lp.eLpNorm_le_of_ae_tendsto (u := atTop) (Eventually.of_forall hb)\n"

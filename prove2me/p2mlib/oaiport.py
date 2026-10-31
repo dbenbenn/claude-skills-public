@@ -1349,6 +1349,12 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # The vector-measure `tendsto_integral_of_L1' f hfi …` took it already in d13f23b.
     _pre = r"(?<![\w.'@])(?:MeasureTheory\.)?"
     text = _insert_named_arg(text, _pre + r"eLpNorm_sum_le(?![\w'])", 'hfs', 'fun _ _ => by ' + AESM_TAC)
+    # ours: `eLpNorm_add_le hf hg hp` / `eLpNorm_sub_le hf hg hp` / primed `… hf hg p`; d13f23b has no hf, hg (its
+    # eLpNorm is ∞ off a.e.-strongly-measurable functions). By name, hg first so hf reads first; a call with three
+    # positional arguments is already ours (Boltzmann q141: 26 modules)
+    for _k in ('hg', 'hf'):
+        text = _insert_named_arg(text, _pre + r"eLpNorm_(?:add|sub)_le'?(?![\w'])", _k, 'by ' + AESM_TAC,
+                                 keep=lambda _t, pos: len(pos) >= 3)
     text = _insert_named_arg(text, _pre + r"eLpNorm_le_eLpNorm_of_exponent_le(?![\w'])", 'hf', 'by ' + AESM_TAC)
     text = _insert_named_arg(text, _pre + r"tendsto_integral_of_L1'(?![\w'])", 'hfi', 'by ' + AESM_TAC,
                              keep=lambda t, pos: len(pos) > 1 and 'stronglymeasurable' in t[pos[1][1]:pos[1][2]].lower())
