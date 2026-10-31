@@ -4003,7 +4003,7 @@ def absent_instances(g, plan, name, text):
     bundle must emit the command again, not `attribute [local instance]` a constant no file declares
     (Lech oaiq-032, Def_OAIQ032L039:289: `scalarComm_p6`, cut from L026)."""
     b = next(x for x in plan['bundles'] if x['name'] == name)
-    ren = collision_renames(g)
+    ren = dict(g.collision_renames())
     inst_names = getattr(g, 'instance_names', None) or {}
     body = strip(text)
     out = set()
@@ -4062,7 +4062,7 @@ def gen_bundle(g, plan, name, collapse_mathlib=True):
     avail |= _ext_have(g, plan, _ext_imports(g, plan, keep), b['imports'], sts)
     for st in sts:
         avail |= _bundle_have(g, plan, plan['stubs'][st]['bundles'])
-    ren = collision_renames(g)
+    ren = dict(g.collision_renames())
     ren.update(_stmt_renames(g, plan, sts))
     body = Carver(g).carve(keep, g.have_names(keep | avail), deprivatize=True, rename=ren,
                          external=plan.get('external_defs') or ())
@@ -4076,7 +4076,7 @@ def gen_stub(g, plan, node, collapse_mathlib=True):
     bs = plan['stubs'][node]['bundles']
     avail = _bundle_have(g, plan, bs)
     avail |= _ext_have(g, plan, _ext_imports(g, plan, [node], statement_only=True), bs)
-    ren = collision_renames(g)
+    ren = dict(g.collision_renames())
     ren.update(_stmt_renames(g, plan, [node]))
     body = Carver(g).carve({node}, g.have_names({node} | avail), sorry={node}, rename=ren,
                          external=plan.get('external_defs') or ())
@@ -4109,7 +4109,7 @@ def gen_piece(g, plan, node, collapse_mathlib=True):
     avail |= _ext_have(g, plan, _ext_imports(g, plan, keep), p['bundles'], p['imports'])
     for i in p['imports']:
         avail |= _bundle_have(g, plan, plan['stubs'][i]['bundles'])
-    ren = collision_renames(g)
+    ren = dict(g.collision_renames())
     ren.update(_stmt_renames(g, plan, p['imports']))
     ren[node] = statement_name(plan, node).rsplit('.', 1)[-1] + '_oai'
     body = Carver(g).carve(keep, g.have_names(keep | avail), rename=ren,

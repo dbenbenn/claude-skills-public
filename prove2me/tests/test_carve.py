@@ -2838,3 +2838,11 @@ def test_make_plan_computes_each_pieces_bundle_closure_once():
     import inspect
     src = inspect.getsource(C.make_plan)
     assert 'in _bundle_closure(' not in src
+
+
+def test_file_generators_reuse_the_graphs_collision_renames():
+    # oaiq-098: `gen` on 564k declarations spent hours in collision_renames(g), recomputed for every bundle,
+    # statement and piece; the graph caches it (g.collision_renames()), the callers copy it before updating.
+    import inspect
+    for fn in (C.gen_bundle, C.gen_stub, C.gen_piece, C.absent_instances):
+        assert ' collision_renames(g)' not in inspect.getsource(fn), fn.__name__
