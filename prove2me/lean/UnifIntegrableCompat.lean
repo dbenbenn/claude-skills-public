@@ -106,6 +106,7 @@ theorem of_enn (h : ∀ ε > 0, ∃ δ > 0, ∀ i s, μ s ≤ δ → eLpNorm (f 
     (hm : ∀ i, AEStronglyMeasurable (f i) μ) : UnifIntegrable f p μ :=
   of_enn' (fun ε hε => (h ε hε).imp fun _ ⟨hδ, hb⟩ => ⟨hδ, fun i s _ => hb i s⟩) hm
 
+@[aesop 50% apply (rule_sets := [Measurable])]
 protected theorem aestronglyMeasurable (hf : UnifIntegrable f p μ) (i : ι) :
     AEStronglyMeasurable (f i) μ :=
   hf.2 i
@@ -245,6 +246,7 @@ namespace UniformIntegrable
 protected theorem unifIntegrable (hf : UniformIntegrable f p μ) : UnifIntegrable f p μ :=
   hf.1
 
+@[aesop 50% apply (rule_sets := [Measurable])]
 protected theorem aestronglyMeasurable (hf : UniformIntegrable f p μ) (i : ι) :
     AEStronglyMeasurable (f i) μ :=
   hf.1.2 i
@@ -362,8 +364,6 @@ theorem uniformIntegrable_average_real (hp : 1 ≤ p) {f : ℕ → α → ℝ}
     (hf : UniformIntegrable f p μ) :
     UniformIntegrable (fun n => (∑ i ∈ Finset.range n, f i) / (n : α → ℝ)) p μ :=
   uniformIntegrable_iff_mathlib.2 (MeasureTheory.uniformIntegrable_average_real hp hf.toMathlib)
-
-attribute [aesop 50% apply (rule_sets := [Measurable])] UnifIntegrable.aestronglyMeasurable UniformIntegrable.aestronglyMeasurable
 
 /-! ### `UnifTight` -/
 

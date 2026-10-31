@@ -445,11 +445,14 @@ def test_unifint_shim_declares_what_the_rewrites_name():
 def test_unifint_members_are_measurability_rules():
     # the ports' inserted measurability tactic ends in `measurability`: with the shim's projections as aesop rules it
     # finds `f n` measurable from `hu : UnifIntegrable f p μ` in context (Boltzmann CollisionSources, q141). Spelled
-    # `aesop 50% apply` (unsafe by default): the token `unsafe` is refused by prove2.me's soundness guard, and the
-    # shim is carved into a published bundle (OAIQ080A000 FAILED at publish, q141)
-    assert re.search(r"^attribute \[aesop 50% apply \(rule_sets := \[Measurable\]\)\] "
-                     r"UnifIntegrable\.aestronglyMeasurable UniformIntegrable\.aestronglyMeasurable$",
-                     O.unifint_shim(), re.M)
+    # `aesop 50% apply` (unsafe by default): the token `unsafe` is refused by prove2.me's soundness guard. And as a
+    # declaration attribute, never a standalone `attribute [aesop …]` command: the carver kept that command in every
+    # piece keeping a theorem of the shim, beside the bundle that had registered the rule ("already registered", q141)
+    shim = O.unifint_shim()
+    assert not re.search(r"^attribute \[aesop", shim, re.M)
+    for ns in ('UnifIntegrable', 'UniformIntegrable'):
+        assert re.search(r"^@\[aesop 50%% apply \(rule_sets := \[Measurable\]\)\]\nprotected theorem aestronglyMeasurable "
+                         r"\(hf : %s f p μ\)" % ns, shim, re.M), ns
 
 
 def test_unifint_mode_in_module_files():
