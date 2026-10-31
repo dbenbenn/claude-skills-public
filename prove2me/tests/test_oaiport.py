@@ -3030,3 +3030,15 @@ def test_by_convert_chain_closes_the_diamond_first():
     # inside a bracket the tactic ends before the closing `)`/`]`: left alone (Erdos970 MellinCalculus)
     src2 = "      (by convert (preTransparency := .instances) int_F using 1; simp only [f', F, f]; field_simp)]\n"
     assert O.core_rewrites(src2) == src2
+
+
+def test_convert_tactic_whose_bracket_continues_on_the_next_line():
+    # PolycyclicRecognition FilteredNilpotentPerturbation (q145): the simp list opened after `using 1;` closes
+    # on the next line; the rule cut it at the line's end and left `(simp only [a, b,)` and a stray line
+    src = ("      convert hh using 1; simp only [pow_succ', Module.End.mul_apply,\n"
+           "        LinearMap.sub_apply, map_sub]; abel\n"
+           "  obtain ⟨m, hm⟩ := hbn\n")
+    out = O.core_rewrites(src)
+    assert ("      convert hh using 1 <;> first | (with_reducible_and_instances rfl) | (simp only [pow_succ', "
+            "Module.End.mul_apply, LinearMap.sub_apply, map_sub]; abel)\n  obtain ⟨m, hm⟩ := hbn\n") in out, out
+    assert O.core_rewrites(out) == out

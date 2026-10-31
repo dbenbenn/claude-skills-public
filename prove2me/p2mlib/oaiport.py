@@ -1411,6 +1411,30 @@ def fin_norm_num(text):
     return ''.join(out) + text[i:]
 
 
+
+def _join_convert_tail_brackets(text):
+    """Join the continuation lines of a `convert … using n; tac` (or `<;> tac`) line whose `tac` opens a
+    bracket that closes on a later line (at most four lines); inside a bracket a newline is whitespace."""
+    lines = text.split('\n')
+    out, i = [], 0
+    while i < len(lines):
+        line = lines[i]
+        m = re.search(r"\bconvert\b.*?\busing \d+[ \t]*(?:;|<;>)(.*)$", line)
+        if m:
+            depth = sum((c in '([{') - (c in ')]}') for c in m.group(1))
+            j = i
+            while depth > 0 and j + 1 < len(lines) and j - i < 4 and lines[j + 1].strip():
+                j += 1
+                depth += sum((c in '([{') - (c in ')]}') for c in lines[j])
+            if j > i and depth == 0:
+                line = line.rstrip() + ' ' + ' '.join(l.strip() for l in lines[i + 1:j + 1])
+                out.append(line)
+                i = j + 1
+                continue
+        out.append(line)
+        i += 1
+    return '\n'.join(out)
+
 def core_rewrites(text, compat_ns='OAI', known=None):
     """Lean core/Mathlib renames every port needs. OpenAI's `TensorProduct.inductionOn z tmul add`
     (Mathlib d13f23b) takes its zero case from `tmul 0 0`; ours has only `induction_on`, which
@@ -1609,6 +1633,9 @@ def core_rewrites(text, compat_ns='OAI', known=None):
         # application early (`apply Finset.sum_congr rfl` read `rfl` as "expected ')'"; SKRatio, q130)
         tac = re.sub(r"<;>[ \t]*\n[ \t]*", '<;> ', tac)
         return '%s <;> first | (with_reducible_and_instances rfl) | (%s)' % (m.group('head'), tac)
+    # a tactic after `using n;` whose bracket closes on a later line (a long `simp only [a,\n b]; abel`):
+    # join those lines first, so the rule below sees the whole tactic (FilteredNilpotentPerturbation, q145)
+    text = _join_convert_tail_brackets(text)
     # the term may span lines, and a chain ending in `<;>` continues on the next line (oaiq-092)
     text = re.sub(r"(?m)^(?P<head>(?:[ \t]*(?:· )?|[^\n]*?\bby[ \t]+)convert (?:(?!convert\b)[^;\n])*?"
                   r"(?:\n(?:(?!convert\b)[^;\n])*?){0,3}? using \d+)[ \t]*(?:;|<;>)[ \t]*"
