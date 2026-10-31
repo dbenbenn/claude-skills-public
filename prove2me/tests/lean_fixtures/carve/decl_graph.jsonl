@@ -26,6 +26,8 @@
 {"i":false,"k":"def","m":"CarveDev.Alt","n":"CD.List.headOr","p":false,"r":[5,0,6,51],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Alt","n":"CD.Mac.termTwice!_","p":false,"r":[14,0,14,43],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Alt","n":"CD.Mac.useMac","p":false,"r":[16,0,16,28],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.AttrReg","n":"CD.AR.R","p":false,"r":[10,0,10,33],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.AttrReg","n":"CD.AR.S","p":false,"r":[12,0,12,33],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"CD.Aux.auxOnly","p":false,"r":[108,0,108,22],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"CD.Int.cdId","p":false,"r":[64,0,65,43],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Base","n":"CD.Perm.cdPerm","p":false,"r":[99,0,99,21],"s":false,"t":[],"u":[],"v":[]}
@@ -96,6 +98,7 @@
 {"i":false,"k":"def","m":"CarveDev.Coer","n":"CD.Co.Tst.zero","p":false,"r":[42,0,42,39],"s":false,"t":["CD.Co.Tst"],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Coer","n":"CD.Co.needsPos","p":false,"r":[67,0,67,41],"s":false,"t":["CD.Co.Pos"],"u":[],"v":["CD.Co.Pos"]}
 {"i":false,"k":"def","m":"CarveDev.Coer","n":"CD.Co.rdef","p":false,"r":[44,0,44,33],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.ExpImpl","n":"CD.EX.Impl.val","p":false,"r":[5,0,5,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Fields","n":"CD.Inner.casesOn","p":false,"r":[17,0,18,11],"s":false,"t":["CD.Inner","CD.Inner.mk"],"u":["u"],"v":["CD.Inner","CD.Inner.mk","CD.Inner.rec"]}
 {"i":false,"k":"def","m":"CarveDev.Fields","n":"CD.Inner.ctorIdx","p":false,"r":null,"s":false,"t":["CD.Inner"],"u":[],"v":["CD.Inner"]}
 {"i":false,"k":"def","m":"CarveDev.Fields","n":"CD.Inner.mk.noConfusion","p":false,"r":[17,10,17,15],"s":false,"t":["CD.Inner","CD.Inner.mk"],"u":["u"],"v":["CD.Inner","CD.Inner.mk","CD.Inner.noConfusion"]}
@@ -244,6 +247,13 @@
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD._aux_CarveDev_Mid___unexpand_CD_double_eq_1","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.termDE","p":false,"r":[25,0,25,32],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.termWZ","p":false,"r":[70,0,70,24],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.NamedNota","n":"CD.NN.twice","p":false,"r":[11,0,11,34],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.NamedNota","n":"_private.CarveDev.NamedNota.0.CD.NN._aux_CarveDev_NamedNota___macroRules__private_CarveDev_NamedNota_0_CD_NN_plusNota_1","p":false,"r":[14,0,14,51],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.NamedNota","n":"_private.CarveDev.NamedNota.0.CD.NN._aux_CarveDev_NamedNota___macroRules__private_CarveDev_NamedNota_0_CD_NN_twiceNota_1","p":false,"r":[13,0,13,47],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.NamedNota","n":"_private.CarveDev.NamedNota.0.CD.NN._aux_CarveDev_NamedNota___unexpand_CD_NN_twice_1","p":false,"r":[13,0,13,47],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.NamedNota","n":"_private.CarveDev.NamedNota.0.CD.NN._aux_CarveDev_NamedNota___unexpand_Nat_add_1","p":false,"r":[14,0,14,51],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.NamedNota","n":"_private.CarveDev.NamedNota.0.CD.NN.plusNota","p":false,"r":[14,0,14,51],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"def","m":"CarveDev.NamedNota","n":"_private.CarveDev.NamedNota.0.CD.NN.twiceNota","p":false,"r":[13,0,13,47],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.NotaVar","n":"CD.NV.PolyAlg.denote","p":false,"r":[32,0,32,35],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"def","m":"CarveDev.NotaVar","n":"CD.NV.R.casesOn","p":false,"r":[15,0,17,12],"s":false,"t":["CD.NV.R","CD.NV.R.mk"],"u":["u"],"v":["CD.NV.R","CD.NV.R.mk","CD.NV.R.rec"]}
 {"i":false,"k":"def","m":"CarveDev.NotaVar","n":"CD.NV.R.ctorIdx","p":false,"r":null,"s":false,"t":["CD.NV.R"],"u":[],"v":["CD.NV.R"]}
@@ -310,6 +320,11 @@
 {"i":false,"k":"rec","m":"CarveDev.LocalCtx","n":"CD.LC.Wc.rec","p":false,"r":[17,0,18,9],"s":false,"t":["CD.LC.Wc","CD.LC.Wc.mk"],"u":["u"],"v":[]}
 {"i":false,"k":"rec","m":"CarveDev.NotaVar","n":"CD.NV.R.rec","p":false,"r":[15,0,17,12],"s":false,"t":["CD.NV.R","CD.NV.R.mk"],"u":["u"],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Alt","n":"CD.List.headOr_nil","p":true,"r":[8,0,8,41],"s":false,"t":["CD.List.headOr"],"u":[],"v":["CD.List.headOr"]}
+{"i":false,"k":"theorem","m":"CarveDev.AttrReg","n":"CD.AR.R.flip","p":true,"r":[14,0,14,59],"s":false,"t":["CD.AR.R"],"u":[],"v":["CD.AR.R"]}
+{"i":false,"k":"theorem","m":"CarveDev.AttrReg","n":"CD.AR.S.flip","p":true,"r":[16,0,16,59],"s":false,"t":["CD.AR.S"],"u":[],"v":["CD.AR.S"]}
+{"i":false,"k":"theorem","m":"CarveDev.AttrReg","n":"CD.AR.useR","p":true,"r":[24,0,24,52],"s":false,"t":["CD.AR.R"],"u":[],"v":["CD.AR.R","CD.AR.R.flip"]}
+{"i":false,"k":"theorem","m":"CarveDev.AttrReg","n":"CD.AR.useRS","p":true,"r":[30,0,30,75],"s":false,"t":["CD.AR.R","CD.AR.S"],"u":[],"v":["CD.AR.R","CD.AR.S","CD.AR.useR","CD.AR.useS"]}
+{"i":false,"k":"theorem","m":"CarveDev.AttrReg","n":"CD.AR.useS","p":true,"r":[28,0,28,52],"s":false,"t":["CD.AR.S"],"u":[],"v":["CD.AR.S","CD.AR.S.flip"]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.Aux.aux_eq","p":true,"r":[114,0,114,31],"s":false,"t":["CD.Aux.auxOnly"],"u":[],"v":["CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.Pkg.succ_le_succ","p":true,"r":[103,0,103,60],"s":false,"t":[],"u":[],"v":[]}
 {"i":false,"k":"theorem","m":"CarveDev.Base","n":"CD.Space.mk.inj","p":true,"r":null,"s":false,"t":["CD.Space","CD.Space.mk"],"u":[],"v":["CD.Space","CD.Space.mk","CD.Space.mk.noConfusion"]}
@@ -357,6 +372,9 @@
 {"i":false,"k":"theorem","m":"CarveDev.DupUseZ","n":"CD.Dup.useZ","p":true,"r":[5,0,5,45],"s":false,"t":[],"u":[],"v":["CD.Dup.bound"]}
 {"i":false,"k":"theorem","m":"CarveDev.DupUseZ","n":"CD.Dup.useZ'","p":true,"r":[7,0,7,67],"s":false,"t":[],"u":[],"v":["CD.Dup.bound"]}
 {"i":false,"k":"theorem","m":"CarveDev.DupZ","n":"CD.Dup.bound","p":true,"r":[5,0,5,59],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"theorem","m":"CarveDev.ExpImpl","n":"CD.EX.Impl.val_eq","p":true,"r":[7,0,7,47],"s":false,"t":["CD.EX.Impl.val"],"u":[],"v":["CD.EX.Impl.val"]}
+{"i":false,"k":"theorem","m":"CarveDev.ExpUse","n":"CD.EX.uses_alias","p":true,"r":[7,0,7,68],"s":false,"t":["CD.EX.Impl.val"],"u":[],"v":["CD.EX.Impl.val_eq"]}
+{"i":false,"k":"theorem","m":"CarveDev.ExpUse","n":"CD.EX.uses_alias_top","p":true,"r":[9,0,9,56],"s":false,"t":["CD.EX.Impl.val"],"u":[],"v":["CD.EX.uses_alias"]}
 {"i":false,"k":"theorem","m":"CarveDev.Fields","n":"CD.AZ.wcl","p":true,"r":[37,0,38,14],"s":false,"t":[],"u":[],"v":["CD.ZG.wcl"]}
 {"i":false,"k":"theorem","m":"CarveDev.Fields","n":"CD.Inner.fqm","p":true,"r":[20,0,20,56],"s":false,"t":["CD.Inner","CD.Inner.val"],"u":[],"v":["CD.Inner","CD.Inner.val"]}
 {"i":false,"k":"theorem","m":"CarveDev.Fields","n":"CD.Inner.mk.inj","p":true,"r":null,"s":false,"t":["CD.Inner","CD.Inner.mk"],"u":[],"v":["CD.Inner","CD.Inner.mk","CD.Inner.mk.noConfusion"]}
@@ -440,6 +458,8 @@
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_keptHere","p":true,"r":[168,0,168,50],"s":false,"t":["CD.NoteNs.keptHere"],"u":[],"v":["CD.NoteNs.keptHere"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"CD.uses_witness","p":true,"r":[150,0,150,55],"s":false,"t":["CD.doubleWitness","CD.Aux.auxOnly"],"u":[],"v":["CD.doubleWitness","CD.Aux.auxOnly"]}
 {"i":false,"k":"theorem","m":"CarveDev.Mid","n":"_private.CarveDev.Mid.0.CD.helper","p":true,"r":[30,0,30,40],"s":false,"t":[],"u":[],"v":[]}
+{"i":false,"k":"theorem","m":"CarveDev.NamedNota","n":"CD.NN.tw_top","p":true,"r":[18,0,18,49],"s":false,"t":["CD.NN.twice"],"u":[],"v":["CD.NN.tw_zero","CD.NN.twice"]}
+{"i":false,"k":"theorem","m":"CarveDev.NamedNota","n":"CD.NN.tw_zero","p":true,"r":[16,0,16,32],"s":false,"t":["CD.NN.twice"],"u":[],"v":["CD.NN.twice"]}
 {"i":false,"k":"theorem","m":"CarveDev.NotaVar","n":"CD.NV.R.mk.inj","p":true,"r":null,"s":false,"t":["CD.NV.R","CD.NV.R.mk"],"u":[],"v":["CD.NV.R","CD.NV.R.mk","CD.NV.R.mk.noConfusion"]}
 {"i":false,"k":"theorem","m":"CarveDev.NotaVar","n":"CD.NV.R.mk.injEq","p":true,"r":null,"s":false,"t":["CD.NV.R","CD.NV.R.mk"],"u":[],"v":["CD.NV.R","CD.NV.R.mk","CD.NV.R.mk.inj"]}
 {"i":false,"k":"theorem","m":"CarveDev.NotaVar","n":"CD.NV.R.mk.sizeOf_spec","p":true,"r":null,"s":false,"t":["CD.NV.R","CD.NV.R.mk","CD.NV.R.rec"],"u":[],"v":[]}
@@ -487,6 +507,8 @@
 {"imports":["Init","Init","CarveDev.DupA"],"module":"CarveDev.DupUseA2"}
 {"imports":["Init","Init","CarveDev.DupUseZ","CarveDev.DupUseA","CarveDev.DupUseA2"],"module":"CarveDev.DupTop"}
 {"imports":["Init","Init","CarveDev.DupZ"],"module":"CarveDev.DupUseZ"}
+{"imports":["Init","Init","CarveDev.ExpImpl"],"module":"CarveDev.ExpOnly"}
+{"imports":["Init","Init","CarveDev.ExpOnly"],"module":"CarveDev.ExpUse"}
 {"imports":["Init","Init","CarveDev.InstBase"],"module":"CarveDev.InstA"}
 {"imports":["Init","Init","CarveDev.InstBase"],"module":"CarveDev.InstB"}
 {"imports":["Init","Init","CarveDev.InstBase"],"module":"CarveDev.InstLate"}
@@ -497,13 +519,16 @@
 {"imports":["Init","Init","CarveDev.SimpBase"],"module":"CarveDev.SimpUse"}
 {"imports":["Init","Init","CarveDev.SimpLate","CarveDev.SimpUse"],"module":"CarveDev.SimpTop"}
 {"imports":["Init","Init","CarveDev.SimpRflA"],"module":"CarveDev.SimpRflB"}
+{"imports":["Init","Init"],"module":"CarveDev.AttrReg"}
 {"imports":["Init","Init"],"module":"CarveDev.Base"}
 {"imports":["Init","Init"],"module":"CarveDev.CoeLocal"}
 {"imports":["Init","Init"],"module":"CarveDev.Coer"}
 {"imports":["Init","Init"],"module":"CarveDev.DupA"}
 {"imports":["Init","Init"],"module":"CarveDev.DupZ"}
+{"imports":["Init","Init"],"module":"CarveDev.ExpImpl"}
 {"imports":["Init","Init"],"module":"CarveDev.InstColA"}
 {"imports":["Init","Init"],"module":"CarveDev.LocalCtx"}
+{"imports":["Init","Init"],"module":"CarveDev.NamedNota"}
 {"imports":["Init","Init"],"module":"CarveDev.NotaVar"}
 {"imports":["Init","Init"],"module":"CarveDev.ShadowA"}
 {"imports":["Init","Init"],"module":"CarveDev.ShadowB"}

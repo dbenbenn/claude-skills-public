@@ -2907,3 +2907,24 @@ def test_omit_losing_a_gone_class_drops_its_whole_instance_binder():
     edits, empty = C._binder_cut_edits(src, 0, len(src), [{'start': 6, 'end': 15}])
     parts, cur = C._apply(src, 0, edits)
     assert (b''.join(parts) + src[cur:]).decode() == 'omit hp\n' and not empty
+
+
+def test_a_named_local_notation_loses_its_name_in_generated_files(g):
+    # q142 (JointDickman `Erdos970_PNT5_Strong`): `local notation (name := mellintransform2) "𝓜" => …` is
+    # a private declaration; the piece and its statement stub both declared it, and the server-shape check
+    # (solution, then statement, in one file) failed "private declaration … has already been declared".
+    # Generated files drop the `(name := …)`: an anonymous local notation repeats without trouble.
+    p = _tiny_plan(g, ['CD.NN.tw_top'], 'NN')
+    for txt in (C.gen_piece(g, p, 'CD.NN.tw_top'), C.gen_stub(g, p, 'CD.NN.tw_top')):
+        assert 'local notation "𝓣" => twice\n' in txt, txt
+        assert 'local infixl:65 " ⊞ " => Nat.add\n' in txt, txt
+        assert '(name :=' not in C.strip(txt), txt
+
+
+@pytest.mark.lean
+def test_named_notations_export_modules_and_registered_attributes_compile(g, tmp_path):
+    # each solution compiles before its own statement in one file (the server-shape check)
+    for i, (targets, prefix) in enumerate([(['CD.NN.tw_top'], 'NN')]):
+        d = tmp_path / str(i)
+        d.mkdir()
+        _compile_in_publish_order(g, _tiny_plan(g, targets, prefix), d)

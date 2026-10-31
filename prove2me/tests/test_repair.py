@@ -121,3 +121,17 @@ def test_a_statement_never_loses_an_include():
     f = 'variable (h : 1 = 1)\n\ninclude h in\ntheorem t : True := trivial\n'
     assert R.repair(f, ['Def_X.lean:3:8: error: unknown'], statement=True) is None
     assert R.repair(f, ['Def_X.lean:3:8: error: unknown'])[1] == ['include h in']
+
+
+def test_a_local_notation_declared_twice_that_is_used_is_not_cut():
+    # q142 (JointDickman): the server-shape check (solution, then statement) declared the named
+    # `local notation (name := mellintransform2) "𝓜"` twice; the repair cut it, and the cut, applied to
+    # the piece too, gave "Unknown identifier `𝓜`" at its first use. Lean's own error stays instead.
+    f = ('section\nlocal notation (name := tw) "G" => keep\ntheorem a : G 0 = 1 := rfl\nend\n'
+         'section\nlocal notation (name := tw) "G" => keep\ntheorem b : G 0 = 1 := sorry\nend\n')
+    msg = 'error: private declaration `tw` has already been declared'
+    assert R.repair(f, [err(6, 0, msg)]) is None
+    # unused after it, or another error: cut as before
+    assert R.repair(f.replace('theorem b : G 0', 'theorem b : keep 0'), [err(6, 0, msg)])[1] == \
+        ['local notation (name := tw) "G" => keep']
+    assert R.repair(f, [err(6, 0)])[1] == ['local notation (name := tw) "G" => keep']

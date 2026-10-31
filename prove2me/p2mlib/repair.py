@@ -86,6 +86,24 @@ def _is_context(cmd):
     return bool(CONTEXT.match(cmd)) and not cmd.startswith('scoped[')
 
 
+LOCAL_NOTATION = re.compile(r'local\s+(?:notation3?|infixl?|infixr|prefix|postfix)\b')
+
+
+def _declared_twice(output, ln):
+    """Does Lean say, at line ln, that something "has already been declared"?"""
+    lines = output.split('\n') if isinstance(output, str) else output
+    return any(m and int(m.group(1)) == ln and 'has already been declared' in o
+               for o in lines for m in [ERROR.match(o)])
+
+
+def _used_after(text, cmd, last):
+    """Does a command after line `last` use a token the notation command cmd declares?"""
+    from .carve import _notation_tokens, _uses_token
+    from .leantext import strip
+    rest = strip('\n'.join(text.split('\n')[last:]))
+    return any(_uses_token(rest, tok) for tok in _notation_tokens(cmd))
+
+
 def repair(text, output, statement=False):
     """statement: the file states a theorem to publish; an `include`/`omit` decides its hypotheses,
     so it is never cut (the proof's type check is what judges any other cut)."""
@@ -99,6 +117,11 @@ def repair(text, output, statement=False):
         if hit is None or not _is_context(hit[2]):
             return None
         if statement and re.match(r'(?:include|omit)\b', hit[2]):
+            return None
+        # a local notation declared twice is fine itself, and what follows uses it: cut, it turned
+        # the error into "Unknown identifier" at its first use (q142 JointDickman: a named notation
+        # in both the piece and its statement, cut from the piece by the server-shape check's repair)
+        if LOCAL_NOTATION.match(hit[2]) and _declared_twice(output, ln) and _used_after(text, hit[2], hit[1]):
             return None
         a, _, cmd = hit
         if cmd.startswith('variable'):

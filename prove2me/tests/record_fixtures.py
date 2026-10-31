@@ -18,7 +18,8 @@ FIX = os.path.join(HERE, 'lean_fixtures')
 # the CarveDev development's root modules (test_carve.test_tools_reproduce_the_recordings uses them too)
 CARVE_ROOTS = ['CarveDev.Top', 'CarveDev.ShadowA', 'CarveDev.ShadowB', 'CarveDev.ShadowC', 'CarveDev.ShadowD',
                'CarveDev.SimpRflB', 'CarveDev.DupTop', 'CarveDev.SimpTop',
-               'CarveDev.NotaVar', 'CarveDev.CoeLocal', 'CarveDev.UnivMax', 'CarveDev.LocalFor']
+               'CarveDev.NotaVar', 'CarveDev.CoeLocal', 'CarveDev.UnivMax', 'CarveDev.LocalFor',
+               'CarveDev.NamedNota', 'CarveDev.ExpUse', 'CarveDev.AttrReg']
 REPLAYED = ['Structure', 'Broken', 'Notation', 'Rewire', 'Audit', 'Scope', 'Alias', 'Variable', 'ScopedVariable']
 
 

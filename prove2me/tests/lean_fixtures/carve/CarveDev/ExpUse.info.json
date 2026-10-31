@@ -1,0 +1,445 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 91,
+    "col": 66,
+    "line": 3
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 25,
+    "col": 0,
+    "line": 3
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 108,
+    "col": 15,
+    "line": 5
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 108,
+     "name": "CD.EX",
+     "role": "scope",
+     "start": 103
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 93,
+    "col": 0,
+    "line": 5
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.EX.uses_alias",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 178,
+    "col": 68,
+    "line": 7
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 128,
+     "name": "uses_alias",
+     "role": "decl",
+     "start": 118
+    },
+    {
+     "end": 131,
+     "name": "n",
+     "role": "binder",
+     "start": 130
+    },
+    {
+     "end": 137,
+     "name": "Nat",
+     "role": "ref",
+     "start": 134
+    },
+    {
+     "end": 150,
+     "name": "Alias.val",
+     "role": "ref",
+     "start": 141
+    },
+    {
+     "end": 152,
+     "name": "n",
+     "role": "ref",
+     "start": 151
+    },
+    {
+     "end": 156,
+     "name": "n",
+     "role": "ref",
+     "start": 155
+    },
+    {
+     "end": 176,
+     "name": "Alias.val_eq",
+     "role": "ref",
+     "start": 164
+    },
+    {
+     "end": 178,
+     "name": "n",
+     "role": "ref",
+     "start": 177
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 128,
+      "col": 18,
+      "line": 7
+     },
+     "start": {
+      "byte": 118,
+      "col": 8,
+      "line": 7
+     }
+    }
+   ],
+   "inst_keys": [
+    "Add Nat",
+    "HAdd",
+    "HAdd Nat Nat Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.EX.uses_alias"
+   ],
+   "namespace": "CD.EX",
+   "opens": [],
+   "resolved": [
+    [
+     118,
+     128,
+     "CD.EX.uses_alias",
+     "b"
+    ],
+    [
+     118,
+     128,
+     "",
+     "b"
+    ],
+    [
+     130,
+     131,
+     "",
+     "b"
+    ],
+    [
+     134,
+     137,
+     "Nat"
+    ],
+    [
+     141,
+     150,
+     "CD.EX.Impl.val"
+    ],
+    [
+     151,
+     152,
+     ""
+    ],
+    [
+     155,
+     156,
+     ""
+    ],
+    [
+     164,
+     176,
+     "CD.EX.Impl.val_eq"
+    ],
+    [
+     177,
+     178,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 110,
+    "col": 0,
+    "line": 7
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 161,
+    "col": 51,
+    "line": 7
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.EX.uses_alias_top",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 236,
+    "col": 56,
+    "line": 9
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 202,
+     "name": "uses_alias_top",
+     "role": "decl",
+     "start": 188
+    },
+    {
+     "end": 214,
+     "name": "Alias.val",
+     "role": "ref",
+     "start": 205
+    },
+    {
+     "end": 234,
+     "name": "uses_alias",
+     "role": "ref",
+     "start": 224
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 202,
+      "col": 22,
+      "line": 9
+     },
+     "start": {
+      "byte": 188,
+      "col": 8,
+      "line": 9
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.EX.uses_alias_top"
+   ],
+   "namespace": "CD.EX",
+   "opens": [],
+   "resolved": [
+    [
+     188,
+     202,
+     "CD.EX.uses_alias_top",
+     "b"
+    ],
+    [
+     188,
+     202,
+     "",
+     "b"
+    ],
+    [
+     205,
+     214,
+     "CD.EX.Impl.val"
+    ],
+    [
+     224,
+     234,
+     "CD.EX.uses_alias"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 180,
+    "col": 0,
+    "line": 9
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 221,
+    "col": 41,
+    "line": 9
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 247,
+    "col": 9,
+    "line": 11
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 247,
+     "name": "CD.EX",
+     "role": "scope",
+     "start": 242
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.EX",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 238,
+    "col": 0,
+    "line": 11
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 248,
+    "col": 0,
+    "line": 12
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 248,
+    "col": 0,
+    "line": 12
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/ExpUse.lean",
+ "messages": [],
+ "mode": "elaborate"
+}

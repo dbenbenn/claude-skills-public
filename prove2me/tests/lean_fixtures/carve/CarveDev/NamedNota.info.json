@@ -1,0 +1,649 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 498,
+    "col": 27,
+    "line": 7
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 515,
+    "col": 15,
+    "line": 9
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 515,
+     "name": "CD.NN",
+     "role": "scope",
+     "start": 510
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 500,
+    "col": 0,
+    "line": 9
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.NN.twice",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 551,
+    "col": 34,
+    "line": 11
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 526,
+     "name": "twice",
+     "role": "decl",
+     "start": 521
+    },
+    {
+     "end": 529,
+     "name": "n",
+     "role": "binder",
+     "start": 528
+    },
+    {
+     "end": 535,
+     "name": "Nat",
+     "role": "ref",
+     "start": 532
+    },
+    {
+     "end": 542,
+     "name": "Nat",
+     "role": "ref",
+     "start": 539
+    },
+    {
+     "end": 551,
+     "name": "n",
+     "role": "ref",
+     "start": 550
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 526,
+      "col": 9,
+      "line": 11
+     },
+     "start": {
+      "byte": 521,
+      "col": 4,
+      "line": 11
+     }
+    }
+   ],
+   "inst_keys": [
+    "HMul",
+    "HMul Nat Nat Nat",
+    "Mul Nat",
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.NN.twice"
+   ],
+   "namespace": "CD.NN",
+   "opens": [],
+   "resolved": [
+    [
+     521,
+     526,
+     "CD.NN.twice",
+     "b"
+    ],
+    [
+     521,
+     526,
+     "",
+     "b"
+    ],
+    [
+     528,
+     529,
+     "",
+     "b"
+    ],
+    [
+     532,
+     535,
+     "Nat"
+    ],
+    [
+     539,
+     542,
+     "Nat"
+    ],
+    [
+     550,
+     551,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 517,
+    "col": 0,
+    "line": 11
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 543,
+    "col": 26,
+    "line": 11
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [
+    [
+     "_private.CarveDev.NamedNota.0.CD.NN.twiceNota",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [
+    "_private.CarveDev.NamedNota.0.CD.NN.twiceNota"
+   ],
+   "end": {
+    "byte": 603,
+    "col": 47,
+    "line": 13
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 586,
+     "name": "twiceNota",
+     "role": "ref",
+     "start": 577
+    },
+    {
+     "end": 603,
+     "name": "twice",
+     "role": "ref",
+     "start": 598
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.notation",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.NN",
+   "opens": [],
+   "resolved": [
+    [
+     577,
+     586,
+     "_private.CarveDev.NamedNota.0.CD.NN.twiceNota",
+     "b"
+    ],
+    [
+     598,
+     603,
+     "CD.NN.twice"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 553,
+    "col": 0,
+    "line": 13
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [
+    [
+     "_private.CarveDev.NamedNota.0.CD.NN.plusNota",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [
+    "_private.CarveDev.NamedNota.0.CD.NN.plusNota"
+   ],
+   "end": {
+    "byte": 657,
+    "col": 51,
+    "line": 14
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 637,
+     "name": "plusNota",
+     "role": "ref",
+     "start": 629
+    },
+    {
+     "end": 657,
+     "name": "Nat.add",
+     "role": "ref",
+     "start": 650
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.mixfix",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.NN",
+   "opens": [],
+   "resolved": [
+    [
+     629,
+     637,
+     "_private.CarveDev.NamedNota.0.CD.NN.plusNota",
+     "b"
+    ],
+    [
+     650,
+     657,
+     "Nat.add"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 604,
+    "col": 0,
+    "line": 14
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.NN.tw_zero",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 694,
+    "col": 32,
+    "line": 16
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 674,
+     "name": "tw_zero",
+     "role": "decl",
+     "start": 667
+    },
+    {
+     "end": 694,
+     "name": "rfl",
+     "role": "ref",
+     "start": 691
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 674,
+      "col": 15,
+      "line": 16
+     },
+     "start": {
+      "byte": 667,
+      "col": 8,
+      "line": 16
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [
+    "_private.CarveDev.NamedNota.0.CD.NN.twiceNota"
+   ],
+   "names": [
+    "CD.NN.tw_zero"
+   ],
+   "namespace": "CD.NN",
+   "opens": [],
+   "resolved": [
+    [
+     667,
+     674,
+     "",
+     "b"
+    ],
+    [
+     667,
+     674,
+     "CD.NN.tw_zero",
+     "b"
+    ],
+    [
+     691,
+     694,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 659,
+    "col": 0,
+    "line": 16
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 688,
+    "col": 26,
+    "line": 16
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.NN.tw_top",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 753,
+    "col": 49,
+    "line": 18
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 710,
+     "name": "tw_top",
+     "role": "decl",
+     "start": 704
+    },
+    {
+     "end": 752,
+     "name": "tw_zero",
+     "role": "ref",
+     "start": 745
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 710,
+      "col": 14,
+      "line": 18
+     },
+     "start": {
+      "byte": 704,
+      "col": 8,
+      "line": 18
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [
+    "_private.CarveDev.NamedNota.0.CD.NN.plusNota",
+    "_private.CarveDev.NamedNota.0.CD.NN.twiceNota"
+   ],
+   "names": [
+    "CD.NN.tw_top"
+   ],
+   "namespace": "CD.NN",
+   "opens": [],
+   "resolved": [
+    [
+     704,
+     710,
+     "",
+     "b"
+    ],
+    [
+     704,
+     710,
+     "CD.NN.tw_top",
+     "b"
+    ],
+    [
+     745,
+     752,
+     "CD.NN.tw_zero"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 696,
+    "col": 0,
+    "line": 18
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 735,
+    "col": 31,
+    "line": 18
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 764,
+    "col": 9,
+    "line": 20
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 764,
+     "name": "CD.NN",
+     "role": "scope",
+     "start": 759
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.NN",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 755,
+    "col": 0,
+    "line": 20
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 765,
+    "col": 0,
+    "line": 21
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 765,
+    "col": 0,
+    "line": 21
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/NamedNota.lean",
+ "messages": [],
+ "mode": "elaborate"
+}

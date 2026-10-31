@@ -2786,6 +2786,24 @@ def _skip_ws(t, b):
     return b
 
 
+_LOCAL_NOTATION = re.compile(rb'\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?local\b', re.S)
+_NOTATION_NAME = re.compile(rb'\(\s*name\s*:=\s*[^()\s]+\s*\)\s*')
+
+
+def _notation_name_edits(t, c):
+    """The edit dropping the `(name := n)` of a `local notation`/`local infix…` command: a named local
+    notation is a private declaration, so a piece and the statement it proves, compiled in one file by
+    the server-shape check, both declared it (q142 JointDickman: `local notation (name :=
+    mellintransform2) "𝓜"`, "private declaration … has already been declared"); an anonymous one gets
+    a fresh name each time. Only before the first token literal, the notation's own options."""
+    lm = _LOCAL_NOTATION.match(t, c.start.byte, c.end.byte)
+    if not lm:
+        return []
+    q = t.find(b'"', lm.end(), c.end.byte)
+    m = _NOTATION_NAME.search(t, lm.end(), q if q >= 0 else c.end.byte)
+    return [(m.start(), m.end(), '')] if m else []
+
+
 def _binder_cut_edits(t, a, b, bad):
     """Edits removing the identifiers `bad` from the `include`/`omit` command t[a:b], and whether
     nothing is left of it. An identifier inside a `[…]` instance binder takes the whole binder with
@@ -3296,6 +3314,7 @@ class Carver:
                 pre += self._local_attrs(info, c, m, drop, local_attrs, have, c.index in sorry)
             elif c.short_kind in NOTATION:
                 edits += self._rename_edits(info, c, m, opens, rename)
+                edits += _notation_name_edits(t, c)
             if edits or pre:
                 reps[c.index] = pre + _cmd_text(info, c, edits)
         first = info.commands[0].start.byte if info.commands else 0

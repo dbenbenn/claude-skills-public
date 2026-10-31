@@ -1,0 +1,1599 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 431,
+    "col": 32,
+    "line": 6
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 448,
+    "col": 15,
+    "line": 8
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 448,
+     "name": "CD.AR",
+     "role": "scope",
+     "start": 443
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 433,
+    "col": 0,
+    "line": 8
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.AR.R",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 483,
+    "col": 33,
+    "line": 10
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 455,
+     "name": "R",
+     "role": "decl",
+     "start": 454
+    },
+    {
+     "end": 458,
+     "name": "a",
+     "role": "binder",
+     "start": 457
+    },
+    {
+     "end": 460,
+     "name": "b",
+     "role": "binder",
+     "start": 459
+    },
+    {
+     "end": 466,
+     "name": "Nat",
+     "role": "ref",
+     "start": 463
+    },
+    {
+     "end": 479,
+     "name": "a",
+     "role": "ref",
+     "start": 478
+    },
+    {
+     "end": 483,
+     "name": "b",
+     "role": "ref",
+     "start": 482
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 455,
+      "col": 5,
+      "line": 10
+     },
+     "start": {
+      "byte": 454,
+      "col": 4,
+      "line": 10
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.AR.R"
+   ],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [
+    [
+     454,
+     455,
+     "CD.AR.R",
+     "b"
+    ],
+    [
+     454,
+     455,
+     "",
+     "b"
+    ],
+    [
+     457,
+     458,
+     "",
+     "b"
+    ],
+    [
+     459,
+     460,
+     "",
+     "b"
+    ],
+    [
+     463,
+     466,
+     "Nat"
+    ],
+    [
+     478,
+     479,
+     ""
+    ],
+    [
+     482,
+     483,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 450,
+    "col": 0,
+    "line": 10
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 475,
+    "col": 25,
+    "line": 10
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.AR.S",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 518,
+    "col": 33,
+    "line": 12
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 490,
+     "name": "S",
+     "role": "decl",
+     "start": 489
+    },
+    {
+     "end": 493,
+     "name": "a",
+     "role": "binder",
+     "start": 492
+    },
+    {
+     "end": 495,
+     "name": "b",
+     "role": "binder",
+     "start": 494
+    },
+    {
+     "end": 501,
+     "name": "Nat",
+     "role": "ref",
+     "start": 498
+    },
+    {
+     "end": 514,
+     "name": "a",
+     "role": "ref",
+     "start": 513
+    },
+    {
+     "end": 518,
+     "name": "b",
+     "role": "ref",
+     "start": 517
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 490,
+      "col": 5,
+      "line": 12
+     },
+     "start": {
+      "byte": 489,
+      "col": 4,
+      "line": 12
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.AR.S"
+   ],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [
+    [
+     489,
+     490,
+     "CD.AR.S",
+     "b"
+    ],
+    [
+     489,
+     490,
+     "",
+     "b"
+    ],
+    [
+     492,
+     493,
+     "",
+     "b"
+    ],
+    [
+     494,
+     495,
+     "",
+     "b"
+    ],
+    [
+     498,
+     501,
+     "Nat"
+    ],
+    [
+     513,
+     514,
+     ""
+    ],
+    [
+     517,
+     518,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 485,
+    "col": 0,
+    "line": 12
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 510,
+    "col": 25,
+    "line": 12
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.AR.R.flip",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 579,
+    "col": 59,
+    "line": 14
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 534,
+     "name": "R.flip",
+     "role": "decl",
+     "start": 528
+    },
+    {
+     "end": 537,
+     "name": "a",
+     "role": "binder",
+     "start": 536
+    },
+    {
+     "end": 539,
+     "name": "b",
+     "role": "binder",
+     "start": 538
+    },
+    {
+     "end": 545,
+     "name": "Nat",
+     "role": "ref",
+     "start": 542
+    },
+    {
+     "end": 549,
+     "name": "h",
+     "role": "binder",
+     "start": 548
+    },
+    {
+     "end": 553,
+     "name": "R",
+     "role": "ref",
+     "start": 552
+    },
+    {
+     "end": 555,
+     "name": "a",
+     "role": "ref",
+     "start": 554
+    },
+    {
+     "end": 557,
+     "name": "b",
+     "role": "ref",
+     "start": 556
+    },
+    {
+     "end": 562,
+     "name": "R",
+     "role": "ref",
+     "start": 561
+    },
+    {
+     "end": 564,
+     "name": "b",
+     "role": "ref",
+     "start": 563
+    },
+    {
+     "end": 566,
+     "name": "a",
+     "role": "ref",
+     "start": 565
+    },
+    {
+     "end": 577,
+     "name": "Eq.symm",
+     "role": "ref",
+     "start": 570
+    },
+    {
+     "end": 579,
+     "name": "h",
+     "role": "ref",
+     "start": 578
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 534,
+      "col": 14,
+      "line": 14
+     },
+     "start": {
+      "byte": 528,
+      "col": 8,
+      "line": 14
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.AR.R.flip"
+   ],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [
+    [
+     528,
+     534,
+     "CD.AR.R.flip",
+     "b"
+    ],
+    [
+     528,
+     534,
+     "",
+     "b"
+    ],
+    [
+     536,
+     537,
+     "",
+     "b"
+    ],
+    [
+     538,
+     539,
+     "",
+     "b"
+    ],
+    [
+     542,
+     545,
+     "Nat"
+    ],
+    [
+     548,
+     549,
+     "",
+     "b"
+    ],
+    [
+     552,
+     553,
+     "CD.AR.R"
+    ],
+    [
+     554,
+     555,
+     ""
+    ],
+    [
+     556,
+     557,
+     ""
+    ],
+    [
+     561,
+     562,
+     "CD.AR.R"
+    ],
+    [
+     563,
+     564,
+     ""
+    ],
+    [
+     565,
+     566,
+     ""
+    ],
+    [
+     570,
+     577,
+     "Eq.symm"
+    ],
+    [
+     578,
+     579,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 520,
+    "col": 0,
+    "line": 14
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 567,
+    "col": 47,
+    "line": 14
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.AR.S.flip",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 640,
+    "col": 59,
+    "line": 16
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 595,
+     "name": "S.flip",
+     "role": "decl",
+     "start": 589
+    },
+    {
+     "end": 598,
+     "name": "a",
+     "role": "binder",
+     "start": 597
+    },
+    {
+     "end": 600,
+     "name": "b",
+     "role": "binder",
+     "start": 599
+    },
+    {
+     "end": 606,
+     "name": "Nat",
+     "role": "ref",
+     "start": 603
+    },
+    {
+     "end": 610,
+     "name": "h",
+     "role": "binder",
+     "start": 609
+    },
+    {
+     "end": 614,
+     "name": "S",
+     "role": "ref",
+     "start": 613
+    },
+    {
+     "end": 616,
+     "name": "a",
+     "role": "ref",
+     "start": 615
+    },
+    {
+     "end": 618,
+     "name": "b",
+     "role": "ref",
+     "start": 617
+    },
+    {
+     "end": 623,
+     "name": "S",
+     "role": "ref",
+     "start": 622
+    },
+    {
+     "end": 625,
+     "name": "b",
+     "role": "ref",
+     "start": 624
+    },
+    {
+     "end": 627,
+     "name": "a",
+     "role": "ref",
+     "start": 626
+    },
+    {
+     "end": 638,
+     "name": "Eq.symm",
+     "role": "ref",
+     "start": 631
+    },
+    {
+     "end": 640,
+     "name": "h",
+     "role": "ref",
+     "start": 639
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 595,
+      "col": 14,
+      "line": 16
+     },
+     "start": {
+      "byte": 589,
+      "col": 8,
+      "line": 16
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.AR.S.flip"
+   ],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [
+    [
+     589,
+     595,
+     "CD.AR.S.flip",
+     "b"
+    ],
+    [
+     589,
+     595,
+     "",
+     "b"
+    ],
+    [
+     597,
+     598,
+     "",
+     "b"
+    ],
+    [
+     599,
+     600,
+     "",
+     "b"
+    ],
+    [
+     603,
+     606,
+     "Nat"
+    ],
+    [
+     609,
+     610,
+     "",
+     "b"
+    ],
+    [
+     613,
+     614,
+     "CD.AR.S"
+    ],
+    [
+     615,
+     616,
+     ""
+    ],
+    [
+     617,
+     618,
+     ""
+    ],
+    [
+     622,
+     623,
+     "CD.AR.S"
+    ],
+    [
+     624,
+     625,
+     ""
+    ],
+    [
+     626,
+     627,
+     ""
+    ],
+    [
+     631,
+     638,
+     "Eq.symm"
+    ],
+    [
+     639,
+     640,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 581,
+    "col": 0,
+    "line": 16
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 628,
+    "col": 47,
+    "line": 16
+   }
+  },
+  {
+   "attrs": [
+    "symm"
+   ],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 672,
+    "col": 30,
+    "line": 18
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 657,
+     "name": "symm",
+     "role": "attr",
+     "start": 653
+    },
+    {
+     "end": 665,
+     "name": "R.flip",
+     "role": "ref",
+     "start": 659
+    },
+    {
+     "end": 672,
+     "name": "S.flip",
+     "role": "ref",
+     "start": 666
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.attribute",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [
+    [
+     659,
+     665,
+     "CD.AR.R.flip"
+    ],
+    [
+     666,
+     672,
+     "CD.AR.S.flip"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 642,
+    "col": 0,
+    "line": 18
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 683,
+    "col": 9,
+    "line": 20
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 683,
+     "name": "L",
+     "role": "scope",
+     "start": 682
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.section",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 674,
+    "col": 0,
+    "line": 20
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [
+    "local symm"
+   ],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 714,
+    "col": 29,
+    "line": 22
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 706,
+     "name": "symm",
+     "role": "attr",
+     "start": 702
+    },
+    {
+     "end": 714,
+     "name": "R.flip",
+     "role": "ref",
+     "start": 708
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.attribute",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [
+    [
+     708,
+     714,
+     "CD.AR.R.flip"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 685,
+    "col": 0,
+    "line": 22
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      8
+     ],
+     "opener": 7
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.AR.useR",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 768,
+    "col": 52,
+    "line": 24
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 728,
+     "name": "useR",
+     "role": "decl",
+     "start": 724
+    },
+    {
+     "end": 731,
+     "name": "h",
+     "role": "binder",
+     "start": 730
+    },
+    {
+     "end": 735,
+     "name": "R",
+     "role": "ref",
+     "start": 734
+    },
+    {
+     "end": 744,
+     "name": "R",
+     "role": "ref",
+     "start": 743
+    },
+    {
+     "end": 768,
+     "name": "h",
+     "role": "ref",
+     "start": 767
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 728,
+      "col": 12,
+      "line": 24
+     },
+     "start": {
+      "byte": 724,
+      "col": 8,
+      "line": 24
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.AR.useR"
+   ],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [
+    [
+     724,
+     728,
+     "CD.AR.useR",
+     "b"
+    ],
+    [
+     724,
+     728,
+     "",
+     "b"
+    ],
+    [
+     730,
+     731,
+     "",
+     "b"
+    ],
+    [
+     734,
+     735,
+     "CD.AR.R"
+    ],
+    [
+     743,
+     744,
+     "CD.AR.R"
+    ],
+    [
+     767,
+     768,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 716,
+    "col": 0,
+    "line": 24
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 749,
+    "col": 33,
+    "line": 24
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [
+      8
+     ],
+     "opener": 7
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 775,
+    "col": 5,
+    "line": 26
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 775,
+     "name": "L",
+     "role": "scope",
+     "start": 774
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 770,
+    "col": 0,
+    "line": 26
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.AR.useS",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 829,
+    "col": 52,
+    "line": 28
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 789,
+     "name": "useS",
+     "role": "decl",
+     "start": 785
+    },
+    {
+     "end": 792,
+     "name": "h",
+     "role": "binder",
+     "start": 791
+    },
+    {
+     "end": 796,
+     "name": "S",
+     "role": "ref",
+     "start": 795
+    },
+    {
+     "end": 805,
+     "name": "S",
+     "role": "ref",
+     "start": 804
+    },
+    {
+     "end": 829,
+     "name": "h",
+     "role": "ref",
+     "start": 828
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 789,
+      "col": 12,
+      "line": 28
+     },
+     "start": {
+      "byte": 785,
+      "col": 8,
+      "line": 28
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.AR.useS"
+   ],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [
+    [
+     785,
+     789,
+     "CD.AR.useS",
+     "b"
+    ],
+    [
+     785,
+     789,
+     "",
+     "b"
+    ],
+    [
+     791,
+     792,
+     "",
+     "b"
+    ],
+    [
+     795,
+     796,
+     "CD.AR.S"
+    ],
+    [
+     804,
+     805,
+     "CD.AR.S"
+    ],
+    [
+     828,
+     829,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 777,
+    "col": 0,
+    "line": 28
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 810,
+    "col": 33,
+    "line": 28
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.AR.useRS",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 912,
+    "col": 75,
+    "line": 30
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 844,
+     "name": "useRS",
+     "role": "decl",
+     "start": 839
+    },
+    {
+     "end": 847,
+     "name": "h",
+     "role": "binder",
+     "start": 846
+    },
+    {
+     "end": 851,
+     "name": "R",
+     "role": "ref",
+     "start": 850
+    },
+    {
+     "end": 860,
+     "name": "h'",
+     "role": "binder",
+     "start": 858
+    },
+    {
+     "end": 864,
+     "name": "S",
+     "role": "ref",
+     "start": 863
+    },
+    {
+     "end": 873,
+     "name": "R",
+     "role": "ref",
+     "start": 872
+    },
+    {
+     "end": 883,
+     "name": "S",
+     "role": "ref",
+     "start": 882
+    },
+    {
+     "end": 898,
+     "name": "useR",
+     "role": "ref",
+     "start": 894
+    },
+    {
+     "end": 900,
+     "name": "h",
+     "role": "ref",
+     "start": 899
+    },
+    {
+     "end": 906,
+     "name": "useS",
+     "role": "ref",
+     "start": 902
+    },
+    {
+     "end": 909,
+     "name": "h'",
+     "role": "ref",
+     "start": 907
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 844,
+      "col": 13,
+      "line": 30
+     },
+     "start": {
+      "byte": 839,
+      "col": 8,
+      "line": 30
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.AR.useRS"
+   ],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [
+    [
+     839,
+     844,
+     "CD.AR.useRS",
+     "b"
+    ],
+    [
+     839,
+     844,
+     "",
+     "b"
+    ],
+    [
+     846,
+     847,
+     "",
+     "b"
+    ],
+    [
+     850,
+     851,
+     "CD.AR.R"
+    ],
+    [
+     858,
+     860,
+     "",
+     "b"
+    ],
+    [
+     863,
+     864,
+     "CD.AR.S"
+    ],
+    [
+     872,
+     873,
+     "CD.AR.R"
+    ],
+    [
+     882,
+     883,
+     "CD.AR.S"
+    ],
+    [
+     894,
+     898,
+     "CD.AR.useR"
+    ],
+    [
+     899,
+     900,
+     ""
+    ],
+    [
+     902,
+     906,
+     "CD.AR.useS"
+    ],
+    [
+     907,
+     909,
+     ""
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 831,
+    "col": 0,
+    "line": 30
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 888,
+    "col": 55,
+    "line": 30
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 923,
+    "col": 9,
+    "line": 32
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 923,
+     "name": "CD.AR",
+     "role": "scope",
+     "start": 918
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.AR",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 914,
+    "col": 0,
+    "line": 32
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 924,
+    "col": 0,
+    "line": 33
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 924,
+    "col": 0,
+    "line": 33
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/AttrReg.lean",
+ "messages": [],
+ "mode": "elaborate"
+}
