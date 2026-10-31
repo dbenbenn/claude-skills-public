@@ -159,6 +159,38 @@ def test_phases_find_carve_dirs_and_count_live_items(tmp_path):
     assert A.phases_for('other', str(jobs), str(ports)) is None
 
 
+
+def test_a_retry_shows_the_carve_of_the_earlier_batch_it_resumes(tmp_path):
+    # 2026-10-31: q141-boltzmann-retry resumed oaiq-080's carve in ports/oaiq-080/bz and showed
+    # "pipeline: setting up" for hours, since only its own job and ports dirs were searched
+    jobs, ports = tmp_path / 'jobs', tmp_path / 'ports'
+    bz = ports / 'oaiq-080' / 'bz'
+    bz.mkdir(parents=True)
+    (bz / 'pipeline_state.json').write_text(json.dumps({'steps': {'publish': {'status': 'running'}}}))
+    other = jobs / 'oaiq-079' / 'x'                     # another module's carve: not shown
+    other.mkdir(parents=True)
+    (other / 'pipeline_state.json').write_text('{}')
+    reg = {'batches': {'79': {'name': 'oaiq-079', 'modules': ['M.Other'], 'launched': 5},
+                       '80': {'name': 'oaiq-080', 'modules': ['M.Bz'], 'launched': 10},
+                       '141': {'name': 'q141-bz-retry', 'modules': ['M.Bz'], 'launched': 20, 'retry': True}},
+           'groups': {}}
+    ph = A.phases_for('q141-bz-retry', str(jobs), str(ports), reg)
+    assert [(d['name'], d['earlier']) for d in ph['dirs']] == [('oaiq-080/bz', 'oaiq-080')]
+    assert ph['dirs'][0]['current'] == 'publish'
+    own = jobs / 'q141-bz-retry' / 'bz2'                # a fresh carve of its own comes first
+    own.mkdir(parents=True)
+    (own / 'pipeline_state.json').write_text('{}')
+    ph = A.phases_for('q141-bz-retry', str(jobs), str(ports), reg)
+    assert [d['name'] for d in ph['dirs']] == ['bz2', 'oaiq-080/bz'] and ph['dirs'][0]['earlier'] is None
+    # the earlier batch itself does not borrow its successor's dirs
+    assert [d['name'] for d in A.phases_for('oaiq-080', str(jobs), str(ports), reg)['dirs']] == ['bz']
+
+
+def test_agents_json_carries_the_queue_overview(tmp_path):
+    ov = {'counts': {'waiting': 0, 'retry_waiting': 6}}
+    out = A.agents_json(str(tmp_path), NOW, queue=ov)
+    assert out['queue'] == ov and A.agents_json(str(tmp_path), NOW)['queue'] is None
+
 # ---- quota ----
 
 def test_quota_event_takes_last_and_survives_garbage():

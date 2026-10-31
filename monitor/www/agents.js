@@ -11,7 +11,8 @@ const shortModel = m => (m || '').replace(/^claude-/, '');
 
 function stagesHtml(d){
   const items = d.total != null ? `<span class="items">${d.live} / ${d.total} items live</span>` : '';
-  return `<div class="pl"><span class="lab">${esc(d.name)}</span><div class="stages" role="list">` +
+  const lab = d.earlier ? `<span class="lab earlier" title="carve of the earlier batch ${esc(d.earlier)}, which this retry resumes">${esc(d.name)}</span>` : `<span class="lab">${esc(d.name)}</span>`;
+  return `<div class="pl">${lab}<div class="stages" role="list">` +
     d.stages.map(s => `<i role="listitem" class="${s.status}${s.name === d.current ? ' cur' : ''}" title="${esc(s.name)}: ${s.status}">${esc(s.name)}</i>`).join('') +
     `</div>${items}</div>`;
 }
@@ -44,7 +45,34 @@ function drawAgents(){
   box.innerHTML = grp('Running', A.running) + grp('Finished in the last 24 h', A.recent) ||
     '<p class="empty">No headless agents are running or finished in the last 24 h.</p>';
   if (!A.running.length && !A.recent.length) box.innerHTML = '<p class="empty">No headless agents are running or finished in the last 24 h.</p>';
+  drawQueue(A.queue);
   document.getElementById('agents-sub').textContent = `${A.running.length} running · ${A.recent.length} finished in 24 h${A.hidden ? ' · ' + A.hidden + ' older hidden' : ''} · cost is list price (estimate until the run ends)`;
+}
+
+// the OAI queue's overview.json: what waits to be picked up and what the queue will not retry by itself
+function drawQueue(Q){
+  const el = document.getElementById('queue-ov');
+  if (!el) return;
+  if (!Q || !Q.counts) { el.hidden = true; return; }
+  el.hidden = false;
+  const c = Q.counts, slots = Q.retry_slots || [0, 0];
+  const tile = (n, lab, title, warn) => `<div class="tile${warn ? ' warn' : ''}" title="${esc(title)}"><div class="num">${n}</div><div class="lab">${esc(lab)}</div></div>`;
+  const li = r => `<li><b>${esc(r.label)}</b> <small>${esc(r.module)}</small>` +
+    (r.why ? ` · ${esc(r.why)}` : '') + (r.held_by ? ` · held by overlap with ${esc(r.held_by)}` : '') +
+    (r.last_batch ? ` · last batch <a href="page/agent.html?name=${encodeURIComponent(r.last_batch)}">${esc(r.last_batch)}</a>` : '') +
+    (r.goals && r.goals.length ? ` · ${r.goals.length} goal${r.goals.length > 1 ? 's' : ''} open` : '') +
+    (r.resume ? `<br><small>notes: ${esc(r.resume)}</small>` : '') + '</li>';
+  const opened = new Set([...el.querySelectorAll('details[open]')].map(d => d.dataset.k));
+  const list = (rows, t) => rows && rows.length ? `<details data-k="${esc(t)}"${opened.has(t) ? ' open' : ''}><summary>${esc(t)} (${rows.length})</summary><ul>${rows.map(li).join('')}</ul></details>` : '';
+  el.innerHTML =
+    tile(c.waiting, 'new groups waiting', 'Open target groups not yet tried, in queue order') +
+    tile(c.retry_waiting, `retries waiting · ${slots[0]}/${slots[1]} retry slots busy`, `Attempted groups with notes and a retry left (${Q.retry_attempts} allowed); they launch on the retry model once nothing new waits and a retry slot is free`) +
+    tile(c.running, 'batches running', (Q.running || []).map(b => b.name).join(', ')) +
+    tile(c.needs_person, 'need a person', 'Attempted, still Open, and the queue will not retry them by itself: retry spent, no notes, or on no_retry', c.needs_person > 0) +
+    tile(c.proved, 'groups proved', 'Target groups whose goals are all Proved') +
+    list(Q.needs_person, 'Need a person: the queue will not retry these by itself') +
+    list(Q.retry_waiting, 'Retries waiting') + list(Q.waiting, 'New groups waiting') +
+    `<p class="hint" style="grid-column:1/-1;margin:0">OAI queue ${Q.stop ? '<b>STOP set</b> · ' : ''}as of ${esc(fmtAt(Q.updated))}</p>`;
 }
 
 async function loadAgents(){

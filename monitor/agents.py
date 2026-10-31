@@ -128,22 +128,46 @@ def carve_dirs(name, jobs=None, ports=None):
     return sorted(set(found))
 
 
-def phases_for(name, jobs=None, ports=None):
-    """None when the agent has no carve state yet, else {'dirs': [{name, stages, current, live, total}]}."""
-    out = []
-    for d in carve_dirs(name, jobs, ports):
-        st = load(os.path.join(d, 'pipeline_state.json'))
-        if not isinstance(st, dict):
-            continue
-        v = pipeline_view(st)
-        live = total = None
-        for rs in (d, os.path.join(d, 'publish'), os.path.join(d, 'work')):
-            r = load(os.path.join(rs, 'run_state.json'))
-            if isinstance(r, dict):
-                live, total = items_live(r)
-                break
-        out.append(dict(v, name=os.path.basename(d), live=live, total=total,
-                        mtime=int(os.path.getmtime(os.path.join(d, 'pipeline_state.json')))))
+def earlier_batches(name, registry):
+    """Names of the queue batches launched before batch `name` on any of its modules, newest first: a
+    retry resumes their carves (q141-boltzmann-retry worked in ports/oaiq-080/bz)."""
+    bs = list((registry or {}).get('batches', {}).values())
+    me = next((b for b in bs if b.get('name') == name), None)
+    if not me:
+        return []
+    mods = set(me.get('modules', []))
+    prior = [b for b in bs if b.get('name') != name and mods & set(b.get('modules', []))
+             and (b.get('launched') or 0) < (me.get('launched') or 0)]
+    return [b['name'] for b in sorted(prior, key=lambda b: -(b.get('launched') or 0))]
+
+
+def dir_view(d, label, earlier=None):
+    st = load(os.path.join(d, 'pipeline_state.json'))
+    if not isinstance(st, dict):
+        return None
+    v = pipeline_view(st)
+    live = total = None
+    for rs in (d, os.path.join(d, 'publish'), os.path.join(d, 'work')):
+        r = load(os.path.join(rs, 'run_state.json'))
+        if isinstance(r, dict):
+            live, total = items_live(r)
+            break
+    return dict(v, name=label, earlier=earlier, live=live, total=total,
+                mtime=int(os.path.getmtime(os.path.join(d, 'pipeline_state.json'))))
+
+
+def phases_for(name, jobs=None, ports=None, registry=None):
+    """None when the agent has no carve state yet, else {'dirs': [{name, stages, current, live, total,
+    earlier}]}: its own carve dirs, then those of the earlier queue batches on its modules, labelled
+    '<earlier batch>/<dir>' (earlier = that batch's name)."""
+    jobs, ports = jobs or JOBS_DIR, ports or PORTS_DIR
+    out = [dir_view(d, os.path.basename(d)) for d in carve_dirs(name, jobs, ports)]
+    for e in earlier_batches(name, registry):
+        for d in carve_dirs(e, jobs, ports):
+            base = next(b for b in (os.path.join(jobs, e), os.path.join(ports, e)) if (d + os.sep).startswith(b + os.sep))
+            rel = os.path.relpath(d, base)
+            out.append(dir_view(d, e if rel == '.' else e + '/' + rel, e))
+    out = [x for x in out if x]
     return {'dirs': out} if out else None
 
 
@@ -181,11 +205,12 @@ def summarize(name, root, now, registry=None, cost_hist=None, jobs=None, ports=N
             'cost': us.get('estimated_cost_usd'), 'cost_exact': us.get('cost_is_exact'),
             'budget': meta.get('budget_usd'), 'cost_series': (cost_hist or {}).get(name, []),
             'last_text': last, 'active': int(tmtime) if tmtime else None,
-            'goals': goals_for(name, registry), 'phases': phases_for(name, jobs, ports)}
+            'goals': goals_for(name, registry), 'phases': phases_for(name, jobs, ports, registry)}
 
 
-def agents_json(root, now, registry=None, cost_hist=None, jobs=None, ports=None):
-    """Running first, then agents that finished in the last 24 h (newest first)."""
+def agents_json(root, now, registry=None, cost_hist=None, jobs=None, ports=None, queue=None):
+    """Running first, then agents that finished in the last 24 h (newest first); `queue` is the OAI queue's
+    overview.json (waiting, retry_waiting, running, needs_person), passed through for the card's header."""
     rows = []
     for n in sorted(os.listdir(root)) if os.path.isdir(root) else []:
         if not NAME.match(n) or not os.path.isfile(os.path.join(root, n, 'state.json')):
@@ -196,7 +221,7 @@ def agents_json(root, now, registry=None, cost_hist=None, jobs=None, ports=None)
               and now - (r['ended'] or r['active'] or r['started'] or 0) <= FINISHED_WINDOW]
     key = lambda r: -(r['ended'] or r['active'] or r['started'] or 0)
     return {'updated': int(now), 'running': sorted(running, key=lambda r: -(r['started'] or 0)),
-            'recent': sorted(recent, key=key), 'hidden': len(rows) - len(running) - len(recent)}
+            'recent': sorted(recent, key=key), 'hidden': len(rows) - len(running) - len(recent), 'queue': queue}
 
 
 def record_costs(hist, root, now):

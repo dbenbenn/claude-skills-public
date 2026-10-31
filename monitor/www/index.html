@@ -56,7 +56,16 @@ code{font-size:13px}
 <p class="sub" id="upd">Loading…</p>
 <div class="alarm" id="alarm" role="alert" hidden></div>
 <div class="inbox" id="inbox" hidden></div>
-<nav class="nav" aria-label="Views"><a href="#t-sys">System resources</a><a href="#t-quota">Subscription quota</a><a href="#t-agents">Headless agents</a><a href="#sections">Work in progress</a></nav>
+<nav class="nav" aria-label="Views"><a href="#t-quota">Subscription quota</a><a href="#t-sys">System resources</a><a href="#t-agents">Headless agents</a><a href="#sections">Work in progress</a></nav>
+<section class="card" aria-labelledby="t-quota">
+<h2 id="t-quota">Subscription quota</h2>
+<p class="chart-sub" id="quota-sub">Loading…</p>
+<div class="qgrid">
+<div class="chart"><h3>5-hour window (last 48 h)</h3><div id="c-q5"></div></div>
+<div class="chart"><h3>7-day window (last 7 days)</h3><div id="c-q7"></div></div>
+</div>
+<p class="hint">Utilization of the Claude subscription as reported in the agents' rate-limit records. Solid lines mark past resets, the dashed line the next one. Steps change only while some agent is running.</p>
+</section>
 <section class="card" aria-labelledby="t-sys">
 <h2 id="t-sys">System resources</h2>
 <p class="chart-sub">The whole machine, split by what uses it; sampled every 30 s · times in Berlin time (CET/CEST). Memory: each category's own process memory (file cache excluded): Lean (Lean, lake, the Lean slots), queue workers (the queue supervisor, headless agents and detached carve drivers), Claude sessions (interactive ones and their tools); the rest is everything else in use.</p>
@@ -77,18 +86,10 @@ code{font-size:13px}
 <p class="chart-sub">Trouble that was in the red banner and has stopped: the condition is gone, the racing jobs are no longer both running, or an OOM kill is over an hour old. Repeats are one row with their worst reading.</p>
 <ul class="cleared" id="cleared"></ul></div>
 </section>
-<section class="card" aria-labelledby="t-quota">
-<h2 id="t-quota">Subscription quota</h2>
-<p class="chart-sub" id="quota-sub">Loading…</p>
-<div class="qgrid">
-<div class="chart"><h3>5-hour window (last 48 h)</h3><div id="c-q5"></div></div>
-<div class="chart"><h3>7-day window (last 7 days)</h3><div id="c-q7"></div></div>
-</div>
-<p class="hint">Utilization of the Claude subscription as reported in the agents' rate-limit records. Solid lines mark past resets, the dashed line the next one. Steps change only while some agent is running.</p>
-</section>
 <section class="card" aria-labelledby="t-agents">
 <h2 id="t-agents">Headless agents</h2>
 <p class="chart-sub" id="agents-sub">Loading…</p>
+<div class="qov" id="queue-ov" hidden></div>
 <div id="agents-box"></div>
 </section>
 <div id="sections"></div>

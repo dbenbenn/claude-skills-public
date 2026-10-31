@@ -34,3 +34,13 @@
 .seg2{display:inline-flex;border:1px solid var(--grid);border-radius:7px;overflow:hidden}
 .seg2 button{font:inherit;font-size:13px;background:transparent;color:var(--text-secondary);border:0;border-left:1px solid var(--grid);padding:4px 10px;cursor:pointer}
 .seg2 button:first-child{border-left:0}.seg2 button[aria-pressed="true"]{background:var(--series-1);color:#fff}
+.qov{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px 12px;margin:4px 0 10px}
+.qov .tile{border:1px solid var(--grid);border-radius:8px;padding:6px 10px;background:var(--surface-1)}
+.qov .tile.warn{border-left:4px solid var(--warn)}
+.qov .num{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.qov .lab{font-size:12px;color:var(--text-secondary)}
+.qov details{grid-column:1/-1;font-size:13px}
+.qov summary{cursor:pointer;color:var(--text-secondary)}
+.qov ul{margin:4px 0 0;padding-left:18px}.qov li{margin:2px 0;overflow-wrap:anywhere}
+.qov li small{color:var(--text-muted)}
+.pl .lab.earlier{font-style:italic}

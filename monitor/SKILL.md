@@ -92,7 +92,7 @@ and STALE badges stay in their sections; unreadable section files are listed und
 
 ## Headless agents, quota and logs (no tokens)
 
-The main page has two more cards between the system charts and the sections:
+The main page has two more cards around the system charts (quota above them since 2026-10-31, agents below):
 
 - **Subscription quota**: the 5-hour window (last 48 h) and the 7-day window (last 7 days) as step charts,
   with reset markers (solid = past, dashed = next). The sampler (`agents.update_quota`) reads only the new
@@ -108,7 +108,15 @@ The main page has two more cards between the system charts and the sections:
   needed). **Phases**: a bar of ten stages (fetch, port, build, graph, plan, gen, measure, prose, check,
   publish; each covers the `carve_pipeline.py` steps listed in `agents.STAGES`), current one outlined, failed
   red, plus items live/total from `run_state.json`. Carve dirs are found at `~/.claude/jobs/<agent>/**/` (depth 3)
-  and `~/claude/p2m-standalone/openai-ports/<agent>/`; no state yet shows "setting up" (queue agents only).
+  and `~/claude/p2m-standalone/openai-ports/<agent>/`; a queue retry also shows the carves of the earlier batches on
+  its modules (registry `batches`), labelled `<earlier>/<dir>` in italics, since it resumes them (`agents.earlier_batches`;
+  q141-boltzmann-retry showed "setting up" for hours while resuming `oaiq-080/bz`); no state yet shows "setting up"
+  (queue agents only).
+- **Queue overview** at the top of the agents card: tiles for new groups waiting, retries waiting (with retry slots
+  busy), batches running, groups that need a person (attempted-open with the retry spent, no notes, or on `no_retry`;
+  amber when any) and groups proved, plus expandable lists. Read from `headless-agents/queue/overview.json`, which the
+  queue supervisor (`claude-private/tools/oai-queue/queue.py`, `write_overview`) rewrites every tick; `/agents.json`
+  passes it through as `queue`.
 - **Carve sections** `carve-<hash>` (the hash of the driver's unit `carve-<hash>`): written by the carve driver itself
   (`prove2me/p2mlib/carvemonitor.py`, a daemon thread of `carve_pipeline.py`, every 60 s and at each step boundary;
   `split_run.py --go` keeps the counts current while a background publisher outlives its driver). Phases: Steps,

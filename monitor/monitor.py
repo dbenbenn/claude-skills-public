@@ -572,7 +572,9 @@ def agents_body(now=None):
     now = now or time.time()
     if now - State.agents[0] > 5:
         reg = load_json(os.path.join(AG.AGENTS_DIR, 'queue', 'registry.json'), None)
-        State.agents = (now, json.dumps(AG.agents_json(AG.AGENTS_DIR, now, reg, State.costs), ensure_ascii=False).encode())
+        ov = load_json(os.path.join(AG.AGENTS_DIR, 'queue', 'overview.json'), None)
+        State.agents = (now, json.dumps(AG.agents_json(AG.AGENTS_DIR, now, reg, State.costs, queue=ov),
+                                        ensure_ascii=False).encode())
     return State.agents[1]
 
 
