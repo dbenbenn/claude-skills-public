@@ -1253,6 +1253,10 @@ MEASURE_HOOK = textwrap.dedent('''
     _seq = json.loads(os.environ.get('STUB_TIMES_SEQ', '[]'))
     _tp = os.path.join(os.getcwd(), 'carve_work', 'times.json')
     _t = json.load(open(_tp)) if os.path.exists(_tp) else {}
+    # an entry the pipeline dropped to have it re-measured comes back as first measured, unless _seq says otherwise
+    _op = os.path.join(os.getcwd(), 'carve_work', 'times.orig.json')
+    _o = json.load(open(_op)) if os.path.exists(_op) else {}
+    _t.update({k: v for k, v in _o.items() if k not in _t and k.split(':')[0] in _kinds})
     if _i < len(_seq):
         _t.update({k: v for k, v in _seq[_i].items() if k.split(':')[0] in _kinds})
     json.dump(_t, open(_tp, 'w'))
@@ -1277,6 +1281,7 @@ def _overlap_carve(env, monkeypatch, pieces=None, bundles=None, stimes=None, seq
     t.update({'statement:' + n: _t((stimes or {}).get(n, 5)) for n in pieces})
     t.update({'piece:' + n: _t(s) for n, (_, s) in pieces.items()})
     (work / 'times.json').write_text(json.dumps(t))
+    (work / 'times.orig.json').write_text(json.dumps(t))
     monkeypatch.setenv('STUB_HOOK_carve_measure_config_json', MEASURE_HOOK)
     monkeypatch.setenv('STUB_TIMES_SEQ', json.dumps(list(seq)))
     return plan
@@ -1392,7 +1397,7 @@ def test_a_slow_piece_after_publishing_is_split_by_a_frozen_replan_of_that_piece
     # oaiq-081: HighQueryCorrect.marked 283 s against a plan of 40 s. Its statements are live, so the
     # whole carve is not re-planned: only the declarations the piece kept cost their measured ratio
     _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)},
-                   seq=[{}, {}, {}, {'piece:P0': _t(40)}])
+                   seq=[{}, {}, {}, {}, {'piece:P0': _t(40)}])
     r = run(env, *ARGS_NEW, '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     st = json.load(open(env.dir / 'pipeline_state.json'))
@@ -1410,11 +1415,27 @@ def test_a_slow_piece_after_publishing_is_split_by_a_frozen_replan_of_that_piece
     assert cfg['cost_factors'] == {'P0': 19.2, 'lemma_P0': 19.2} and 'frozen' in cfg and 'P0' in cfg['forced']
 
 
+def test_a_slow_piece_is_measured_again_before_its_automatic_split(env, monkeypatch):
+    # q138 (2026-10-31): computeLDL_14_3_2 measured 1595 s of CPU while the machine thrashed (swap full,
+    # network down); alone it compiles in 2 s, siblings 5-9 s. Its automatic frozen re-plan would have split
+    # a 2 s piece. A slow piece is measured once more first, and split only if it is still slow
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)},
+                   seq=[{}, {}, {'piece:P0': _t(3)}])
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['remeasured'] == {'P0': 192} and not st.get('piece_replans')
+    assert not (st.get('auto_config') or {}).get('cost_factors')
+    seq = tools_called(env)
+    assert seq.count(('carve', 'plan')) == 1 and [t[0] for t in seq].count('carve_measure') == 3
+    assert 'measuring piece:P0 again' in (env.dir / 'logs' / 'calibrate.log').read_text()
+
+
 def test_the_automatic_split_may_promote_the_slow_pieces_private_lemmas(env, monkeypatch):
     # oaiq-091: pieces of 60 and 394 private lemmas (`traceLift_*`, `B_ACE_*`); the frozen re-plan could
     # promote public lemmas only, so each private one needed a hand `forced` entry by graph node name
     plan = _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)},
-                          seq=[{}, {}, {}, {'piece:P0': _t(40)}])
+                          seq=[{}, {}, {}, {}, {'piece:P0': _t(40)}])
     priv = '_private.Solutions.F.M.0.OAI.X.traceLift_1'
     plan['pieces']['P0']['keep'].append(priv)
     plan['pieces']['P1']['keep'].append('_private.Solutions.F.M.0.OAI.X.other')
@@ -1430,7 +1451,7 @@ def test_the_automatic_split_may_promote_the_slow_pieces_private_lemmas(env, mon
 
 
 def test_a_piece_still_slow_after_its_automatic_split_stops_for_a_person(env, monkeypatch):
-    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)}, seq=[{}, {}, {}, {'piece:P0': _t(180)}])
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)}, seq=[{}, {}, {}, {}, {'piece:P0': _t(180)}])
     r = run(env, *ARGS_NEW, '--publish')
     assert r.returncode == 1
     assert "step 'calibrate_pieces'" in r.stderr and 'still over after an automatic split' in r.stderr

@@ -1410,6 +1410,22 @@ class Pipeline:
             else:
                 auto.append((n, secs, cost))
         k = self.state.get('piece_replans', 0)
+        again = [(n, secs) for n, secs, _ in auto if n not in (self.state.get('remeasured') or {})]
+        if again and k < MAX_REPLANS:
+            # measured once more before any split (q138: 1595 s of CPU for a piece that compiles in 2 s alone,
+            # measured while the machine thrashed): its entry is dropped, measure_pieces measures it again
+            rm = self.state.setdefault('remeasured', {})
+            times_path = got[4]
+            for n, secs in again:
+                rm[n] = secs
+                times.pop('piece:' + n, None)
+            json.dump(times, open(times_path, 'w'), indent=1)
+            self.calibrate_log(lines + ['measuring %s again before any split' % ', '.join('piece:' + n for n, _ in again)])
+            self.invalidate('measure_pieces')
+            self.restart = True
+            print('calibrate_pieces: measuring %d slow piece(s) again before any split' % len(again),
+                  file=sys.stderr, flush=True)
+            return None
         if auto and k < MAX_REPLANS:
             a = self.state.setdefault('auto_config', {})
             cf = dict(a.get('cost_factors') or {})
