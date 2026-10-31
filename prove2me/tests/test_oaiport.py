@@ -1567,6 +1567,18 @@ def test_elpnorm_nnreal_and_mono_real_drop_their_measurability_argument():
                    "  have hb := eLpNorm_mono_real (μ:=law) (p:=p) hb\n")
 
 
+def test_elpnorm_mono_enorm_and_nnnorm_ae_drop_their_measurability_argument():
+    # d13f23b's `eLpNorm_mono_enorm_ae hf h` and `eLpNorm_mono_nnnorm_ae hf h` take the measurability first; ours
+    # take the bound only (Boltzmann q141: 14 OpenAI sites, every first argument a measurability proof)
+    src = ("  exact ⟨hu.ae_mono hm hb,C,fun n => (eLpNorm_mono_enorm_ae (hm n) (hb n)).trans (hC n)⟩\n"
+           "  apply le_trans (eLpNorm_mono_enorm_ae ((hf n).indicator hs.compl) ?_) (hgs n)\n"
+           "  exact MeasureTheory.eLpNorm_mono_nnnorm_ae hX h\n")
+    assert O.core_rewrites(src) == (
+        "  exact ⟨hu.ae_mono hm hb,C,fun n => (eLpNorm_mono_enorm_ae (hb n)).trans (hC n)⟩\n"
+        "  apply le_trans (eLpNorm_mono_enorm_ae ?_) (hgs n)\n"
+        "  exact MeasureTheory.eLpNorm_mono_nnnorm_ae h\n")
+
+
 def test_lp_elpnorm_le_of_ae_tendsto_drops_the_limit_measurability():
     src = ("  have he := Lp.eLpNorm_le_of_ae_tendsto (.of_forall hbound) hFm hmeas hlim\n"
            "  apply Lp.eLpNorm_le_of_ae_tendsto (u := atTop) (Eventually.of_forall hb)\n"
