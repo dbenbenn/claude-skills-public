@@ -3005,3 +3005,6 @@ def test_by_convert_chain_closes_the_diamond_first():
     assert (":= by convert h using 1 <;> first | (with_reducible_and_instances rfl) | (push_cast <;> ring)\n"
             in out), out
     assert O.core_rewrites(out) == out
+    # inside a bracket the tactic ends before the closing `)`/`]`: left alone (Erdos970 MellinCalculus)
+    src2 = "      (by convert (preTransparency := .instances) int_F using 1; simp only [f', F, f]; field_simp)]\n"
+    assert O.core_rewrites(src2) == src2

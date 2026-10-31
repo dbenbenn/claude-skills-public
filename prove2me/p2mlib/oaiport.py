@@ -1559,6 +1559,13 @@ def core_rewrites(text, compat_ns='OAI', known=None):
         tac = m.group('tac').strip()
         if 'with_reducible_and_instances rfl' in tac or re.match(r"(\(?first\b|rfl\b|ring\b|<;>)", tac):
             return m.group(0)
+        # a `(by convert … ; tac)]` inside brackets: the tail closes an outer bracket, so the tactic's end is
+        # not the line's (Erdos970 MellinCalculus, q142)
+        depth = 0
+        for ch in tac:
+            depth += (ch in '([{') - (ch in ')]}')
+            if depth < 0:
+                return m.group(0)
         # a sequence ending in `; rfl`: our stronger simp lemmas can close the goal first, and the bare
         # `rfl` then fails with "No goals to be solved" (RandomMean, oaiq-117)
         tac = re.sub(r";[ \t]*rfl[ \t]*$", '; try rfl', tac)
