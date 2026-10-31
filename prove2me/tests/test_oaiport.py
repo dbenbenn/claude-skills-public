@@ -2956,3 +2956,14 @@ def test_every_convert_ring_closes_diamonds_and_eventually_eq_set_renames():
     assert "_ ≤ _ := by convert hmul using 1 <;> first | (with_reducible_and_instances rfl) | ring\n" in out
     assert "(Filter.EventuallyEq.inter Filter.EventuallyEq.rfl h)" in out
     assert O.core_rewrites(out) == out
+
+
+# `convert h using 1; ring` after `by` (a calc step `_ ≤ _ := by convert h using 1; ring`) gets the same
+# diamond-safe form as one at the start of a line (JointDickman GraphEdgeMajorant, q142; 38 such sites in
+# openai/math).
+
+def test_by_convert_semicolon_ring_becomes_first_rfl_ring():
+    src = "    _ ≤ _ := by convert hCAB using 1; ring\n"
+    out = O.core_rewrites(src)
+    assert "    _ ≤ _ := by convert hCAB using 1 <;> first | rfl | ring\n" in out
+    assert O.core_rewrites(out) == out

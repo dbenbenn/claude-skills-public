@@ -1536,7 +1536,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # `simp [..]; ring` -> `simp [..] <;> ring` (oaiq-098); before the convert rules, which parenthesise the tactic
     # after `convert … <;>` as a `first` alternative this rule leaves alone
     text = _simp_semicolon_closer(text)
-    text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
+    text = re.sub(r"(?m)((?:^[ \t]*|\bby[ \t]+)convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first[ \t]*\|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
     # any other `convert … using n <;> ring` (a term over several lines, after `by` or `gcongr;`) closes the
