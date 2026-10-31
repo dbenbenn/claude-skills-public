@@ -661,23 +661,29 @@ def _pm_explicit(text, lemmas):
     for m in _PM_EXPLICIT.finditer(text):
         if m.start() < i:
             continue
-        a1 = m.end()
-        while a1 < len(text) and text[a1] in ' \t':
-            a1 += 1
+        line = text[text.rfind('\n', 0, m.start()) + 1:m.start()]
+        indent = len(line) - len(line.lstrip(' \t'))
+
+        def skip(k):
+            """k past blanks, and past a newline into a continuation line indented further than `.map`'s."""
+            while k < len(text) and text[k] in ' \t':
+                k += 1
+            if text.startswith('\n', k):
+                j = k + 1
+                while j < len(text) and text[j] in ' \t':
+                    j += 1
+                if j - k - 1 > indent:
+                    return j
+            return k
+        a1 = skip(m.end())
+        if text.startswith('\n', a1):
+            continue
         e1 = _arg_end(text, a1)
         if e1 == a1 or text[a1:e1] in _NOT_ARGS:
             continue
-        a2 = e1
-        while a2 < len(text) and text[a2] in ' \t':
-            a2 += 1
-        if text.startswith('\n', a2):       # a continuation line, indented further than the line of `.map`
-            line = text[text.rfind('\n', 0, m.start()) + 1:m.start()]
-            k = a2 + 1
-            while k < len(text) and text[k] in ' \t':
-                k += 1
-            if k - a2 - 1 <= len(line) - len(line.lstrip(' \t')):
-                continue
-            a2 = k
+        a2 = skip(e1)
+        if text.startswith('\n', a2):
+            continue
         e2 = _arg_end(text, a2)
         f = text[a2:e2]
         if e2 == a2 or f in _NOT_ARGS or 'aemeasurable' in f.lower() or re.match(r"\(\s*(?:[\w']+\s*:=|by\b)", f):

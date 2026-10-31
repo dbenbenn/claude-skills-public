@@ -1529,6 +1529,13 @@ def test_probabilitymeasure_map_with_applied_arguments_gets_its_proof():
     assert "(ProbabilityMeasure.map (samples s) (f := (profile s)) (by first | exact (hp s).aemeasurable" in out
     assert "ProbabilityMeasure.map (samples t)\n        (f := (profile t)) (by first | exact (hp t).aemeasurable" in out
     assert O.core_rewrites(out) == out
+    # both arguments on the continuation line (SequenceCellProfiles, q145)
+    src3 = ("theorem baz (profile : ℕ → N → S) (hp : ∀ n, Measurable (profile n))\n"
+            "    (hν : Tendsto (fun n => ProbabilityMeasure.map\n"
+            "      (cell μ (Q n) (hQ0 n)) (profile n)) atTop (𝓝 ν)) : True := sorry\n")
+    out3 = O.core_rewrites(src3)
+    assert ("ProbabilityMeasure.map\n      (cell μ (Q n) (hQ0 n)) (f := (profile n)) (by first | exact (hp n).aemeasurable"
+            in out3), out3
     # a proof already given (positional or named) is left alone
     same = ("theorem bar : ProbabilityMeasure.map (samples r) (hp r).aemeasurable = ν ∧\n"
             "    ProbabilityMeasure.map (μ n) (f := g) (by fun_prop) = ν := sorry\n")
