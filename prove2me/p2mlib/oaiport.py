@@ -1567,7 +1567,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
         tac = re.sub(r"<;>[ \t]*\n[ \t]*", '<;> ', tac)
         return '%s <;> first | (with_reducible_and_instances rfl) | (%s)' % (m.group('head'), tac)
     # the term may span lines, and a chain ending in `<;>` continues on the next line (oaiq-092)
-    text = re.sub(r"(?m)^(?P<head>[ \t]*(?:· )?convert (?:(?!convert\b)[^;\n])*?"
+    text = re.sub(r"(?m)^(?P<head>(?:[ \t]*(?:· )?|[^\n]*?\bby[ \t]+)convert (?:(?!convert\b)[^;\n])*?"
                   r"(?:\n(?:(?!convert\b)[^;\n])*?){0,3}? using \d+)[ \t]*(?:;|<;>)[ \t]*"
                   r"(?P<tac>[^\n]*<;>[ \t]*\n[ \t]*[^\n]+|[^\n]+)$",
                   _convert_tac, text)

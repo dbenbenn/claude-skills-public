@@ -2991,3 +2991,14 @@ def test_multiline_convert_semicolon_ring_becomes_first_rfl_ring():
     assert "        using 1 <;> first | rfl | ring\n" in out
     assert "  exact bar using 1; ring\n" in out   # no convert above: left alone
     assert O.core_rewrites(out) == out
+
+
+# `convert h using 1 <;> tac` after `by` (a `have … := by convert …` on one line) gets the same
+# diamond-first form as one at the start of a line (JointDickman CountingRamp, q142)
+
+def test_by_convert_chain_closes_the_diamond_first():
+    src = "          (T : ℝ)*((candidateLow e : ℝ)*(N+1)) := by convert h using 1 <;> push_cast <;> ring\n"
+    out = O.core_rewrites(src)
+    assert (":= by convert h using 1 <;> first | (with_reducible_and_instances rfl) | (push_cast <;> ring)\n"
+            in out), out
+    assert O.core_rewrites(out) == out
