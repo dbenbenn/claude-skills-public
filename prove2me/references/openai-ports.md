@@ -716,7 +716,12 @@ back WA. The lessons:
   and with `set_option backward.isDefEq.respectTransparency false` at module scope and keep the version with
   fewer errors (`scripts/try_module.py FILE [--show LINE,...]` does both, with the pipeline's `-j1 -DautoImplicit=false`
   and through the lean-cap wrapper, and names the version with fewer errors); where the option
-  breaks later steps, scope it with `set_option … false in` per declaration. oaiq-002's "several more hours" of
+  breaks later steps, scope it with `set_option … false in` per declaration. Since f252eeb the pipeline's build
+  does the first half by itself (q128: a chain of 15 such modules surfaced over seven build rounds, three hours): a
+  module failing with the transparency note is compiled again with the option at module scope, and if that
+  builds, its `.olean` stands in so its importers build in the same round. The module is still reported as failed
+  ("builds only with the transparency option … needs a patch", listed together in the last line), so the build
+  step stops until each gets its port patch (`openai-ports/q128-finitistic-retry/add_option_patch.py` writes them). oaiq-002's "several more hours" of
   drift became 2 hours. Repair with the pipeline's own flags (`lean -j1 -DautoImplicit=false`): a `-j1` build can
   hit heartbeats an in-place `lake build` does not.
 - **`(kernel) deterministic timeout` where the elaborator accepted every step** (oaiq-068): typically a goal
