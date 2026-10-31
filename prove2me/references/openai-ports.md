@@ -195,6 +195,11 @@ Problem336).** Fix each at the cause; none needs a macro.
   hand-patched uniform integrability, so it stays opt-in until those are published.
 - *When a port rule matches a tactic spelling*, `rg` the port for the unspaced and variant spellings of the same
   tactic (q133: `; first|…` without spaces escaped the `; first | …` rule, 8af004c).
+- *A simp-family step now closes the goal*, so its `; ring` fails "No goals" (oaiq-098: BasisIntervals,
+  NodeIntervals). Port rule `_simp_semicolon_closer` (a910463): `simp`/`norm_num`/`field_simp`/`push_cast`/… `;
+  ring` (or `ring_nf`, `linarith`, `positivity`, …, chained) becomes `<;> …`, a no-op on no goals and the same on
+  one; after a `<;>` chain only where the line ends its block. It changes meaning only where the simp step closed
+  one goal of an unbulleted block and the closer was meant for the next: a build error then, not a silent change.
 - *"not type-correct under the `implicit` transparency level"* in `rw`/`simp`/`dsimp` (category theory,
   homological algebra; oaiq-032). Fix per failing module, never as a port default (making
   `backward.isDefEq.respectTransparency false` a header default broke modules that had built: synthInstance and
