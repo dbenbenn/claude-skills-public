@@ -16,7 +16,8 @@ lessons oaiq-112, -113, -123). This script is the only way records get committed
    than a temp worktree: no checkout of the ~21k-file tree per push and nothing to clean up if the
    run is killed; the only temp file is the index, removed in all cases.)
 3. Refuse before committing: a path outside the repo or the whole repo; added or modified *.lean
-   under openai-ports/ (records hold no OpenAI Lean; --allow-lean overrides); an embedded git repo;
+   under openai-ports/, and a carve tree's generated files there (chk/ edge/ stage/ olean/ out/ src/,
+   .olean, .ilean; q144) (records hold no OpenAI Lean; --allow-lean overrides); an embedded git repo;
    more than --max-files changes (default 1000: a records folder may hold a 100k-file carve tree);
    a file over 50 MB.
 4. Commit onto origin/main (author and committer from the repo's git config; the message is used
@@ -173,6 +174,17 @@ def is_openai_lean(path):
     return path.startswith(LEAN_ROOT) and path.endswith('.lean')
 
 
+# a carve tree's generated subdirectories and compiled Lean: OpenAI-derived, never records (q144: oaiq-091,
+# -059 and -092 had pushed 2,650 .lean and hundreds of .olean files from carve trees before this script)
+CARVE_GENERATED = {'chk', 'edge', 'stage', 'olean', 'out', 'src'}
+
+
+def is_carve_generated(path):
+    if not path.startswith(LEAN_ROOT):
+        return False
+    return path.endswith(('.olean', '.ilean')) or bool(CARVE_GENERATED & set(path.split('/')[1:-1]))
+
+
 def build(top, base, paths, opts, env):
     """Stage PATHS from the working tree onto base's tree in the private index env['GIT_INDEX_FILE'].
     Returns (tree or None if nothing changes, changes, notes)."""
@@ -222,6 +234,12 @@ def check_files(changes, opts):
         raise Refused('%d files to commit, more than --max-files %d (a carve tree in the records '
                       'folder? pass narrower paths, ignore it in .gitignore, or raise --max-files): %s'
                       % (len(changes), opts.max_files, ', '.join(p for _s, p in changes[:5])))
+    gen = [p for st, p in changes if st != 'D' and is_carve_generated(p)]
+    if gen and not opts.allow_lean:
+        raise Refused('refusing a carve tree\'s generated or compiled files (%s/, .olean, .ilean) under %s: '
+                      'keep the carve dir out of git (.gitignore) and commit only its patches and notes '
+                      '(--allow-lean if this is really our own): %s'
+                      % ('/, '.join(sorted(CARVE_GENERATED)), LEAN_ROOT, ', '.join(gen[:10])))
     lean = [p for st, p in changes if st != 'D' and is_openai_lean(p)]
     if lean and not opts.allow_lean:
         raise Refused('refusing OpenAI Lean under %s (records hold no OpenAI Lean; --allow-lean if '

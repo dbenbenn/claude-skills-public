@@ -305,6 +305,29 @@ def test_refuses_openai_lean_unless_allowed(world):
     assert 'openai-ports/oaiq-001/Port.lean' in origin_files(world)
 
 
+def test_refuses_a_carve_trees_generated_files(world):
+    # q144 (2026-10-31): oaiq-091, -059 and -092 had pushed 2,650 OpenAI-derived .lean files and hundreds of
+    # .olean from carve trees in their records folders (before this script existed); the carve's own
+    # pipeline.json and carve_patches.json are records, its generated subdirectories and compiled files are not
+    sh = world['shared']
+    write(sh, 'openai-ports/oaiq-002/cc/carve_patches.json', '[]\n')
+    rc, out = run(world, 'openai-ports/oaiq-002', '-m', 'patches')
+    assert rc == 0, out
+    assert 'openai-ports/oaiq-002/cc/carve_patches.json' in origin_files(world)
+    head = git(world['origin'], 'rev-parse', 'main')
+    assert push_records.is_carve_generated('openai-ports/oaiq-002/cc/olean/Solutions/X.olean')
+    for bad in ('openai-ports/oaiq-002/cc/stage/Def_X.json',
+                'openai-ports/oaiq-002/cc/chk/x.log', 'openai-ports/oaiq-002/cc/out/lib/a.txt',
+                'openai-ports/oaiq-002/X.ilean'):
+        write(sh, bad, 'x\n')
+        rc, out = run(world, 'openai-ports/oaiq-002', '-m', 'carve tree')
+        assert rc == 1 and bad.rsplit('/', 1)[-1] in out, (bad, out)
+        assert git(world['origin'], 'rev-parse', 'main') == head
+        os.remove(os.path.join(sh, bad))
+    assert_no_leftovers(world)
+    assert not push_records.is_carve_generated('artin/out/x.lean')
+
+
 def test_lean_outside_openai_ports_is_fine(world):
     write(world['shared'], 'artin/Own.lean', 'theorem t : True := trivial\n')
     rc, out = run(world, 'artin', '-m', 'own lean')
