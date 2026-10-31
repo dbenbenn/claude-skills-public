@@ -272,13 +272,15 @@ def compat_block(text, namespace='OAI'):
 def apply_rewrites(text, rewrites):
     """Each whole name X of `rewrites` replaced by its target (not inside a longer name). When the
     text opens X's namespace (`open Finset`, `open Finset in`) and the target lives in the same
-    namespace, the bare last component is rewritten too (`prod_le_prod₀` -> `prod_le_prod`)."""
+    namespace, the bare last component is rewritten too, to the full name (`prod_le_prod₀` ->
+    `Finset.prod_le_prod`): a bare `prod_le_prod` is ambiguous with our `Filter.prod_le_prod` under
+    `open Filter Finset` (JointDickman, q142)."""
     for old, new in rewrites.items():
         text = re.sub(r'(?<![\w.\'])%s(?![\w\'₀-ₜ])' % re.escape(old), new, text)
         if '.' in old:
             ns, short = old.rsplit('.', 1)
             if new.startswith(ns + '.') and re.search(r'^\s*open\b[^\n]*(?<![\w.])%s(?![\w.])' % re.escape(ns), text, re.M):
-                text = re.sub(r'(?<![\w.\'])%s(?![\w\'₀-ₜ])' % re.escape(short), new[len(ns) + 1:], text)
+                text = re.sub(r'(?<![\w.\'])%s(?![\w\'₀-ₜ])' % re.escape(short), new, text)
     return text
 
 

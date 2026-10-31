@@ -156,7 +156,7 @@ def test_the_three_finset_aliases_are_rewritten_in_every_form():
     out = O.apply_rewrites(src, rw)
     assert 'apply Finset.prod_le_prod\n' in out and '(Finset.one_le_prod (fun' in out
     assert 'exact Finset.prod_le_one (fun' in out
-    assert 'theorem t : x := prod_le_prod h1 h2' in out
+    assert 'theorem t : x := Finset.prod_le_prod h1 h2' in out
     assert 'Other.prod_le_prod₀ h' in out and 'Finset.prod_le_prod₀_aux' in out
     # without `open Finset` a bare name is someone else's and stays
     assert O.apply_rewrites('theorem t : x := prod_le_prod₀ h\n', rw) == 'theorem t : x := prod_le_prod₀ h\n'
@@ -2874,3 +2874,16 @@ def test_fin_norm_num_chain_continued_on_next_line():
     out2 = O.core_rewrites(src2)
     assert '    norm_num [beta] at hne <;>\n    (%s)\ntheorem v' % _fin_wrap(' [beta] at *') in out2
     assert O.core_rewrites(out2) == out2
+
+
+
+# A bare alias use under `open Finset` is rewritten to the full name: our Mathlib also has
+# `Filter.prod_le_prod`, so a bare `prod_le_prod` under `open Filter Finset` is "ambiguous term"
+# (JointDickman DeletedPrimeFactors and about twenty more sites, q142).
+
+def test_bare_alias_use_becomes_the_full_name():
+    rw = {'Finset.prod_le_prod₀': 'Finset.prod_le_prod'}
+    src = 'open Filter Finset\n\n  apply prod_le_prod₀\n  exact prod_le_prod₀ (fun i _ => h i) h\'\n'
+    out = O.apply_rewrites(src, rw)
+    assert '  apply Finset.prod_le_prod\n' in out and 'exact Finset.prod_le_prod (fun i' in out
+    assert O.apply_rewrites(out, rw) == out
