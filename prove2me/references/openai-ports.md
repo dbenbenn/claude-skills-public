@@ -54,7 +54,8 @@ transformations are in `p2mlib.oaiport`, and `tests/test_oaiport.py` pins the bu
 6. **Before publishing:** `carve_prep.py publish-prep`, then `carve_prep.py prose-template DIR`,
    then write by hand only what it lists as "needs written prose", then `carve_prep.py check-text`.
    The last checks the explanation rules, that every backticked name exists, and that no stub
-   contains a comment. Credit OpenAI and the result family in every description and explanation.
+   contains a comment. So write bundle names in full: a backticked prefix such as `` `OAIQ030L…` `` is
+   NOT FOUND; write "OAIQ030L000 to OAIQ030L035" without backticks (q137). Credit OpenAI and the result family in every description and explanation.
    - **Template prose for intermediate items; written prose only for the goal and the forced
      named results** (dbenbenn, 2026-10-24: a carved intermediate item's prose is rarely read soon
      and stays patchable, and model-written prose had become the biggest cost of a carve).
@@ -172,7 +173,28 @@ Problem336).** Fix each at the cause; none needs a macro.
   gone (`inverse_graph` and friends take `f.toFun.ker = ⊥`); `dite_true` takes only the standard instance;
   `toSSetObjEquiv` on singular simplices needs a subtype-to-structure bridge in `--stdsimplex auto` (oaiq-066:
   compose with the homeomorphism and add a naturality lemma; an import of `StdSimplexTopCompat` cannot be
-  patched in, so inline it).
+  patched in, so inline it); `norm_num` no longer closes a constructor disequality of a local `inductive`
+  (`IV.box a b ≠ IV.unk`, not even with `reduceCtorEq`): `nofun` / `⟨nofun, …⟩` does (q133, one site).
+- *The real-valued `Lp` norm* (q136: 18 patches in 13 modules, five build rounds; oaiq-005, -062 and q141 hit it
+  too). `lpNorm f p μ` is `if AEStronglyMeasurable f μ then (eLpNorm f p μ).toReal else 0`, so `toReal_eLpNorm`
+  takes `hf` (a bare `rw [← toReal_eLpNorm]` leaves a side goal or makes no progress) and `lpNorm_congr_ae` cases
+  on measurability; `eLpNorm_indicator_const` takes `MeasurableSet` (the null-measurable form is `…_const₀`); a
+  `MemLp` built from the norm bound alone needs its measurability half, `⟨hg, …⟩`; some lemmas *dropped* the
+  argument instead (`eLpNorm_eq_lintegral_rpow_enorm_toReal`, `Lp.eLpNorm_le_of_ae_tendsto`,
+  `Lp.eLpNorm_lim_le_liminf_eLpNorm`). Several are port rules now (0888a41, af5cc81, 7a21c26); for the rest, when
+  a port fails on one of these names, `rg` the whole port and repair every site at once, since a failing module
+  hides its importers' failures until the next round.
+- *A Mathlib definition that changed shape* (not a renamed lemma) wants a **shadowing shim**, not per-site
+  patches (q141: d13f23b's `UnifIntegrable`, `UniformIntegrable` and `UnifTight` at about 260 sites in 80 of 526
+  modules, after oaiq-080 spent 3.3 h patching sites). Write a module under `OAI` with the old shape and its API
+  proved from ours: inside `namespace OAI` a declaration `OAI.X` wins over `open MeasureTheory`'s `X`, so bare
+  names need no rewriting. Check the d13f23b source of the definition first. Models: `StdSimplexCompat`, and
+  `UnifIntegrableCompat` (00f2d9c, 64c9ae2; opt-in per carve, pipeline.json `"unif_integrable": "on"`; each
+  construction site needs one measurability line, and a lemma concluding `UniformIntegrable` from `eLpNorm`
+  estimates alone gains a measurability hypothesis). Making it the default would re-port the carves that
+  hand-patched uniform integrability, so it stays opt-in until those are published.
+- *When a port rule matches a tactic spelling*, `rg` the port for the unspaced and variant spellings of the same
+  tactic (q133: `; first|…` without spaces escaped the `; first | …` rule, 8af004c).
 - *"not type-correct under the `implicit` transparency level"* in `rw`/`simp`/`dsimp` (category theory,
   homological algebra; oaiq-032). Fix per failing module, never as a port default (making
   `backward.isDefEq.respectTransparency false` a header default broke modules that had built: synthInstance and
@@ -239,7 +261,9 @@ and new `carve.py` inside one carve. So:
   a failing module and reports every failure in one run.
 - **Run it detached and wait on it** (2026-10-27): `carve_pipeline.py DIR … --detach` starts the run as a
   systemd user unit (log `DIR/logs/driver.log`); `carve_pipeline.py DIR --wait 100` returns its status, or
-  exits 4 still running: re-arm that. A Bash background command dies at 2 h, and that killed drivers mid-build
+  exits 4 still running: re-arm that. Arm the wait with the Bash tool's `timeout` set above the wait (e.g.
+  7000000 ms for `--wait 100`): without it the harness stops a background command after 10 minutes (q137). A Bash
+  background command dies at 2 h, and that killed drivers mid-build
   and mid-graph on every port over ~300 modules (oaiq-033..049); a killed wait costs nothing. Since a932a18 the
   build leaves `graph` its LeanInfo reading, so `graph` takes seconds after a build.
   `--wait` reports only its own run (never while the unit is active, and it says when the run had already
@@ -272,7 +296,16 @@ and new `carve.py` inside one carve. So:
   replays. What rebuilds everything is a changed `lean/compat_4_34.lean` (44 changes since 2026-10-20): a re-port
   rewrites `Compat.lean`, which every module imports (oaiq-088: four full rebuilds of 2,385 modules, each starting
   `Built …Compat`). The driver warns when a re-port would do that; on a built carve use `--upgrade --keep-port`
-  unless the new shims are needed (df97e19). `names` prints progress and runs four lookups at a time. A
+  unless the new shims are needed (df97e19). Every plain `--upgrade` of a built carve re-ports (oaiq-098: two
+  11-hour rebuilds of 564 modules, the second only to pick up a planner fix). When a built carve needs a missing
+  Mathlib name, add it to `compat_4_34.lean` (with its test) for later carves, but in this carve declare it by a
+  port patch in a common ancestor of its users (oaiq-107: 9 users of `SimpleGraph.ncard_neighborSet` among 444
+  modules that all import Compat). A LeanInfo change re-elaborates the whole graph (oaiq-081: 3,092 modules): a
+  large published carve that needs one tool fix takes it on a private snapshot, `--snapshot <commit>`, rather than
+  a HEAD that also changed LeanInfo. After a build failure, skipped importers hide the next errors: stop the
+  driver after each fix (`systemctl --user stop carve-<hash>`) and resume rather than waiting for the build to
+  end (oaiq-107). An in-place `lake build` of the root to see them all can invalidate the pipeline's oleans
+  (q128: a full 70-minute rebuild; q136 got away with it): build single modules in place instead. `names` prints progress and runs four lookups at a time. A
   kinds-limited `measure` judges only its kinds' edge records (oaiq-081), and a cached ok is reused only while its
   `.olean` exists, so a repair cut needs no `times.json` edit (oaiq-096; 17b6d76).
 - **The port folder has an owner; rehearse on a copy only with its own workspace** (2026-10-29). The port writes
@@ -619,7 +652,13 @@ back WA. The lessons:
      value writes in 0.2 s (opus-kadison: 105 s as a theorem's type). Remedy: `abbrev`s naming the large sides or
      subterms, in a bundle (in the same `attribute [-instance]` context as the stubs), and the statement restated
      with them; its piece starts with `unfold` of them, and importers still work, even `with_reducible exact`,
-     since an `abbrev` unfolds at reducible transparency. Where the type cannot shrink (a frozen statement),
+     since an `abbrev` unfolds at reducible transparency. When the large part is the conclusion under binders,
+     name the *whole conclusion* as a `Prop`-valued `abbrev` taking the binders (q140: 5.9e9 nodes to 6.3e3,
+     serialization 316 s to 0.4 s; an `abbrev` of the large subterm alone only halved it, since every instance on
+     the subtype embeds it again); measure `sizeWithoutSharing` per binder and of the body first. Give the
+     `abbrev` a type ascription and copy every instance binder the statement has (`[IsClosed (B : Set _)]`),
+     else its body elaborates with a metavariable or another instance path and the importers stop matching.
+     Where the type cannot shrink (a frozen statement),
      declaring OpenAI's theorem directly as `theorem _root_.solution` instead of `<name>_oai` plus a `solution`
      copy halves the serialization (98 s to 61 s). Profile the `chk/` file whose name matches the current plan:
   earlier plans' files stay there (oaiq-078). A *statement* over the limit stops calibrate: it publishes,
@@ -662,6 +701,15 @@ back WA. The lessons:
   strict chain (`List.IsChain (toLex · < toLex ·)` by `decide +kernel`, `List.isChain_iff_pairwise`) and use
   `List.toFinset_card_of_nodup` (85 s to 0.3 s). In a kernel-heavy development, force the source's own block or
   merge lemmas at the first plan (oaiq-114: 31 of them, every piece under 42 s, Proved in 80 minutes).
+  A piece that measures under the limit but times out on the verifier, with elaboration a few seconds and the rest
+  "type checking", is kernel-bound in one or two terms (oaiq-081, q131: 55-99 s locally, three verifier timeouts
+  each). Bisect with `sorry` truncations, two variants at a time; splitting cannot help a single slow term.
+  q131's case: a generic lemma about `compiled c` applied to a *constant* (`highLoop`) defined as `.seq A B`,
+  with hypotheses proved for `compiled (.seq A B)`; the elaborator accepts it at once, the kernel compares the
+  two compiled tables for minutes. Move the step into a local `have generic : ∀ {c first second …}, c = .seq
+  first second → … := by intro …; subst hceq; exact …` and apply it as `generic (c := highLoop) rfl …` (134 s to
+  0.07 s): the kernel checks the lemma on variables and a one-step `rfl`. No declaration is added, so the plan
+  is unchanged.
 - **Category theory / homological algebra: try the transparency option first** (oaiq-116). Errors full of `simp
   made no progress` / `rewrite failed` on `comp_f`, `ShiftedHom`, `Cocycle`, `single…` lemmas are the "not
   type-correct under the `implicit` transparency level" check, not API drift: compile each failing module as is
@@ -676,6 +724,11 @@ back WA. The lessons:
   inferInstance` in two statements). State the irrelevance as a lemma, `@f … i₁ = @f … i₂ := by cases
   Subsingleton.elim i₁ i₂; rfl`, and chain with `.trans`, so the kernel never compares the proof terms.
   Bisect by `sorry`-ing the tail of the proof (about 40 s a trial; three variants in parallel).
+- **"failed to synthesize" an instance in a bundle at `measure`**: read `work/repairs.json` first. A REPAIR that
+  deleted an `omit`/`include`/`variable` line changes the signatures of everything after it in that section, so
+  the error surfaces in a later file (q139: a broken `omit […] [D]` was deleted, `at_correct` gained three
+  instance arguments, and the failure showed six bundles later, followed by 23 "olean does not exist"). The
+  carver now drops only the binder holding the gone class (df42c97).
 - **"maximum recursion depth" at a line that looks fine**: the position can belong to a later declaration;
   bisect with `#exit` cuts (oaiq-080, where an `IsProbabilityMeasure` instance that is false here made
   `infer_instance` loop).
@@ -692,7 +745,7 @@ back WA. The lessons:
   measurability and fail here (`f n = 0`, `g = 1_A`, `A` non-measurable of inner measure 0). The repair is no
   shim: each site needs a measurability fact of the limit, and lemmas that took arbitrary limits gain a
   hypothesis their callers pass. Likewise `μ.map Φ` is a probability measure there for every `Φ`, here only
-  for an `AEMeasurable` one. `UniformIntegrable` has three components here, two there. Budget a module-route
+  for an `AEMeasurable` one. `UniformIntegrable` has three components here, two there (the opt-in shim above restores d13f23b's shape). Budget a module-route
   port of an analysis development at about 12% of modules needing a hand repair, a third of them measurability.
 - **Foreign packages** (oaiq-083). OpenAI's lakefile requires about twenty packages (PrimeNumberTheoremAnd,
   StrongPNT, RellichKondrachov, TauCeti, ClassFieldTheory, …) that the repo does not contain. `oai_fetch.py`
@@ -707,14 +760,27 @@ back WA. The lessons:
   `prep_upstream.py`. Very large closures with foreign packages (oaiq-093: 2,679 modules, OpenAI's Mathlib
   ahead of ours by missing structures such as `Group.Generators`) are a day's work, not a batch. Look for statements already published from them (the Chowla
   split) to use as `external_theorems`.
-- **The CoeT WA on universe-polymorphic statements** (opus-kadison, oaiq-039; also Erdős 3 v2 and oaiq-003 Rokhlin).
-  The verifier's plain comparison of `solution`'s type with the target's fails for some polymorphic statements
-  (why is unknown: locally it succeeds), and the fallback `CoeT` search then times out at `typeclass` 20000 on a
-  heavy type. That fallback reproduces exactly: it failed locally for precisely the 13 rejected statements of 246
-  polymorphic ones. Private probes: binders with conclusion `True`, or `{H : Type}` instead of `Type*`, or no
-  `attribute [-instance]` line, were all accepted, so the trigger is polymorphism plus a heavy type. The local
-  check runs the fallback (19c7a63), so carve_measure reports such a piece. Remedy: state it monomorphically if
-  every importer is; else `carve.py fold CONFIG NODE…` (config `folded`) folds the statement into every importer's
+- **The CoeT WA: "failed to synthesize CoeT … timeout at `typeclass` (20000)"** (opus-kadison, oaiq-039; also
+  Erdős 3 v2, oaiq-003 Rokhlin, oaiq-122, q129). The verifier's plain comparison of `solution`'s type with the
+  target's fails for some polymorphic statements, and the fallback `CoeT` search then times out on a heavy type.
+  That fallback reproduces exactly: it failed locally for precisely the 13 rejected statements of 246
+  polymorphic ones, and the local check runs it (19c7a63), so carve_measure reports such a piece. **The cost is
+  the type's unshared size** (q129, measured): the check fails even comparing a statement with itself;
+  `isDefEq` takes 4 ms and the time goes to `synthInstance` on `CoeT T x T`, whose budget counts heartbeats,
+  that is allocations, while it walks instance terms that are shared in the DAG as a tree. `(u v : unitary (Q τ
+  ω)) : u * v = 1` over a `RingCon` quotient is 18.9M nodes and fails; `u = 1` is 8.5M and passes. COE_CHECK
+  prints `sizeWithoutSharing` (facecb3). Remedies, in order:
+  1. **Shortcut instances** for the carrier's algebraic classes, in a bundle the statement imports (a post-carve
+     patch): `instance (priority := high) q129Monoid : Monoid (TracialQuotient τ l) := inferInstance`, plus
+     `StarMul`, `Ring`, `Algebra ℂ`, …, in a `noncomputable section`. q129's statement fell to 2,613 nodes and
+     passed, and the same shortcuts prepended to three slow pieces of the family cut their kernel time from 306 s
+     to 170 s. Try them in slow pieces first: pieces are not frozen. (Proposed, not built: a pipeline.json
+     `shortcut_instances: {type pattern: [classes]}` that emits this bundle.)
+  2. State it monomorphically if every importer is (earlier probes with `{H : Type}` passed: smaller terms).
+  3. Fold, last: folding makes the importers' pieces slow, the second blocker this family hit.
+  CoeT failures come in families: after `measure_pieces` fails, list every FAIL of the run (`awk '$1=="piece" &&
+  $4=="FAIL"'` from the run's `====` line) and treat them together (oaiq-122: 19 of 51 pieces, folded in three
+  20-minute rounds from the driver's tail). Folding: `carve.py fold CONFIG NODE…` (config `folded`) folds the statement into every importer's
   piece, whose live statements stay, and only those pieces are resubmitted (through split_run with a
   `comparisons/` note on each, since the old sketches are live). Regenerate pieces of a published carve with the
   carve's own snapshot (pipeline_state.json `snapshot`): a newer carver emits more `attribute [-instance]` lines
@@ -819,7 +885,27 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   the result's own folder), `overlap`; a driver killed mid-build shows `build: running` and no failure line, and
   resuming replays the built modules in seconds (oaiq-125). Resume with `--upgrade --keep-port` unless the port
   rules' changes are wanted; on an unpublished carve, `--from plan` picks up carver fixes (oaiq-122). Re-derive
-  every old patch's `old` from the current ported text, not from the old notes (oaiq-117).
+  every old patch's `old` from the current ported text, not from the old notes (oaiq-117). One that never
+  published needs no re-port: fix meta `prefixes` to `openai_prefixes(DIR/src/lean)`, add `"overlap": true` by
+  editing `pipeline.json` (the CLI `--overlap` is refused as a changed parameter), then `--upgrade --keep-port
+  --from plan --stop-after names --detach` and `--publish --detach` (q134: about 35 minutes, all 7 pieces
+  accepted first try).
+- **A new port patch on an old unpublished carve whose port rules have changed since** (q140): editing the
+  patches file makes `filter_patches` stale, and the re-run port uses the *current* rules even under
+  `--keep-port` (it only suppresses re-ports caused by rule changes), which would rewrite every module under the
+  old hand repairs. Re-port on the carve's own snapshot, `python3 ~/.cache/p2m/skill/<old sha>/prove2me/scripts/
+  carve_pipeline.py DIR --detach --stop-after wsbuild` (only the patched module's text changes), then `--upgrade
+  --keep-port --publish --detach` from the current snapshot. (Not built: `--keep-port` re-running a stale port
+  with the snapshot recorded for the port step.)
+- **Hand repairs on a `--keep-port` carve start from a stale port** (q136): `--redo filter_patches` whose output is
+  unchanged does not re-port, so the workspace still holds the port of the old rules while the log reads as if
+  the new ones were in force, and `mkpatches.py` diffs against it. Before repairing by hand, `--redo port`. When
+  filter_patches drops a patch as "the port now writes it", check whether that patch carried another repair in the
+  same hunk, and re-add that as its own entry (q136 lost two that way, a build round each).
+- **Leaves left Open by unsent pieces** (q129): before assuming a goal's open leaves are hard, check whether each
+  has a pending or never-sent piece. oaiq-122 stopped at `calibrate_pieces` on three slow pieces and never sent
+  the other 36 (10-112 s); sent by hand with `split_run.py` from a copy of the run config (`state` and `log`
+  pointed into the job dir), 36 were accepted at once.
 - **A carve published on an old skill with a few broken items**: finish its own `publish/` rather than
   re-planning frozen across many skill versions: newer graph rules infer needs the published bundles never had
   (oaiq-120: 40 plan problems). Compile each item against the *published* bundles (`fetch_theorems.py --names
@@ -847,7 +933,8 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   pipeline.json `hide_instances` (0eea563). A module that built before and now times out at `whnf` after an
   upgrade: bisect the compat instances first (`attribute [-instance]` in a copy, ~20 s each). A heartbeat failure
   in the pipeline's build is not evidence until plain `lean -DautoImplicit=false` reproduces it: LeanInfo
-  elaborates synchronously and spends more (3230451 retries such modules with plain `lean -o`).
+  elaborates synchronously and spends more (3230451 retries such modules with plain `lean -o`). Bundles and pieces
+  are the opposite case: the verifier elaborates synchronously too (verifier-failures.md, q128).
 - **Post-carve patches naming a collision suffix** (`_r<hex>_<n>`) break silently across snapshots: prefer a
   carver fix (oaiq-123). After a re-plan, re-read every post-carve patch that names an `<x>_oai`: it is right
   only while `x` is still a piece target (oaiq-122: one still matched and broke a piece, the other matched nothing
@@ -871,6 +958,13 @@ these rules over-approximate on purpose; each comes from a worker carve that fai
   the section's variables, which once dropped a statement's `local notation "work"` and turned `run.output`
   into `run.run_oai` (oaiq-081). An `export` that still exports something keeps its namespace block (oaiq-081
   `PA.denote`).
+- (0871d92, q135) a dotted declaration `Poly.finite` is elaborated with `Poly` open, so a short name in it
+  (even a `match` pattern head, `| some s =>`) can mean a `Poly.some` the bundle holds though the module never
+  imported it; the carver pins such names, including library names reached by `export`. (0b402cf) an
+  *imported* `@[simp] … := rfl` lemma counts for a default simp call when it mentions a project definition the
+  caller mentions. To diagnose "unsolved goals" after `simp` in a bundle, run `simp?` at that line in the original
+  module and look for each lemma it names in the bundles; for "Invalid pattern" or a type mismatch on a short
+  name, `#check` it at that point of a truncated copy of the bundle.
 - a local instance used by a kept command comes back, reactivated (`attribute [local instance P] N`,
   with its source priority) when an imported bundle declares it, else emitted again under a file-unique
   name after the earlier local instances its own elaboration used (oaiq-032, oaiq-031);
