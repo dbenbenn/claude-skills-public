@@ -645,5 +645,28 @@ turned on as a local instance in the modules that use the characters `𝐞`/`fou
 /-- d13f23b's `BorelSpace Circle`, for `circleMeasurableSpace`. -/
 theorem circleBorelSpace : @BorelSpace Circle _ circleMeasurableSpace :=
   inferInstanceAs <| BorelSpace <| Subtype (· ∈ Metric.sphere (0 : ℂ) 1)
+open MeasureTheory in
+/-- Mathlib d13f23b's `MeasureTheory.average_add` (CircleDomains, q146). -/
+theorem _root_.MeasureTheory.average_add {α E : Type*} [MeasurableSpace α] {μ : Measure α}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] {f g : α → E}
+    (hf : Integrable f μ) (hg : Integrable g μ) :
+    ⨍ a, (f + g) a ∂μ = ⨍ a, f a ∂μ + ⨍ a, g a ∂μ := by
+  simp only [average_eq, Pi.add_apply, integral_add hf hg, smul_add]
+open MeasureTheory in
+/-- Mathlib d13f23b's `MeasureTheory.average_sub` (CircleDomains, q146). -/
+theorem _root_.MeasureTheory.average_sub {α E : Type*} [MeasurableSpace α] {μ : Measure α}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] {f g : α → E}
+    (hf : Integrable f μ) (hg : Integrable g μ) :
+    ⨍ a, (f - g) a ∂μ = ⨍ a, f a ∂μ - ⨍ a, g a ∂μ := by
+  simp only [average_eq, Pi.sub_apply, integral_sub hf hg, smul_sub]
+open MeasureTheory in
+/-- Mathlib d13f23b's `MeasureTheory.average_const_mul` (CircleDomains, q146). -/
+theorem _root_.MeasureTheory.average_const_mul {α 𝕜 : Type*} [MeasurableSpace α] (μ : Measure α)
+    [RCLike 𝕜] (r : 𝕜) (f : α → 𝕜) : ⨍ a, r * f a ∂μ = r * ⨍ a, f a ∂μ :=
+  integral_const_mul ..
+/-- Mathlib d13f23b's `Homeomorph.locallyPathConnectedSpace` (CircleDomains, q146). -/
+theorem _root_.Homeomorph.locallyPathConnectedSpace {X Y : Type*} [TopologicalSpace X]
+    [TopologicalSpace Y] [LocallyPathConnectedSpace X] (h : X ≃ₜ Y) : LocallyPathConnectedSpace Y :=
+  h.symm.isOpenEmbedding.locallyPathConnectedSpace
 end OAICompat434
 

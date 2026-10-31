@@ -3049,3 +3049,15 @@ def test_convert_tactic_whose_bracket_continues_on_the_next_line():
     assert ("      convert hh using 1 <;> first | (with_reducible_and_instances rfl) | (simp only [pow_succ', "
             "Module.End.mul_apply, LinearMap.sub_apply, map_sub]; abel)\n  obtain ⟨m, hm⟩ := hbn\n") in out, out
     assert O.core_rewrites(out) == out
+
+
+def test_compat_has_average_add_sub_const_mul_and_homeomorph_lpc():
+    # d13f23b's `MeasureTheory.average_add`, `average_sub`, `average_const_mul` and
+    # `Homeomorph.locallyPathConnectedSpace`, missing in 0df444a (CircleDomains, q146)
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert '_root_.MeasureTheory.average_add' in src and '⨍ a, (f + g) a ∂μ' in src
+    assert '_root_.MeasureTheory.average_sub' in src and '⨍ a, (f - g) a ∂μ' in src
+    assert '_root_.MeasureTheory.average_const_mul' in src
+    assert '_root_.Homeomorph.locallyPathConnectedSpace' in src
