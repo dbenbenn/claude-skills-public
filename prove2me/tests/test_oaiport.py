@@ -1035,6 +1035,76 @@ def test_convert_using_semicolon_unspaced_first_closes_all_goals():
     assert "convert (hd _).comp t (hc t) using 1 <;> first|rfl|(unfold l;ring)\n" in out
 
 
+# oaiq-098 (BasisIntervals 1471/1473, NodeIntervals 29-46): our `simp`/`norm_num` closes the goal itself, so the
+# `; ring` after it fails "No goals"; `<;> ring` is a no-op on no goals and the same on the one goal simp leaves
+def test_simp_semicolon_ring_becomes_diamond():
+    src = ("  · simp only [foo, bar] at h ⊢; ring\n"
+           "  · norm_num [qBase];ring\n"
+           "    field_simp\n"
+           "  · have : a = b := by simp (config := {decide := true}) [h₁]; linarith [sq_nonneg a]\n"
+           "  · rw [h]; push_cast; ring_nf\n"
+           "  · simp_all ;  positivity\n"
+           "  | inl h => simp [h]; ring\n"
+           "  exact ⟨by norm_num at h; nlinarith, (by simp; ring)⟩\n")
+    out = O._simp_semicolon_closer(src)
+    assert "  · simp only [foo, bar] at h ⊢ <;> ring\n" in out
+    assert "  · norm_num [qBase] <;> ring\n" in out
+    assert "by simp (config := {decide := true}) [h₁] <;> linarith [sq_nonneg a]\n" in out
+    assert "  · rw [h]; push_cast <;> ring_nf\n" in out
+    assert "  · simp_all <;> positivity\n" in out
+    assert "  | inl h => simp [h] <;> ring\n" in out
+    assert "  exact ⟨by norm_num at h <;> nlinarith, (by simp <;> ring)⟩\n" in out
+    assert O._simp_semicolon_closer(out) == out
+
+
+def test_simp_semicolon_closer_tail_is_chained():
+    # NodeIntervals qLarge_contains: `norm_num [..]; ring_nf; simp` was repaired as `<;> (ring_nf; simp)`; each
+    # closer leaves at most one goal, so chaining them all also covers a ring_nf that closes the goal
+    src = "  · norm_num [qSmall, b]; ring_nf; simp\n  · dsimp [r] at *; norm_num;linarith\n"
+    assert O._simp_semicolon_closer(src) == ("  · norm_num [qSmall, b] <;> ring_nf <;> simp\n"
+                                             "  · dsimp [r] at * <;> norm_num <;> linarith\n")
+
+
+def test_simp_semicolon_ring_after_diamond_chain_only_when_terminal():
+    # the BasisIntervals/NodeIntervals form: a terminal `convert … <;> norm_num [..]; ring`
+    src = ("lemma a : P := by\n"
+           "  convert RBox.contains_mul hp hb using 1 <;> norm_num [qSmall,qLarge,b]; ring\n"
+           "lemma b : Q := by\n"
+           "  constructor <;> simp [f]; ring\n"
+           "  exact h\n")
+    out = O._simp_semicolon_closer(src)
+    assert "  convert RBox.contains_mul hp hb using 1 <;> norm_num [qSmall,qLarge,b] <;> ring\n" in out
+    # not terminal: `; ring` ran on the first goal only, and the next line expects the rest
+    assert "  constructor <;> simp [f]; ring\n" in out
+
+
+def test_simp_semicolon_ring_then_convert_rule_matches_hand_repair():
+    src = ("lemma a : P := by\n"
+           "  convert hh using 1 <;> simp only [waveAmplitudeBox,ite_false]; ring\n")
+    out = O.core_rewrites(src)
+    assert ("  convert hh using 1 <;> first | (with_reducible_and_instances rfl) | "
+            "(simp only [waveAmplitudeBox,ite_false, if_false] <;> ring)\n") in out
+
+
+def test_simp_semicolon_ring_left_alone():
+    src = ("  · simp [h] <;> ring\n"                               # already <;>
+           "  · first | simp; ring | linarith\n"                    # first alternatives: semantics would change
+           "  · first | (norm_num; ring) | rfl\n"
+           "  · (simp; ring) <|> linarith\n"
+           "    first\n"
+           "    | rw [h]; simp; ring\n"
+           "  · simp [show a = b by simp; ring]\n"                  # inside a simp list
+           "  · ring_nf; simp; ring_nf at h\n"                      # a closer with a location
+           "  · simp; ring; exact h\n"                              # more follows
+           "  · simp; ring <;> rfl\n"
+           "  -- simp; ring\n"                                      # comments and strings
+           "  /- norm_num; ring -/\n"
+           "  · exact foo \"simp; ring\"\n"
+           "  · all_goals simp; ring\n"                             # not a lead this rule takes
+           "  · simpa using h; ring\n")
+    assert O._simp_semicolon_closer(src) == src
+
+
 # d13f23b renames/signatures (UnitDistances, StandardMap 2026-10-25): `finsum_le_finsum` (ordered monoid, finite
 # supports) is our `finsum_le_finsum'`; `Filter.eventuallyEqSet_iff` is `Filter.eventuallyEq_set`;
 # `posLog_le_posLog` asks `-1 ≤ x` there and `0 ≤ x` here.

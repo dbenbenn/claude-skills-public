@@ -940,6 +940,114 @@ def _simp_lists_add_if_true(text):
     return ''.join(out) + text[i:]
 
 
+_SEMI_HEAD = re.compile(r"(?P<lead>^[ \t]*(?:·[ \t]*)?|(?<![\w'.])by[ \t]+|=>[ \t]+|[(⟨][ \t]*|(?<!<);[ \t]*|<;>[ \t]*)"
+                        r"(?P<head>simp_all|simp_arith|simp_rw|simp|dsimp|norm_num1?|field_simp|push_cast|norm_cast)"
+                        r"(?![\w'?!])", re.M)
+_SEMI_ARG = re.compile(r"[ \t]+|⊢|\*|←|↑|[+\-]?[\w.'✝]+")
+_SEMI_CLOSER = re.compile(r"(?P<w>ring_nf|ring1|ring|positivity|n?linarith|simp|norm_num)(?![\w'?!])")
+
+
+def _simp_semicolon_closer(text):
+    """Our `simp`/`norm_num` often closes a goal OpenAI's left for the closer after it, which then fails "No goals"
+    (oaiq-098 BasisIntervals, NodeIntervals: `norm_num [..]; ring`). A simp-family tactic (`simp`, `simp only`,
+    `simp_all`, `norm_num`, `field_simp`, `push_cast`, ... with its `[..]`, config and `at` clauses) followed by
+    `;` and a closer that acts on the main goal only (`ring`, `ring_nf`, `ring1`, `linarith [..]`, `nlinarith [..]`,
+    `positivity`, bare `simp`/`norm_num`), the last tactic of its sequence, becomes `<;> closer` (several closers:
+    `<;> c1 <;> c2`, each of which leaves at most one goal too). In tactic position (line start or bullet, `by`,
+    `=>`, `(`, `⟨`, after `;`) the simp-family tactic works on one goal and leaves at most one, so `<;>` is a no-op
+    when it leaves none and the same when it leaves one. After a `<;>` chain (`convert … <;> simp; ring`) it may leave several, where `; ring` ran on the
+    first only: there only when the line ends the tactic block (in a block the rest were then unsolved). Left
+    alone: `first` alternatives and `<|>` (succeeding instead of failing would change which alternative runs),
+    closers with arguments other than a lemma list, anything else following, comments and literals."""
+    from .leantext import code_only
+    code, out, i = code_only(text), [], 0
+    for m in _SEMI_HEAD.finditer(code):
+        if m.start() < i:
+            continue
+        j = m.end()
+        while j < len(code):        # the head's arguments, brackets balanced
+            if code[j] in '([{':
+                e = _balanced_end(code, j)
+                if e is None:
+                    break
+                j = e
+                continue
+            a = _SEMI_ARG.match(code, j)
+            if not a:
+                break
+            j = a.end()
+        sep = re.compile(r"[ \t]*;(?!>)[ \t]*").match(code, j)
+        if not sep:
+            continue
+        args_end, k, tail = j, sep.end(), []
+        while code[args_end - 1] in ' \t':
+            args_end -= 1
+        while True:
+            c = _SEMI_CLOSER.match(code, k)
+            if not c:
+                break
+            e = c.end()
+            if c.group('w').endswith('linarith'):
+                b = re.compile(r"[ \t]*\[").match(code, e)
+                if b:
+                    e = _balanced_end(code, b.end() - 1)
+                    if e is None:
+                        break
+            tail.append((c.start(), e))
+            k = e
+            nxt = re.compile(r"[ \t]*;(?!>)[ \t]*").match(code, k)
+            if not nxt or not _SEMI_CLOSER.match(code, nxt.end()):
+                break
+            k = nxt.end()
+        if not tail:
+            continue
+        end = re.compile(r"[ \t]*(\n|$|\)|⟩|,)").match(code, tail[-1][1])
+        if not end:
+            continue
+        lead = m.group('lead')
+        line_start = code.rfind('\n', 0, m.start()) + 1
+        line_end = code.find('\n', m.start())
+        line = code[line_start:len(code) if line_end < 0 else line_end]
+        if '<|>' in line or (line.lstrip().startswith('|') and '=>' not in line):
+            continue
+        # the innermost bracket open at the head, from the declaration's first line (column 0)
+        d = line_start
+        while d > 0 and code[d:d + 1].isspace():
+            d = code.rfind('\n', 0, d - 1) + 1
+        stack = []
+        for p in range(d, m.start() + len(lead)):
+            if code[p] in _BRACKETS:
+                stack.append(p)
+            elif stack and code[p] == _BRACKETS[code[stack[-1]]]:
+                stack.pop()
+        seg_start = line_start
+        if stack:
+            p = stack[-1]
+            if code[p] in '[{':
+                continue
+            if re.search(r"(\||(?<![\w'])first)[ \t]*$", code[code.rfind('\n', 0, p) + 1:p]):
+                continue
+            seg_start = max(seg_start, p + 1)
+        seg = code[seg_start:m.start() + len(lead)]
+        if re.search(r"(?<![\w'])first(?![\w'])", seg) or ('|' in seg and '=>' not in seg[seg.rfind('|'):]):
+            continue
+        if lead.startswith('<;>'):
+            if end.group(1) not in ('\n', ''):
+                continue
+            chain = line_start
+            while chain > 0 and code[code.rfind('\n', 0, chain - 1) + 1:chain - 1].rstrip(' \t').endswith('<;>'):
+                chain = code.rfind('\n', 0, chain - 1) + 1
+            first = code[chain:line_start + len(line)]
+            bys = [b.end() for b in re.finditer(r"(?<![\w'.])by[ \t]+", first[:m.start() - chain])]
+            col = bys[-1] if bys else len(re.match(r"[ \t]*(?:·[ \t]+)?", first).group(0))
+            nl = re.compile(r"\n([ \t]*)\S").search(code, tail[-1][1])
+            if nl and len(nl.group(1).expandtabs()) >= col:
+                continue
+        out.append(text[i:args_end] + ''.join(' <;> ' + text[a:b] for a, b in tail))
+        i = tail[-1][1]
+    return ''.join(out) + text[i:]
+
+
 def mathlib_token_idents(text):
     """Identifiers that full Mathlib turns into tokens, escaped (oaiq-082: Std-only OpenAI modules, but
     our Compat imports Mathlib): a bare `variables` (Mathlib's command keyword) becomes `«variables»`
@@ -1415,6 +1523,9 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     for _n in ('eLpNorm_le_of_ae_bound', 'eLpNorm_le_of_ae_nnnorm_bound'):    # SKValue, 2026-10-26
         text = _drop_positional_arg(text, _n)     # GreenOperator, 2026-10-26
     text = _drop_positional_arg(_drop_positional_arg(text, 'eLpNorm_congr_norm_ae'), 'eLpNorm_congr_norm_ae')
+    # `simp [..]; ring` -> `simp [..] <;> ring` (oaiq-098); before the convert rules, which parenthesise the tactic
+    # after `convert … <;>` as a `first` alternative this rule leaves alone
+    text = _simp_semicolon_closer(text)
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first[ \t]*\|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
@@ -2049,8 +2160,8 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
 
 # the core rewrites that are functions of the text alone, by name: patch_drop_note tries each on its own
 NAMED_RULES = ('convert_funext_rfl_to_congr_deriv', 'convert_ext_to_congr_of_eventually_eq', 'fin_norm_num',
-               '_convert_close_diamonds', '_simp_lists_add_if_true', 'mathlib_token_idents', '_finset_antidiagonal',
-               '_memlp_mul_swap', '_mgf_gaussian_real_map_eq', '_drop_map_smul_proof',
+               '_convert_close_diamonds', '_simp_lists_add_if_true', '_simp_semicolon_closer', 'mathlib_token_idents',
+               '_finset_antidiagonal', '_memlp_mul_swap', '_mgf_gaussian_real_map_eq', '_drop_map_smul_proof',
                '_drop_map_smul_side_goal', 'guard_renames')
 
 
