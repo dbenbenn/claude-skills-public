@@ -2256,6 +2256,32 @@ def test_convert_ext_bullet_becomes_congr_of_eventuallyEq():
     assert O.core_rewrites(src2) == src2
 
 
+def test_congr_deriv_rules_read_the_conclusion_not_a_hypothesis():
+    # a `HasDerivAt` hypothesis does not make a `Tendsto` conclusion a derivative goal: the ext rule turned
+    # `convert hh using 1` on a `Tendsto` into `hh.congr_of_eventuallyEq …` (q136, CAT0Fillings
+    # Calculus/Piecewise `scalarAverageDeriv_tendsto`)
+    src = ('lemma foo {F : ℝ → ℝ} {D t : ℝ} (hd : HasDerivAt F D t)\n'
+           '    {e : ℕ → ℝ} (he : Tendsto e atTop (𝓝 0)) :\n'
+           '    Tendsto (fun j => avg F (e j) t) atTop (𝓝 D) := by\n'
+           '  have hh := foo\n'
+           '  convert hh using 1\n'
+           '  · funext j\n'
+           '    exact heq j\n'
+           '  · congr 1\n')
+    assert O.core_rewrites(src) == src
+    src2 = src.replace('    exact heq j\n', '    rfl\n')
+    assert O.core_rewrites(src2) == src2
+    # a `have` whose stated type is the derivative still counts
+    src3 = ('lemma foo (hd : Tendsto e atTop (𝓝 0)) : True := by\n'
+            '  have k : HasDerivAt f (g x) x := by\n'
+            '    convert h using 1\n'
+            '    · funext y\n'
+            '      rfl\n'
+            '    · ring\n'
+            '  trivial\n')
+    assert 'refine h.congr_deriv (Eq.symm ?_)' in O.core_rewrites(src3)
+
+
 def test_congr_deriv_rules_keep_converts_orientation():
     # `convert h using 1` leaves the value goal as `goal' = h'`; `h.congr_deriv ?_` leaves `h' = goal'`, which
     # broke the kept bullet wherever it was not symmetric (`change A = B`, `rw` of the unfolded left side,

@@ -1085,6 +1085,22 @@ def _memlp_mul_swap(text):
     return ''.join(out) + text[i:]
 
 
+def _header_conclusion(head):
+    """The conclusion of a `theorem`/`lemma`/`have` header (its text up to `:= by`): what follows the first `:`
+    outside brackets (binders are bracketed, so a `∀ x : T,` in the conclusion stays in it); '' when there is
+    none (`have h := …`). A `HasDerivAt` hypothesis does not make a `Tendsto` conclusion a derivative goal
+    (q136, CAT0Fillings Calculus/Piecewise)."""
+    depth = 0
+    for i, c in enumerate(head):
+        if c in '([{⦃⟨':
+            depth += 1
+        elif c in ')]}⦄⟩':
+            depth -= 1
+        elif c == ':' and depth == 0 and not head.startswith(':=', i):
+            return head[i + 1:]
+    return ''
+
+
 _CONVERT_RFL = re.compile(
     r"(?m)^(?P<ind>[ \t]*)convert (?P<e>(?:(?! using \d)(?<!convert)(?!convert ).)+?) using 1\n"
     r"(?P=ind)· (?:funext \w+\n(?P=ind)  rfl|rfl)\n(?P=ind)· ", re.S)
@@ -1105,7 +1121,7 @@ def convert_funext_rfl_to_congr_deriv(text):
         for m in reversed(list(re.finditer(r"(?m)^([ \t]*)(?:theorem|lemma|have)\b", text[:pos]))):
             if len(m.group(1).expandtabs()) >= len(ind.expandtabs()):
                 continue
-            head = text[m.start():pos].split(':= by')[0]
+            head = _header_conclusion(text[m.start():pos].split(':= by')[0])
             ks = re.findall(r"Has(F?)Deriv(Within)?At", head)
             if not ks or ks[-1][1]:
                 return None
@@ -1144,7 +1160,7 @@ def convert_ext_to_congr_of_eventually_eq(text):
         for m in reversed(list(re.finditer(r"(?m)^([ \t]*)(?:theorem|lemma|have)\b", text[:pos]))):
             if len(m.group(1).expandtabs()) >= len(ind.expandtabs()):
                 continue
-            head = text[m.start():pos].split(':= by')[0]
+            head = _header_conclusion(text[m.start():pos].split(':= by')[0])
             ks = re.findall(r"Has(F?)Deriv(Within)?At", head)
             return bool(ks) and not ks[-1][0] and not ks[-1][1]
         return False
