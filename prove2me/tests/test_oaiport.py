@@ -774,6 +774,16 @@ def test_compat_has_cstar_norm_le_norm_of_le_of_nonneg():
 # d13f23b has `MvPolynomial.monomial_mul_monomial` (ours: `MvPolynomial.monomial_mul`); QuarticPowerFree
 # uses it under `open MvPolynomial` (2026-10-25). A compat theorem with the new name.
 
+# d13f23b has `Measure.withDensity_comp` (Probability/Kernel/Composition/WithDensity); ours lacks it (Boltzmann
+# PositiveSourceFormula q141; 10 openai/math files use the name).
+
+def test_compat_has_measure_withdensity_comp():
+    src = open(O_COMPAT, encoding='utf-8').read()
+    assert 'theorem _root_.MeasureTheory.Measure.withDensity_comp' in src
+    assert {'Mathlib.Probability.Kernel.WithDensity',
+            'Mathlib.Probability.Kernel.Composition.MeasureComp'} <= set(O.COMPAT_NARROW_IMPORTS)
+
+
 def test_compat_has_mvpolynomial_monomial_mul_monomial():
     import os
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
@@ -1626,6 +1636,30 @@ def test_tendsto_in_measure_indicator_le_and_mono_ae_real_drift():
         "  _ ≤ _ := add_le_add ((eLpNorm_indicator_le _).trans (hj n)) (hgs n)\n"
         "  exact eLpNorm_indicator_le _\n"
         "  exact (eLpNorm_mono_ae_real hb).trans h\n")
+
+
+def test_map_smul_side_goal_after_rw_is_dropped():
+    # d13f23b's `rw [Measure.map_smul]` leaves an AEMeasurable side goal, closed by the next `exact ….aemeasurable`;
+    # ours has none, so that line hits "no goals" (Boltzmann oaiq-080 8 sites by hand, q141; 10 in openai/math)
+    src = ("  rw [← he',← normalReflectionLaw_isometry,normalReflectionLaw_north,Measure.map_smul,\n"
+           "    (sphereIsometry_measurePreserving R).map_eq]\n"
+           "  exact (sphereIsometry R).measurable.aemeasurable\n"
+           "\n"
+           "  rw [h,measure_smul,Measure.map_smul]\n"
+           "  exact (measurable_point v).aemeasurable\n"
+           "  rw [Measure.map_map]\n"
+           "  exact hf.aemeasurable\n"
+           "  · rw [Measure.map_smul]\n"
+           "    exact foo\n")
+    assert O.core_rewrites(src) == (
+        "  rw [← he',← normalReflectionLaw_isometry,normalReflectionLaw_north,Measure.map_smul,\n"
+        "    (sphereIsometry_measurePreserving R).map_eq]\n"
+        "\n"
+        "  rw [h,measure_smul,Measure.map_smul]\n"
+        "  rw [Measure.map_map]\n"
+        "  exact hf.aemeasurable\n"
+        "  · rw [Measure.map_smul]\n"
+        "    exact foo\n")
 
 
 def test_lp_elpnorm_le_of_ae_tendsto_drops_the_limit_measurability():

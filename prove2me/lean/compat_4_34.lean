@@ -606,5 +606,23 @@ alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod
 alias List.Nodup.getElem?_inj := List.getElem?_inj
+open ProbabilityTheory MeasureTheory ENNReal in
+/-- Mathlib d13f23b's `Measure.withDensity_comp`: a density on `κ ∘ₘ μ` moves into the kernel (Boltzmann
+PositiveSourceFormula, q141). -/
+theorem _root_.MeasureTheory.Measure.withDensity_comp {𝓧 𝓨 : Type*} {m𝓧 : MeasurableSpace 𝓧}
+    {m𝓨 : MeasurableSpace 𝓨} {μ : Measure 𝓧} {κ : Kernel 𝓧 𝓨} [IsSFiniteKernel κ] {f' : 𝓨 → ℝ≥0∞}
+    (hf' : Measurable f') :
+    (κ ∘ₘ μ).withDensity f' = (κ.withDensity (fun _ b ↦ f' b)) ∘ₘ μ := by
+  refine Measure.ext_of_lintegral _ fun g hg ↦ Eq.symm ?_
+  calc ∫⁻ b, g b ∂((κ.withDensity (fun _ b ↦ f' b)) ∘ₘ μ)
+      = ∫⁻ a, ∫⁻ b, g b ∂(κ.withDensity (fun _ b ↦ f' b)) a ∂μ :=
+        Measure.lintegral_bind (Kernel.measurable _).aemeasurable hg.aemeasurable
+    _ = ∫⁻ a, ∫⁻ b, f' b * g b ∂κ a ∂μ := by
+        congr with a
+        exact Kernel.lintegral_withDensity _ (by fun_prop) _ hg
+    _ = ∫⁻ b, f' b * g b ∂(κ ∘ₘ μ) :=
+        (Measure.lintegral_bind (Kernel.measurable _).aemeasurable (hf'.mul hg).aemeasurable).symm
+    _ = ∫⁻ b, g b ∂((κ ∘ₘ μ).withDensity f') :=
+        (lintegral_withDensity_eq_lintegral_mul _ hf' hg).symm
 end OAICompat434
 

@@ -830,6 +830,14 @@ def _mgf_gaussian_real_map_eq(text):
     return ''.join(out) + text[i:]
 
 
+def _drop_map_smul_side_goal(text):
+    """d13f23b's `rw [… Measure.map_smul …]` leaves an AEMeasurable side goal, which the next line closes with
+    `exact ….aemeasurable` at the rw's indentation; ours has no side goal, so that line is dropped (Boltzmann
+    NormalOutgoingSymmetry, DilatedTwoCoreLimit: oaiq-080 removed 8 by hand, q141)."""
+    return re.sub(r"(?m)^([ \t]*)((?:rw|rewrite) \[[^\]]*(?<![\w.'])(?:MeasureTheory\.)?Measure\.map_smul(?![\w'])[^\]]*\]"
+                  r"[^\n]*\n)\1exact [^\n]*\.aemeasurable[ \t]*\n", r"\1\2", text)
+
+
 def _drop_map_smul_proof(text):
     """d13f23b's `Measure.map_smul c hf` takes an AEMeasurable proof; ours is `map_smul c μ f` with none
     (SingleLatticeCovering 2026-10-25; Brenier/SmoothObstruction oaiq-005). The proof is the argument after
@@ -1328,6 +1336,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # d13f23b's `Measure.map_smul c hf` takes an AEMeasurable proof; ours is `map_smul c μ f` with none
     # (SingleLatticeCovering 2026-10-25)
     text = _drop_map_smul_proof(text)
+    text = _drop_map_smul_side_goal(text)
     text = _drop_positional_arg(text, 'Measure.fst_map_prodMk')   # CompactFactors, oaiq-005
     # d13f23b's `unifIntegrable_iff'` unfolds `UnifIntegrable` to the epsilon-delta form, which is our
     # definition itself: `rw [unifIntegrable_iff']` / `apply unifIntegrable_iff'.mpr` are dropped (WeakHessian, oaiq-052)
@@ -2041,7 +2050,8 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
 # the core rewrites that are functions of the text alone, by name: patch_drop_note tries each on its own
 NAMED_RULES = ('convert_funext_rfl_to_congr_deriv', 'convert_ext_to_congr_of_eventually_eq', 'fin_norm_num',
                '_convert_close_diamonds', '_simp_lists_add_if_true', 'mathlib_token_idents', '_finset_antidiagonal',
-               '_memlp_mul_swap', '_mgf_gaussian_real_map_eq', '_drop_map_smul_proof', 'guard_renames')
+               '_memlp_mul_swap', '_mgf_gaussian_real_map_eq', '_drop_map_smul_proof',
+               '_drop_map_smul_side_goal', 'guard_renames')
 
 
 def patch_drop_note(old, pre, post):
@@ -2116,6 +2126,8 @@ COMPAT_NARROW_IMPORTS = (
     'Mathlib.Geometry.Manifold.IsManifold.Basic',
     'Mathlib.Probability.Kernel.CondDistrib',
     'Mathlib.Probability.Kernel.Defs',
+    'Mathlib.Probability.Kernel.WithDensity',
+    'Mathlib.Probability.Kernel.Composition.MeasureComp',
     'Mathlib.Topology.Algebra.LinearMapCompletion',
 )
 
