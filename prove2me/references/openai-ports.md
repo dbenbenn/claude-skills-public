@@ -1061,11 +1061,15 @@ these rules over-approximate on purpose; each comes from a worker carve that fai
   caller mentions. To diagnose "unsolved goals" after `simp` in a bundle, run `simp?` at that line in the original
   module and look for each lemma it names in the bundles; for "Invalid pattern" or a type mismatch on a short
   name, `#check` it at that point of a truncated copy of the bundle.
-- (open, q142) a *named* `local notation (name := n) …` is a private declaration, so a piece and the statement it
-  proves both carrying it fail the server-shape check ("private declaration … has already been declared"), and
-  measure's repair loop may cut the line, giving "Unknown identifier" at its first use; and a module made only of
-  an `export` block is never pulled into the pieces that use its aliases. Post-carve patches until fixed: drop the
-  `(name := …)`; inline the `export` block.
+- (aac228e, cf1f4a3, q142) a *named* `local notation (name := n) …` is a private declaration, so a piece and the
+  statement it proves both carrying it failed the server-shape check ("private declaration … has already been
+  declared"), and measure's repair loop cut the line ("Unknown identifier" at its first use): generated files drop
+  the `(name := …)`, and the repair loop no longer cuts a notation whose token is used later. An `export` command
+  is a graph node that alias uses depend on, so a module made only of an `export` block reaches the pieces that use
+  its aliases (one alias brings all of that export's names). (7269ddb, q141) a global `attribute […]` command drops
+  the targets the file imports from its own module's bundle, which already ran it (aesop refuses a second
+  registration); a command on a declaration of *another* module still repeats, so shims put attributes on the
+  declaration.
 - a local instance used by a kept command comes back, reactivated (`attribute [local instance P] N`,
   with its source priority) when an imported bundle declares it, else emitted again under a file-unique
   name after the earlier local instances its own elaboration used (oaiq-032, oaiq-031);
