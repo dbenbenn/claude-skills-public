@@ -21,7 +21,8 @@ usage: mkpatches.py PRISTINE_DIR REPAIRED_DIR OUT.json [--why TEXT] [--drop-stal
 Each new entry is {old, new, count: 1, route: "modules", why}: one per diff hunk, whole lines, the
 context widened a line at a time on both sides (merging hunks whose context meets) until `old`
 occurs exactly once over all modules, as the entries before it leave them, and starts and ends at no
-identifier (carve_prep.cut_identifier: oaiq-040's `hpos` matched inside `hpositive`). Compat.lean and
+identifier (carve_prep.cut_identifier: oaiq-040's `hpos` matched inside `hpositive`); it never reaches up into an
+`import Solutions.` line, which filter-patches cannot see (q147-ostmann-retry). Compat.lean and
 the StdSimplex shims are generated after the patches, so edits there are reported, not patched; a
 module only in REPAIRED_DIR is reported too (patches cannot create files). A new hunk that changes
 lines an existing entry wrote is reported as amending it (it works; consider folding the two).
@@ -73,12 +74,24 @@ def _cores(a, b):
     return out
 
 
-def _groups(cores, ctx, n):
-    """Cores with their context (ctx[k] lines each side, clamped to [0, n]) merged where the
+def _floors(a, cores):
+    """Per core, the first line its context may reach upward: just past the last `import
+    Solutions.` line before it. filter-patches ports under the placeholder folder
+    `Solutions.FilterPatches`, so an `old` holding the real folder's import counts 0 there and the
+    pipeline refuses it (q147-ostmann-retry); such a hunk widens downward instead."""
+    out = []
+    for i1, _, _, _ in cores:
+        imp = [i for i in range(i1) if a[i].startswith('import Solutions.')]
+        out.append(imp[-1] + 1 if imp else 0)
+    return out
+
+
+def _groups(cores, ctx, n, floors=None):
+    """Cores with their context (ctx[k] lines each side, clamped to [floors[k], n]) merged where the
     widened ranges overlap: [(lo, hi, [core indices])]."""
     gs = []
     for k, (i1, i2, _, _) in enumerate(cores):
-        lo, hi = max(i1 - ctx[k], 0), min(i2 + ctx[k], n)
+        lo, hi = max(i1 - ctx[k], floors[k] if floors else 0), min(i2 + ctx[k], n)
         if gs and lo < gs[-1][1]:
             gs[-1] = (gs[-1][0], max(hi, gs[-1][1]), gs[-1][2] + [k])
         else:
@@ -91,8 +104,9 @@ def _module_patches(a, b, cur, name, why):
     as a) as the entries before it leave it; `cur` is updated. [(patch, first core line)]."""
     cores = _cores(a, b)
     ctx = [0] * len(cores)
+    floors = _floors(a, cores)
     while True:
-        gs = _groups(cores, ctx, len(a))
+        gs = _groups(cores, ctx, len(a), floors)
         texts = dict(cur)
         out, grow = [], []
         for lo, hi, ks in gs:
@@ -102,7 +116,7 @@ def _module_patches(a, b, cur, name, why):
             ok = old and sum(t.count(old) for t in texts.values()) == 1 \
                 and cut_identifier(old, texts.values()) is None
             if not ok:
-                if lo == 0 and hi == len(a):
+                if lo <= floors[ks[0]] and hi == len(a):
                     raise MkPatchError('%s: even the whole module is not unique over the port' % name)
                 grow += ks
                 continue

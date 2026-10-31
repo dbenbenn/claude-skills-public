@@ -165,3 +165,23 @@ def test_cli_refuses_stale_without_flag(tmp_path):
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stderr + r.stdout
     assert [p['old'] for p in json.loads(out.read_text())] == ['x\n']
+
+
+def test_context_never_widens_into_folder_imports():
+    """filter-patches ports under the placeholder folder `Solutions.FilterPatches`, so an `old` that
+    holds an `import Solutions.<FOLDER>.…` line counts 0 there and the pipeline refuses the patch
+    (q147-ostmann-retry: a compat theorem inserted right after the header). Context widens downward
+    instead."""
+    hdr = ('import Mathlib\nimport Solutions.F.%s\n\nset_option linter.all false\n\nnamespace OAI\n\n'
+           'namespace E\nopen scoped E\n\nsection\nnamespace W\n\nopen X Y\n\n')
+    pristine = {'A.lean': hdr % 'C' + 'theorem a : True := trivial\n',
+                'B.lean': hdr % 'C' + 'theorem b : True := trivial\n',
+                'C.lean': 'import Mathlib\n\ntheorem c : True := trivial\n'}
+    repaired = dict(pristine)
+    repaired['A.lean'] = (hdr % 'C').replace('namespace OAI', 'theorem shim : True := trivial\n\nnamespace OAI') \
+        + 'theorem a : True := trivial\n'
+    pats, _ = check(pristine, repaired)
+    assert pats and not any('import Solutions.' in p['old'] for p in pats), pats
+    ren = {f: t.replace('Solutions.F.', 'Solutions.FilterPatches.') for f, t in pristine.items()}
+    keep, drop = carve_prep.filter_patches(pats, ren)
+    assert not drop, drop
