@@ -618,6 +618,8 @@ alias Finset.prod_le_prod₀ := Finset.prod_le_prod
 alias Finset.prod_le_one₀ := Finset.prod_le_one
 alias Finset.one_le_prod₀ := Finset.one_le_prod
 alias List.Nodup.getElem?_inj := List.getElem?_inj
+alias Pi.tsum_apply := tsum_apply
+alias Pi.tprod_apply := tprod_apply
 open ProbabilityTheory MeasureTheory ENNReal in
 /-- Mathlib d13f23b's `Measure.withDensity_comp`: a density on `κ ∘ₘ μ` moves into the kernel (Boltzmann
 PositiveSourceFormula, q141). -/

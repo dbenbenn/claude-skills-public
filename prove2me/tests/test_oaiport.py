@@ -812,6 +812,14 @@ def test_circle_measurable_space_is_a_local_instance_where_characters_are_used()
     assert line in O.module_files(src2, 'Solutions.G', (), '')['A.lean']
 
 
+def test_compat_renames_pi_tsum_apply():
+    # d13f23b's `Pi.tsum_apply` / `Pi.tprod_apply` are our root `tsum_apply` / `tprod_apply` (Boltzmann
+    # SelectedCoreSelection, q141)
+    _, rw = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert O.apply_rewrites('  exact Pi.tsum_apply (Pi.summable.mpr h)\n', rw) == '  exact tsum_apply (Pi.summable.mpr h)\n'
+    assert O.apply_rewrites('rw [Pi.tprod_apply hf]', rw) == 'rw [tprod_apply hf]'
+
+
 def test_compat_has_mvpolynomial_monomial_mul_monomial():
     import os
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
