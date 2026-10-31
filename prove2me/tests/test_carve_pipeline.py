@@ -1051,6 +1051,22 @@ def test_hide_instances_reach_every_ported_module_and_port_again(env):
     assert all('--header' in c['argv'] for c in filt)
 
 
+def test_unif_integrable_reaches_port_and_filter_patches_and_ports_again(env):
+    # q141 (Boltzmann): pipeline.json `unif_integrable` turns on the uniform integrability shim; patches are
+    # counted against the shimmed text, so filter_patches must get the option too, and a changed value re-ports
+    assert run(env, *ARGS).returncode == 0
+    p = json.load(open(env.dir / 'pipeline.json'))
+    p['unif_integrable'] = 'on'
+    json.dump(p, open(env.dir / 'pipeline.json', 'w'))
+    env.log.write_text('')
+    r = run(env, '--stop-after', 'port')
+    assert r.returncode == 0 and _ported(env), r.stdout + r.stderr
+    argv = _ported(env)[0]['argv']
+    assert argv[argv.index('--unif-integrable') + 1] == 'on'
+    filt = [c for c in calls(env) if c.get('tool') == 'carve_prep' and c['argv'][0] == 'filter-patches']
+    assert all('--unif-integrable' in c['argv'] for c in filt)
+
+
 def _forget_rule_hashes(env):
     """A state written before the rule hashes were recorded."""
     st = json.load(open(env.dir / 'pipeline_state.json'))

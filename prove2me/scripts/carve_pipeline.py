@@ -17,6 +17,7 @@ DIR is the carve directory. The first run needs the parameters, which are stored
   --forced NAME         (repeat) theorems published as statements of their own
   --patches FILE        single-file patches, filtered for the module route (carve_prep filter-patches)
   --compat-imports narrow|M1,M2   --stdsimplex auto|structure|subtype|off   (oai_port_modules options)
+  --unif-integrable on|off   (oai_port_modules option; pipeline.json `unif_integrable`)
   --fetch [--commit SHA]  run oai_fetch first: it copies the root's import closure into DIR/src/lean
                         from the local openai/math clone (~/claude/openai-math), the network only for
                         what the clone lacks. Else DIR/src/lean (or --lean-src) must exist and hold the
@@ -147,6 +148,7 @@ def parse(argv):
     ap.add_argument('--patches')
     ap.add_argument('--compat-imports')
     ap.add_argument('--stdsimplex')
+    ap.add_argument('--unif-integrable', choices=('off', 'on'))
     ap.add_argument('--budget', type=float)
     ap.add_argument('--lean-src')
     ap.add_argument('--fetch', action='store_true', default=None)

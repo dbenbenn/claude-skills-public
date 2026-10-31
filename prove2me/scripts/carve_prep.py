@@ -24,7 +24,7 @@ usage:
       for a bundle that has an anonymous instance (its name is Lean's to generate).
   carve_prep.py filter-patches PATCHES.json LEAN_ROOT OUT.json PREFIX [PREFIX ...]
                        [--compat-ns NS | --root-compat] [--compat FILE] [--header H.lean]
-                       [--stdsimplex auto|structure|subtype|off] [--folder FOLDER]
+                       [--stdsimplex auto|structure|subtype|off] [--folder FOLDER] [--unif-integrable on|off]
       keep the single-file patches (oai_port.py) whose `old` occurs exactly `count` times over the
       modules under the prefixes AS oai_port_modules.py PATCHES THEM (after its import, header,
       core and compat rewrites, macro inlining and guard renames: pass it the same options), for
@@ -369,7 +369,7 @@ def filter_patches(patches, texts, detail=None):
 
 
 def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='', stdsimplex='auto', detail=None,
-                        folder='FilterPatches', notes=None):
+                        folder='FilterPatches', notes=None, unifint='off'):
     """filter_patches against the text oai_port_modules.py patches: the modules after its import,
     header, core and compat rewrites (oaiport.module_texts), never OpenAI's raw source
     (ComparatorModel 2026-10-24: the `| zero` case core_rewrites then added counted 0 there and was
@@ -379,7 +379,8 @@ def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='
     gets {patch old: oaiport.patch_drop_note} for each patch dropped for its count with fewer occurrences
     than it says (oaiq-090: which port rule now rewrites its site, or that the site's text changed)."""
     pre = {}
-    texts = O.module_texts(sources, 'Solutions.' + folder, compat_text, compat_ns, header, stdsimplex, pre=pre)
+    texts = O.module_texts(sources, 'Solutions.' + folder, compat_text, compat_ns, header, stdsimplex, pre=pre,
+                           unifint=unifint)
     det = [] if detail is None else detail
     keep, drop = filter_patches(patches, texts, det)
     if notes is not None:
@@ -390,7 +391,8 @@ def port_filter_patches(patches, sources, compat_text, compat_ns='OAI', header='
 
 
 def cmd_filter_patches(argv):
-    pos = positional(argv, ('--compat-ns', '--compat', '--header', '--stdsimplex', '--compat-imports', '--folder'))
+    pos = positional(argv, ('--compat-ns', '--compat', '--header', '--stdsimplex', '--compat-imports', '--folder',
+                            '--unif-integrable'))
     if len(pos) < 4:
         sys.exit(__doc__)
     src, lean_root, out, prefixes = pos[0], pos[1], pos[2], pos[3:]
@@ -402,7 +404,8 @@ def cmd_filter_patches(argv):
     try:
         keep, drop = port_filter_patches(json.load(open(src)), srcs, compat, ns, header,
                                          opt(argv, '--stdsimplex', 'auto'), detail,
-                                         opt(argv, '--folder', 'FilterPatches'), notes)
+                                         opt(argv, '--folder', 'FilterPatches'), notes,
+                                         opt(argv, '--unif-integrable', 'off'))
     except O.PortError as e:
         sys.exit(str(e))
     for n, p in drop:

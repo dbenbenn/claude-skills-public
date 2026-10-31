@@ -5,6 +5,7 @@ single-file route is oai_port.py).
 usage: oai_port_modules.py LEAN_ROOT FOLDER PREFIX [PREFIX ...] [--patches P.json] [--header H.lean]
                            [--compat-ns NS | --root-compat] [--compat FILE] [--ws WORKSPACE]
                            [--stdsimplex auto|structure|subtype|off] [--compat-imports narrow|M1,M2,…]
+                           [--unif-integrable on|off]
 
   LEAN_ROOT   the fetched lean/ tree (oai_fetch.py DEST ROOT_MODULE, then DEST/lean)
   FOLDER      the workspace folder: modules land in Solutions/FOLDER/ as Solutions.FOLDER.*
@@ -30,6 +31,11 @@ usage: oai_port_modules.py LEAN_ROOT FOLDER PREFIX [PREFIX ...] [--patches P.jso
               Definitions.Def_OAIStdSimplexCompat is in the workspace, carve_prep.py config makes
               its declarations external, so the carve imports it. carve_prep.py filter-patches
               takes the same option
+  --unif-integrable on|off (default off) the uniform integrability shim: `on` adds the module
+              UnifIntegrableCompat (lean/UnifIntegrableCompat.lean: d13f23b's `UnifIntegrable`,
+              two-component `UniformIntegrable` and ℝ≥0∞-`UnifTight` as OAI.* declarations that shadow
+              Mathlib's inside `namespace OAI`, with d13f23b's API) and imports it in each module naming
+              them (p2mlib.oaiport.unifint_rewrite). carve_prep.py filter-patches takes the same option
 
 Files are rewritten only when their text changes, so oai_build_modules.py rebuilds only those.
 """
@@ -62,7 +68,8 @@ def write_changed(out, files):
 
 
 def main(argv):
-    valued = ('--patches', '--header', '--compat-ns', '--compat', '--ws', '--stdsimplex', '--compat-imports')
+    valued = ('--patches', '--header', '--compat-ns', '--compat', '--ws', '--stdsimplex', '--compat-imports',
+              '--unif-integrable')
     skip = {argv.index(o) + 1 for o in valued if o in argv}
     pos = [a for i, a in enumerate(argv) if not a.startswith('--') and i not in skip]
     if len(pos) < 3:
@@ -77,7 +84,7 @@ def main(argv):
     try:
         files = O.module_files(O.module_sources(lean_root, prefixes), 'Solutions.' + folder, patches,
                                open(opt(argv, '--compat', COMPAT), encoding='utf-8').read(), ns, header,
-                               opt(argv, '--stdsimplex', 'auto'), cimp)
+                               opt(argv, '--stdsimplex', 'auto'), cimp, opt(argv, '--unif-integrable', 'off'))
     except O.PortError as e:
         sys.exit(str(e))
     out = os.path.join(ws, 'Solutions', folder)

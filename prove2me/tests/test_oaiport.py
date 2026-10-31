@@ -381,6 +381,76 @@ def test_stdsimplex_single_file_inlines_or_imports_the_bundle():
     assert O.stdsimplex_single('def x := 1\n', 'auto') == ('def x := 1\n', [], '')
 
 
+# ---------------------------------------------------------------- the uniform integrability shim
+
+# OpenAI's Mathlib (d13f23b) redefined `UnifIntegrable` (a Tendsto of a supremum, extended-real ε),
+# gave `UniformIntegrable` two components where ours has three (measurability first), and takes
+# `UnifTight`'s ε in ℝ≥0∞. The Boltzmann port (oaiq-080, 80 modules, ~260 sites) used d13f23b's
+# shapes throughout: `obtain ⟨hu, C, hC⟩ := hf`, `hu.ae_mono`, `hu.sub hv _`, `hf.spec … (ε : ℝ≥0∞)`.
+# Opt-in mode `unifint='on'`: the module UnifIntegrableCompat declares OAI.UnifIntegrable,
+# OAI.UniformIntegrable and OAI.UnifTight (shadowing Mathlib's inside `namespace OAI`).
+
+UNIF_SRC = ('import Mathlib\n\nnamespace OAI.U\nopen MeasureTheory\n'
+            'theorem a (hf : UniformIntegrable f 1 μ) : MeasureTheory.UnifIntegrable f 1 μ := by\n'
+            '  obtain ⟨δ, hδ, h⟩ := unifIntegrable_iff.mp hf.1 ε hε\n'
+            '  obtain ⟨δ, hδ, h⟩ := MeasureTheory.unifIntegrable_iff\'.1 hf.1 ε hε\n'
+            '  apply unifIntegrable_iff\'.mpr\n'
+            '  refine ⟨unifIntegrable_iff.mpr ?_, C, ?_⟩\n'
+            '  exact MeasureTheory.uniformIntegrable_const hp hp\' hg\n'
+            'theorem b : UnifTight f 1 μ := MeasureTheory.UnifTight.comp g h\n'
+            'theorem uniformIntegrable_mine : True := trivial\nend OAI.U\n')
+
+
+def test_unifint_detection_and_rewrites():
+    assert O.mentions_unifint(UNIF_SRC)
+    assert O.mentions_unifint('theorem x (h : UnifTight f 1 μ) : True := trivial\n')
+    assert not O.mentions_unifint('def UnifIntegrableLike := 1\ndef myUniformIntegrable := 2\n')
+    t = O.unifint_rewrite(UNIF_SRC)
+    # the iff directions d13f23b states as one `Iff` become the shim's separate lemmas
+    assert 'OAI.UnifIntegrable.enn_spec hf.1 ε hε' in t
+    assert "OAI.UnifIntegrable.enn_spec' hf.1 ε hε" in t
+    assert "apply OAI.UnifIntegrable.of_enn'\n" in t
+    assert 'refine ⟨OAI.UnifIntegrable.of_enn ?_, C, ?_⟩' in t
+    # Mathlib-qualified names the shim declares point at the shim; others and local names stay
+    assert ': OAI.UnifIntegrable f 1 μ' in t and 'OAI.uniformIntegrable_const hp' in t
+    assert 'OAI.UnifTight.comp g h' in t
+    assert 'MeasureTheory.' not in t.split('open MeasureTheory\n', 1)[1]
+    assert 'theorem uniformIntegrable_mine' in t
+    # the WeakHessian core rule drops `apply unifIntegrable_iff'.mpr` (our definition is that
+    # form); with the shim the line must survive as the shim's lemma
+    assert "apply OAI.UnifIntegrable.of_enn'" in O.core_rewrites(t)
+
+
+def test_unifint_shim_declares_what_the_rewrites_name():
+    shim = O.unifint_shim()
+    assert shim.startswith('import Mathlib\n')
+    assert shim.rstrip().endswith('end UnifIntegrableCompat')
+    names = O.unifint_shim_names()
+    for n in ('UnifIntegrable', 'UniformIntegrable', 'UnifTight', 'UnifIntegrable.enn_spec',
+              "UnifIntegrable.enn_spec'", 'UnifIntegrable.of_enn', "UnifIntegrable.of_enn'",
+              'UnifIntegrable.ae_mono', 'UnifIntegrable.comp', 'UniformIntegrable.spec',
+              'UniformIntegrable.memLp_of_tendstoInMeasure', 'uniformIntegrable_const',
+              'UnifTight.exists_measurableSet_indicator', 'unifTight_const',
+              'tendsto_Lp_finite_of_tendstoInMeasure', 'tendsto_Lp_of_tendsto_ae'):
+        assert n in names, n
+
+
+def test_unifint_mode_in_module_files():
+    src = {'OAI.U.A': ('A', UNIF_SRC),
+           'OAI.U.B': ('B', 'import OAI.U.A\nnamespace OAI.U\ntheorem c : True := trivial\nend OAI.U\n')}
+    off = O.module_files(src, 'Solutions.G', (), '')
+    assert 'UnifIntegrableCompat.lean' not in off and 'unifIntegrable_iff' in off['A.lean']
+    on = O.module_files(src, 'Solutions.G', (), '', unifint='on')
+    assert on['UnifIntegrableCompat.lean'] == O.unifint_shim()
+    assert 'import Solutions.G.UnifIntegrableCompat\n' in on['A.lean']
+    assert 'UnifIntegrableCompat' not in on['B.lean']
+    assert 'OAI.UnifIntegrable.enn_spec hf.1' in on['A.lean']
+    # patches are counted against module_texts, which must apply the same mode
+    assert O.module_texts(src, 'Solutions.G', '', unifint='on')['A.lean'] == on['A.lean']
+    with pytest.raises(O.PortError, match='unif'):
+        O.module_files(src, 'Solutions.G', (), '', unifint='auto')
+
+
 def test_core_rewrites_unsuffixed_prod_le_prod_is_primed():
     # d13f23b's one-hypothesis `Finset.prod_le_prod` is our `Finset.prod_le_prod'`; the `₀` form
     # is left for the compat alias rewrite, and primed or longer names are untouched

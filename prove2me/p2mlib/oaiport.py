@@ -1627,6 +1627,70 @@ def stdsimplex_single(text, mode='auto', use_bundle=False, drop=((), ())):
     return text, [], block
 
 
+# ---------------------------------------------------------------- the uniform integrability shim
+
+# d13f23b's `UnifIntegrable` (Tendsto of a supremum, extended-real ε), two-component
+# `UniformIntegrable` and ℝ≥0∞-`UnifTight`, as OAI.* declarations shadowing Mathlib's inside
+# `namespace OAI` (module route, opt-in: pipeline.json `unif_integrable`; oaiq-080/q141 Boltzmann)
+UNIFINT_SHIM = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'UnifIntegrableCompat.lean')
+UNIFINT_MODULE = 'UnifIntegrableCompat'
+UNIFINT_MODES = ('off', 'on')
+_UNIFINT = re.compile(r"(?<![\w.'])(?:MeasureTheory\.)?(?:UnifIntegrable|UniformIntegrable|UnifTight|"
+                      r"unifIntegrable_[\w']+|uniformIntegrable_[\w']+|unifTight_[\w']+)(?![\w'])")
+# d13f23b's `unifIntegrable_iff` / `unifIntegrable_iff'` directions (the shim cannot state them as
+# equivalences: their right sides do not give measurability)
+_UNIFINT_IFF = [(re.compile(r"(?<![\w.'])(?:MeasureTheory\.)?unifIntegrable_iff%s\.(?:%s)(?![\w'])" % (p, d)), r)
+                for p, d, r in (("'", 'mpr|2', "OAI.UnifIntegrable.of_enn'"), ("'", 'mp|1', "OAI.UnifIntegrable.enn_spec'"),
+                                ('', 'mpr|2', 'OAI.UnifIntegrable.of_enn'), ('', 'mp|1', 'OAI.UnifIntegrable.enn_spec'))]
+
+
+def unifint_shim():
+    """The shim's text (lean/UnifIntegrableCompat.lean)."""
+    return open(UNIFINT_SHIM, encoding='utf-8').read()
+
+
+def unifint_shim_names():
+    """The names the shim declares below `OAI` (`UnifIntegrable.add`, `uniformIntegrable_const`, …)."""
+    names, ns = set(), []
+    for line in unifint_shim().split('\n'):
+        m = re.match(r'namespace (\S+)', line)
+        if m:
+            ns.append(m.group(1))
+            continue
+        if re.match(r'end (\S+)\s*$', line) and ns and line.split()[1] == ns[-1]:
+            ns.pop()
+            continue
+        m = re.match(r"(?:protected )?(?:theorem|lemma|def) ([\w'.]+)", line)
+        if m and ns[:1] == ['OAI']:
+            names.add('.'.join(ns[1:] + [m.group(1)]))
+    return names
+
+
+def mentions_unifint(text):
+    """Does the text name uniform integrability (`UnifIntegrable`, `UniformIntegrable`, `UnifTight`
+    or a lemma `unifIntegrable_*`, `uniformIntegrable_*`, `unifTight_*`)?"""
+    return bool(_UNIFINT.search(text))
+
+
+def unifint_mode(mode):
+    if mode not in UNIFINT_MODES:
+        raise PortError('unknown --unif-integrable mode %r (one of %s)' % (mode, ', '.join(UNIFINT_MODES)))
+    return mode
+
+
+def unifint_rewrite(text):
+    """The text for the shim: d13f23b's `unifIntegrable_iff(')` directions become the shim's lemmas, and a
+    Mathlib-qualified name the shim declares (`MeasureTheory.UnifIntegrable`) its OAI one. Bare names need no
+    rewrite: inside `namespace OAI` the shim's declarations win over `open MeasureTheory`. Runs before
+    core_rewrites, whose WeakHessian rule drops `apply unifIntegrable_iff'.mpr` (our definition's form)."""
+    for rx, rep in _UNIFINT_IFF:
+        text = rx.sub(rep, text)
+    names = unifint_shim_names()
+    return re.sub(r"(?<![\w.'])MeasureTheory\.((?:[A-Z][\w']*\.)?[\w']+)(?![\w'])",
+                  lambda m: 'OAI.' + m.group(1) if m.group(1) in names else m.group(0), text)
+
+
 LINT = ('set_option linter.all false\nset_option linter.unusedVariables false\n'
         'set_option linter.unusedTactic false\nset_option linter.unreachableTactic false\n')
 
@@ -1896,7 +1960,7 @@ def comm_cstar_line(text, compat_ns='OAI'):
 
 
 def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsimplex='auto',
-                 matrix_default_instance=False, pre=None):
+                 matrix_default_instance=False, pre=None, unifint='off'):
     """The workspace modules of a module-route port before the patches: {file name: text} under
     Lean prefix `mod` (e.g. Solutions.OAIQW_X), Compat.lean not included. `sources` as
     module_sources returns. Each module's OAI imports are rewritten to the ported copies (an import
@@ -1907,7 +1971,9 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
     stdsimplex_rewrite). This is the text the patches are counted against
     (carve_prep.py filter-patches; ComparatorModel 2026-10-24: counted against the raw source, a
     patch of what core_rewrites had inserted counted 0). `pre`, a dict, gets each module's text as it
-    went into the core rewrites (for patch_drop_note)."""
+    went into the core rewrites (for patch_drop_note). `unifint` 'on': each module naming uniform
+    integrability imports `<mod>.UnifIntegrableCompat` (unifint_rewrite)."""
+    unifint = unifint_mode(unifint)
     names = {k: v[0] for k, v in sources.items()}
     block, rewrites = compat_block(compat_text, compat_ns)
     sources = inline_module_macros(sources)
@@ -1944,6 +2010,11 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
             if 'toTopHomeoD' in t:
                 imps.append('import %s.%s' % (mod, STDSIMPLEX_TOP_MODULE))
             t = '\n'.join(ls[:k] + imps + ls[k:])
+        if unifint == 'on' and mentions_unifint(t):
+            t = unifint_rewrite(t)
+            ls = t.split('\n')
+            k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
+            t = '\n'.join(ls[:k] + ['import %s.%s' % (mod, UNIFINT_MODULE)] + ls[k:])
         ls = t.split('\n')
         k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
         t = '\n'.join(ls[:k] + [''] + (LINT + mx + header).rstrip().split('\n') + ls[k:])
@@ -2038,20 +2109,22 @@ COMPAT_NARROW_IMPORTS = (
 
 
 def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', header='', stdsimplex='auto',
-                 compat_imports=None):
+                 compat_imports=None, unifint='off'):
     """module_texts, then the patches for the module route (each exactly its count over all files;
     single-file-only ones skipped, see single_file_only), Compat.lean holding
     compat_block(compat_text, compat_ns), and StdSimplexCompat.lean (the shim) when a module
     needs it. `compat_imports`: Mathlib modules for Compat to import instead of all of Mathlib (it
     puts every Mathlib instance in scope of every module; COMPAT_NARROW_IMPORTS)."""
-    files = apply_patches(module_texts(sources, mod, compat_text, compat_ns, header, stdsimplex),
-                          patches, route='modules')
+    files = apply_patches(module_texts(sources, mod, compat_text, compat_ns, header, stdsimplex,
+                                       unifint=unifint), patches, route='modules')
     cimp = '\n'.join('import ' + m for m in compat_imports) if compat_imports else 'import Mathlib'
     files['Compat.lean'] = cimp + '\n\n' + compat_block(compat_text, compat_ns)[0]
     if any(('import %s.%s\n' % (mod, STDSIMPLEX_MODULE)) in x for x in files.values()):
         files[STDSIMPLEX_MODULE + '.lean'] = stdsimplex_shim()
     if any(('import %s.%s\n' % (mod, STDSIMPLEX_TOP_MODULE)) in x for x in files.values()):
         files[STDSIMPLEX_TOP_MODULE + '.lean'] = open(STDSIMPLEX_TOP, encoding='utf-8').read().replace('@MOD@', mod)
+    if any(('import %s.%s\n' % (mod, UNIFINT_MODULE)) in x for x in files.values()):
+        files[UNIFINT_MODULE + '.lean'] = unifint_shim()
     return files
 
 

@@ -31,7 +31,7 @@ OVERLAP_ONLY = ('publish_early', 'measure_pieces', 'calibrate_pieces', 'pieces_p
 DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
               'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags',
-              'overlap']
+              'overlap', 'unif_integrable']
 
 
 LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
@@ -801,6 +801,8 @@ class Pipeline:
             a += ['--compat-imports', self.p['compat_imports']]
         if self.p.get('stdsimplex'):
             a += ['--stdsimplex', self.p['stdsimplex']]
+        if self.p.get('unif_integrable'):
+            a += ['--unif-integrable', self.p['unif_integrable']]
         if self.p.get('hide_instances'):
             a += ['--header', self.port_header()]
         return a
