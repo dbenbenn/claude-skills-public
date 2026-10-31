@@ -3070,3 +3070,72 @@ def test_compat_has_average_add_sub_const_mul_and_homeomorph_lpc():
     assert '_root_.MeasureTheory.average_sub' in src and '⨍ a, (f - g) a ∂μ' in src
     assert '_root_.MeasureTheory.average_const_mul' in src
     assert '_root_.Homeomorph.locallyPathConnectedSpace' in src
+
+
+def test_subgroup_map_top_in_rewrite_lists():
+    # d13f23b's `Subgroup.map_top f : (⊤ : Subgroup G).map f = f.range` is `(range_eq_map f).symm`; ours has no
+    # `Subgroup.map_top`. Inside rw/simp lists it becomes `← MonoidHom.range_eq_map` (a `←` use the unreversed
+    # lemma); term uses are left alone (PolycyclicRecognition q145: 15 sites, all in lists)
+    src = ("      | zero => simp only [derivedSeries_zero, Subgroup.map_top, Subgroup.range_subtype,\n"
+           "          foo]\n"
+           "  rw [← Subgroup.map_top f, bar] at h\n"
+           "  rw [AddSubgroup.map_top]\n"
+           "  simpa [Subgroup.map_top] using h\n"
+           "  nth_rw 2 [Subgroup.map_top]\n"
+           "  exact (Subgroup.map_top f).trans h\n"
+           "  rw [Subgroup.map_top_of_surjective f hf]\n")
+    out = O.core_rewrites(src)
+    assert out == (
+        "      | zero => simp only [derivedSeries_zero, ← MonoidHom.range_eq_map, Subgroup.range_subtype,\n"
+        "          foo]\n"
+        "  rw [MonoidHom.range_eq_map f, bar] at h\n"
+        "  rw [← AddMonoidHom.range_eq_map]\n"
+        "  simpa [← MonoidHom.range_eq_map] using h\n"
+        "  nth_rw 2 [← MonoidHom.range_eq_map]\n"
+        "  exact (Subgroup.map_top f).trans h\n"
+        "  rw [Subgroup.map_top_of_surjective f hf]\n"), out
+    assert O.core_rewrites(out) == out
+
+
+def test_eventually_empty_or_univ_unprimed_and_mfderiv_abuse_renamed():
+    # d13f23b's `Filter.eventuallyEmptyOrUniv_iff` is our `Filter.eventuallyConst_set` (same `(∀ᶠ x in l, x ∈ s) ∨
+    # (∀ᶠ x in l, x ∉ s)`); `HasMFDerivAt.congr_of_eventuallyEq_abuse` is our `HasMFDerivAt.congr_of_eventuallyEq`
+    # (d13f23b's unsuffixed one inserts `tangentSpaceCast`) (PolycyclicRecognition q145)
+    src = ("  · exact eventuallyEmptyOrUniv_iff.2 (Or.inr h)\n"
+           "  apply Filter.eventuallyEmptyOrUniv_iff.mp\n"
+           "  rw [eventuallyEmptyOrUniv_iff']\n"
+           "  exact eventuallyEmptyOrUniv_preimage\n"
+           "    exact hh'.congr_of_eventuallyEq_abuse heq.symm\n"
+           "  apply HasMFDerivAt.congr_of_eventuallyEq_abuse (f := γ 1)\n")
+    assert O.core_rewrites(src) == (
+        "  · exact eventuallyConst_set.2 (Or.inr h)\n"
+        "  apply Filter.eventuallyConst_set.mp\n"
+        "  rw [eventuallyConst_set']\n"
+        "  exact eventuallyEmptyOrUniv_preimage\n"
+        "    exact hh'.congr_of_eventuallyEq heq.symm\n"
+        "  apply HasMFDerivAt.congr_of_eventuallyEq (f := γ 1)\n")
+
+
+def test_additive_combination_becomes_linear_combination_with_abel():
+    # the vendored PrimeNumberTheoremAnd `additive_combination` is an `elab` tactic the platform refuses; its default
+    # form is `linear_combination` with its normalizer `(try simp only [smul_add, smul_sub]); abel` (JointDickman
+    # q142, as the Erdos970 copy of the same lemma has it). Forms with `(norm := …)`/`(exp := …)`, the tactic's own
+    # definition and comments are left alone
+    lc = 'linear_combination (norm := ((try simp only [smul_add, smul_sub]); abel))'
+    src = ("  additive_combination h₁ + h₂ + h₃\n"
+           "  · additive_combination 2 • h\n"
+           "  have : a = b := by additive_combination h\n"
+           "  all_goals additive_combination\n")
+    assert O.core_rewrites(src) == (
+        "  %s h₁ + h₂ + h₃\n"
+        "  · %s 2 • h\n"
+        "  have : a = b := by %s h\n"
+        "  all_goals %s\n") % (lc, lc, lc, lc)
+    keep = ("  additive_combination (norm := skip) 2 • h1\n"
+            "  additive_combination (exp := 2) h\n"
+            "  additive_combination2 h\n"
+            "  -- additive_combination h\n"
+            "/-- Example:\n  additive_combination h1 - h2\n-/\n"
+            'syntax (name := AdditiveCombination) "additive_combination"\n'
+            "  | `(tactic| additive_combination%$tk $[(norm := $tac)]? $(e)?) =>\n")
+    assert O.core_rewrites(keep) == keep

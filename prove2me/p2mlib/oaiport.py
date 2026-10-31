@@ -986,6 +986,50 @@ def _simp_lists_add_if_true(text):
     return ''.join(out) + text[i:]
 
 
+_REWRITE_LIST = re.compile(r"(?<![\w.'])(?:rw|rwa|rewrite|erw|nth_rw|nth_rewrite|simp_rw|simp|simpa|simp_all|simp_arith"
+                           r"|dsimp|field_simp|norm_num)(?![\w'])[?!]?[^\[\n]*?\[")
+
+
+def _subgroup_map_top(text):
+    """d13f23b's `Subgroup.map_top f : (⊤ : Subgroup G).map f = f.range` is `(MonoidHom.range_eq_map f).symm`; ours
+    has no `Subgroup.map_top`. Inside a rw/simp-family list it becomes `← MonoidHom.range_eq_map` (a `← ` use the
+    unreversed lemma; `AddSubgroup` likewise). Term uses are left alone (PolycyclicRecognition q145: 15 sites, all
+    in lists)."""
+    out, i = [], 0
+    for m in _REWRITE_LIST.finditer(text):
+        if m.start() < i:
+            continue
+        q = m.end() - 1
+        e = _balanced_end(text, q)
+        if e is None:
+            continue
+        lst = text[q:e]
+        new = re.sub(r"(?<![\w.'@])(←[ \t]*)?(Add)?Subgroup\.map_top(?![\w'])",
+                     lambda k: ('' if k.group(1) else '← ') + (k.group(2) or '') + 'MonoidHom.range_eq_map', lst)
+        if new != lst:
+            out.append(text[i:q] + new)
+            i = e
+    return ''.join(out) + text[i:]
+
+
+# the vendored PrimeNumberTheoremAnd `additive_combination` (an `elab` tactic the platform refuses) in its default
+# form, without `(norm := …)` or `(exp := …)`
+_ADDITIVE_COMBINATION = re.compile(r"(?<![\w'.])additive_combination(?![\w'%?!])(?![ \t]*\((?:norm|exp)[ \t]*:=)")
+ADDITIVE_COMBINATION_LC = 'linear_combination (norm := ((try simp only [smul_add, smul_sub]); abel))'
+
+
+def _additive_combination(text):
+    """`additive_combination e` is `linear_combination` with additive_combination's own default normalizer,
+    `(try simp only [smul_add, smul_sub]); abel` (JointDickman q142; the Erdos970 copy of the same lemma has it so).
+    Comments and literals (the tactic's own docstrings and syntax) are left alone."""
+    from .leantext import code_only
+    out, i = [], 0
+    for m in _ADDITIVE_COMBINATION.finditer(code_only(text)):
+        out.append(text[i:m.start()] + ADDITIVE_COMBINATION_LC)
+        i = m.end()
+    return ''.join(out) + text[i:]
+
+
 _SEMI_HEAD = re.compile(r"(?P<lead>^[ \t]*(?:·[ \t]*)?|(?<![\w'.])by[ \t]+|=>[ \t]+|[(⟨][ \t]*|(?<!<);[ \t]*|<;>[ \t]*)"
                         r"(?P<head>simp_all|simp_arith|simp_rw|simp|dsimp|norm_num1?|field_simp|push_cast|norm_cast)"
                         r"(?![\w'?!])", re.M)
@@ -1527,8 +1571,12 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = re.sub(r"(?<![\w.'])MeasureTheory\.integral_comp_log_Ioi_zero(?![\w'])", pre + 'integral_comp_log_Ioi_zero', text)
     # d13f23b's `Filter.EventuallyEqSet.inter` (union, compl, diff) is our `Filter.EventuallyEq.*` (q142)
     text = re.sub(r"(?<![\w'])((?:Filter\.)?)EventuallyEqSet\.(inter|union|compl|diff)(?![\w'])", r"\1EventuallyEq.\2", text)
-    # d13f23b's `Filter.eventuallyEmptyOrUniv_iff'` is our `Filter.eventuallyConst_set'` (FiniteFactor, 2026-10-25)
-    text = re.sub(r"(?<![\w'])eventuallyEmptyOrUniv_iff'", "eventuallyConst_set'", text)
+    # d13f23b's `Filter.eventuallyEmptyOrUniv_iff'` is our `Filter.eventuallyConst_set'` (FiniteFactor, 2026-10-25),
+    # the unprimed one our `Filter.eventuallyConst_set` (PolycyclicRecognition q145)
+    text = re.sub(r"(?<![\w'])eventuallyEmptyOrUniv_iff('?)(?![\w'])", r"eventuallyConst_set\1", text)
+    # d13f23b's `HasMFDerivAt.congr_of_eventuallyEq_abuse` is our `HasMFDerivAt.congr_of_eventuallyEq` (d13f23b's
+    # unsuffixed one composes with `tangentSpaceCast`; its only `_abuse` congr lemma; q145)
+    text = re.sub(r"(?<=\.)congr_of_eventuallyEq_abuse(?![\w'])", 'congr_of_eventuallyEq', text)
     # d13f23b's `eLpNorm_eq_lintegral_rpow_enorm_toReal hp0 hptop hf` and `eLpNorm_eq_eLpNorm' hp0 hptop hf` have a
     # third, measurability argument, `eLpNorm_nnreal_eq_eLpNorm' hp hf` a second, `eLpNorm_mono_real hf h` a first
     # and `Lp.eLpNorm_le_of_ae_tendsto bound hf hg h` a third (`hg`), `eLpNorm_mono_enorm_ae hf h` and
@@ -1688,6 +1736,8 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # ours added `(hf : AEStronglyMeasurable f μ)` to `meas_ge_le_mul_pow_eLpNorm_enorm` (HardSphere oaiq-054)
     text = _insert_named_arg(text, _pre + r"meas_ge_le_mul_pow_eLpNorm_enorm(?![\w'])", 'hf', 'by ' + AESM_TAC)
     text = _simp_lists_add_if_true(text)
+    text = _subgroup_map_top(text)
+    text = _additive_combination(text)
     text = _finset_antidiagonal(text)
     text = _total_map_rewrites(text, known)
     text = _memlp_mul_swap(text)      # MemLp.mul's factors swapped (oaiq-054/059/071/072)
@@ -2278,9 +2328,9 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
 
 # the core rewrites that are functions of the text alone, by name: patch_drop_note tries each on its own
 NAMED_RULES = ('convert_funext_rfl_to_congr_deriv', 'convert_ext_to_congr_of_eventually_eq', 'fin_norm_num',
-               '_convert_close_diamonds', '_simp_lists_add_if_true', '_simp_semicolon_closer', 'mathlib_token_idents',
-               '_finset_antidiagonal', '_memlp_mul_swap', '_mgf_gaussian_real_map_eq', '_drop_map_smul_proof',
-               '_drop_map_smul_side_goal', 'guard_renames')
+               '_convert_close_diamonds', '_simp_lists_add_if_true', '_subgroup_map_top', '_additive_combination',
+               '_simp_semicolon_closer', 'mathlib_token_idents', '_finset_antidiagonal', '_memlp_mul_swap',
+               '_mgf_gaussian_real_map_eq', '_drop_map_smul_proof', '_drop_map_smul_side_goal', 'guard_renames')
 
 
 def patch_drop_note(old, pre, post):
