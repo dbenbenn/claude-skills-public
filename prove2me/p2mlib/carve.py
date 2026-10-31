@@ -2828,6 +2828,17 @@ def _apply(text_bytes, base, edits):
     return out, cur
 
 
+def _no_attribute_targets(txt):
+    """Is the `attribute [...]` command txt left without targets? The list may nest brackets (q141:
+    `attribute [aesop safe apply (rule_sets := [Foo])] X`, its targets all registered already)."""
+    m = re.match(r'\s*(?:local\s+|scoped\s+)?attribute\s*(?=\[)', txt)
+    if not m:
+        return False
+    t = txt.encode('utf-8')
+    a = len(txt[:m.end()].encode('utf-8'))
+    return not t[_attribute_list_end(t, a, len(t)):].strip()
+
+
 def _attribute_list_end(t, a, b):
     """Byte offset just past the `]` closing the attribute list of the command in t[a:b] (b if none)."""
     i = t.find(b'[', a, b)
@@ -3268,6 +3279,7 @@ class Carver:
                 refs = [i for i in c.idents or [] if i['role'] == 'ref']
                 gone = [i for i in refs if self._gone(i['name'], c, m, have, opens, idn=i)]
                 ents = attribute_entries(txt) if restricted_attribute(txt) or generating_attribute(txt) else None
+                ran = self._ran_in_bundle(info, c, m, refs, gone, txt) if ents is None else []
                 if gone and len(gone) == len(refs):
                     drop.add(c.index)
                 elif ents is not None:
@@ -3323,12 +3335,14 @@ class Carver:
                         reps[c.index] = '\n'.join(out)
                     else:
                         drop.add(c.index)
-                elif gone:
-                    new_txt = _cmd_text(info, c, [(i['start'], _skip_ws(t, i['end']), '') for i in gone] +
-                                        self._rename_edits(info, c, m, opens, rename))
+                elif gone or ran:
+                    cut = gone + ran
+                    new_txt = _cmd_text(info, c, [(i['start'], _skip_ws(t, i['end']), '') for i in cut] +
+                                        [e for e in self._rename_edits(info, c, m, opens, rename)
+                                         if not any(i['start'] <= e[0] < i['end'] for i in cut)])
                     # `attribute [-simp] a b` whose targets are all gone, though `simp` itself is a
                     # reference that stays: nothing left to apply it to (PeriodicGroups, 2026-10-26)
-                    if re.fullmatch(r'\s*(?:local\s+|scoped\s+)?attribute\s*\[[^\]]*\]\s*', new_txt):
+                    if _no_attribute_targets(new_txt):
                         drop.add(c.index)
                     else:
                         reps[c.index] = new_txt
@@ -3400,6 +3414,31 @@ class Carver:
         body = body.strip('\n')
         return ('section\n-- module %s\n' % m + (body + '\n' if body else '') +
                 ''.join(x + '\n' for x in closers) + 'end\n\n')
+
+    def _ran_in_bundle(self, info, c, m, refs, gone, txt):
+        """The targets of global attribute command c that this file imports from the bundle (or
+        statement) declaring them, in c's own module: that file kept the command with them, so the
+        attribute is registered already. Applied again, aesop refuses ("rule … is already
+        registered"; q141, 17 of 47 pieces: a section's `attribute [aesop …] X Y` came back in every
+        file keeping a declaration of it). A `local`/`scoped` attribute ends with its scope and stays;
+        so does a target from another module, whose bundle need not have emitted this module, an
+        external one, or one Lean recorded nothing for."""
+        g = self.g
+        ents = attribute_entries(txt)
+        if not ents or any(re.match(r'(?:local|scoped)\b', e) for e in ents):
+            return []
+        lend = _attribute_list_end(info.text_bytes, c.start.byte, c.end.byte)
+        out = []
+        for i in refs:
+            if i['start'] < lend or i in gone:
+                continue
+            r = g.reading(info, c, i)
+            owners = {g.owner.get(n) for n in (r.consts if r is not None else ()) if g.is_project(n)}
+            if owners and None not in owners and all(
+                    o not in self.keep and g.nodes[o].module == m and
+                    not any(pubname(n) in self.external for n in g.nodes[o].names) for o in owners):
+                out.append(i)
+        return out
 
     def _ref_modules(self, idn, c, m):
         """The modules of the project declarations identifier idn of command c resolves to."""

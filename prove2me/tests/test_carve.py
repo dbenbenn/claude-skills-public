@@ -2947,10 +2947,35 @@ def test_a_module_made_only_of_an_export_block_comes_with_its_aliases(g):
         assert 'namespace CD.EX.Alias\nexport CD.EX.Impl (val val_eq)\nend CD.EX.Alias' in txt, txt
 
 
+def test_a_standalone_attribute_its_targets_bundle_already_ran_is_not_repeated(g):
+    # q141: `attribute [aesop …] X Y` after shim lemmas came back in every file keeping a declaration of
+    # its section, so a piece importing the bundle that declared X and ran the command ran it again, and
+    # aesop refuses a rule registered twice (17 of 47 pieces). A global attribute command drops the
+    # targets this file imports from their own module's bundle: the command ran there.
+    p = _tiny_plan(g, ['CD.AR.useRS'], 'AR')
+    b = next(x for x in p['bundles'] if 'CD.AR.R.flip' in x['nodes'])
+    assert 'CD.AR.S.flip' in b['nodes']
+    assert 'attribute [symm] R.flip S.flip\n' in C.gen_bundle(g, p, b['name'])
+    sec = _section(C.gen_piece(g, p, 'CD.AR.useRS'), 'CarveDev.AttrReg')
+    assert 'attribute [symm]' not in sec, sec
+    # a local one ends with its section: it stays
+    assert 'attribute [local symm] R.flip\n' in sec, sec
+    # targets split across files: the one this file declares keeps the attribute
+    keep = {'CD.AR.S.flip', 'CD.AR.useS'}
+    sec = _section(C.Carver(g).carve(keep, g.have_names(keep | {'CD.AR.R', 'CD.AR.S', 'CD.AR.R.flip'})),
+                   'CarveDev.AttrReg')
+    assert 'attribute [symm] S.flip\n' in sec, sec
+    # left without targets, a list with brackets inside goes too (it stayed, unparsable)
+    assert C._no_attribute_targets('attribute [aesop safe apply (rule_sets := [Foo])] ')
+    assert C._no_attribute_targets('attribute [-simp]\n') and not C._no_attribute_targets('attribute [-simp] x')
+    assert not C._no_attribute_targets('attribute [aesop safe (rule_sets := [Foo])] X')
+
+
 @pytest.mark.lean
 def test_named_notations_export_modules_and_registered_attributes_compile(g, tmp_path):
     # each solution compiles before its own statement in one file (the server-shape check)
-    for i, (targets, prefix) in enumerate([(['CD.NN.tw_top'], 'NN'), (['CD.EX.uses_alias_top'], 'EX')]):
+    for i, (targets, prefix) in enumerate([(['CD.NN.tw_top'], 'NN'), (['CD.EX.uses_alias_top'], 'EX'),
+                                           (['CD.AR.useRS'], 'AR')]):
         d = tmp_path / str(i)
         d.mkdir()
         _compile_in_publish_order(g, _tiny_plan(g, targets, prefix), d)
