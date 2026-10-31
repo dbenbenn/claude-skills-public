@@ -48,7 +48,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 from p2mlib import oaiport as O  # noqa: E402
 from carve_prep import cut_identifier  # noqa: E402
 
-GENERATED = ('Compat.lean', O.STDSIMPLEX_MODULE + '.lean', O.STDSIMPLEX_TOP_MODULE + '.lean')
+GENERATED = ('Compat.lean', O.STDSIMPLEX_MODULE + '.lean', O.STDSIMPLEX_TOP_MODULE + '.lean', O.UNIFINT_MODULE + '.lean')
 
 
 class MkPatchError(Exception):

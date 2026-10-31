@@ -451,6 +451,21 @@ def test_unifint_mode_in_module_files():
         O.module_files(src, 'Solutions.G', (), '', unifint='auto')
 
 
+def test_every_shim_module_is_known_where_the_stdsimplex_one_is():
+    # a shim module the port writes is not OpenAI's: mkpatches must not patch it, the prose templates must not link
+    # it into openai/math, and a change to its file must make the port stale
+    import importlib.util
+    from p2mlib import carvepipeline as CP, prosetemplate as PT
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    spec = importlib.util.spec_from_file_location('mkpatches', os.path.join(here, 'scripts', 'mkpatches.py'))
+    mk = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mk)
+    for mod, path in ((O.STDSIMPLEX_MODULE, O.STDSIMPLEX_SHIM), (O.UNIFINT_MODULE, O.UNIFINT_SHIM)):
+        assert mod + '.lean' in mk.GENERATED
+        assert mod in PT.SHIM_MODULES
+        assert os.path.relpath(path, here) in CP._COMPAT
+
+
 def test_core_rewrites_unsuffixed_prod_le_prod_is_primed():
     # d13f23b's one-hypothesis `Finset.prod_le_prod` is our `Finset.prod_le_prod'`; the `₀` form
     # is left for the compat alias rewrite, and primed or longer names are untouched

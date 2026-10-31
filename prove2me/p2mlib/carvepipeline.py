@@ -315,7 +315,8 @@ def _epoch(stamp):
 # oaiport rewrite, `--upgrade` kept the old ported text (it took `--redo port`). oaiq-047: an upgrade
 # across a LeanInfo.lean change left `graph` done, and `plan` re-elaborated 1259 modules one at a time
 # (the LeanInfo cache is keyed by LeanInfo.lean) for ~3 h with no output.
-_COMPAT = ['lean/compat_4_34.lean', 'lean/StdSimplexCompat.lean', 'lean/StdSimplexTopCompat.lean']
+_COMPAT = ['lean/compat_4_34.lean', 'lean/StdSimplexCompat.lean', 'lean/StdSimplexTopCompat.lean',
+           'lean/UnifIntegrableCompat.lean']
 # what of carve_prep.py `filter-patches` runs: its rule input was the whole file, which changes almost daily
 # for other subcommands, so every skill commit made a planned carve's port stale (oaiq-081, 2026-10-29)
 FILTER_PATCHES_CODE = ('cmd_filter_patches', 'port_filter_patches', 'filter_patches', 'cut_identifier', '_IDENT',
