@@ -1457,6 +1457,8 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = re.sub(r"(?<![\w.'])EuclideanDomain\.instIsPrincipalIdealRing(?![\w'])",
                   'EuclideanDomain.to_principal_ideal_domain', text)
     text = re.sub(r"(?<![\w.'])MeasureTheory\.integral_comp_log_Ioi_zero(?![\w'])", pre + 'integral_comp_log_Ioi_zero', text)
+    # d13f23b's `Filter.EventuallyEqSet.inter` (union, compl, diff) is our `Filter.EventuallyEq.*` (q142)
+    text = re.sub(r"(?<![\w'])((?:Filter\.)?)EventuallyEqSet\.(inter|union|compl|diff)(?![\w'])", r"\1EventuallyEq.\2", text)
     # d13f23b's `Filter.eventuallyEmptyOrUniv_iff'` is our `Filter.eventuallyConst_set'` (FiniteFactor, 2026-10-25)
     text = re.sub(r"(?<![\w'])eventuallyEmptyOrUniv_iff'", "eventuallyConst_set'", text)
     # d13f23b's `eLpNorm_eq_lintegral_rpow_enorm_toReal hp0 hptop hf` and `eLpNorm_eq_eLpNorm' hp0 hptop hf` have a
@@ -1537,6 +1539,10 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = re.sub(r"(?m)^([ \t]*convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first[ \t]*\|[^\n]*)$", r"\1 <;> \2", text)
     text = _convert_close_diamonds(text)
+    # any other `convert … using n <;> ring` (a term over several lines, after `by` or `gcongr;`) closes the
+    # instance diamond first too (JointDickman WeightedRationalKernel, q142)
+    text = re.sub(r"(?m)(using \d+[ \t]*<;>[ \t]*)ring(?=[ \t]*(?:$|\)))",
+                  r"\1first | (with_reducible_and_instances rfl) | ring", text)
     # `convert h using n; tac` / `<;> tac` (field_simp, ring_nf, dsimp ...) on an inequality leaves an `instLE`
     # diamond as the FIRST goal, which tac cannot see through ("made no progress"; oaiq-088: 8 sites).
     # Close it with reducible-instances rfl first, run tac on what is left.

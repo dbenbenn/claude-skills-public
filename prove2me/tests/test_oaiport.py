@@ -2932,3 +2932,19 @@ def test_euclidean_pid_instance_rename_and_integral_comp_log_Ioi_zero_compat():
     assert O.core_rewrites(out) == out
     block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
     assert re.search(r'^theorem integral_comp_log_Ioi_zero\b', block, re.M)
+
+
+# Every `convert … using n <;> ring`, not only a one-line statement at the start of a line, gets the
+# instance-diamond rfl before `ring` (JointDickman WeightedRationalKernel: the term spans two lines; others
+# sit after `by` or `gcongr;`, q142). d13f23b's `Filter.EventuallyEqSet.inter` / `union` / `compl` / `diff`
+# are our `Filter.EventuallyEq.*` (JointDickman ArcWindowUnfolding, IrrationalRotation).
+
+def test_every_convert_ring_closes_diamonds_and_eventually_eq_set_renames():
+    src = ("    convert mul_le_mul_of_nonneg_left hfloor\n      (show 0 ≤ c by positivity) using 1 <;> ring\n"
+           "      _ ≤ _ := by convert hmul using 1 <;> ring\n"
+           "  rw [setIntegral_congr_set (Filter.EventuallyEqSet.inter Filter.EventuallyEq.rfl h)]\n")
+    out = O.core_rewrites(src)
+    assert "(show 0 ≤ c by positivity) using 1 <;> first | (with_reducible_and_instances rfl) | ring\n" in out
+    assert "_ ≤ _ := by convert hmul using 1 <;> first | (with_reducible_and_instances rfl) | ring\n" in out
+    assert "(Filter.EventuallyEq.inter Filter.EventuallyEq.rfl h)" in out
+    assert O.core_rewrites(out) == out
