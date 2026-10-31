@@ -828,7 +828,10 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
 
 - **Overlap-mode carves freeze themselves** (2026-10-29): once `publish_early` ran, config `frozen` and `forced`
   already hold the published plan, bundles and statements (`pipeline_state.json` `auto_config`), and a slow piece
-  gets its frozen re-plan automatically (previous section). The recipe below is what that automates; it is still
+  gets its frozen re-plan automatically (previous section). Only what is published or being published is
+  locked against change (`carvepipeline.locked_files`, 955adf7): files of an automatic split's plan the
+  publisher never sent no longer block a re-plan that reuses their names (oaiq-122: 227 such files beside 74
+  published, "9 … published or being published changed"). The recipe below is what that automates; it is still
   the way for classic carves, for a piece the automation hands back, and for real verifier timeouts.
 - **Frozen bundles keep their old imports** (20365e5): with `frozen`, published bundles keep their old plan's
   imports, and `check_plan` no longer reports their inferred needs or cycles, unless the frozen carve used another
@@ -950,7 +953,10 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   only while `x` is still a piece target (oaiq-122: one still matched and broke a piece, the other matched nothing
   and its heartbeat timeout came back). A plan from before 20365e5 recomputes frozen bundles' imports: after
   `--upgrade`, `--redo plan` (plain `--upgrade` keeps the old plan). A heartbeat raise by split_run updates the
-  frozen `published/lib` copy too since 4b230e3. Editing the post-carve patches file re-runs `gen` since dad2e72 (older: `--redo gen`).
+  frozen `published/lib` copy too since 4b230e3. Editing the post-carve patches file re-runs `gen` since dad2e72 (older: `--redo gen`),
+  and since a3c96b5 a `gen` whose output changed makes `measure` / `measure_pieces` and every later step stale, also
+  after publishing (q131: before it, the patched pieces never reached `publish/out` and nothing was resent; on an
+  older snapshot resume with `--from measure_pieces --publish --detach` and `rg` the new text in `publish/out`).
 
 ## Which local instances and lemmas a carved file brings back (carver rules, 2026-10-27/28)
 
