@@ -986,7 +986,10 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
 - **Leaves left Open by unsent pieces** (q129): before assuming a goal's open leaves are hard, check whether each
   has a pending or never-sent piece. oaiq-122 stopped at `calibrate_pieces` on three slow pieces and never sent
   the other 36 (10-112 s); sent by hand with `split_run.py` from a copy of the run config (`state` and `log`
-  pointed into the job dir), 36 were accepted at once.
+  pointed into the job dir), 36 were accepted at once. Since dc103c1 a `--publish` run that stops at
+  `calibrate_pieces` after publishing began releases the within-budget pieces itself (after their gates;
+  `publish/release.json` lists them and the `held` slow ones; it starts a publisher if none runs, and the stop
+  message lists what went); by hand only on older snapshots.
 - **A carve published on an old skill with a few broken items**: finish its own `publish/` rather than
   re-planning frozen across many skill versions: newer graph rules infer needs the published bundles never had
   (oaiq-120: 40 plan problems). Compile each item against the *published* bundles (`fetch_theorems.py --names
@@ -1025,6 +1028,11 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   and since a3c96b5 a `gen` whose output changed makes `measure` / `measure_pieces` and every later step stale, also
   after publishing (q131: before it, the patched pieces never reached `publish/out` and nothing was resent; on an
   older snapshot resume with `--from measure_pieces --publish --detach` and `rg` the new text in `publish/out`).
+  A frozen item the run state shows stopped (not live) takes post-carve patches since 3dc33a3: the driver lists
+  such files in config `frozen.thawed`, gen generates them with the patches, and their `published/lib` copy follows
+  (q128: before it, gen copied the frozen text, the patch reached no copy and nothing was resent; on older
+  snapshots edit `out/lib`, `publish/out/lib` and `published/lib` identically). A patch whose only match is a live
+  frozen file fails a full gen ("PATCH ON A FROZEN FILE ONLY").
 
 ## Which local instances and lemmas a carved file brings back (carver rules, 2026-10-27/28)
 
