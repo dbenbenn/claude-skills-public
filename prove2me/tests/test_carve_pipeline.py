@@ -2022,3 +2022,19 @@ def test_a_measure_from_before_the_gen_hash_is_stale_when_gen_ran_after_it(env, 
     r = run(env)
     assert r.returncode == 0, r.stdout + r.stderr
     assert 'stale: measure' in r.stdout and ('carve_measure', 'config.json') in tools_called(env)
+
+
+def test_a_frozen_file_of_no_item_of_the_published_plan_may_change(env, monkeypatch):
+    # oaiq-122 (2026-10-30): published/lib frozen before 54e5524 kept an earlier plan's never-posted statement
+    # files; a re-plan that reused one of their names stopped at gen ("published or being published changed")
+    _overlap_carve(env, monkeypatch)
+    _gen_writes(monkeypatch, lib__Def_B0='b0', lib__Thm_P0='p0', solutions__Sol_P0='s')
+    assert run(env, *ARGS_NEW, '--publish').returncode == 0
+    (env.dir / 'published' / 'lib' / 'Thm_Stale_lemma.lean').write_text('an earlier plan')
+    _gen_writes(monkeypatch, lib__Def_B0='b0', lib__Thm_P0='p0', lib__Thm_Stale_lemma='this plan', solutions__Sol_P0='s')
+    r = run(env, '--redo', 'gen', '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    # a file of the published plan stays frozen
+    _gen_writes(monkeypatch, lib__Def_B0='b0 changed', lib__Thm_P0='p0', solutions__Sol_P0='s')
+    r = run(env, '--redo', 'gen', '--publish')
+    assert r.returncode == 1 and "step 'gen'" in r.stderr and 'Def_B0.lean' in r.stderr

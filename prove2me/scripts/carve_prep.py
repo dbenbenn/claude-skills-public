@@ -39,8 +39,9 @@ usage:
       by publish/release.json, which is removed: carve_pipeline's overlap mode) for split_run.py,
       MANIFEST.sha1; prose/ and explanations/ created empty (written by hand). --sync, for a publish/
       a publisher may be reading: nothing is removed, each new or changed file is replaced
-      atomically, and when a file already in publish/out/lib (a bundle or statement, published or
-      being published) would change or vanish it exits 1 naming them, writing nothing.
+      atomically, and when a bundle or statement file of publish/out/lib that is published or being
+      published (carvepipeline.locked_files: frozen by publish_early, posted per the run state, or of a
+      plan a running publisher may send) would change or vanish it exits 1 naming them, writing nothing.
   carve_prep.py bundle-prose PUBLISH_DIR TEMPLATE.md
       prose/<NAME>.md for every bundle: TEMPLATE with {NAME}, {MODULES} (the bundle's `-- module`
       markers), {IMPORTS} (its bundle imports) and {EXTRA} (extra_<NAME>.md beside the template).
@@ -459,7 +460,11 @@ def publish_prep(d, source, tags, sync=False):
             sys.exit('no work/%s: run carve.py plan/gen and carve_measure.py first' % f)
     release = os.path.join(P, 'release.json')
     if sync and os.path.isdir(os.path.join(P, 'out')):
-        drift = published_drift(os.path.join(d, 'out', 'lib'), os.path.join(P, 'out', 'lib'))
+        # only what is published or being published is frozen: publish/out/lib also keeps the files of
+        # earlier plans the publisher never sent (oaiq-122: 9 of 227 refused a re-plan reusing their names)
+        from p2mlib.carvepipeline import locked_files, publisher_running_at
+        locked = locked_files(d, publisher_running_at(d))
+        drift = [f for f in published_drift(os.path.join(d, 'out', 'lib'), os.path.join(P, 'out', 'lib')) if f in locked]
         if drift:
             sys.exit('publish-prep --sync: %d bundle/statement file(s) of publish/out/lib would change or vanish: %s.\n'
                      'They are published or being published, so they are frozen: undo what changed them (a '

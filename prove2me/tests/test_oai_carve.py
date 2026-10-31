@@ -571,6 +571,7 @@ def test_publish_prep_sync_updates_pieces_and_adds_items_but_never_changes_a_pub
     assert (P / 'out/lib/Thm_T.lean').read_text() == 't'
     assert not (P / 'release.json').exists()
     assert 'out/lib/Thm_T.lean' in (P / 'MANIFEST.sha1').read_text()
+    (P / 'run_state.json').write_text(json.dumps({'bundle:A': {'state': 'live', 'id': 'x'}}))
     (tmp_path / 'out/lib/Def_A.lean').write_text('a changed')
     (tmp_path / 'out/solutions/Sol_S.lean').write_text('p3')
     with pytest.raises(SystemExit, match='Def_A.lean'):
@@ -578,6 +579,41 @@ def test_publish_prep_sync_updates_pieces_and_adds_items_but_never_changes_a_pub
     assert (P / 'out/lib/Def_A.lean').read_text() == 'a'
     assert (P / 'out/solutions/Sol_S.lean').read_text() == 'p2'
     assert CP.published_drift(str(tmp_path / 'out' / 'lib'), str(P / 'out' / 'lib')) == ['Def_A.lean']
+
+
+def test_publish_prep_sync_lets_files_no_publisher_was_given_change(tmp_path, monkeypatch):
+    # oaiq-122 (2026-10-30): publish/out/lib kept 227 statement files of an automatic split's plan the
+    # publisher never sent; a later re-plan reusing 9 of their names was refused ("published or being
+    # published changed"). Frozen are: what publish_early froze (published/ plan and lib), what the run
+    # state shows posted, and while a publisher runs, every item of a plan it may be sending.
+    from p2mlib import carvepipeline as CPL
+    P = _prep_dir(tmp_path)
+    (tmp_path / 'out/lib/Thm_Old.lean').write_text('old')          # an earlier plan's statement
+    (tmp_path / 'out/lib/Def_Z.lean').write_text('z')              # posted, stopped
+    CP.publish_prep(str(tmp_path), 'src', ['t'])
+    pub = tmp_path / 'published'
+    (pub / 'lib').mkdir(parents=True)
+    (pub / 'plan.json').write_text((P / 'plan.json').read_text())
+    for f in ('Def_A.lean', 'Thm_S.lean', 'Thm_Old.lean'):         # Thm_Old: frozen before 54e5524
+        (pub / 'lib' / f).write_text((P / 'out' / 'lib' / f).read_text())
+    (P / 'run_state.json').write_text(json.dumps({'bundle:Z': {'state': 'stop', 'history': {'wa': 1}}}))
+    assert CPL.locked_files(str(tmp_path)) == {'Def_A.lean', 'Thm_S.lean', 'Def_Z.lean'}
+    (tmp_path / 'out/lib/Thm_Old.lean').write_text('reused name, new text')
+    CP.publish_prep(str(tmp_path), 'src', ['t'], sync=True)
+    assert (P / 'out/lib/Thm_Old.lean').read_text() == 'reused name, new text'
+    for f in ('Thm_S.lean', 'Def_Z.lean'):
+        (tmp_path / 'out/lib' / f).write_text('changed')
+        with pytest.raises(SystemExit, match=f):
+            CP.publish_prep(str(tmp_path), 'src', ['t'], sync=True)
+        (tmp_path / 'out/lib' / f).write_text((P / 'out' / 'lib' / f).read_text())
+    # while a publisher runs, a statement of the plan it may be sending (not yet posted) is frozen too
+    (tmp_path / 'work' / 'plan.json').write_text(json.dumps(dict(json.load(open(P / 'plan.json')), stubs={'S': {'bundles': ['A']}, 'T': {'bundles': ['A']}})))
+    (tmp_path / 'out/lib/Thm_T.lean').write_text('t')
+    CP.publish_prep(str(tmp_path), 'src', ['t'], sync=True)
+    (tmp_path / 'out/lib/Thm_T.lean').write_text('t2')
+    monkeypatch.setattr(CPL, 'publisher_running_at', lambda d, state=None: True)
+    with pytest.raises(SystemExit, match='Thm_T.lean'):
+        CP.publish_prep(str(tmp_path), 'src', ['t'], sync=True)
 
 
 def test_measure_cache_key_covers_the_imported_carve_modules(tmp_path, monkeypatch):

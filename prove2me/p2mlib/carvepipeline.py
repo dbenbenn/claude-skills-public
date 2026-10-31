@@ -124,6 +124,75 @@ def published_drift(lib, published_lib):
     return out
 
 
+def plan_lib_files(plan):
+    """The out/lib file names of a plan's bundles and statements (an external statement is someone else's)."""
+    from . import carve as CV
+    ext = set(plan.get('external') or ())
+    return ({'Def_%s.lean' % b['name'] for b in plan.get('bundles') or ()}
+            | {'Thm_%s.lean' % CV.slug(CV.statement_name(plan, n)) for n in plan.get('stubs') or {} if n not in ext})
+
+
+def _load_json(path, default=None):
+    try:
+        return json.load(open(path))
+    except (OSError, ValueError):
+        return default
+
+
+def run_state_files(d):
+    """{out/lib file name: run-state record} of the bundles and statements in DIR/publish/run_state.json."""
+    from . import carve as CV
+    plan = _load_json(os.path.join(d, 'published', 'plan.json')) or \
+        _load_json(os.path.join(d, 'publish', 'plan.json')) or {}
+    out = {}
+    for item, rec in (_load_json(os.path.join(d, 'publish', 'run_state.json')) or {}).items():
+        kind, _, n = item.partition(':')
+        if kind == 'bundle':
+            out['Def_%s.lean' % n] = rec
+        elif kind == 'statement':
+            out['Thm_%s.lean' % CV.slug(CV.statement_name(plan, n))] = rec
+    return out
+
+
+def posted(rec):
+    """Has the publisher posted this item (live, in flight, retried after a failure, or stopped)?"""
+    return isinstance(rec, dict) and (rec.get('state', 'todo') != 'todo' or bool(rec.get('history')) or bool(rec.get('id')))
+
+
+def locked_files(d, running=False):
+    """The out/lib files of carve DIR that are published or being published, so that no step may change
+    them: those publish_early froze (published/lib, as far as they are items of published/plan.json),
+    those the publisher's run state shows posted, and while a publisher runs every bundle and statement
+    of a plan it may be sending (published/plan.json, publish/plan.json). The rest of publish/out/lib and
+    published/lib may change: oaiq-122 (2026-10-30), files of an automatic split's plan the publisher
+    never sent (227 beside 74 published) made `check_published_unchanged` and `publish-prep --sync`
+    refuse a re-plan that reused 9 of their names."""
+    pub = os.path.join(d, 'published')
+    frozen_plan = _load_json(os.path.join(pub, 'plan.json'))
+    out = set()
+    if frozen_plan and os.path.isdir(os.path.join(pub, 'lib')):
+        out |= plan_lib_files(frozen_plan) & set(os.listdir(os.path.join(pub, 'lib')))
+    out |= {f for f, rec in run_state_files(d).items() if posted(rec)}
+    if running:
+        for p in (frozen_plan, _load_json(os.path.join(d, 'publish', 'plan.json'))):
+            out |= plan_lib_files(p) if p else set()
+    return out
+
+
+def publisher_running_at(d, state=None):
+    """Is a publisher running on carve DIR: a `split_run --go` holding its publish lock, or the background
+    publisher pipeline_state.json records (its systemd unit active, or its pid a split_run)?"""
+    if runlock.held_by(runlock.dir_key('publish', os.path.join(d, 'publish', 'run.json'))):
+        return True
+    if state is None:
+        state = _load_json(os.path.join(d, 'pipeline_state.json')) or {}
+    pub = state.get('publisher') or {}
+    if pub.get('unit') and unit_active(pub['unit']):
+        return True
+    pid = pub.get('pid')
+    return bool(pid) and 'split_run' in runlock.cmdline(pid)
+
+
 def unit_active(unit):
     """Is the systemd user unit running (False without systemd)?"""
     if not unit or not shutil.which('systemctl'):
@@ -1026,8 +1095,9 @@ class Pipeline:
         (published/lib holds them as they went to the publisher)."""
         if not (self.state.get('auto_config') or {}).get('frozen'):
             return
-        cfg = self.read_config() or {}
-        drift = published_drift(os.path.join(self.gen_out(), 'lib'), os.path.join(self.published_dir(), 'lib'))
+        locked = locked_files(self.d, self.publisher_running())
+        drift = [f for f in published_drift(os.path.join(self.gen_out(), 'lib'), os.path.join(self.published_dir(), 'lib'))
+                 if f in locked]
         if drift:
             raise StepFailed(
                 "step '%s': %d bundle/statement file(s) that are published or being published changed: %s. They are "
@@ -1437,13 +1507,7 @@ class Pipeline:
 
     def publisher_running(self):
         """Is a publisher (the background one, or any `split_run --go` on this carve) running?"""
-        if runlock.held_by(self.publish_lock_key()):
-            return True
-        pub = self.state.get('publisher') or {}
-        if pub.get('unit') and unit_active(pub['unit']):
-            return True
-        pid = pub.get('pid')
-        return bool(pid) and 'split_run' in runlock.cmdline(pid)
+        return publisher_running_at(self.d, self.state)
 
     def join_publisher(self, before, poll=30):
         if not self.publisher_running():
@@ -1491,9 +1555,7 @@ class Pipeline:
         stubs = {n for n in plan.get('stubs') or {} if n not in ext}
         # only this plan's bundles and statements: publish/out/lib keeps earlier plans' files (oaiq-122: 227
         # never-posted files frozen beside 83 published blocked every later re-plan reusing one of their names)
-        from p2mlib import carve as CV
-        mine = {'Def_%s.lean' % b['name'] for b in plan.get('bundles') or ()} | \
-            {'Thm_%s.lean' % CV.slug(CV.statement_name(plan, n)) for n in stubs}
+        mine = plan_lib_files(plan)
         for f in sorted(os.listdir(lib)) if os.path.isdir(lib) else ():
             if f in mine:
                 shutil.copy(os.path.join(lib, f), os.path.join(dst, 'lib', f))
