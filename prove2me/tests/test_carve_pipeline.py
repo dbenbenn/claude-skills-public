@@ -1456,7 +1456,8 @@ def test_a_piece_still_slow_after_its_automatic_split_stops_for_a_person(env, mo
     assert r.returncode == 1
     assert "step 'calibrate_pieces'" in r.stderr and 'still over after an automatic split' in r.stderr
     assert 'accept_over' in r.stderr and 'frozen' in r.stderr
-    assert not (env.dir / 'publish' / 'release.json').exists()
+    # the slow piece holds back only itself (q129): P1 is released
+    assert json.load(open(env.dir / 'publish' / 'release.json'))['pieces'] == ['piece:P1']
     assert tools_called(env).count(('carve', 'plan')) == 2
 
 
@@ -2090,3 +2091,37 @@ def test_a_frozen_bundle_stopped_before_it_went_live_takes_a_post_carve_patch(en
     r = run(env, '--redo', 'gen', '--publish')
     assert r.returncode == 1 and "step 'gen'" in r.stderr and 'Def_B1.lean' in r.stderr
 
+def test_a_slow_piece_that_stops_for_a_person_holds_back_only_itself(env, monkeypatch):
+    # q129 (2026-10-30): oaiq-122 stopped at calibrate_pieces on three slow pieces and never sent the other 36
+    # (10-112 s), so 68 live statements stayed Open leaves for hours; sent by hand, 36 were accepted at once.
+    # The pieces within budget go through the pieces' gates and are released to a background publisher;
+    # the slow one waits for the person.
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 150), 'P1': (40, 30), 'P2': (40, 100)}, stimes={'P0': 80})
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "step 'calibrate_pieces'" in r.stderr and 'the type is the cost' in r.stderr
+    assert 'released' in r.stderr and 'piece:P1' in r.stderr and 'piece:P2' in r.stderr
+    import hashlib
+    rel = json.load(open(env.dir / 'publish' / 'release.json'))
+    assert rel['pieces'] == ['piece:P1', 'piece:P2'] and rel['held'] == ['piece:P0']
+    assert rel['plan_sha'] == hashlib.sha1((env.dir / 'publish' / 'plan.json').read_bytes()).hexdigest()
+    seq = [(c['tool'], c['argv']) for c in calls(env)]
+    i = max(k for k, (t, a) in enumerate(seq) if t == 'carve_measure')
+    gates = [(t, a[0]) for t, a in seq[i + 1:]]
+    assert gates == [('carve_prep', 'publish-prep'), ('carve_prep', 'prose-template'), ('carve_prep', 'check-text'),
+                     ('split_run', 'publish/run.json')]
+    assert seq[i + 1][1][-1] == '--sync' and seq[i + 3][1][-2:] == ['--kinds', 'piece']
+    # the first publisher had ended (nothing but held pieces left): a new one sends the released pieces
+    assert sum(1 for l in _raw(env) if l.startswith('systemd-run')) == 2
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['steps']['calibrate_pieces']['status'] == 'failed' and 'pieces_prep' not in st['steps']
+
+
+def test_slow_pieces_release_nothing_without_publish(env, monkeypatch):
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 150), 'P1': (40, 30)}, stimes={'P0': 80})
+    assert run(env, *ARGS_NEW, '--publish', '--stop-after', 'publish_early').returncode == 0
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 1 and "step 'calibrate_pieces'" in r.stderr, r.stdout + r.stderr
+    assert not (env.dir / 'publish' / 'release.json').exists()
+    assert not any(l.startswith('systemd-run') for l in _raw(env))

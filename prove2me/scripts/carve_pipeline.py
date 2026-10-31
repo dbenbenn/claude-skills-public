@@ -77,7 +77,8 @@ resumed driver waits for it before its final publish. Slow items: a statement st
 limit re-plan globally only when many are (a systematic cost-model error) and nothing is published, else each is
 split alone (`carve.py split --only`, the rest of the plan kept); once published, a slow piece gets one frozen
 re-plan with its own declarations costed at its measured ratio (config `cost_factors`), and stops for a person
-when that cannot help. Without --publish the pieces are measured all the same and nothing is posted.
+when that cannot help, first releasing the pieces within budget (their gates run, publish/release.json lists
+them, a background publisher sends them; q129). Without --publish the pieces are measured all the same and nothing is posted.
 
 Long runs: --detach starts the same run as its own systemd user unit (carve-<hash>, output appended to
 DIR/logs/driver.log) and returns at once; --wait [MINUTES] (default 100) then blocks until that run

@@ -1492,17 +1492,56 @@ class Pipeline:
             return None
         if auto:
             manual += ['%s: %.0f s, %d automatic re-plans already' % ('piece:' + n, secs, k) for n, secs, _ in auto]
-        self.calibrate_log(lines + ['  needs a person: ' + m for m in manual])
+        released = self.release_within_budget(plan, times, [key for key, _, _ in res['over']])
+        self.calibrate_log(lines + ['  needs a person: ' + m for m in manual] + ([released.strip()] if released else []))
         raise StepFailed(
             "step 'calibrate_pieces': piece(s) over the %.0f s limit after the bundles and statements began "
             "publishing:\n  %s\nThe published part is frozen (config `frozen` and `forced`, set by the pipeline), so "
-            "nothing published is re-planned; the other pieces wait until every piece fits (the release is "
-            "written in `publish`). %s A published statement cannot be restated: where its type is the cost, "
+            "nothing published is re-planned; a slow piece holds back only itself (with --publish the pieces "
+            "within budget are released at once), and the full release is written in `publish`. %s A published "
+            "statement cannot be restated: where its type is the cost, "
             "declaring OpenAI's theorem directly as `theorem _root_.solution` halves the serialization. Forced "
             "lemmas: pipeline.json `forced` plus `config_set.template_forced` (template prose), then "
             "`--from config --publish`. A piece under %d s may go as is and be split after two real timeouts: "
-            "pipeline.json `accept_over` [\"piece:NAME\"]. Log %s"
-            % (res['limit'], '\n  '.join(manual), self.PIECE_HINT, ACCEPT_CAP, log))
+            "pipeline.json `accept_over` [\"piece:NAME\"]. Log %s%s"
+            % (res['limit'], '\n  '.join(manual), self.PIECE_HINT, ACCEPT_CAP, log, released))
+
+    def release_within_budget(self, plan, times, slow):
+        """calibrate_pieces stops for a person (with --publish, once publishing began): the pieces measured
+        within budget pass the pieces' gates (as pieces_prep) and are released for this plan
+        (publish/release.json lists them; split_run holds every other piece), to the background publisher
+        if it runs on this plan, else to one started now. A slow piece holds back only itself: no piece
+        imports another. q129 (2026-10-30): oaiq-122 stopped on three slow pieces and never sent the other 36
+        (10-112 s), so 68 live statements stayed Open leaves for hours; sent by hand, 36 were accepted at
+        once. Returns the line for the stop message ('' when nothing is released)."""
+        if not self.p.get('go'):
+            return ''
+        fast = sorted('piece:' + n for n in plan.get('pieces') or {}
+                      if (times.get('piece:' + n) or {}).get('ok') and 'piece:' + n not in slow)
+        if not fast:
+            return ''
+        try:
+            self.pieces_gates('calibrate_pieces')
+        except StepFailed as e:
+            return ('\nThe %d piece(s) within budget were not released: their gates failed: %s'
+                    % (len(fast), str(e).splitlines()[0]))
+        P = os.path.join(self.d, 'publish')
+        sha = hashlib.sha1(open(os.path.join(P, 'plan.json'), 'rb').read()).hexdigest()
+        rel = {'plan_sha': sha, 'pieces': fast, 'held': sorted(slow), 'released': _now()}
+        tmp = os.path.join(P, 'release.json.tmp')
+        json.dump(rel, open(tmp, 'w'), indent=1)
+        os.replace(tmp, os.path.join(P, 'release.json'))
+        if self.publisher_running():
+            pub = os.path.join(self.published_dir(), 'plan.json')
+            same = os.path.exists(pub) and hashlib.sha1(open(pub, 'rb').read()).hexdigest() == sha
+            how = ('the running background publisher sends them' if same else 'a publisher on an earlier plan '
+                   'still runs and does not send them: once it ends, run again with --publish')
+        else:
+            self.freeze_published()
+            self.start_publisher()
+            how = 'a background publisher was started for them'
+        return ('\nReleased now (publish/release.json; %s): %d piece(s) within budget, %s; held: %s.'
+                % (how, len(fast), ', '.join(fast), ', '.join(sorted(slow))))
 
     def source_line(self):
         m = json.load(open(self.meta))
@@ -1650,8 +1689,11 @@ class Pipeline:
         pieces (and any new statements) into publish/ without touching what is published (it refuses
         if a published file would change), then prose-template, check-text of the explanations and a dry
         run over every item."""
+        self.pieces_gates('pieces_prep')
+
+    def pieces_gates(self, step):
         meta = ['--meta', self.meta, '--lean-root', self.lean_src]
-        self.run_cmds('pieces_prep', [
+        self.run_cmds(step, [
             self.tool('carve_prep', 'publish-prep', self.d, self.source_line(), self.p.get('tags') or 'openai-math', '--sync'),
             self.tool('carve_prep', 'prose-template', self.d, *meta),
             # the prose was checked in check_text (which re-runs after any re-plan): the explanations only
