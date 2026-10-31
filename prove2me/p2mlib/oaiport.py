@@ -649,7 +649,7 @@ def _total_map_rewrites(text, known=None):
 _PM_EXPLICIT = re.compile(r"(?<![\w.'])(?:MeasureTheory\.)?ProbabilityMeasure\.map(?![\w'])")
 
 
-def _pm_explicit(text, lemmas):
+def _pm_explicit(text, lemmas, outer=None):
     """`ProbabilityMeasure.map ν f` with both arguments given (each a name or a balanced group, the second
     possibly on the next line): d13f23b's takes no proof, ours `(f_aemble : AEMeasurable f ν)` with `f`
     implicit, so it becomes `ProbabilityMeasure.map ν (f := f) (by …)`, the declaration's named facts about `f`
@@ -688,8 +688,10 @@ def _pm_explicit(text, lemmas):
         f = text[a2:e2]
         if e2 == a2 or f in _NOT_ARGS or 'aemeasurable' in f.lower() or re.match(r"\(\s*(?:[\w']+\s*:=|by\b)", f):
             continue
-        decl = text[_decl_start(text, m.start()):m.start()]
-        out.append(text[i:a2] + '(f := %s) (by %s)' % (f, _aem_tac(_aem_named([f], decl, lemmas))))
+        decl = outer if outer is not None else text[_decl_start(text, m.start()):m.start()]
+        # an argument can hold another map (`ProbabilityMeasure.map (ProbabilityMeasure.map ν g) f`)
+        arg1, f2 = _pm_explicit(text[a1:e1], lemmas, decl), _pm_explicit(f, lemmas, decl)
+        out.append(text[i:a1] + arg1 + text[e1:a2] + '(f := %s) (by %s)' % (f2, _aem_tac(_aem_named([f], decl, lemmas))))
         i = e2
     return ''.join(out) + text[i:]
 

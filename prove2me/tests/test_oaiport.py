@@ -1536,6 +1536,15 @@ def test_probabilitymeasure_map_with_applied_arguments_gets_its_proof():
     out3 = O.core_rewrites(src3)
     assert ("ProbabilityMeasure.map\n      (cell μ (Q n) (hQ0 n)) (f := (profile n)) (by first | exact (hp n).aemeasurable"
             in out3), out3
+    # nested: the inner map is the outer one's first argument (ProfileChainConcentration, q145)
+    src4 = ("theorem qux (hp : ∀ m, Measurable (profile m))\n"
+            "    (h : Tendsto (fun m => ProbabilityMeasure.map\n"
+            "        (ProbabilityMeasure.map (μ m) (fun a => profile m a))\n"
+            "        (fun f => (f 0, f 1))) atTop (𝓝 ν)) : True := sorry\n")
+    out4 = O.core_rewrites(src4)
+    assert "(ProbabilityMeasure.map (μ m) (f := (fun a => profile m a)) (by " in out4, out4
+    assert "\n        (f := (fun f => (f 0, f 1))) (by " in out4, out4
+    assert O.core_rewrites(out4) == out4
     # a proof already given (positional or named) is left alone
     same = ("theorem bar : ProbabilityMeasure.map (samples r) (hp r).aemeasurable = ν ∧\n"
             "    ProbabilityMeasure.map (μ n) (f := g) (by fun_prop) = ν := sorry\n")
