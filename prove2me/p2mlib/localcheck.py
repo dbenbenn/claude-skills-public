@@ -33,6 +33,13 @@ import re
 
 IMPORT = re.compile(r'^import (\S+)\s*$', re.M)
 
+# The `lean` options of every local compile of a file the verifier will compile (a bundle, statement or
+# piece; a ported or rewired solution). The verifier has autoImplicit off and elaborates synchronously:
+# q128 (2026-10-30): bundles OAIQ023F039 and F028 compiled clean with plain `lean -j1 -DautoImplicit=false`
+# and timed out on the verifier at `«abstract nested proofs»`; with Elab.async=false they failed locally
+# exactly as there. Not for port modules (oai_build_modules), which are never submitted.
+VERIFIER_FLAGS = ('-DautoImplicit=false', '-DElab.async=false')
+
 
 def content_key(solution, lib_dir, version='1'):
     h = hashlib.sha1(('check-version:' + str(version) + '\n').encode())

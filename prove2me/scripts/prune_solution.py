@@ -295,7 +295,9 @@ def main():
                         '.pruned_%d_%s' % (os.getpid(), os.path.basename(dest)))
     open(cand, 'w', encoding='utf-8').write(out)
     try:
-        p = subprocess.run(['lake', 'env', 'lean', '-DautoImplicit=false',
+        # the verifier's elaboration, synchronous (q128)
+        from p2mlib.localcheck import VERIFIER_FLAGS
+        p = subprocess.run(['lake', 'env', 'lean', *VERIFIER_FLAGS,
                             os.path.relpath(cand, ws)], cwd=ws, capture_output=True, text=True)
         # the verifier rejects a sorry as firmly as an error, so a sorry warning fails too; and
         # match `: error` as a prefix, since coded errors print as `: error(lean.unknownIdentifier):`

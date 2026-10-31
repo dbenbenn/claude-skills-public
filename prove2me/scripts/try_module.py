@@ -31,7 +31,9 @@ from p2mlib import lean_cap_first  # noqa: E402
 from p2mlib.leantext import header_end  # noqa: E402
 
 OPT = 'set_option backward.isDefEq.respectTransparency false'
-FLAGS = ['-j1', '-DautoImplicit=false']          # what oai_build_modules and carve_measure use
+# what oai_build_modules' `lean` fallback uses; a module is never submitted, so not carve_measure's
+# Elab.async=false (p2mlib.localcheck.VERIFIER_FLAGS, q128)
+FLAGS = ['-j1', '-DautoImplicit=false']
 
 
 def with_option(text):

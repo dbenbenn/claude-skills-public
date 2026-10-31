@@ -44,7 +44,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))  # p2mlib
-from p2mlib import copies, leanedit, leaninfo, names  # noqa: E402
+from p2mlib import copies, leanedit, leaninfo, localcheck, names  # noqa: E402
 from p2mlib.workspace import workspace, published as _published, published_by_full  # noqa: E402
 
 _workspace = workspace
@@ -108,7 +108,8 @@ def check(path):
     if p.returncode:
         return False, p.stdout + p.stderr
     ws = workspace()
-    c = subprocess.run(['lake', 'env', 'lean', '-DautoImplicit=false', os.path.relpath(os.path.abspath(path), ws)],
+    # the verifier's elaboration, synchronous (q128)
+    c = subprocess.run(['lake', 'env', 'lean', *localcheck.VERIFIER_FLAGS, os.path.relpath(os.path.abspath(path), ws)],
                        cwd=ws, capture_output=True, text=True)
     out = c.stdout + c.stderr
     bad = c.returncode != 0 or re.search(r': error\b', out) or re.search(r'declaration uses .sorry.', out)

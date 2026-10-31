@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Compile every generated bundle, statement stub and piece of a carve (carve.py gen), one Lean at
-a time, -j1, in publish order (p2mlib.carve.publish_order), and record CPU seconds and errors.
+a time, -j1, in publish order (p2mlib.carve.publish_order), and record CPU seconds and errors. Lean
+runs with the verifier's options (p2mlib.localcheck.VERIFIER_FLAGS): autoImplicit off and synchronous
+elaboration (Elab.async=false; q128: heartbeat timeouts the verifier reported showed only so).
 
 usage: carve_measure.py CONFIG.json [--force] [--keep-going] [--dir D] [--no-repair]
                          [--no-edge-check] [--drop-false-edges] [--allow-false-edges]
@@ -25,7 +27,8 @@ core split, measured first into the same D/olean).
 A file that fails on a context command (a `variable` binder, `open`, `include`, ...) is repaired by
 cutting it (p2mlib.repair, up to 20 cuts); the cuts are recorded in <work>/repairs.json and
 re-applied on every later run, since `carve.py gen` rewrites the files. A result is reused while the
-file's text (sha1), and that of every carve module it imports (transitively), is unchanged and it passed. Stops at the first failure unless --keep-going.
+file's text (sha1), and that of every carve module it imports (transitively), is unchanged and it passed,
+and the Lean options are the same (a result from before Elab.async=false is measured once more). Stops at the first failure unless --keep-going.
 
 The edge check (on by default; --no-edge-check skips it) runs after each file compiles: every
 `import Theorems.*` of a bundle, statement or piece, and every `import Definitions.*` of a bundle
@@ -138,7 +141,7 @@ class Measure:
         return dict(os.environ, LEAN_PATH=self.olean + ':' + lp)
 
     def run(self, path, module, env):
-        args = ['lean', '-j1', '-DautoImplicit=false']
+        args = ['lean', '-j1', *L.VERIFIER_FLAGS]       # the verifier's elaboration (q128)
         if module:
             out = os.path.join(self.olean, *module.split('.'))
             os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -196,7 +199,13 @@ class Measure:
             return os.path.join(self.lib, 'Thm_%s.lean' % s), 'Theorems.Thm_' + s
         return os.path.join(self.sol, 'Sol_%s.lean' % s), None
 
-    def cache_key(self, path, seen=None):
+    def cache_key(self, path):
+        """text_key with the compile flags: q128 (2026-10-30): an "ok" measured before Elab.async=false
+        (keyed by the text alone) is no evidence the verifier accepts the file (F028 was one), so it is
+        measured once more; each later run reuses it while the text and the flags are unchanged."""
+        return hashlib.sha1((self.text_key(path) + '\0' + ' '.join(L.VERIFIER_FLAGS)).encode()).hexdigest()
+
+    def text_key(self, path, seen=None):
         """sha1 of the file and, transitively, of the carve's own modules it imports (out/lib): a re-plan
         that changes an imported bundle invalidates the cached result (oaiq-010: `holderShift` moved out
         of a bundle's reach, three statements kept their old "ok" and failed to publish)."""
@@ -211,7 +220,7 @@ class Measure:
             if mm:
                 dep = os.path.join(self.lib, mm.group(1) + '.lean')
                 if os.path.exists(dep):
-                    parts.append(self.cache_key(dep, seen))
+                    parts.append(self.text_key(dep, seen))
         k = parts[0] if len(parts) == 1 else hashlib.sha1('\0'.join(parts).encode()).hexdigest()
         seen[path] = k
         return k
@@ -365,7 +374,7 @@ class Measure:
         shutil.copy(src, sp)
         out = os.path.join(self.d, 'profile', *mod.split('.'))
         os.makedirs(os.path.dirname(out), exist_ok=True)
-        args = ['lean', '-j1', '-DautoImplicit=false', '-Dprofiler=true', '-Dtrace.profiler=true',
+        args = ['lean', '-j1', *L.VERIFIER_FLAGS, '-Dprofiler=true', '-Dtrace.profiler=true',
                 '-Dtrace.profiler.threshold=%d' % PROFILE_THRESHOLD_MS, '-R', self.stage,
                 '-o', out + '.olean', '-i', out + '.ilean', sp]
         r = subprocess.run(args, cwd=self.lean_ws, env=env, capture_output=True, text=True)

@@ -778,3 +778,112 @@ def test_name_check_reconciles_from_the_prefetched_lookups(tmp_path, monkeypatch
     ok, msg = CP.name_check({'out': str(out), 'work': str(work)})
     assert ok, msg
     assert sorted(asked) == [('bundle', 'B0'), ('statement', 'A.t')]          # once each, prefetched
+
+
+# ---- the verifier elaborates synchronously (q128, 2026-10-30) -----------------------------------
+# Bundles OAIQ023F039 and F028 measured clean with plain `lean -j1 -DautoImplicit=false`, and the verifier
+# timed out at `«abstract nested proofs»`; with `-DElab.async=false` the same files failed locally as on the
+# server. Every local compile of a file the verifier will compile passes the flag.
+
+def test_measure_compiles_with_synchronous_elaboration(tmp_path, monkeypatch):
+    import carve_measure as M
+    from p2mlib import localcheck as L
+    assert '-DElab.async=false' in L.VERIFIER_FLAGS and '-DautoImplicit=false' in L.VERIFIER_FLAGS
+    m = object.__new__(M.Measure)
+    m.olean, m.stage, m.lean_ws = str(tmp_path / 'olean'), str(tmp_path / 'stage'), str(tmp_path)
+    src = tmp_path / 'Def_B.lean'
+    src.write_text('def b := 1\n')
+    seen = []
+
+    class R:
+        returncode, stdout, stderr = 0, '', ''
+    monkeypatch.setattr(M.subprocess, 'run', lambda args, **k: seen.append(args) or R())
+    m.run(str(src), 'Definitions.Def_B', {})
+    m.run(str(src), None, {})
+    assert all(a[:2] == ['lean', '-j1'] and '-DElab.async=false' in a and '-DautoImplicit=false' in a
+               for a in seen) and len(seen) == 2
+
+
+def test_profile_compiles_with_synchronous_elaboration(tmp_path, monkeypatch):
+    M, m = _measure_obj(tmp_path, {'bundles': [{'name': 'B', 'imports': [], 'nodes': ['x']}]})
+    src = tmp_path / 'lib' / 'Def_B.lean'
+    src.write_text('def b := 1\n')
+    seen = []
+
+    class R:
+        returncode, stdout, stderr = 0, 'cumulative profiling times:\n\telaboration 1s\n', ''
+    monkeypatch.setattr(M.subprocess, 'run', lambda args, **k: seen.append(args) or R())
+    m.profile('bundle:B', {}, secs=1.0)
+    assert '-DElab.async=false' in seen[0] and '-Dprofiler=true' in seen[0]
+
+
+def test_an_ok_measured_with_asynchronous_elaboration_is_measured_again(tmp_path):
+    # a times.json entry from before the flag (key: the text's sha1 alone) is no evidence the verifier
+    # accepts the file (q128's F028 was such an "ok"); entries keyed with the flags are reused
+    import hashlib
+    M, m = _measure_obj(tmp_path, {'bundles': [{'name': 'B', 'imports': [], 'nodes': ['x']}]})
+    src = tmp_path / 'lib' / 'Def_B.lean'
+    src.write_text('import Mathlib\ndef b := 1\n')
+    m.item_files = lambda kind, n: (str(src), 'Definitions.Def_B')
+    m.apply_recorded = lambda s: None
+    o = m.olean_path('Definitions.Def_B')
+    os.makedirs(os.path.dirname(o))
+    open(o, 'w').close()
+    old_key = hashlib.sha1(src.read_bytes()).hexdigest()
+    assert m.cache_key(str(src)) != old_key
+    m.times['bundle:B'] = {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': [], 'key': old_key}
+    calls = []
+
+    def run(path, module, env):
+        calls.append(module)
+        open(o, 'w').close()
+        return {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}, ''
+    m.run = run
+    m.times['bundle:B'] = m.measure('bundle:B', {})
+    assert calls == ['Definitions.Def_B'] and m.times['bundle:B']['key'] == m.cache_key(str(src))
+    m.measure('bundle:B', {})
+    assert len(calls) == 1                                  # keyed with the flags: reused
+
+
+def test_oai_port_check_compiles_with_synchronous_elaboration(tmp_path, monkeypatch):
+    import oai_port as OP
+    seen = []
+
+    class R:
+        returncode, stdout, stderr = 0, "'solution' depends on axioms: [propext]\n", ''
+    monkeypatch.setattr(OP.subprocess, 'run', lambda args, **k: seen.append(args) or R())
+    res = OP.check('import Mathlib\n\ntheorem solution : True := trivial\n', ['import Mathlib'], 'N.t',
+                   str(tmp_path), ws=str(tmp_path))
+    assert res['errors'] == 0 and seen[0][:4] == ['lake', 'env', 'lean', '-j1']
+    assert '-DElab.async=false' in seen[0] and '-DautoImplicit=false' in seen[0]
+
+
+def test_rewire_check_compiles_with_synchronous_elaboration(tmp_path, monkeypatch):
+    import rewire as RW
+    seen = []
+
+    class R:
+        returncode, stdout, stderr = 0, '', ''
+    monkeypatch.setattr(RW.subprocess, 'run', lambda args, **k: seen.append(args) or R())
+    monkeypatch.setattr(RW, 'workspace', lambda: str(tmp_path))
+    f = tmp_path / 'Sol.lean'
+    f.write_text('theorem solution : True := trivial\n')
+    ok, _ = RW.check(str(f))
+    assert ok and seen[1][:3] == ['lake', 'env', 'lean'] and '-DElab.async=false' in seen[1]
+
+
+def test_prune_check_compiles_with_synchronous_elaboration(tmp_path, monkeypatch):
+    import sys
+    import prune_solution as PS
+    seen = []
+
+    class R:
+        returncode, stdout, stderr = 0, '', ''
+    monkeypatch.setattr(PS.subprocess, 'run', lambda args, **k: seen.append(args) or R())
+    monkeypatch.setattr(PS, 'prune_by_lean', lambda f: 'theorem solution : True := trivial\n')
+    monkeypatch.setenv('P2M_WORKSPACE', str(tmp_path))
+    f = tmp_path / 'Sol.lean'
+    f.write_text('theorem solution : True := trivial\n')
+    monkeypatch.setattr(sys, 'argv', ['prune_solution.py', str(f), '--check'])
+    PS.main()
+    assert seen[0][:3] == ['lake', 'env', 'lean'] and '-DElab.async=false' in seen[0]

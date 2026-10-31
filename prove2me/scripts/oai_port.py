@@ -44,7 +44,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
-from p2mlib import oaiport as O  # noqa: E402
+from p2mlib import localcheck as L, oaiport as O  # noqa: E402
 from p2mlib.workspace import workspace  # noqa: E402
 
 COMPAT = os.path.join(os.path.dirname(HERE), 'lean', 'compat_4_34.lean')
@@ -108,7 +108,8 @@ def check(sol, pre, target, out, ws=None):
     open(chkp, 'w', encoding='utf-8').write(chk)
     ru0 = resource.getrusage(resource.RUSAGE_CHILDREN)
     t0 = time.time()
-    r = subprocess.run(['lake', 'env', 'lean', '-j1', '-DautoImplicit=false', chkp], cwd=ws,
+    # the verifier's elaboration, synchronous (q128)
+    r = subprocess.run(['lake', 'env', 'lean', '-j1', *L.VERIFIER_FLAGS, chkp], cwd=ws,
                        capture_output=True, text=True)
     wall = time.time() - t0
     ru1 = resource.getrusage(resource.RUSAGE_CHILDREN)
