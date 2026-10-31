@@ -229,8 +229,12 @@ Problem336).** Fix each at the cause; none needs a macro.
   undo patches. Preparing upstream packages: turn `/--` doc comments inside tactic blocks into `/-` (LeanArchitect
   allows them, plain Lean does not), and list every `sorry` in the closure with the import that brings it in, which
   often is unused (q142: `PerronFormula` imported `Wiener` for nothing, two `sorry`s and 221 KB). Its
-  `additive_combination` is an `elab` the platform refuses: `linear_combination (norm := ((try simp only
-  [smul_add, smul_sub]); abel)) …`, as the Chowla copy does.
+  `additive_combination` is an `elab` the platform refuses: the port writes `linear_combination (norm := ((try
+  simp only [smul_add, smul_sub]); abel)) …`, as the Chowla copy does (ae6d21c, which also renames
+  `Subgroup.map_top` inside rewrite lists, `eventuallyEmptyOrUniv_iff` and `HasMFDerivAt.congr_of_eventuallyEq_abuse`
+  from q145). `Finset.one_le_prod` / `one_le_prod'` swap meaning between d13f23b and ours (ordered monoid vs
+  GroupWithZero, `one_le_prod₀` there): the rule maps the monoid lemma, and a source that meant the GroupWithZero
+  one (q145's vendored Gromov `PosDef`) needs a per-port patch.
 - *When a port rule matches a tactic spelling*, `rg` the port for the unspaced and variant spellings of the same
   tactic (q133: `; first|…` without spaces escaped the `; first | …` rule, 8af004c).
 - *A simp-family step now closes the goal*, so its `; ring` fails "No goals" (oaiq-098: BasisIntervals,
