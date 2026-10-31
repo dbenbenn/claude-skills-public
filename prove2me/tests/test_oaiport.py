@@ -1610,6 +1610,24 @@ def test_elpnorm_add_and_sub_le_get_their_measurability_by_name():
                    "  exact eLpNorm_add_le (hf.sub hg) (hg.sub hh) (by norm_num)\n") % ((tac,) * 6)
 
 
+def test_tendsto_in_measure_indicator_le_and_mono_ae_real_drift():
+    # ours: `tendstoInMeasure_of_tendsto_eLpNorm hp hf hg hfg` (d13f23b: `hp hfg`), `eLpNorm_indicator_le f`
+    # (d13f23b: `f hs`), `eLpNorm_mono_ae_real h` (d13f23b: `hf h`) (Boltzmann q141)
+    tac = 'by ' + O.AESM_TAC
+    src = ("  have := tendstoInMeasure_of_tendsto_eLpNorm (by norm_num : (1:ℝ≥0∞) ≠ 0) ha\n"
+           "  exact tendstoInMeasure_of_tendsto_eLpNorm one_ne_zero hfm ham hf\n"
+           "  _ ≤ _ := add_le_add ((eLpNorm_indicator_le _ hs.compl).trans (hj n)) (hgs n)\n"
+           "  exact eLpNorm_indicator_le _\n"
+           "  exact (eLpNorm_mono_ae_real (Measurable.aestronglyMeasurable hFm) hb).trans h\n")
+    assert O.core_rewrites(src) == (
+        "  have := tendstoInMeasure_of_tendsto_eLpNorm (hf := fun _ => %s) (hg := %s) "
+        "(by norm_num : (1:ℝ≥0∞) ≠ 0) ha\n" % (tac, tac) +
+        "  exact tendstoInMeasure_of_tendsto_eLpNorm one_ne_zero hfm ham hf\n"
+        "  _ ≤ _ := add_le_add ((eLpNorm_indicator_le _).trans (hj n)) (hgs n)\n"
+        "  exact eLpNorm_indicator_le _\n"
+        "  exact (eLpNorm_mono_ae_real hb).trans h\n")
+
+
 def test_lp_elpnorm_le_of_ae_tendsto_drops_the_limit_measurability():
     src = ("  have he := Lp.eLpNorm_le_of_ae_tendsto (.of_forall hbound) hFm hmeas hlim\n"
            "  apply Lp.eLpNorm_le_of_ae_tendsto (u := atTop) (Eventually.of_forall hb)\n"

@@ -1337,11 +1337,12 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # d13f23b's `eLpNorm_eq_lintegral_rpow_enorm_toReal hp0 hptop hf` and `eLpNorm_eq_eLpNorm' hp0 hptop hf` have a
     # third, measurability argument, `eLpNorm_nnreal_eq_eLpNorm' hp hf` a second, `eLpNorm_mono_real hf h` a first
     # and `Lp.eLpNorm_le_of_ae_tendsto bound hf hg h` a third (`hg`), `eLpNorm_mono_enorm_ae hf h` and
-    # `eLpNorm_mono_nnnorm_ae hf h` a first; ours have none (MemoryPrecision 2026-10-25, oaiq-038, oaiq-048, q141)
+    # `eLpNorm_mono_nnnorm_ae hf h` and `eLpNorm_mono_ae_real hf h` a first, `eLpNorm_indicator_le f hs` a second;
+    # ours have none (MemoryPrecision 2026-10-25, oaiq-038, oaiq-048, q141)
     for _n, _k in (("eLpNorm_eq_lintegral_rpow_enorm_toReal", 3), ("eLpNorm_eq_eLpNorm'", 3),
                    ("eLpNorm_nnreal_eq_eLpNorm'", 2), ("eLpNorm_mono_real", 1), ("eLpNorm_norm", 2),
                    ("eLpNorm_le_nnreal_smul_eLpNorm_of_ae_le_mul", 1), ("eLpNorm_mono_enorm_ae", 1),
-                   ("eLpNorm_mono_nnnorm_ae", 1)):
+                   ("eLpNorm_mono_nnnorm_ae", 1), ("eLpNorm_mono_ae_real", 1), ("eLpNorm_indicator_le", 2)):
         text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?" + re.escape(_n) + r"(?![\w'])", _k)
     text = _drop_nth_arg(text, r"(?<![\w.'@])(?:MeasureTheory\.)?Lp\.eLpNorm_le_of_ae_tendsto(?![\w'])", 3)
     # ours added a measurability argument to `eLpNorm_sum_le` (hfs, first), `eLpNorm_le_eLpNorm_of_exponent_le`
@@ -1355,6 +1356,10 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     for _k in ('hg', 'hf'):
         text = _insert_named_arg(text, _pre + r"eLpNorm_(?:add|sub)_le'?(?![\w'])", _k, 'by ' + AESM_TAC,
                                  keep=lambda _t, pos: len(pos) >= 3)
+    # ours: `tendstoInMeasure_of_tendsto_eLpNorm hp hf hg hfg`; d13f23b: `hp hfg` (q141)
+    for _k, _v in (('hg', 'by ' + AESM_TAC), ('hf', 'fun _ => by ' + AESM_TAC)):
+        text = _insert_named_arg(text, _pre + r"tendstoInMeasure_of_tendsto_eLpNorm(?![\w'])", _k, _v,
+                                 keep=lambda _t, pos: len(pos) >= 4)
     text = _insert_named_arg(text, _pre + r"eLpNorm_le_eLpNorm_of_exponent_le(?![\w'])", 'hf', 'by ' + AESM_TAC)
     text = _insert_named_arg(text, _pre + r"tendsto_integral_of_L1'(?![\w'])", 'hfi', 'by ' + AESM_TAC,
                              keep=lambda t, pos: len(pos) > 1 and 'stronglymeasurable' in t[pos[1][1]:pos[1][2]].lower())
