@@ -2967,3 +2967,18 @@ def test_by_convert_semicolon_ring_becomes_first_rfl_ring():
     out = O.core_rewrites(src)
     assert "    _ ≤ _ := by convert hCAB using 1 <;> first | rfl | ring\n" in out
     assert O.core_rewrites(out) == out
+
+
+# ... and where the convert spans lines, the `using n; ring` on its last line (TwoPointCorrelations
+# ModFiveSmoothedDecay, q142: two sites)
+
+def test_multiline_convert_semicolon_ring_becomes_first_rfl_ring():
+    src = ("      convert mul_le_mul_of_nonneg_left hHsq\n"
+           "        (by positivity : 0 ≤ 4 * Real.pi * C) using 1; ring\n"
+           "      convert foo hHsq (by positivity : 0 ≤ 4 * C)\n        using 1; ring\n"
+           "  simp only [foo] at h\n  exact bar using 1; ring\n")
+    out = O.core_rewrites(src)
+    assert "(by positivity : 0 ≤ 4 * Real.pi * C) using 1 <;> first | rfl | ring\n" in out
+    assert "        using 1 <;> first | rfl | ring\n" in out
+    assert "  exact bar using 1; ring\n" in out   # no convert above: left alone
+    assert O.core_rewrites(out) == out

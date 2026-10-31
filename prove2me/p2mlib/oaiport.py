@@ -1538,6 +1538,15 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = _simp_semicolon_closer(text)
     text = re.sub(r"(?m)((?:^[ \t]*|\bby[ \t]+)convert [^\n;]* using \d+)[ \t]*;[ \t]*(?:ring|\(first \| rfl \| ring\))[ \t]*$", r"\1 <;> first | rfl | ring", text)
     text = re.sub(r"(?m)^([ \t]*(?:· )?convert [^\n;]* using \d+)[ \t]*;[ \t]*(first[ \t]*\|[^\n]*)$", r"\1 <;> \2", text)
+    # the same on the last line of a convert that spans lines (ModFiveSmoothedDecay, q142)
+    def _cont_ring(m):
+        for line in reversed(m.string[:m.start()].split('\n')[-4:-1]):
+            if re.search(r"\busing \d+", line) or not line.strip():
+                return m.group(0)     # a statement of its own ends there
+            if re.match(r"[ \t]*(?:· )?convert\b", line):
+                return m.group(1) + ' <;> first | rfl | ring'
+        return m.group(0)
+    text = re.sub(r"(?m)^([ \t]*(?!(?:· )?convert\b)[^\n;]*\busing \d+)[ \t]*;[ \t]*ring[ \t]*$", _cont_ring, text)
     text = _convert_close_diamonds(text)
     # any other `convert … using n <;> ring` (a term over several lines, after `by` or `gcongr;`) closes the
     # instance diamond first too (JointDickman WeightedRationalKernel, q142)
