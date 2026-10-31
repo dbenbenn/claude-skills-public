@@ -235,3 +235,152 @@ def test_an_unchanged_port_replays_under_another_snapshot_and_leaninfo(monkeypat
     tick(out / 'Compat.lean')
     build()
     assert built == ['Solutions.F.Compat', 'Solutions.F.A', 'Solutions.F.Main']
+
+
+# ---- transparency failures in one round (q128-finitistic-retry, 2026-10-30) -------------------------
+# 15 modules of oaiq-023 failed only the "not type-correct under the `implicit` transparency level" check and
+# built with module-scope `set_option backward.isDefEq.respectTransparency false`; since a failed module skips
+# its importers, they surfaced over seven rounds (~3 h). A failed module whose errors carry that note is now
+# compiled once more as a copy with the option (try_module.with_option); when the copy builds, its .olean
+# stands in so the importers build this round, and the module is reported as needing a patch. The build
+# still fails, and the stand-in never replays.
+
+NOTE = ('%s:3:2: error: simp made no progress\n\nNote: The target expression is not type-correct under the '
+        '`implicit` transparency level, which may have triggered the failure.')
+
+
+def _chain(tmp_path):
+    ws = tmp_path / 'ws'
+    d = ws / 'Solutions' / 'F'
+    d.mkdir(parents=True)
+    (d / 'A.lean').write_text('import Mathlib\n\nnamespace OAI\ntheorem a : True := by simp\nend OAI\n')
+    (d / 'B.lean').write_text('import Solutions.F.A\ntheorem b : True := OAI.a\n')
+    (d / 'Main.lean').write_text('import Solutions.F.B\ntheorem m : True := b\n')
+    return str(ws)
+
+
+class _Lean:
+    """`lake env lean ... -o OLEAN FILE` stub: builds when the option is in FILE (or `ok`), else fails."""
+    def __init__(self, ok=False):
+        self.calls, self.ok = [], ok
+
+    def __call__(self, args, cwd=None, env=None, **k):
+        import types
+        import try_module as T
+        text = open(args[-1]).read()
+        self.calls.append((args, text))
+        if self.ok or T.OPT in text:
+            open(args[args.index('-o') + 1], 'w').write('substitute')
+            open(args[args.index('-i') + 1], 'w').close()
+            return types.SimpleNamespace(returncode=0, stdout='', stderr='')
+        return types.SimpleNamespace(returncode=1, stdout='%s:3:2: error: still broken\n' % args[-1], stderr='')
+
+
+def _leaninfo(note_for=('A',), fail=()):
+    built = []
+
+    def fake(path, module, olean, ilean, ws=None, **k):
+        m = module.rsplit('.', 1)[-1]
+        if m in note_for:
+            return False, 1.0, [NOTE % path]
+        if m in fail:
+            return False, 1.0, ['%s:1:0: error: drift' % path]
+        built.append(m)
+        open(olean, 'w').close()
+        return True, 1.0, []
+    return fake, built
+
+
+def test_a_transparency_failure_that_the_option_fixes_lets_its_importers_build(monkeypatch, tmp_path, capsys):
+    from p2mlib import leaninfo
+    import try_module as T
+    ws = _chain(tmp_path)
+    fake, built = _leaninfo()
+    lean = _Lean()
+    monkeypatch.setattr(leaninfo, 'build_module', fake)
+    monkeypatch.setattr(B.subprocess, 'run', lean)
+    ok, lines = B.build(ws, 'F', 'Main')
+    out = capsys.readouterr().out
+    assert not ok                                          # the port text still needs the patch
+    assert built == ['B', 'Main']                          # importers built this round
+    args, text = lean.calls[0]
+    olean = os.path.join(ws, '.lake', 'build', 'lib', 'lean', 'Solutions', 'F', 'A.olean')
+    assert args[:3] == ['lake', 'env', 'lean'] and args[args.index('-o') + 1] == olean
+    root = args[args.index('-R') + 1]
+    assert args[-1] == os.path.join(root, 'Solutions', 'F', 'A.lean')       # the module's own name
+    assert text == T.with_option(open(os.path.join(ws, 'Solutions', 'F', 'A.lean')).read())[0]
+    assert not os.path.exists(args[-1])                    # the copy is temporary
+    assert open(olean).read() == 'substitute'
+    assert any('Solutions.F.A' in l and 'transparency option' in l for l in lines)
+    assert not any('Built Solutions.F.A' in l for l in lines)
+    last = out.rstrip().split('\n')[-1]
+    assert 'Solutions.F.A' in last and 'needs a patch' in last
+    assert open(os.path.join(ws, 'Solutions', 'F', 'A.lean')).read().count(T.OPT) == 0   # FILE untouched
+
+
+def test_a_stand_in_olean_never_replays(monkeypatch, tmp_path):
+    from p2mlib import leaninfo
+    ws = _chain(tmp_path)
+    fake, built = _leaninfo()
+    monkeypatch.setattr(leaninfo, 'build_module', fake)
+    monkeypatch.setattr(B.subprocess, 'run', _Lean())
+    B.build(ws, 'F', 'Main')
+    ok, lines = B.build(ws, 'F', 'Main')                   # nothing patched: A is compiled again
+    assert not ok and not any('Replayed Solutions.F.A' in l for l in lines)
+    # patched: A builds for real, the mark goes, and its importers rebuild against it
+    fake2, built2 = _leaninfo(note_for=())
+    monkeypatch.setattr(leaninfo, 'build_module', fake2)
+    ok, lines = B.build(ws, 'F', 'Main')
+    assert ok and built2 == ['A', 'B', 'Main']
+    ok, lines = B.build(ws, 'F', 'Main')
+    assert ok and all('Replayed' in l for l in lines)
+
+
+def test_no_option_copy_without_the_transparency_note(monkeypatch, tmp_path):
+    from p2mlib import leaninfo
+    ws = _chain(tmp_path)
+    fake, built = _leaninfo(note_for=(), fail=('A',))
+    lean = _Lean(ok=True)
+    monkeypatch.setattr(leaninfo, 'build_module', fake)
+    monkeypatch.setattr(B.subprocess, 'run', lean)
+    ok, lines = B.build(ws, 'F', 'Main')
+    assert not ok and lean.calls == [] and built == []
+
+
+def test_a_module_the_option_does_not_fix_fails_as_before(monkeypatch, tmp_path, capsys):
+    from p2mlib import leaninfo
+    ws = _chain(tmp_path)
+    fake, built = _leaninfo()
+    monkeypatch.setattr(leaninfo, 'build_module', fake)
+
+    def broken(args, **k):
+        import types
+        return types.SimpleNamespace(returncode=1, stdout='%s:4:2: error: still broken\n' % args[-1], stderr='')
+    monkeypatch.setattr(B.subprocess, 'run', broken)
+    ok, lines = B.build(ws, 'F', 'Main')
+    out = capsys.readouterr().out
+    assert not ok and built == []
+    assert lines[0].startswith('✖ [1/3] FAILED Solutions.F.A') and 'not type-correct' in out
+    assert any('Skipped Solutions.F.B' in l for l in lines)
+    assert not os.path.exists(os.path.join(ws, '.lake', 'build', 'lib', 'lean', 'Solutions', 'F', 'A.olean'))
+
+
+def test_the_lean_fallback_tries_the_option_too(monkeypatch, tmp_path):
+    # without the compiled LeanInfo the errors come from `lean`'s output, the note on a later line
+    from p2mlib import leaninfo
+    import types
+    import try_module as T
+    ws = _chain(tmp_path)
+    monkeypatch.setattr(leaninfo, 'build_module', lambda *a, **k: None)
+    calls = []
+
+    def run(args, **k):
+        calls.append(args)
+        text = open(args[-1]).read()
+        if args[-1].endswith('A.lean') and T.OPT not in text:
+            return types.SimpleNamespace(returncode=1, stdout=NOTE % args[-1], stderr='')
+        open(args[args.index('-o') + 1], 'w').close()
+        return types.SimpleNamespace(returncode=0, stdout='', stderr='')
+    monkeypatch.setattr(B.subprocess, 'run', run)
+    ok, lines = B.build(ws, 'F', 'Main')
+    assert not ok and len(calls) == 4 and any('Built Solutions.F.Main' in l for l in lines)

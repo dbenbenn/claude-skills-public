@@ -24,6 +24,14 @@ first errors printed; the build goes on with every module that does not import a
 are listed as skipped), so one run reports every failing module, and the script then exits 1
 (oaiq-038/048: stopping at the first failure cost a 5-13 min rebuild per drift fix).
 
+A failed module whose errors carry the "not type-correct under the `implicit` transparency level" note
+is compiled once more as a temporary copy with try_module.py's module-scope `set_option
+backward.isDefEq.respectTransparency false`; when that copy builds, its .olean stands in for the
+module's (marked by a `.transparency` file beside it, so it is never replayed), its importers build in
+the same run, and the module is listed last as building only with the option: the port still needs
+that patch, so the run still exits 1 (q128-finitistic-retry: 15 such modules surfaced one round at a
+time, over seven rounds and ~3 h, since a failed module skips its importers).
+
 Each module compiles through the compiled LeanInfo (p2mlib.leaninfo.build_module, 2026-10-27): the
 same elaboration writes the .olean/.ilean and caches the reading `carve.py graph` needs, which
 before cost a second elaboration of every module. The logged seconds are LeanInfo's build_ms (its
@@ -33,12 +41,16 @@ import json
 import os
 import re
 import resource
+import shutil
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 from p2mlib import leaninfo  # noqa: E402
+sys.path.insert(0, HERE)
+import try_module  # noqa: E402
 
 
 def opt(argv, name, default=None):
@@ -138,6 +150,42 @@ def merged_elab_lines(lines, previous, overhead=3.0, cached=None):
     return '\n'.join(out) + '\n'
 
 
+TRANSPARENCY_NOTE = 'not type-correct under the `implicit` transparency level'
+STAND_IN = '.transparency'      # beside an .olean built from the option copy: compile the module again
+
+
+def drop_outputs(out):
+    for ext in ('.olean', '.ilean', STAND_IN):
+        if os.path.exists(out + ext):
+            os.remove(out + ext)
+
+
+def build_with_option(ws, src, mod, out):
+    """q128-finitistic-retry (2026-10-30): compile a temporary copy of `src` with try_module's
+    module-scope transparency option as `mod`, writing out.olean/.ilean (then marked as a stand-in).
+    Returns (built, CPU seconds, the copy's errors)."""
+    text, _ = try_module.with_option(open(src, encoding='utf-8').read())
+    root = tempfile.mkdtemp(prefix='oai_build_option_')
+    try:
+        copy = os.path.join(root, *mod.split('.')) + '.lean'      # -R root names it `mod`
+        os.makedirs(os.path.dirname(copy))
+        open(copy, 'w', encoding='utf-8').write(text)
+        drop_outputs(out)
+        ru0 = resource.getrusage(resource.RUSAGE_CHILDREN)
+        o = try_module.compile_(copy, ws, run=subprocess.run,
+                                extra=['-R', root, '-o', out + '.olean', '-i', out + '.ilean'])
+        ru1 = resource.getrusage(resource.RUSAGE_CHILDREN)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    cpu = (ru1.ru_utime - ru0.ru_utime) + (ru1.ru_stime - ru0.ru_stime)
+    errs = [e for _, e in try_module.errors(o)]
+    if errs or not os.path.exists(out + '.olean'):       # no .olean and no error: the run died
+        drop_outputs(out)
+        return False, cpu, errs or [o[-2000:]]
+    open(out + STAND_IN, 'w').write('built from a copy with `%s`; the port needs that patch\n' % try_module.OPT)
+    return True, cpu, []
+
+
 def build(ws, folder, root, force=False, log=None):
     pre = 'Solutions.' + folder
     d = os.path.join(ws, 'Solutions', folder)
@@ -146,6 +194,7 @@ def build(ws, folder, root, force=False, log=None):
     lines, total = [], 0.0
     rebuilt = set()
     failed, skipped = [], set()       # keep going past a failure (oaiq-038/048): report them all
+    with_option = []                  # built only from the transparency-option copy (q128)
 
     def olean_of(m):
         return os.path.join(out_root, *(pre + '.' + m).split('.')) + '.olean'
@@ -155,10 +204,24 @@ def build(ws, folder, root, force=False, log=None):
         lines.append(s)
         if log:
             open(log, 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
-    def fail(i, mod, cpu, errs):
-        say('✖ [%d/%d] FAILED %s (%.1fs)' % (i + 1, len(order), mod, cpu))
+    def fail(i, mod, cpu, errs, src, out, log_text=''):
+        """Report a failed module, unless it fails only the transparency check (q128): then its
+        option copy stands in. Returns the CPU seconds of that extra compile."""
+        if TRANSPARENCY_NOTE in '\n'.join(errs) + log_text:
+            built, ocpu, oerrs = build_with_option(ws, src, mod, out)
+            if built:
+                say('✖ [%d/%d] OPTION %s (%.1fs + %.1fs): builds only with the transparency option (`%s` '
+                    'at module scope); needs a patch' % (i + 1, len(order), mod, cpu, ocpu, try_module.OPT))
+                with_option.append(mod)
+                return ocpu
+            say('✖ [%d/%d] FAILED %s (%.1fs; with the transparency option too, %d error%s)' % (
+                i + 1, len(order), mod, cpu, len(oerrs), '' if len(oerrs) == 1 else 's'))
+        else:
+            ocpu = 0.0
+            say('✖ [%d/%d] FAILED %s (%.1fs)' % (i + 1, len(order), mod, cpu))
         print('\n'.join(errs[:10]), flush=True)
         failed.append(mod)
+        return ocpu
     for i, m in enumerate(order):
         mod = pre + '.' + m
         out = os.path.join(out_root, *mod.split('.'))
@@ -169,15 +232,21 @@ def build(ws, folder, root, force=False, log=None):
             skipped.add(m)
             say('- [%d/%d] Skipped %s (imports %s, which did not build)' % (i + 1, len(order), mod, pre + '.' + bad[0]))
             continue
-        if not force and not stale(m, src, out + '.olean', module_imports(d, pre, m), rebuilt, olean_of):
+        # a stand-in .olean from the option copy (q128) never replays: the module is compiled again
+        if not force and not os.path.exists(out + STAND_IN) and \
+                not stale(m, src, out + '.olean', module_imports(d, pre, m), rebuilt, olean_of):
             say('✔ [%d/%d] Replayed %s' % (i + 1, len(order), mod))
             continue
+        if os.path.exists(out + STAND_IN):
+            drop_outputs(out)          # the real compile's outcome alone decides what is left
         res = leaninfo.build_module(src, mod, out + '.olean', out + '.ilean', ws=ws)
         if res is not None:
             ok, cpu, errs = res
             total += cpu
             if not ok:
-                fail(i, mod, cpu, errs)
+                total += fail(i, mod, cpu, errs, src, out)
+                if mod in with_option:
+                    rebuilt.add(m)
                 continue
             rebuilt.add(m)
             say('✔ [%d/%d] Built %s (%.1fs)' % (i + 1, len(order), mod, cpu))
@@ -192,10 +261,11 @@ def build(ws, folder, root, force=False, log=None):
         o = r.stdout + r.stderr
         errs = [l for l in o.split('\n') if ': error' in l]
         if r.returncode or errs:
-            fail(i, mod, cpu, errs or [o[-2000:]])
-            for f in (out + '.olean', out + '.ilean'):
-                if os.path.exists(f):
-                    os.remove(f)
+            drop_outputs(out)
+            # the note is on a later line than `: error`, so the whole output is searched
+            total += fail(i, mod, cpu, errs or [o[-2000:]], src, out, o)
+            if mod in with_option:
+                rebuilt.add(m)
             continue
         rebuilt.add(m)
         say('✔ [%d/%d] Built %s (%.1fs)' % (i + 1, len(order), mod, cpu))
@@ -203,8 +273,13 @@ def build(ws, folder, root, force=False, log=None):
     if failed:
         print('%d modules failed: %s; %d skipped because they import one' % (
             len(failed), ', '.join(failed), len(skipped)), flush=True)
-        return False, lines
-    return True, lines
+    if with_option:
+        # last, so the pipeline's failure message (the log's tail) shows it
+        print('%d module%s build only with the transparency option (`%s` at module scope, before `namespace '
+              'OAI`; their importers built against that copy), needs a patch each: %s' % (
+                  len(with_option), '' if len(with_option) == 1 else 's', try_module.OPT, ', '.join(with_option)),
+              flush=True)
+    return not (failed or with_option), lines
 
 
 def main(argv):

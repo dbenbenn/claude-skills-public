@@ -59,10 +59,11 @@ def errors(log):
     return out
 
 
-def compile_(path, ws, run=subprocess.run):
+def compile_(path, ws, run=subprocess.run, extra=()):
+    """`lean`'s output on `path`; `extra` goes before the file (oai_build_modules: -R/-o/-i)."""
     env = dict(os.environ)
     lean_cap_first(env)
-    r = run(['lake', 'env', 'lean'] + FLAGS + [path], cwd=ws, env=env, capture_output=True, text=True)
+    r = run(['lake', 'env', 'lean'] + FLAGS + list(extra) + [path], cwd=ws, env=env, capture_output=True, text=True)
     return r.stdout + r.stderr
 
 
