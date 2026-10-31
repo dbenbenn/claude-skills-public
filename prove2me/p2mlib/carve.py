@@ -780,6 +780,20 @@ class Graph:
                 self.cmd_node[(m, c.index)] = key
                 self.scoped[key] = x
         self._scoped_cmds = {(self.nodes[k].module, self.nodes[k].cmd) for k in self.scoped}
+        # so is an `export`: a declaration naming one of its aliases depends on it, and a module made
+        # only of an export block is then carried too (q142 JointDickman_Counting_BilinearEnergy:
+        # `namespace … / export Problem337.VaughanBilinear (energy_identity …) / end`, never pulled
+        # into the pieces calling `BilinearEnergy.energy_identity`, "Unknown identifier")
+        self.exports = {}                                # pseudo-node key -> export command
+        for m, info in self.infos.items():
+            for c in info.commands:
+                if c.short_kind != 'export' or len([i for i in c.idents or [] if i['role'] == 'ref']) < 2:
+                    continue
+                key = '«export»:%s:%d' % (m, c.index)
+                a, b = info.command_span(c.index)
+                self.nodes[key] = Node(key, m, c.index, [], 'export', False, False, False, [], b - a, False)
+                self.cmd_node[(m, c.index)] = key
+                self.exports[key] = c
         self.by_module = collections.defaultdict(list)
         for k, nd in self.nodes.items():
             self.by_module[nd.module].append(k)
@@ -1048,6 +1062,8 @@ class Graph:
             if k in self.scoped:
                 nd.sdeps = nd.sig = self._source_refs(info, c, nd.module, k)
                 continue
+            if k in self.exports:
+                continue                                 # _build_export_deps
             declared = set(c.names)
             for n in nd.names:
                 x = self.consts[n]
@@ -1105,6 +1121,61 @@ class Graph:
         for k, nd in self.nodes.items():
             nd.deps = nd.term | nd.sdeps | nd.ndeps | nd.ideps
         self._build_scoped_deps()
+        self._build_export_deps()
+
+    def _build_export_deps(self):
+        """An export node depends on the project declarations it exports, and a node whose source
+        names one of its aliases (`N.a` for `export X (a)` in namespace N, read through the namespaces
+        and `open`s at the use, as Lean reads it) on the export: the carved file needs the alias, not
+        only the declaration Lean recorded (q142). A use counts when Lean resolved the token to what
+        the alias names, or recorded nothing there."""
+        if not self.exports:
+            return
+        alias = collections.defaultdict(list)            # alias full name -> [(export key, targets)]
+        for k, c in self.exports.items():
+            nd = self.nodes[k]
+            refs = [i for i in c.idents or [] if i['role'] == 'ref']
+            tok = refs[0]['name']
+            opens = self.scope_opens(self.infos[nd.module], c, nd.module)
+            cands = [tok[len('_root_.'):]] if tok.startswith('_root_.') else \
+                list(dict.fromkeys([join(p, tok) for p in prefixes(c.namespace)] + [join(o, tok) for o in opens]))
+            for i in refs[1:]:
+                targets = {join(x, i['name']) for x in cands}
+                owners = {self.owner[n] for t in targets for n in self.pub.get(t, ()) if n in self.owner}
+                nd.sdeps |= owners
+                alias[join(c.namespace, i['name'])].append((k, targets))
+            nd.sig = set(nd.sdeps)
+            nd.deps = set(nd.sdeps)
+        shorts = {a.rsplit('.', 1)[-1] for a in alias}
+        for k, nd in self.nodes.items():
+            if k in self.exports or k in self.scoped:
+                continue
+            info = self.infos[nd.module]
+            c = info.commands[nd.cmd]
+            opens = None
+            vs = c.value_start.byte if c.value_start else None
+            for idn in c.idents or []:
+                if idn['role'] != 'ref' or idn['name'].rsplit('.', 1)[-1] not in shorts:
+                    continue
+                tok = idn['name']
+                if opens is None:
+                    opens = self.scope_opens(info, c, nd.module)
+                cands = [tok[len('_root_.'):]] if tok.startswith('_root_.') else \
+                    [join(p, tok) for p in prefixes(decl_ns(c))] + [join(o, tok) for o in opens]
+                r = self.reading(info, c, idn)
+                meant = {pubname(n) for n in r.consts} if r is not None else None
+                for a in cands:
+                    for ek, targets in alias.get(a, ()):
+                        en = self.nodes[ek]
+                        if not (en.module == nd.module and en.cmd < nd.cmd or
+                                en.module != nd.module and self.sees(nd.module, en.module)):
+                            continue
+                        if meant is not None and not meant & targets:
+                            continue
+                        nd.sdeps.add(ek)
+                        nd.deps.add(ek)
+                        if vs is None or idn['start'] < vs:
+                            nd.sig.add(ek)
 
     def _add_default_simp_deps(self):
         """A declaration whose proof calls the default simp set (`simp`, `simpa`, `simp_all`,

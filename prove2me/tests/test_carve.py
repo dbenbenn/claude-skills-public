@@ -2921,10 +2921,36 @@ def test_a_named_local_notation_loses_its_name_in_generated_files(g):
         assert '(name :=' not in C.strip(txt), txt
 
 
+def _with_bundles(g, p, txt, names):
+    """A generated file's text and that of every bundle it imports, directly or not."""
+    pos, bimp, _ = C._plan_index(p)
+    cl = C._bundle_closure(bimp, [pos[n] for n in names])
+    return txt + ''.join(C.gen_bundle(g, p, p['bundles'][i]['name']) for i in sorted(cl))
+
+
+def test_a_module_made_only_of_an_export_block_comes_with_its_aliases(g):
+    # q142 (JointDickman_Counting_BilinearEnergy): a module holding only `namespace … / export
+    # Problem337.VaughanBilinear (energy_identity …) / end` was never carried: the pieces calling
+    # `BilinearEnergy.energy_identity` had the theorem's module, not the alias ("Unknown identifier").
+    # The export command is a node, and a declaration naming one of its aliases depends on it.
+    ex = g.cmd_node[('CarveDev.ExpOnly', next(c.index for c in g.infos['CarveDev.ExpOnly'].commands
+                                              if c.short_kind == 'export'))]
+    assert g.nodes[ex].deps == {'CD.EX.Impl.val', 'CD.EX.Impl.val_eq'}
+    assert ex in g.nodes['CD.EX.uses_alias'].sig and ex in g.nodes['CD.EX.uses_alias_top'].sig
+    # the original names are no use of the alias
+    assert ex not in g.nodes['CD.EX.Impl.val_eq'].deps
+    p = _tiny_plan(g, ['CD.EX.uses_alias_top'], 'EX')
+    pc = p['pieces']['CD.EX.uses_alias_top']
+    for txt in (_with_bundles(g, p, C.gen_piece(g, p, 'CD.EX.uses_alias_top'), pc['bundles']),
+                _with_bundles(g, p, C.gen_stub(g, p, 'CD.EX.uses_alias_top'),
+                              p['stubs']['CD.EX.uses_alias_top']['bundles'])):
+        assert 'namespace CD.EX.Alias\nexport CD.EX.Impl (val val_eq)\nend CD.EX.Alias' in txt, txt
+
+
 @pytest.mark.lean
 def test_named_notations_export_modules_and_registered_attributes_compile(g, tmp_path):
     # each solution compiles before its own statement in one file (the server-shape check)
-    for i, (targets, prefix) in enumerate([(['CD.NN.tw_top'], 'NN')]):
+    for i, (targets, prefix) in enumerate([(['CD.NN.tw_top'], 'NN'), (['CD.EX.uses_alias_top'], 'EX')]):
         d = tmp_path / str(i)
         d.mkdir()
         _compile_in_publish_order(g, _tiny_plan(g, targets, prefix), d)
