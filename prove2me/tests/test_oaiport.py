@@ -1513,6 +1513,28 @@ def test_probabilitymeasure_map_gets_its_measurability_proof():
     assert O.core_rewrites(same) == same
 
 
+def test_probabilitymeasure_map_with_applied_arguments_gets_its_proof():
+    # PolycyclicRecognition (q145): `ProbabilityMeasure.map (samples r) (profile r)` inside a binder, a cast, and
+    # split over two lines; the measurability fact is a `∀ r, Measurable (profile r)` hypothesis
+    src = ("theorem foo (samples : ℝ → ProbabilityMeasure A) (profile : ℝ → A → X)\n"
+           "    (hp : ∀ r, Measurable (profile r))\n"
+           "    (hν : Tendsto (fun r => ProbabilityMeasure.map (samples r) (profile r)) atTop (𝓝 ν)) :\n"
+           "    ((ProbabilityMeasure.map (samples s) (profile s) : Measure X) U) = 0 ∧\n"
+           "      ProbabilityMeasure.map (samples t)\n"
+           "        (profile t) = ν := by\n"
+           "  sorry\n")
+    out = O.core_rewrites(src)
+    tac = "first | exact (hp r).aemeasurable | %s" % O.AEM_TAC[len('first | '):]
+    assert "ProbabilityMeasure.map (samples r) (f := (profile r)) (by %s)) atTop" % tac in out
+    assert "(ProbabilityMeasure.map (samples s) (f := (profile s)) (by first | exact (hp s).aemeasurable" in out
+    assert "ProbabilityMeasure.map (samples t)\n        (f := (profile t)) (by first | exact (hp t).aemeasurable" in out
+    assert O.core_rewrites(out) == out
+    # a proof already given (positional or named) is left alone
+    same = ("theorem bar : ProbabilityMeasure.map (samples r) (hp r).aemeasurable = ν ∧\n"
+            "    ProbabilityMeasure.map (μ n) (f := g) (by fun_prop) = ν := sorry\n")
+    assert O.core_rewrites(same) == same
+
+
 def test_fst_map_prodmk_drops_its_first_measurability_argument():
     # CompactFactors AlgebraModels: d13f23b `Measure.fst_map_prodMk hq measurable_id`, ours takes only the second
     out = O.core_rewrites("  simpa only [Measure.fst_map_prodMk hq measurable_id, Measure.fst_compProd] using he\n")

@@ -642,14 +642,50 @@ def _total_map_rewrites(text, known=None):
     text = re.sub(r"(?m)^([ \t]*(?:let|have)\b[^\n]*?:[ \t]*ProbabilityMeasure\b[^\n]*?:=[ \t]*)"
                   r"(\w[\w.']*)\.map[ \t]+(\((?:[^()]|\([^()]*\))*\)|[\w.']+)[ \t]*$", pm_let, text)
 
-    def pm_explicit(m):
-        if 'aemeasurable' in m.group(2):
-            return m.group(0)
-        decl = m.string[_decl_start(m.string, m.start()):m.start()]
-        return '%s (f := %s) (by %s)' % (m.group(1), m.group(2), _aem_tac(_aem_named([m.group(2)], decl, lemmas)))
-    text = re.sub(r"(?<![\w.'])((?:MeasureTheory\.)?ProbabilityMeasure\.map[ \t]+[\w.']+)[ \t]+"
-                  r"(\((?:[^()]|\([^()]*\))*\)|[\w.']+)(?=[ \t]*$)", pm_explicit, text, flags=re.M)
+    text = _pm_explicit(text, lemmas)
     return _pm_dot_map(text, defs, lemmas)
+
+
+_PM_EXPLICIT = re.compile(r"(?<![\w.'])(?:MeasureTheory\.)?ProbabilityMeasure\.map(?![\w'])")
+
+
+def _pm_explicit(text, lemmas):
+    """`ProbabilityMeasure.map ν f` with both arguments given (each a name or a balanced group, the second
+    possibly on the next line): d13f23b's takes no proof, ours `(f_aemble : AEMeasurable f ν)` with `f`
+    implicit, so it becomes `ProbabilityMeasure.map ν (f := f) (by …)`, the declaration's named facts about `f`
+    first (`(hp : ∀ r, Measurable (profile r))` for `(profile r)`). Inside binders, casts and applications too
+    (PolycyclicRecognition q145: 59 sites like `(fun r => ProbabilityMeasure.map (samples r) (profile r))`,
+    which the end-of-line form missed). A second argument that is already a proof (`hf.aemeasurable`, `(by …)`)
+    or a named `(f := …)` is left alone."""
+    out, i = [], 0
+    for m in _PM_EXPLICIT.finditer(text):
+        if m.start() < i:
+            continue
+        a1 = m.end()
+        while a1 < len(text) and text[a1] in ' \t':
+            a1 += 1
+        e1 = _arg_end(text, a1)
+        if e1 == a1 or text[a1:e1] in _NOT_ARGS:
+            continue
+        a2 = e1
+        while a2 < len(text) and text[a2] in ' \t':
+            a2 += 1
+        if text.startswith('\n', a2):       # a continuation line, indented further than the line of `.map`
+            line = text[text.rfind('\n', 0, m.start()) + 1:m.start()]
+            k = a2 + 1
+            while k < len(text) and text[k] in ' \t':
+                k += 1
+            if k - a2 - 1 <= len(line) - len(line.lstrip(' \t')):
+                continue
+            a2 = k
+        e2 = _arg_end(text, a2)
+        f = text[a2:e2]
+        if e2 == a2 or f in _NOT_ARGS or 'aemeasurable' in f.lower() or re.match(r"\(\s*(?:[\w']+\s*:=|by\b)", f):
+            continue
+        decl = text[_decl_start(text, m.start()):m.start()]
+        out.append(text[i:a2] + '(f := %s) (by %s)' % (f, _aem_tac(_aem_named([f], decl, lemmas))))
+        i = e2
+    return ''.join(out) + text[i:]
 
 
 def _arg_end(text, k):
