@@ -2786,6 +2786,34 @@ def _skip_ws(t, b):
     return b
 
 
+def _binder_cut_edits(t, a, b, bad):
+    """Edits removing the identifiers `bad` from the `include`/`omit` command t[a:b], and whether
+    nothing is left of it. An identifier inside a `[…]` instance binder takes the whole binder with
+    it: `omit … [Hardcoded D]` with `Hardcoded` gone loses `[Hardcoded D]`, not just the class name
+    (q139: the left-over `[D]` failed to parse, and the repair that deleted the line made
+    `RawWalk.at_correct` take `[Coding T]` again)."""
+    groups, depth, start = [], 0, None
+    for i in range(a, b):
+        ch = t[i:i + 1]
+        if ch == b'[':
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == b']' and depth:
+            depth -= 1
+            if depth == 0:
+                groups.append((start, i + 1))
+    edits = set()
+    for idn in bad:
+        g = next((x for x in groups if x[0] <= idn['start'] < x[1]), None)
+        lo, hi = g if g else (idn['start'], idn['end'])
+        edits.add((lo, _skip_ws(t, hi) if _skip_ws(t, hi) < b else hi, ''))
+    edits = sorted(edits)
+    parts, cur = _apply(t, a, edits)
+    rest = (b''.join(parts) + t[cur:b]).decode('utf-8').split()
+    return edits, not [w for w in rest if w not in ('omit', 'include', 'in')]
+
+
 class Carver:
     """Cut declarations out of a development's modules, keeping the context they need.
 
@@ -3139,10 +3167,12 @@ class Carver:
                 ids = [i for i in c.idents or [] if i['role'] in ('ref', 'binder')]
                 bad = [i for i in ids if i['name'] in dropped_vars or
                        self._gone(i['name'], c, m, have, opens, idn=i)]
-                if bad and len(bad) == len(ids):
-                    drop.add(c.index)
-                elif bad:
-                    reps[c.index] = _cmd_text(info, c, [(i['start'], _skip_ws(t, i['end']), '') for i in bad])
+                if bad:
+                    edits, empty = _binder_cut_edits(t, c.start.byte, c.end.byte, bad)
+                    if empty or len(bad) == len(ids):
+                        drop.add(c.index)
+                    else:
+                        reps[c.index] = _cmd_text(info, c, edits)
                 continue
             if k == 'attribute':
                 txt = leanedit.text(info, c.index)

@@ -2846,3 +2846,23 @@ def test_file_generators_reuse_the_graphs_collision_renames():
     import inspect
     for fn in (C.gen_bundle, C.gen_stub, C.gen_piece, C.absent_instances):
         assert ' collision_renames(g)' not in inspect.getsource(fn), fn.__name__
+
+
+def test_omit_losing_a_gone_class_drops_its_whole_instance_binder():
+    # q139 (KMedian Def_OAIQ053K053): `omit [Coding T] [Fintype D] [Coding D] [Hardcoded D]` with the class
+    # `Hardcoded` gone came out as `omit … [Coding D] [D]`; the measure repair then deleted the whole
+    # line, so `RawWalk.at_correct` took `[Coding T]` again and `row_correct` (omitting it) failed
+    src = b'omit [Coding T] [Fintype D] [Coding D] [Hardcoded D]\n'
+    h = src.index(b'Hardcoded')
+    edits, empty = C._binder_cut_edits(src, 0, len(src), [{'start': h, 'end': h + len(b'Hardcoded')}])
+    parts, cur = C._apply(src, 0, edits)
+    assert (b''.join(parts) + src[cur:]).decode() == 'omit [Coding T] [Fintype D] [Coding D] \n'
+    assert not empty
+    # a plain identifier goes alone; nothing left (an `in` head too) means the command goes
+    src = b'omit hx in\n'
+    edits, empty = C._binder_cut_edits(src, 0, len(src), [{'start': 5, 'end': 7}])
+    assert empty
+    src = b'omit [Hardcoded D] hp\n'
+    edits, empty = C._binder_cut_edits(src, 0, len(src), [{'start': 6, 'end': 15}])
+    parts, cur = C._apply(src, 0, edits)
+    assert (b''.join(parts) + src[cur:]).decode() == 'omit hp\n' and not empty
