@@ -193,6 +193,44 @@ Problem336).** Fix each at the cause; none needs a macro.
   construction site needs one measurability line, and a lemma concluding `UniformIntegrable` from `eLpNorm`
   estimates alone gains a measurability hypothesis). Making it the default would re-port the carves that
   hand-patched uniform integrability, so it stays opt-in until those are published.
+  Read d13f23b itself before writing a shim: a shallow fetch is about a minute and 150 MB and is kept at
+  `~/.cache/p2m/mathlib-d13f23b` for every worker (`git init; git fetch --depth 1 origin
+  d13f23b723b8a846827a245b89c10fc7d3f11612; git checkout FETCH_HEAD`); it settled every "Unknown constant" root
+  of q145's 2,753-module port. Place a shim the carve needs in the lowest module under most of its users, not in
+  `compat_4_34.lean` (which rebuilds the whole port), and add an `import` of it to the few users not under it;
+  lemmas with one to three users go into each user (`private theorem` when several). q145's `anc.py` (records
+  folder) computes the common ancestors and the users not under the best host in seconds. Copy the shims into
+  `compat_4_34.lean` (with tests) for later carves once the carve that found them no longer needs a plain
+  `--upgrade`. Shims declare their attributes on the declaration (`@[aesop 50% apply …] theorem …`), never as a
+  standalone `attribute […] X` command: the carver repeats a section's standalone command in every file keeping a
+  declaration of that section, and aesop refuses a rule registered twice (q141: 17 of 47 pieces); shim text
+  passes the soundness guard too (no `unsafe` token; a test checks every shim, adc4387).
+- *Measurability cascades from d13f23b's total `eLpNorm` / `Measure.map`* (q141: 72 modules, 198 patches, 38
+  build rounds after the shim; q145). There `eLpNorm f p μ = ⊤` off a.e.-strongly-measurable `f` and `Measure.map`
+  of a non-measurable map is a Dirac mass, so a finite bound carries measurability and `ProbabilityMeasure.map ν f`
+  needs no proof. Lemmas over arbitrary functions then need a measurability hypothesis here, and so does every
+  caller up to where the function is concrete (about one cascade per 15 modules after the rules, up to three
+  levels): budget build rounds, not single fixes. When an inserted `(hf := by AESM_TAC)` fails, first check
+  whether the declaration has any measurability fact for that function; if not it is a statement repair, in one of
+  three shapes (q145): add the hypothesis its sibling lemma already has and pass it at the call site; apply the
+  lemma to `‖f‖ₑ`, which is ENNReal-valued, so `AEMeasurable` suffices (`enorm_enorm`, `eLpNorm_enorm`); or, for a
+  widely used `def` built by `ProbabilityMeasure.map` of an arbitrary function, make it total as d13f23b is (`if hp
+  : AEMeasurable … then … else ⟨Measure.dirac …, _⟩`) with a `…_coe (hp)` lemma, rather than threading an
+  argument through ~80 uses. Traps (q141): an explicit measurability argument placed before the hypothesis that
+  fixes an implicit function fixes it first, un-beta-reduced (write it `(by exact …)`); a rule that drops
+  d13f23b's leading measurability argument also drops what pinned the implicit `f`, so prefer a shadowing lemma
+  in `namespace OAI` with d13f23b's signature (`hf` taken and ignored) whenever that argument pins an implicit;
+  `whnf` timeouts unifying `F - G` with `(fun z => (f-g) z.1) ∘ e` want the equation stated by `funext; rfl`, or the
+  function given by name (`(f := fun n x => …)`). q141's `tools/rebase_edits.py` (save repairs, re-port pristine
+  on a new snapshot, 3-way merge, mkpatches, verify) made eight mid-repair rule changes cheap.
+- *Vendored sources copied from an earlier port* are already on our Mathlib, and the port's d13f23b rules
+  rewrite them a second time (q142: `Finset.prod_le_prod` turned into `prod_le_prod'` in the Chowla copy of
+  `PrimeNumberTheoremAnd.Erdos970`; hand patches undo it). Prefer the fork's original text; otherwise expect such
+  undo patches. Preparing upstream packages: turn `/--` doc comments inside tactic blocks into `/-` (LeanArchitect
+  allows them, plain Lean does not), and list every `sorry` in the closure with the import that brings it in, which
+  often is unused (q142: `PerronFormula` imported `Wiener` for nothing, two `sorry`s and 221 KB). Its
+  `additive_combination` is an `elab` the platform refuses: `linear_combination (norm := ((try simp only
+  [smul_add, smul_sub]); abel)) …`, as the Chowla copy does.
 - *When a port rule matches a tactic spelling*, `rg` the port for the unspaced and variant spellings of the same
   tactic (q133: `; first|…` without spaces escaped the `; first | …` rule, 8af004c).
 - *A simp-family step now closes the goal*, so its `; ring` fails "No goals" (oaiq-098: BasisIntervals,
@@ -714,7 +752,17 @@ back WA. The lessons:
   two compiled tables for minutes. Move the step into a local `have generic : ∀ {c first second …}, c = .seq
   first second → … := by intro …; subst hceq; exact …` and apply it as `generic (c := highLoop) rfl …` (134 s to
   0.07 s): the kernel checks the lemma on variables and a one-step `rfl`. No declaration is added, so the plan
-  is unchanged.
+  is unchanged. Two more shapes from `Procedure`-style declarations (q144, Coulomb; "replacing `rfl` by `simp
+  only`" helps neither, since the kernel checks the same defeq): `Procedure.comp` typed `… (g ∘ f)` with a *named*
+  `g` makes lazy delta unfold `g` (and its `Rat` arithmetic) before `Function.comp`; a local `compBeta q p :
+  Procedure ea ec (fun a => g (f a)) := q.comp p`, used as `let p := compBeta …; exact p`, took 376 s and 102 s to
+  under 1 s. And an `rfl` between projections of a tuple and of a variable (`delta (T).1 (T).2.1 … = delta (6*x.1)
+  W x.2.2.1`, 229-309 s) wants a generic `rfl` lemma over variables instantiated at the tuple's components
+  (`deltaFn_apply (r W G N) : (fun x => delta x.1 x.2.1 x.2.2.1) (r, W, G, N) = delta r W G := rfl`, then
+  `….congrFun (fun x => deltaFn_apply …)`: 28-150 s to under 0.3 s). Try these in a scratch file with
+  `trace.profiler` before `cost_factors` + `accept_over`. A flat certificate chain (one aggregator over 12-48
+  `fin_cases` leaves) cannot be cut by forcing mid-chain lemmas: add row lemmas by port patch and force them with
+  `config_set.template_forced`.
 - **Category theory / homological algebra: try the transparency option first** (oaiq-116). Errors full of `simp
   made no progress` / `rewrite failed` on `comp_f`, `ShiftedHom`, `Cocycle`, `single…` lemmas are the "not
   type-correct under the `implicit` transparency level" check, not API drift: compile each failing module as is
@@ -734,6 +782,20 @@ back WA. The lessons:
   inferInstance` in two statements). State the irrelevance as a lemma, `@f … i₁ = @f … i₂ := by cases
   Subsingleton.elim i₁ i₂; rfl`, and chain with `.trans`, so the kernel never compares the proof terms.
   Bisect by `sorry`-ing the tail of the proof (about 40 s a trial; three variants in parallel).
+- **Data-table bundles are planned as nearly free** (oaiq-098: 540k `CachedData` interval-table `def`s; bundle D490,
+  3,924 defs and 508 KB planned at 55 s, measured 2,806 s at ~23 GiB, while the whole 2.9 MB source module builds
+  in 157 s, and ~50 more were queued behind it). For all-`def` certificate modules, profile one bundle before
+  measuring the rest, and plan them by bytes with a much smaller `bundle_size` (`config_set`) or one bundle per
+  source module.
+- **One wild reading is the machine, not the piece** (q138: 1,595 s for a piece that compiles alone in 2.2 s,
+  measured while Lean held all its swap). `calibrate_pieces` now measures an over-limit piece once more before its
+  automatic frozen re-plan (f5d1875); by hand, re-time a lone outlier with `lean -j1` and the carve's `olean/` ahead
+  of LEAN_PATH (the toolchain's `lean` directly: `lake env` resets LEAN_PATH).
+- **Slow pieces made of private lemmas are not a cost-model error** (q143): oaiq-091's calibrate read five slow
+  pieces, each 90-99% private lemmas, as a uniform overrun and re-planned twice (time_scale 1.2 → 5.6, items 135 →
+  417) while the same pieces stayed over. Restore the first `time_scale`, add their private `keep` entries to
+  `promote_private` (`config_set`) and re-plan once (q143: 126 pieces all under 114 s, published in about 3 h).
+  On a retry, check whether a carve re-planned more than once was over on the same pieces every round.
 - **"failed to synthesize" an instance in a bundle at `measure`**: read `work/repairs.json` first. A REPAIR that
   deleted an `omit`/`include`/`variable` line changes the signatures of everything after it in that section, so
   the error surfaces in a later file (q139: a broken `omit […] [D]` was deleted, `at_correct` gained three
@@ -915,6 +977,12 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   the new ones were in force, and `mkpatches.py` diffs against it. Before repairing by hand, `--redo port`. When
   filter_patches drops a patch as "the port now writes it", check whether that patch carried another repair in the
   same hunk, and re-add that as its own entry (q136 lost two that way, a build round each).
+- **Repairs left only in the workspace** (q147): oaiq-097 repaired 16 failing modules in `Solutions/` and stopped
+  without `mkpatches.py`; any re-port would have overwritten them. Start a retry by compiling the modules the last
+  build log says failed; if they now pass, compare their mtimes with the log and diff against a pristine scratch
+  port (`oai_port_modules.py … --ws SCRATCH`, on the carve's own snapshot), and turn what you find into patches
+  first. A patch made by an `mkpatches.py` from before 83161d7 can hold an `import Solutions.` line in its `old`,
+  which counts 0 under filter_patches' placeholder folder: check before resuming.
 - **Leaves left Open by unsent pieces** (q129): before assuming a goal's open leaves are hard, check whether each
   has a pending or never-sent piece. oaiq-122 stopped at `calibrate_pieces` on three slow pieces and never sent
   the other 36 (10-112 s); sent by hand with `split_run.py` from a copy of the run config (`state` and `log`
@@ -981,6 +1049,11 @@ these rules over-approximate on purpose; each comes from a worker carve that fai
   caller mentions. To diagnose "unsolved goals" after `simp` in a bundle, run `simp?` at that line in the original
   module and look for each lemma it names in the bundles; for "Invalid pattern" or a type mismatch on a short
   name, `#check` it at that point of a truncated copy of the bundle.
+- (open, q142) a *named* `local notation (name := n) …` is a private declaration, so a piece and the statement it
+  proves both carrying it fail the server-shape check ("private declaration … has already been declared"), and
+  measure's repair loop may cut the line, giving "Unknown identifier" at its first use; and a module made only of
+  an `export` block is never pulled into the pieces that use its aliases. Post-carve patches until fixed: drop the
+  `(name := …)`; inline the `export` block.
 - a local instance used by a kept command comes back, reactivated (`attribute [local instance P] N`,
   with its source priority) when an imported bundle declares it, else emitted again under a file-unique
   name after the earlier local instances its own elaboration used (oaiq-032, oaiq-031);
