@@ -1392,7 +1392,8 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = fin_norm_num(text)     # `norm_num` leaves Fin literals that `simp` decides (oaiq-081/091/092)
     # `convert h using 1 <;> ring` on an inequality leaves an `instLE` diamond ring cannot see through
     text = re.sub(r"(?m)^([ \t]*)convert ([^\n]+?) using 1 <;> ring[ \t]*$",
-                  lambda m: ('%sfirst | (convert %s using 1 <;> ring) | exact (le_of_eq (by ring)).trans (%s.trans '
+                  lambda m: ('%sfirst | (convert %s using 1 <;> first | (with_reducible_and_instances rfl) | ring) | '
+                             'exact (le_of_eq (by ring)).trans (%s.trans '
                              '(le_of_eq (by ring)))') % (m.group(1), m.group(2),
                              m.group(2) if re.fullmatch(r"[\w.']+", m.group(2)) else '(' + m.group(2) + ')'),
                   text)

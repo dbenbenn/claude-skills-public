@@ -2584,10 +2584,13 @@ def test_convert_using_one_ring_gets_an_inequality_fallback():
     # "made no progress"); the fallback chains `le_of_eq` on both sides (oaiq-080: 4 sites)
     src = '  have hdiv := foo\n  convert hdiv using 1 <;> ring\n'
     out = O.core_rewrites(src)
-    assert ('first | (convert hdiv using 1 <;> ring) | exact (le_of_eq (by ring)).trans '
-            '(hdiv.trans (le_of_eq (by ring)))') in out
+    # the convert alternative closes the diamond itself: on a `<` goal the `le_of_eq` fallback cannot apply
+    # (JointDickman RationalArcSeparation, q142)
+    assert ('first | (convert hdiv using 1 <;> first | (with_reducible_and_instances rfl) | ring) | '
+            'exact (le_of_eq (by ring)).trans (hdiv.trans (le_of_eq (by ring)))') in out
     out2 = O.core_rewrites('    convert neg_le_neg hD using 1 <;> ring\n')
-    assert '(convert neg_le_neg hD using 1 <;> ring) | exact (le_of_eq (by ring)).trans ((neg_le_neg hD).trans' in out2
+    assert ('(convert neg_le_neg hD using 1 <;> first | (with_reducible_and_instances rfl) | ring) | '
+            'exact (le_of_eq (by ring)).trans ((neg_le_neg hD).trans') in out2
     # idempotent
     assert O.core_rewrites(out) == out
 
