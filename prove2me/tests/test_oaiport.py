@@ -421,6 +421,13 @@ def test_unifint_detection_and_rewrites():
     assert "apply OAI.UnifIntegrable.of_enn'" in O.core_rewrites(t)
 
 
+def test_shims_pass_the_soundness_guard():
+    # a shim module is carved into a published bundle: no token the platform's guard refuses (q141)
+    from p2mlib import leantext as L
+    for text in (O.unifint_shim(), O.stdsimplex_shim(), open(O_COMPAT, encoding='utf-8').read()):
+        assert L.guard_problems(text) == []
+
+
 def test_unifint_shim_declares_what_the_rewrites_name():
     shim = O.unifint_shim()
     assert shim.startswith('import Mathlib\n')
@@ -437,8 +444,10 @@ def test_unifint_shim_declares_what_the_rewrites_name():
 
 def test_unifint_members_are_measurability_rules():
     # the ports' inserted measurability tactic ends in `measurability`: with the shim's projections as aesop rules it
-    # finds `f n` measurable from `hu : UnifIntegrable f p μ` in context (Boltzmann CollisionSources, q141)
-    assert re.search(r"^attribute \[aesop unsafe 50% apply \(rule_sets := \[Measurable\]\)\] "
+    # finds `f n` measurable from `hu : UnifIntegrable f p μ` in context (Boltzmann CollisionSources, q141). Spelled
+    # `aesop 50% apply` (unsafe by default): the token `unsafe` is refused by prove2.me's soundness guard, and the
+    # shim is carved into a published bundle (OAIQ080A000 FAILED at publish, q141)
+    assert re.search(r"^attribute \[aesop 50% apply \(rule_sets := \[Measurable\]\)\] "
                      r"UnifIntegrable\.aestronglyMeasurable UniformIntegrable\.aestronglyMeasurable$",
                      O.unifint_shim(), re.M)
 
