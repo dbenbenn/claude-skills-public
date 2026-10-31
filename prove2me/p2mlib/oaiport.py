@@ -1451,6 +1451,11 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # d13f23b's `unifIntegrable_iff'` unfolds `UnifIntegrable` to the epsilon-delta form, which is our
     # definition itself: `rw [unifIntegrable_iff']` / `apply unifIntegrable_iff'.mpr` are dropped (WeakHessian, oaiq-052)
     text = re.sub(r"(?m)^[ \t]*(?:rw \[unifIntegrable_iff'\]|apply unifIntegrable_iff'\.mpr)[ \t]*\n", "", text)
+    # d13f23b's `EuclideanDomain.instIsPrincipalIdealRing` is our `EuclideanDomain.to_principal_ideal_domain`;
+    # d13f23b's `integral_comp_log_Ioi_zero` is the compat block's (Jacobsthal, JointDickman, q142)
+    text = re.sub(r"(?<![\w.'])EuclideanDomain\.instIsPrincipalIdealRing(?![\w'])",
+                  'EuclideanDomain.to_principal_ideal_domain', text)
+    text = re.sub(r"(?<![\w.'])MeasureTheory\.integral_comp_log_Ioi_zero(?![\w'])", pre + 'integral_comp_log_Ioi_zero', text)
     # d13f23b's `Filter.eventuallyEmptyOrUniv_iff'` is our `Filter.eventuallyConst_set'` (FiniteFactor, 2026-10-25)
     text = re.sub(r"(?<![\w'])eventuallyEmptyOrUniv_iff'", "eventuallyConst_set'", text)
     # d13f23b's `eLpNorm_eq_lintegral_rpow_enorm_toReal hp0 hptop hf` and `eLpNorm_eq_eLpNorm' hp0 hptop hf` have a
@@ -2085,6 +2090,23 @@ def names_matrix(text):
 _COMM_CSTAR_WORD = re.compile(r"(?<![\w.'])(CommCStarAlgebra|IsMulCommutative)(?![\w'])")
 
 
+# d13f23b's Mathlib.MeasureTheory.Group.Circle gives `Circle` the subtype MeasurableSpace and BorelSpace (what makes
+# `Real.fourierChar` measurable); ours has neither. The compat block's `circleMeasurableSpace` (a def, as oaiq-122 asks of a
+# data-carrying instance) and `circleBorelSpace` are turned on locally in a module using the characters (`𝐞`,
+# `fourierChar`, `probChar`) that declares no Circle instance of its own (Boltzmann DampedCollisionHistories, q141).
+_CIRCLE_CHAR = re.compile(r"(?<![\w'])(𝐞|fourierChar|probChar)(?![\w'])")
+
+
+def circle_line(text, compat_ns='OAI'):
+    """The `attribute [local instance]` line for the compat Circle measurable space when the body of `text` uses
+    `𝐞`, `fourierChar` or `probChar` and declares no `MeasurableSpace Circle` itself, else ''."""
+    body = text[header_end(text):]
+    if not _CIRCLE_CHAR.search(body) or 'MeasurableSpace Circle' in body:
+        return ''
+    p = compat_ns + '.' if compat_ns else ''
+    return 'attribute [local instance] %scircleMeasurableSpace %scircleBorelSpace\n' % (p, p)
+
+
 def comm_cstar_line(text, compat_ns='OAI'):
     """The `attribute [local instance]` line for the compat subalgebra instance when the body of `text` (after its
     imports) names `CommCStarAlgebra` or `IsMulCommutative`, else ''."""
@@ -2118,7 +2140,7 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
     cstar = not matrix_default_instance or any('CStarMatrix' in x for _, x in sources.values())
     files, missing = {}, set()
     for oai, (short, t) in sources.items():
-        mx = (MATRIX_DEFAULT_INSTANCE if not cstar and names_matrix(t) else '') + comm_cstar_line(t, compat_ns)
+        mx = (MATRIX_DEFAULT_INSTANCE if not cstar and names_matrix(t) else '') + comm_cstar_line(t, compat_ns) + circle_line(t, compat_ns)
         def rep(m):
             n = m.group(1)
             if n in names:
@@ -2241,6 +2263,8 @@ COMPAT_NARROW_IMPORTS = (
     'Mathlib.Probability.Kernel.Defs',
     'Mathlib.Probability.Kernel.WithDensity',
     'Mathlib.Probability.Kernel.Composition.MeasureComp',
+    'Mathlib.Analysis.Complex.Circle',
+    'Mathlib.MeasureTheory.Constructions.BorelSpace.Complex',
     'Mathlib.Topology.Algebra.LinearMapCompletion',
 )
 

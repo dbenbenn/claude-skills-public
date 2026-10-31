@@ -363,6 +363,8 @@ theorem uniformIntegrable_average_real (hp : 1 ≤ p) {f : ℕ → α → ℝ}
     UniformIntegrable (fun n => (∑ i ∈ Finset.range n, f i) / (n : α → ℝ)) p μ :=
   uniformIntegrable_iff_mathlib.2 (MeasureTheory.uniformIntegrable_average_real hp hf.toMathlib)
 
+attribute [aesop unsafe 50% apply (rule_sets := [Measurable])] UnifIntegrable.aestronglyMeasurable UniformIntegrable.aestronglyMeasurable
+
 /-! ### `UnifTight` -/
 
 namespace UnifTight

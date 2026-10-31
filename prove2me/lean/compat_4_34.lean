@@ -493,6 +493,18 @@ theorem hasTemperateGrowth_exp_mul_I : (fun x : ℝ => Complex.exp (x * Complex.
       funext x; rw [mul_comm]
     rw [h, norm_iteratedFDeriv_eq_norm_iteratedDeriv, hit]
     simp [norm_pow, Complex.norm_exp]
+/-- Mathlib d13f23b's `integral_comp_log_Ioi_zero`: the substitution `y = log x` over `Ioi 0` (JointDickman
+MellinSieveProfile, CubicMoment, q142). -/
+theorem integral_comp_log_Ioi_zero {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] (g : ℝ → E) :
+    ∫ x in Set.Ioi (0 : ℝ), x⁻¹ • g (Real.log x) = ∫ y, g y := by
+  have h := MeasureTheory.integral_image_eq_integral_abs_deriv_smul (s := (Set.univ : Set ℝ))
+    (f := Real.exp) (f' := Real.exp) MeasurableSet.univ
+    (fun x _ => (Real.hasDerivAt_exp x).hasDerivWithinAt)
+    (fun x _ y _ hxy => Real.exp_injective hxy) (fun x => x⁻¹ • g (Real.log x))
+  rw [Set.image_univ, Real.range_exp] at h
+  rw [h, MeasureTheory.setIntegral_univ]
+  congr 1; funext x
+  simp [abs_of_pos (Real.exp_pos x), smul_smul, Real.exp_ne_zero]
 /-- Mathlib d13f23b's `Finset.sum_le_sum_of_injOn`; ours has no such lemma (LipschitzHilbert, oaiq-090). -/
 theorem sum_le_sum_of_injOn {ι κ M : Type*} [DecidableEq κ] [AddCommMonoid M] [PartialOrder M]
     [IsOrderedAddMonoid M] {s : Finset ι} {t : Finset κ} {f : ι → M} {g : κ → M} (e : ι → κ)
@@ -624,5 +636,12 @@ theorem _root_.MeasureTheory.Measure.withDensity_comp {𝓧 𝓨 : Type*} {m𝓧
         (Measure.lintegral_bind (Kernel.measurable _).aemeasurable (hf'.mul hg).aemeasurable).symm
     _ = ∫⁻ b, g b ∂((κ ∘ₘ μ).withDensity f') :=
         (lintegral_withDensity_eq_lintegral_mul _ hf' hg).symm
+/-- Mathlib d13f23b's `MeasurableSpace Circle` (Mathlib.MeasureTheory.Group.Circle): the subtype structure. A def,
+turned on as a local instance in the modules that use the characters `𝐞`/`fourierChar`/`probChar` (q141). -/
+@[reducible] def circleMeasurableSpace : MeasurableSpace Circle :=
+  inferInstanceAs <| MeasurableSpace <| Subtype (· ∈ Submonoid.unitSphere ℂ)
+/-- d13f23b's `BorelSpace Circle`, for `circleMeasurableSpace`. -/
+theorem circleBorelSpace : @BorelSpace Circle _ circleMeasurableSpace :=
+  inferInstanceAs <| BorelSpace <| Subtype (· ∈ Metric.sphere (0 : ℂ) 1)
 end OAICompat434
 

@@ -435,6 +435,14 @@ def test_unifint_shim_declares_what_the_rewrites_name():
         assert n in names, n
 
 
+def test_unifint_members_are_measurability_rules():
+    # the ports' inserted measurability tactic ends in `measurability`: with the shim's projections as aesop rules it
+    # finds `f n` measurable from `hu : UnifIntegrable f p μ` in context (Boltzmann CollisionSources, q141)
+    assert re.search(r"^attribute \[aesop unsafe 50% apply \(rule_sets := \[Measurable\]\)\] "
+                     r"UnifIntegrable\.aestronglyMeasurable UniformIntegrable\.aestronglyMeasurable$",
+                     O.unifint_shim(), re.M)
+
+
 def test_unifint_mode_in_module_files():
     src = {'OAI.U.A': ('A', UNIF_SRC),
            'OAI.U.B': ('B', 'import OAI.U.A\nnamespace OAI.U\ntheorem c : True := trivial\nend OAI.U\n')}
@@ -782,6 +790,26 @@ def test_compat_has_measure_withdensity_comp():
     assert 'theorem _root_.MeasureTheory.Measure.withDensity_comp' in src
     assert {'Mathlib.Probability.Kernel.WithDensity',
             'Mathlib.Probability.Kernel.Composition.MeasureComp'} <= set(O.COMPAT_NARROW_IMPORTS)
+
+
+# d13f23b's Mathlib.MeasureTheory.Group.Circle gives `Circle` its subtype MeasurableSpace and BorelSpace; ours has
+# neither, so `Measurable fun p => 𝐞 …` has no instance (Boltzmann DampedCollisionHistories, VelocityWeight; q141).
+# A data-carrying compat instance is a def turned on locally (oaiq-122), here in modules using the characters.
+
+def test_circle_measurable_space_is_a_local_instance_where_characters_are_used():
+    src = open(O_COMPAT, encoding='utf-8').read()
+    assert '@[reducible] def circleMeasurableSpace : MeasurableSpace Circle' in src
+    assert 'theorem circleBorelSpace : @BorelSpace Circle _ circleMeasurableSpace' in src
+    assert {'Mathlib.Analysis.Complex.Circle',
+            'Mathlib.MeasureTheory.Constructions.BorelSpace.Complex'} <= set(O.COMPAT_NARROW_IMPORTS)
+    line = 'attribute [local instance] OAI.circleMeasurableSpace OAI.circleBorelSpace\n'
+    assert O.circle_line('theorem t : Measurable (fun x : ℝ => 𝐞 x) := by fun_prop\n') == line
+    assert O.circle_line('theorem t : Measurable (fun x : ℝ => Real.fourierChar x) := by fun_prop\n') == line
+    assert O.circle_line('def AddCircleish := 1\ntheorem t (x : Circle) : True := trivial\n') == ''
+    # a module declaring its own instance keeps it (MultipleMixing Tensors)
+    assert O.circle_line('local instance : MeasurableSpace Circle := borel Circle\nexample := 𝐞 0\n') == ''
+    src2 = {'OAI.G.A': ('A', 'import Mathlib\nnamespace OAI.G\ntheorem a : Measurable (fun x : ℝ => 𝐞 x) := by fun_prop\nend OAI.G\n')}
+    assert line in O.module_files(src2, 'Solutions.G', (), '')['A.lean']
 
 
 def test_compat_has_mvpolynomial_monomial_mul_monomial():
@@ -2887,3 +2915,17 @@ def test_bare_alias_use_becomes_the_full_name():
     out = O.apply_rewrites(src, rw)
     assert '  apply Finset.prod_le_prod\n' in out and 'exact Finset.prod_le_prod (fun i' in out
     assert O.apply_rewrites(out, rw) == out
+
+
+# d13f23b's `EuclideanDomain.instIsPrincipalIdealRing` is our `EuclideanDomain.to_principal_ideal_domain`, and
+# d13f23b's `integral_comp_log_Ioi_zero` (∫ x in Ioi 0, x⁻¹ • g (log x) = ∫ y, g y) is missing here
+# (JointDickman Jacobsthal PrimitiveResultant and MellinSieveProfile, q142; CubicMoment uses the second too).
+
+def test_euclidean_pid_instance_rename_and_integral_comp_log_Ioi_zero_compat():
+    src = "    exact EuclideanDomain.instIsPrincipalIdealRing\n  rw [MeasureTheory.integral_comp_log_Ioi_zero g]\n"
+    out = O.core_rewrites(src)
+    assert "    exact EuclideanDomain.to_principal_ideal_domain\n" in out
+    assert "  rw [OAI.integral_comp_log_Ioi_zero g]\n" in out
+    assert O.core_rewrites(out) == out
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^theorem integral_comp_log_Ioi_zero\b', block, re.M)
