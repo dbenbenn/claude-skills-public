@@ -328,6 +328,11 @@ SNAPSHOT_RULES = {
     'graph': ('LeanInfo tool', ['lean/LeanInfo.lean', 'lean/DeclGraph.lean']),
 }
 GRAPH_READERS = ('extdefs', 'plan', 'gen')     # the steps that load the graph (and LeanInfo's readings)
+# q131 (2026-10-30): the steps that read the files gen writes, with the parts of `out/` each reads; a re-run
+# gen whose output changed makes them stale (and everything after them: publish_prep, pieces_prep sync
+# publish/out). `--redo gen` after a patch for two stopped pieces had left measure_pieces, calibrate_pieces
+# and pieces_prep done, so publish/out kept the old text and split_run resent nothing
+GEN_READERS = {'measure': ('lib',), 'measure_pieces': ('solutions',)}
 GRAPH_CONFIG_KEYS = ('src', 'roots', 'prefix', 'work', 'external_theorems')   # what `carve.py graph` reads
 
 
@@ -435,6 +440,8 @@ class Pipeline:
             'config': {'port': port_out},
             'gen': {'carve patches': hash_paths([cp] if (cp := self.carve_patches_path()) else [])},
         }.get(s, {})
+        if s in GEN_READERS:
+            h['gen output'] = self.gen_output_hash(s)
         if s in GRAPH_READERS and (gp := self.graph_path()):
             # oaiq-123: a `graph` re-run by a LeanInfo change is popped alone, "its consumers check its
             # output": without this, a changed graph left the old plan in place
@@ -445,6 +452,16 @@ class Pipeline:
         if rule and (s != 'filter_patches' or pp):
             h[rule[0]] = rules_hash(self.snap, rule[1])
         return h
+
+    def gen_out(self):
+        """The directory `carve.py gen` writes (config `out`, carve_prep's default DIR/out)."""
+        return os.path.expanduser((self.read_config() or {}).get('out') or os.path.join(self.d, 'out'))
+
+    def gen_output_hash(self, s):
+        """What of gen's output step `s` reads: out/lib for `measure` in overlap mode (the pieces are
+        measure_pieces'), all of out/ for the classic measure."""
+        parts = GEN_READERS[s] if self.overlap() else ('lib', 'solutions')
+        return hash_paths([os.path.join(self.gen_out(), x) for x in parts], ('.lean',))
 
     def graph_path(self):
         """The declaration graph `carve.py graph` writes (config `work`/decl_graph.jsonl), or None."""
@@ -486,6 +503,11 @@ class Pipeline:
                     and g.get('status') == 'done' and g.get('finished', '') > rec.get('finished', '~')):
                 # a record from before the graph hash: `graph` ran again after it (oaiq-019/oaiq-123)
                 return s, 'graph output'
+            if (s in GEN_READERS and 'gen output' not in had and rec['status'] == 'done'
+                    and (self.state['steps'].get('gen') or {}).get('status') == 'done'
+                    and self.state['steps']['gen'].get('finished', '') > rec.get('finished', '~')):
+                # a record from before the gen hash: gen ran again after it (q131)
+                return s, 'gen output'
             if (s in ('build', 'config') and 'port' not in had and rec['status'] == 'done'
                     and self.newest_ported_mtime() > _epoch(rec.get('finished'))):
                 # a record from before the port hash, and the port rewrote a module after it (oaiq-122: an
@@ -1005,8 +1027,7 @@ class Pipeline:
         if not (self.state.get('auto_config') or {}).get('frozen'):
             return
         cfg = self.read_config() or {}
-        out = os.path.expanduser(cfg.get('out') or self.d)
-        drift = published_drift(os.path.join(out, 'lib'), os.path.join(self.published_dir(), 'lib'))
+        drift = published_drift(os.path.join(self.gen_out(), 'lib'), os.path.join(self.published_dir(), 'lib'))
         if drift:
             raise StepFailed(
                 "step '%s': %d bundle/statement file(s) that are published or being published changed: %s. They are "
@@ -1555,7 +1576,10 @@ class Pipeline:
                 # after publishing, only what this run did deliberately (a --redo, or a step it ran before)
                 # may make a step stale; a change from outside (an edited patches file, a port folder
                 # rewritten under the carve) stops for a person
-                if (st[1] not in self.RULE_KEYS and self.publishing_started() and st[0] not in only_redo
+                # (a changed gen output only measures again: what is published is guarded by
+                # check_published_unchanged and publish-prep --sync, q131)
+                if (st[1] not in self.RULE_KEYS and st[1] != 'gen output' and self.publishing_started()
+                        and st[0] not in only_redo
                         and not any(STEPS.index(x) < STEPS.index(st[0]) for x in self.ran_now)):
                     raise StepFailed(self.STALE_AFTER_PUBLISHING % (st[0], st[1], st[0]))
                 print(self.stale_message(*st), flush=True)
@@ -1592,6 +1616,10 @@ class Pipeline:
                 self.save()
                 raise
             rec.update(status=res or 'done', finished=_now())
+            if s in GEN_READERS and 'in' in rec:
+                # what was measured, after the step's own repairs (carve_measure cuts a failing file in
+                # place and records the cut, which gen re-applies): those never make it stale
+                rec['in']['gen output'] = self.gen_output_hash(s)
             self.ran_now.add(s)
             if cfg_before is not None:
                 self.config_consumers(cfg_before)

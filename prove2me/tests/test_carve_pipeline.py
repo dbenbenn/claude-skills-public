@@ -1942,3 +1942,83 @@ def test_without_the_monitor_skill_the_driver_runs_as_before(env):
     r = run(env, *ARGS)                    # the synthetic repo has no monitor/ directory
     assert r.returncode == 0, r.stdout + r.stderr
     assert carve_section(env) is None
+
+
+# ---------------------------------------------------------------- gen's output is an input of what reads it
+GEN_WRITES = textwrap.dedent('''
+    for _f, _x in json.loads(os.environ.get('STUB_GEN_FILES', '{}')).items():
+        _p = os.path.join(os.getcwd(), 'out', _f)
+        os.makedirs(os.path.dirname(_p), exist_ok=True)
+        open(_p, 'w').write(_x)
+''')
+
+
+def _gen_writes(monkeypatch, **files):
+    monkeypatch.setenv('STUB_HOOK_carve_gen', GEN_WRITES)
+    monkeypatch.setenv('STUB_GEN_FILES', json.dumps({k.replace('__', '/') + '.lean': v for k, v in files.items()}))
+
+
+def test_a_rerun_gen_whose_pieces_changed_re_measures_and_re_syncs_them(env, monkeypatch):
+    # q131 (2026-10-30): after a post-carve patch for two stopped pieces, `--redo gen --publish` rewrote out/,
+    # but measure_pieces, calibrate_pieces and pieces_prep stayed done: publish/out kept the old text, and
+    # split_run resent nothing ("exit 0")
+    _overlap_carve(env, monkeypatch)
+    _gen_writes(monkeypatch, lib__Def_B0='b0', solutions__Sol_P0='old')
+    assert run(env, *ARGS_NEW, '--publish').returncode == 0
+    _gen_writes(monkeypatch, lib__Def_B0='b0', solutions__Sol_P0='patched')
+    env.log.write_text('')
+    r = run(env, '--redo', 'gen', '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'stale: measure_pieces' in r.stdout
+    measures = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure']
+    assert measures == [['config.json', '--keep-going', '--kinds', 'piece']]     # bundles and statements unchanged
+    seq = tools_called(env)
+    i = seq.index(('carve_measure', 'config.json'))
+    assert ('carve_prep', 'publish-prep') in seq[i:] and seq[-1] == ('split_run', 'publish/run.json')
+    # a re-run gen that writes the same text re-runs nothing that reads it
+    env.log.write_text('')
+    r = run(env, '--redo', 'gen', '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'stale' not in r.stdout and ('carve_measure', 'config.json') not in tools_called(env)
+
+
+def test_a_bundle_or_statement_changed_by_gen_is_measured_again(env, monkeypatch):
+    _overlap_carve(env, monkeypatch)
+    _gen_writes(monkeypatch, lib__Def_B0='b0', solutions__Sol_P0='p0')
+    assert run(env, *ARGS_NEW).returncode == 0
+    _gen_writes(monkeypatch, lib__Def_B0='b0 fixed', solutions__Sol_P0='p0')
+    env.log.write_text('')
+    r = run(env, '--redo', 'gen')
+    assert r.returncode == 0, r.stdout + r.stderr
+    measures = [c['argv'][-1] for c in calls(env) if c.get('tool') == 'carve_measure']
+    assert measures == ['bundle,statement', 'piece']
+
+
+def test_measure_repairs_do_not_make_measure_stale(env, monkeypatch):
+    # carve_measure cuts a failing file in place (work/repairs.json): what it measured is what it recorded
+    _overlap_carve(env, monkeypatch)
+    _gen_writes(monkeypatch, lib__Def_B0='b0 bad', solutions__Sol_P0='p0')
+    monkeypatch.setenv('STUB_HOOK_carve_measure_config_json', MEASURE_HOOK + textwrap.dedent('''
+        _p = os.path.join(os.getcwd(), 'out', 'lib', 'Def_B0.lean')
+        if 'bundle' in _kinds:
+            open(_p, 'w').write('b0')
+    '''))
+    assert run(env, *ARGS_NEW).returncode == 0
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 0 and 'stale' not in r.stdout and tools_called(env) == [], r.stdout
+
+
+def test_a_measure_from_before_the_gen_hash_is_stale_when_gen_ran_after_it(env, monkeypatch):
+    _overlap_carve(env, monkeypatch)
+    assert run(env, *ARGS_NEW).returncode == 0
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    for s in ('measure', 'measure_pieces'):
+        st['steps'][s].pop('in', None)
+        st['steps'][s]['finished'] = '2026-10-26T19:03:20'
+    st['steps']['gen']['finished'] = '2100-01-01T00:00:00'           # after everything (graph too)
+    json.dump(st, open(env.dir / 'pipeline_state.json', 'w'))
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'stale: measure' in r.stdout and ('carve_measure', 'config.json') in tools_called(env)
