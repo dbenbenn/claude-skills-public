@@ -36,7 +36,9 @@ CONFIG.json (paths may use ~):
                                               # copy ("lib": DIR, else the workspace's
                                               # Definitions/, fetch_theorems.py) and refuses
                                               # without one; "repairs": the old carve's
-                                              # work/repairs.json, to check the regenerated text
+                                              # work/repairs.json, to check the regenerated text;
+                                              # "thawed": file names frozen but not live, which
+                                              # gen generates (carve_pipeline sets it, q128)
    "collapse_mathlib": true,                  # `import Mathlib` instead of the module list
    "external_defs": {"OAI.Erdos3.HasAP": "Definitions.Def_ErdosReciprocal"},  # declarations
                                               # someone else's published bundle provides
@@ -154,14 +156,17 @@ def recorded_repairs(cfg):
 def published_frozen(cfg, plan, names=None):
     """{bundle: published text} of the frozen bundles gen is asked for, from `frozen.lib` or the
     workspace's Definitions/ (where fetch_theorems.py writes published bundles). A published
-    bundle is frozen, so gen writes it byte for byte; without a copy it refuses."""
+    bundle is frozen, so gen writes it byte for byte; without a copy it refuses. `frozen.thawed`
+    (file names, set by carve_pipeline) are frozen but not live, e.g. stopped on the verifier: they
+    are generated, with the post-carve patches (q128)."""
     fz = cfg.get('frozen') or {}
     dirs = [os.path.expanduser(fz['lib'])] if fz.get('lib') else []
     dirs.append(os.path.join(leaninfo.workspace(), 'Definitions'))
     out, missing = {}, []
     planned = {b['name'] for b in plan['bundles']}
+    thawed = set(fz.get('thawed') or ())
     for b in fz.get('bundles', ()):
-        if b not in planned or (names is not None and b not in names):
+        if b not in planned or (names is not None and b not in names) or 'Def_%s.lean' % b in thawed:
             continue
         p = next((os.path.join(d, 'Def_%s.lean' % b) for d in dirs
                   if os.path.exists(os.path.join(d, 'Def_%s.lean' % b))), None)
@@ -186,13 +191,14 @@ def published_frozen_stubs(cfg, plan, names=None):
         return {}
     lib = os.path.expanduser(fz['lib'])
     external = set(cfg.get('external', ())) | set(plan.get('external', ()))
+    thawed = set(fz.get('thawed') or ())
     out = {}
     for n in plan['nodes']:
         if n in external or (names is not None and n not in names):
             continue
         fn = 'Thm_%s.lean' % C.slug(C.statement_name(plan, n))
         p = os.path.join(lib, fn)
-        if os.path.exists(p):
+        if os.path.exists(p) and fn not in thawed:
             out[fn] = open(p, encoding='utf-8').read()
     return out
 
@@ -433,6 +439,13 @@ def main(argv):
         # with the snapshot, a statement folded away): a full gen fails on it, as filter_patches does
         # for port patches (oaiq-123); a partial gen cannot tell
         stale = unused_patches(patches, r['patches_unused']) if names is None and what == 'all' else []
+        why = {pt['literal_old']: pt.get('why') for pt in patches}
+        # q128: a patch whose only match is a frozen file written as published reached no copy at all
+        stale += ['PATCH ON A FROZEN FILE ONLY: %r%s matches %s, which is frozen (published or being '
+                  'published) and written as published, without the patch. A live item cannot change; '
+                  'one that is not live (stopped before it went live) takes patches once carve_pipeline '
+                  'lists it in config frozen.thawed' % (o[:160], ' -- ' + why[o] if why.get(o) else '', f)
+                  for o, f in r['patches_frozen']] if names is None and what == 'all' else []
         for line in stale:
             print(line)
         if r['over_cap'] or stale:

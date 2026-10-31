@@ -166,17 +166,22 @@ def locked_files(d, running=False):
     of a plan it may be sending (published/plan.json, publish/plan.json). The rest of publish/out/lib and
     published/lib may change: oaiq-122 (2026-10-30), files of an automatic split's plan the publisher
     never sent (227 beside 74 published) made `check_published_unchanged` and `publish-prep --sync`
-    refuse a re-plan that reused 9 of their names."""
+    refuse a re-plan that reused 9 of their names. So may an item the run state shows stopped (split_run's
+    terminal states: posted, not live, waiting for a person, whose changed text split_run sends again):
+    q128 (2026-10-30), a frozen bundle stopped on the verifier before it went live could not take the
+    post-carve patch that fixed it."""
+    from .splitrun import TERMINAL
     pub = os.path.join(d, 'published')
     frozen_plan = _load_json(os.path.join(pub, 'plan.json'))
     out = set()
     if frozen_plan and os.path.isdir(os.path.join(pub, 'lib')):
         out |= plan_lib_files(frozen_plan) & set(os.listdir(os.path.join(pub, 'lib')))
-    out |= {f for f, rec in run_state_files(d).items() if posted(rec)}
+    rs = run_state_files(d)
+    out |= {f for f, rec in rs.items() if posted(rec)}
     if running:
         for p in (frozen_plan, _load_json(os.path.join(d, 'publish', 'plan.json'))):
             out |= plan_lib_files(p) if p else set()
-    return out
+    return out - {f for f, rec in rs.items() if isinstance(rec, dict) and rec.get('state') in TERMINAL}
 
 
 def publisher_running_at(d, state=None):
@@ -1084,8 +1089,28 @@ class Pipeline:
         self.run_cmds('plan', [self.tool('carve', 'plan', 'config.json')])
 
     def step_gen(self):
+        self.set_thawed()
         self.run_cmds('gen', [self.tool('carve', 'gen', 'config.json')])
         self.check_published_unchanged('gen')
+
+    def set_thawed(self):
+        """config `frozen.thawed`: the files of published/lib that are not locked (locked_files), which gen
+        generates, with the post-carve patches, instead of copying them (q128: a bundle stopped on the
+        verifier before it went live; oaiq-122: an earlier plan's never-sent statement under a name a
+        re-plan reused)."""
+        cfg = self.read_config()
+        if cfg is None or not isinstance(cfg.get('frozen'), dict):
+            return
+        lib = os.path.join(self.published_dir(), 'lib')
+        have = set(os.listdir(lib)) if (self.state.get('auto_config') or {}).get('frozen') and os.path.isdir(lib) else set()
+        thawed = sorted(have - locked_files(self.d, self.publisher_running()))
+        if thawed == sorted(cfg['frozen'].get('thawed') or ()):
+            return
+        if thawed:
+            cfg['frozen']['thawed'] = thawed
+        else:
+            cfg['frozen'].pop('thawed', None)
+        json.dump(cfg, open(os.path.join(self.d, 'config.json'), 'w'), indent=1)
 
     def published_dir(self):
         return os.path.join(self.d, 'published')
@@ -1096,8 +1121,18 @@ class Pipeline:
         if not (self.state.get('auto_config') or {}).get('frozen'):
             return
         locked = locked_files(self.d, self.publisher_running())
-        drift = [f for f in published_drift(os.path.join(self.gen_out(), 'lib'), os.path.join(self.published_dir(), 'lib'))
-                 if f in locked]
+        lib, plib = os.path.join(self.gen_out(), 'lib'), os.path.join(self.published_dir(), 'lib')
+        changed = published_drift(lib, plib)
+        drift = [f for f in changed if f in locked]
+        plan = _load_json(os.path.join(self.published_dir(), 'plan.json')) or {}
+        thawed = [f for f in changed if f not in locked and f in plan_lib_files(plan) and os.path.exists(os.path.join(lib, f))]
+        if not drift:
+            # a frozen item that is not live (stopped) changed on purpose: its frozen copy follows, as split_run's
+            # heartbeat raise does, and publish-prep --sync brings it to publish/out (q128)
+            for f in thawed:
+                shutil.copy(os.path.join(lib, f), os.path.join(plib, f))
+                print('== %s: %s is frozen but not live (thawed): changed, its copy in published/lib updated'
+                      % (step, f), flush=True)
         if drift:
             raise StepFailed(
                 "step '%s': %d bundle/statement file(s) that are published or being published changed: %s. They are "

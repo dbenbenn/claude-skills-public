@@ -589,18 +589,23 @@ def test_publish_prep_sync_lets_files_no_publisher_was_given_change(tmp_path, mo
     from p2mlib import carvepipeline as CPL
     P = _prep_dir(tmp_path)
     (tmp_path / 'out/lib/Thm_Old.lean').write_text('old')          # an earlier plan's statement
-    (tmp_path / 'out/lib/Def_Z.lean').write_text('z')              # posted, stopped
+    (tmp_path / 'out/lib/Def_Z.lean').write_text('z')              # posted, in flight
+    (tmp_path / 'out/lib/Def_Y.lean').write_text('y')              # posted, stopped (q128: thawed)
     CP.publish_prep(str(tmp_path), 'src', ['t'])
     pub = tmp_path / 'published'
     (pub / 'lib').mkdir(parents=True)
     (pub / 'plan.json').write_text((P / 'plan.json').read_text())
     for f in ('Def_A.lean', 'Thm_S.lean', 'Thm_Old.lean'):         # Thm_Old: frozen before 54e5524
         (pub / 'lib' / f).write_text((P / 'out' / 'lib' / f).read_text())
-    (P / 'run_state.json').write_text(json.dumps({'bundle:Z': {'state': 'stop', 'history': {'wa': 1}}}))
+    (pub / 'lib' / 'Def_Y.lean').write_text('y')
+    (P / 'run_state.json').write_text(json.dumps({'bundle:Z': {'state': 'inflight', 'history': {}, 'job': 'j'},
+                                                  'bundle:Y': {'state': 'stop', 'history': {'wa': 1}}}))
     assert CPL.locked_files(str(tmp_path)) == {'Def_A.lean', 'Thm_S.lean', 'Def_Z.lean'}
+    (tmp_path / 'out/lib/Def_Y.lean').write_text('y fixed')         # the person's answer, resent by split_run
     (tmp_path / 'out/lib/Thm_Old.lean').write_text('reused name, new text')
     CP.publish_prep(str(tmp_path), 'src', ['t'], sync=True)
     assert (P / 'out/lib/Thm_Old.lean').read_text() == 'reused name, new text'
+    assert (P / 'out/lib/Def_Y.lean').read_text() == 'y fixed'
     for f in ('Thm_S.lean', 'Def_Z.lean'):
         (tmp_path / 'out/lib' / f).write_text('changed')
         with pytest.raises(SystemExit, match=f):

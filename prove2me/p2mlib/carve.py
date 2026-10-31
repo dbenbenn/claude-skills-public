@@ -4170,10 +4170,14 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
     `frozen_text`: {bundle name: text} of published bundles. A published bundle is frozen, so its
     file is written exactly as published; when the generator (with patches and repairs) would
     write something else, the bundle is listed in 'frozen_drift' (Boone-Higman, 2026-10-24: a
-    carve extending a published one regenerated its frozen bundles without their repair)."""
+    carve extending a published one regenerated its frozen bundles without their repair). A patch
+    that matched a frozen file whose published text lacks it counts as used only where it applied
+    to a file written from the generator; one that applied nowhere else is in 'patches_frozen'
+    [(literal_old, file name)] (q128, 2026-10-30: a patch for a frozen bundle that stopped before it
+    was live ran "cleanly", and no copy carried it)."""
     repairs, frozen_text = repairs or {}, frozen_text or {}
     frozen_stubs = frozen_stubs or {}
-    stale, drift = [], []
+    stale, drift, frozen_hits = [], [], []
     os.makedirs(os.path.join(out, 'lib'), exist_ok=True)
     os.makedirs(os.path.join(out, 'solutions'), exist_ok=True)
     files = []
@@ -4181,11 +4185,15 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
     used = set()
 
     def put(path, txt, published=None):
+        base = os.path.basename(path)
         for pt in patches:
             if pt['literal_old'] in txt:
                 txt = txt.replace(pt['literal_old'], pt['literal_new'])
-                used.add(pt['literal_old'])
-        base = os.path.basename(path)
+                old, new = pt['literal_old'], pt['literal_new']
+                if published is None or old not in published or (new and old in new and new in published):
+                    used.add(old)          # written, or the published copy carries it already
+                else:
+                    frozen_hits.append((old, base))
         if repairs.get(base):
             txt, _, bad = RP.apply_cuts(txt, repairs[base])
             stale.extend((base, c) for c in bad)
@@ -4247,5 +4255,7 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
                 gen_piece(g, plan, n, collapse_mathlib))
     sizes = {f: os.path.getsize(f) for f in files}
     return {'files': files, 'sizes': sizes, 'over_cap': [f for f, s in sizes.items() if s > SIZE_CAP],
-            'patches_unused': [pt['literal_old'] for pt in patches if pt['literal_old'] not in used],
+            'patches_unused': [pt['literal_old'] for pt in patches
+                               if pt['literal_old'] not in used and all(pt['literal_old'] != o for o, _ in frozen_hits)],
+            'patches_frozen': [(o, f) for o, f in frozen_hits if o not in used],
             'stale_repairs': stale, 'frozen_drift': drift}

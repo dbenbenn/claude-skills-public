@@ -2059,3 +2059,34 @@ def test_a_frozen_file_of_no_item_of_the_published_plan_may_change(env, monkeypa
     _gen_writes(monkeypatch, lib__Def_B0='b0 changed', lib__Thm_P0='p0', solutions__Sol_P0='s')
     r = run(env, '--redo', 'gen', '--publish')
     assert r.returncode == 1 and "step 'gen'" in r.stderr and 'Def_B0.lean' in r.stderr
+
+
+def test_a_frozen_bundle_stopped_before_it_went_live_takes_a_post_carve_patch(env, monkeypatch):
+    # q128 (2026-10-30): publish_early froze every bundle of the plan; OAIQ023F039 then stopped on the
+    # verifier (heartbeat timeout) before it was live. A post-carve patch for it ran "cleanly", but gen copied
+    # the frozen text, so neither out/lib, publish/out/lib nor published/lib carried it and split_run did not
+    # resend it. Frozen but stopped is thawed: gen generates it (config frozen.thawed), published/lib follows.
+    _overlap_carve(env, monkeypatch)
+    files = dict(lib__Def_B0='b0', lib__Def_B1='b1', lib__Thm_P0='p0', lib__Thm_P1='p1', solutions__Sol_P0='s')
+    _gen_writes(monkeypatch, **files)
+    assert run(env, *ARGS_NEW, '--publish').returncode == 0
+    (env.dir / 'publish' / 'run_state.json').write_text(json.dumps({
+        'bundle:B0': {'state': 'raise_heartbeats', 'history': {'heartbeat': 2}, 'sha': 'x'},
+        'bundle:B1': {'state': 'live', 'id': 'b1'}, 'statement:P0': {'state': 'live', 'id': 'p0'}}))
+    monkeypatch.setenv('STUB_HOOK_carve_gen', GEN_WRITES + textwrap.dedent('''
+        open(os.path.join(os.getcwd(), 'thawed.json'), 'w').write(
+            json.dumps(json.load(open('config.json'))['frozen'].get('thawed')))
+    '''))
+    monkeypatch.setenv('STUB_GEN_FILES', json.dumps({'lib/Def_B0.lean': 'b0 patched', 'lib/Def_B1.lean': 'b1',
+                                                     'lib/Thm_P0.lean': 'p0', 'lib/Thm_P1.lean': 'p1'}))
+    r = run(env, '--redo', 'gen', '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert json.load(open(env.dir / 'thawed.json')) == ['Def_B0.lean']    # P1: not posted, but frozen to send
+    assert (env.dir / 'published' / 'lib' / 'Def_B0.lean').read_text() == 'b0 patched'
+    assert (env.dir / 'publish' / 'out' / 'lib' / 'Def_B0.lean').read_text() == 'b0 patched'
+    assert 'thawed' in r.stdout and 'Def_B0.lean' in r.stdout
+    # a live one stays frozen
+    monkeypatch.setenv('STUB_GEN_FILES', json.dumps({'lib/Def_B0.lean': 'b0 patched', 'lib/Def_B1.lean': 'b1 changed'}))
+    r = run(env, '--redo', 'gen', '--publish')
+    assert r.returncode == 1 and "step 'gen'" in r.stderr and 'Def_B1.lean' in r.stderr
+

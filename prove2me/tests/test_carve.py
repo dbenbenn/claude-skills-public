@@ -1024,6 +1024,47 @@ def test_gen_fails_on_a_patch_matching_no_generated_file(tmp_path):
     run('gen', str(cfg))
 
 
+def test_a_patch_only_a_frozen_file_would_take_fails_gen_and_a_thawed_file_takes_it(tmp_path):
+    # q128 (2026-10-30): publish_early froze every bundle of the plan; OAIQ023F039 then stopped on the
+    # verifier before it was live, and a post-carve patch for it ran "cleanly": gen wrote the frozen text,
+    # so no copy carried the patch and split_run resent nothing. A frozen file whose item is not live is
+    # listed in `frozen.thawed` (carve_pipeline) and generated with the patches; a patch whose only match
+    # is a frozen file still written as published fails a full gen, naming both.
+    cfg, work, out, run = _carve_cli(tmp_path, 'first')
+    run('plan', str(cfg))
+    run('gen', str(cfg))
+    pub = tmp_path / 'published'
+    pub.mkdir()
+    for b in ('CDB000', 'CDB002'):
+        (pub / ('Def_%s.lean' % b)).write_bytes((out / 'lib' / ('Def_%s.lean' % b)).read_bytes())
+    thm = sorted(p.name for p in (out / 'lib').glob('Thm_*.lean'))[0]
+    (pub / thm).write_text((out / 'lib' / thm).read_text() + '-- as published\n')
+    old = 'def quad (n : Nat)'
+    assert [f.name for f in out.rglob('*.lean') if old in f.read_text()] == ['Def_CDB002.lean']
+    pat = tmp_path / 'patches.json'
+    pat.write_text(json.dumps([{'literal_old': old, 'literal_new': '-- patched\n' + old, 'why': 'F039 fix'}]))
+    frozen = {'plan': str(work / 'plan.json'), 'bundles': ['CDB000', 'CDB002'], 'lib': str(pub)}
+    cfg2, work2, out2, run2 = _carve_cli(tmp_path, 'second', frozen=frozen, patches=str(pat))
+    run2('plan', str(cfg2))
+    msg = run2('gen', str(cfg2), ok=False)
+    assert 'PATCH ON A FROZEN FILE ONLY' in msg and 'Def_CDB002.lean' in msg and 'F039 fix' in msg, msg
+    assert 'thawed' in msg and 'MATCHING NO GENERATED FILE' not in msg
+    assert '-- patched' not in (out2 / 'lib' / 'Def_CDB002.lean').read_text()
+    # thawed (frozen, but not live): generated with the patch; a thawed statement is regenerated too
+    cfg2.write_text(json.dumps(dict(json.load(open(cfg2)), frozen=dict(frozen, thawed=['Def_CDB002.lean', thm]))))
+    run2('gen', str(cfg2))
+    assert '-- patched\n' + old in (out2 / 'lib' / 'Def_CDB002.lean').read_text()
+    assert (out2 / 'lib' / thm).read_text() == (out / 'lib' / thm).read_text()
+    assert (out2 / 'lib' / 'Def_CDB000.lean').read_bytes() == (pub / 'Def_CDB000.lean').read_bytes()
+    # a thawed bundle needs no published copy
+    (pub / 'Def_CDB002.lean').unlink()
+    run2('gen', str(cfg2))
+    # a patch the published copy already carries is not reported (published after the patch was written)
+    (pub / 'Def_CDB002.lean').write_text((out2 / 'lib' / 'Def_CDB002.lean').read_text())
+    cfg2.write_text(json.dumps(dict(json.load(open(cfg2)), frozen=frozen)))
+    run2('gen', str(cfg2))
+
+
 def test_gen_refuses_a_frozen_bundle_without_a_published_copy(tmp_path):
     cfg, work, out, run = _carve_cli(tmp_path, 'first')
     run('plan', str(cfg))
