@@ -710,5 +710,26 @@ theorem _root_.MeasureTheory.Measure.prod_apply₀ {α β : Type*} [MeasurableSp
   refine lintegral_congr_ae ?_
   filter_upwards [Measure.ae_ae_of_ae_prod hst] with x hx
   exact (measure_congr hx).symm
+/-- Mathlib d13f23b's `AbsolutelyContinuousOnInterval.congr` (CircleDomains, q146). -/
+theorem _root_.AbsolutelyContinuousOnInterval.congr {X : Type*} [PseudoMetricSpace X] {f g : ℝ → X}
+    {a b : ℝ} (hf : AbsolutelyContinuousOnInterval f a b)
+    (hfg : Set.EqOn f g (Set.uIcc a b)) : AbsolutelyContinuousOnInterval g a b := by
+  apply Filter.Tendsto.congr' _ hf
+  rw [Filter.eventuallyEq_inf_principal_iff]
+  filter_upwards with ⟨n, I⟩ hnI
+  exact Finset.sum_congr rfl fun i hi ↦ by rw [hfg (hnI.1 i hi).1, hfg (hnI.1 i hi).2]
+/-- Mathlib d13f23b's public `Set.subset_image_sdiff` (private in 0df444a; CircleDomains, q146). -/
+theorem _root_.Set.subset_image_sdiff {α β : Type*} (f : α → β) (s t : Set α) :
+    f '' s \ f '' t ⊆ f '' (s \ t) := by
+  rw [Set.sdiff_subset_iff, ← Set.image_union, Set.union_sdiff_self]
+  exact Set.image_mono Set.subset_union_right
+/-- Mathlib d13f23b's `exists_contDiff_support_eq_eq_one_iff` (CircleDomains, q146). -/
+theorem _root_.exists_contDiff_support_eq_eq_one_iff {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℝ E] [FiniteDimensional ℝ E] {n : ℕ∞} {s t : Set E} (hs : IsOpen s)
+    (ht : IsClosed t) (h : t ⊆ s) :
+    ∃ f : E → ℝ, ContDiff ℝ n f ∧ Set.range f ⊆ Set.Icc 0 1 ∧ Function.support f = s ∧
+      (∀ x, x ∈ t ↔ f x = 1) := by
+  simpa [contMDiff_iff_contDiff] using
+    exists_contMDiff_support_eq_eq_one_iff (modelWithCornersSelf ℝ E) (n := n) hs ht h
 end OAICompat434
 

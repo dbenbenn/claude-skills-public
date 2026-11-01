@@ -2350,6 +2350,17 @@ def test_variable_binder_is_shadowed_by_a_later_binder():
     assert O.core_rewrites(src) == src
 
 
+def test_forall_family_binder_dot_map_gets_its_proof():
+    # CircleDomains (q146) CountableCodedCollarLaws: `(μ : ∀ i, ProbabilityMeasure (Ω i))`, used as `(μ i).map (a i)`
+    src = ("theorem fam (Ω : I → Type*) [∀ i, MeasurableSpace (Ω i)]\n"
+           "    (μ : ∀ i, ProbabilityMeasure (Ω i)) (a : ∀ i, Ω i → X) (ha : ∀ i, Measurable (a i))\n"
+           "    (h : ∀ i, NullSingletonClass (law ((μ i).map (a i)) : Measure X)) : True := by\n"
+           "  trivial\n")
+    out = O.core_rewrites(src)
+    assert "law ((μ i).map (f := (a i)) (by first | " in out
+    assert O.core_rewrites(out) == out
+
+
 def test_dot_map_is_left_alone_unless_a_binder_makes_mu_a_probability_measure():
     src = ("lemma a (μ : Measure X) : μ.map f = 0 := sorry\n"
            "lemma b (μ : ProbabilityMeasure X) : (μ : Measure X).map f = 0 := sorry\n"
@@ -3188,4 +3199,13 @@ def test_compat_has_more_d13f23b_lemmas_from_circle_domains():
     for n in ('MeasureTheory.average_nonneg_of_ae', 'MeasureTheory.average_nonneg', 'Set.Finite.isClosed_sUnion',
               'Finset.frontier_biUnion_subset', 'Set.Finite.frontier_biUnion_subset',
               'MeasureTheory.Measure.prod_apply₀'):
+        assert 'theorem _root_.%s ' % n in src, n
+
+
+def test_compat_has_congr_sdiff_and_contdiff_bump_from_circle_domains():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for n in ('AbsolutelyContinuousOnInterval.congr', 'Set.subset_image_sdiff',
+              'exists_contDiff_support_eq_eq_one_iff'):
         assert 'theorem _root_.%s ' % n in src, n

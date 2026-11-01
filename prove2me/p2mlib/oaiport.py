@@ -541,7 +541,7 @@ def _lines_before(text, pos, n=3):
     return '\n'.join(reversed(out))
 
 
-_PM_BINDER = re.compile(r"[({][ \t]*([\w'][\w' \t]*?)[ \t]*:[ \t]*((?:[^(){}\n:]*→[ \t]*)?)"
+_PM_BINDER = re.compile(r"[({][ \t]*([\w'][\w' \t]*?)[ \t]*:[ \t]*((?:[^(){}\n:]*→[ \t]*|∀[ \t]*[\w' \t]+,[ \t]*)?)"
                         r"(?:MeasureTheory\.)?ProbabilityMeasure\b")
 _ATOM = r"(?:[\w.']+|\([^()\n]*\))"
 _PM_EXISTS = re.compile(r"∃[ \t]+\(?([\w'][\w' \t]*?)[ \t]*:[ \t]*(?:MeasureTheory\.)?ProbabilityMeasure\b")
