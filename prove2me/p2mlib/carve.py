@@ -1893,7 +1893,7 @@ def _pin_chunks(g, pinned, B, taken, extra):
 def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_budget=90.0,
               bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
               external_defs=None, statement_suffix='', external=(), chunker='bands', pinned=None,
-              bundles_import_statements=True, promote_private=()):
+              bundles_import_statements=True, promote_private=(), bundle_theorems=()):
     """The split: bundles, nodes (published statements) and each node's piece.
 
     - Bundle material B: every reachable non-theorem, what reachable statements need, their
@@ -1905,6 +1905,10 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
       (its closure over non-node theorems) costs at most `budget` seconds and `piece_size` bytes.
       A node needs an ASCII public name and a statement that only uses bundle material; a private
       theorem is promoted only when listed in `promote_private` (a forced one always is a node).
+    - `bundle_theorems`: theorems (not targets or forced) made bundle material, so each is proved
+      once in a bundle and imported, instead of inside every piece that uses it (carve.py's
+      `kernel_lemmas_in_bundles`: the planar packing certificate had 255k `decide +kernel` lemmas,
+      one re-proved in 54 pieces, 129k s of planned piece time for a 35k s build; q148).
     - `frozen`: (old plan, [bundle names]) of bundles already published, kept as they are.
     - `external_defs`: {declaration: module} provided by someone else's published Definitions bundle
       (Erdős 3: the target's own definitions in marwahaha's Def_ErdosReciprocal). They stay out of
@@ -1939,6 +1943,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     seeds = {k for k in reach if not g.nodes[k].theorem}
     for k in reach:
         seeds |= g.nodes[k].sig
+    seeds |= {k for k in bundle_theorems if k in reach and k not in targets and k not in forced}
     fz_chunks = []
     if frozen:
         old, names = frozen

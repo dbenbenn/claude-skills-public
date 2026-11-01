@@ -65,6 +65,8 @@ CONFIG.json (paths may use ~):
    "cost_factors": {"OAI.X.lemma": 4.0},      # a declaration's cost times this (carve_pipeline:
                                               # the declarations of a piece measured over its
                                               # plan, by that ratio, for a frozen re-plan)
+   "kernel_lemmas_in_bundles": true,          # theorems proved by `decide` become bundle material:
+                                              #   checked once, imported by the pieces (q148)
    "promote_private": ["_private.M.0.OAI.X.lemma"],  # private theorems (graph node names) the
                                               # plan may promote to statements like public ones
                                               # (carve_pipeline: the private lemmas of a slow piece)
@@ -233,6 +235,14 @@ def costs(cfg, g):
     return apply_cost_factors(cost, cfg)
 
 
+def bundle_theorems(cfg, g):
+    """The theorems config `kernel_lemmas_in_bundles` makes bundle material: those proved by `decide`
+    (C.kernel_weights), each then checked once in a bundle instead of in every piece using it."""
+    if not cfg.get('kernel_lemmas_in_bundles'):
+        return set()
+    return {k for k in C.kernel_weights(g) if g.nodes[k].theorem and not g.nodes[k].instance}
+
+
 def apply_cost_factors(cost, cfg):
     """config `cost_factors` {declaration: factor}: the declarations of a piece measured over its
     plan cost that much more (carve_pipeline), so a frozen re-plan promotes lemmas inside it only."""
@@ -371,7 +381,8 @@ def main(argv):
                         chunker=cfg.get('chunker', 'bands'),
                         pinned=cfg.get('pinned'),
                         bundles_import_statements=cfg.get('bundles_import_statements', True),
-                        promote_private=cfg.get('promote_private', ()))
+                        promote_private=cfg.get('promote_private', ()),
+                        bundle_theorems=bundle_theorems(cfg, g))
         if cfg.get('folded'):
             P = C.fold_statements(P, cfg['folded'])
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)

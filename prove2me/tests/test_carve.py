@@ -161,6 +161,26 @@ def test_budget_promotes_intermediate_nodes(g, plan):
     assert main['imports'] and set(main['imports']) <= set(plan['nodes'])
 
 
+def test_bundle_theorems_are_proved_once_in_a_bundle_not_in_every_piece(g, plan):
+    # q148 (planar packing): one `decide +kernel` certificate lemma was re-proved in 54 pieces, 129k s
+    # of planned piece time for a 35k s build; as bundle material it is checked once and imported
+    lem = ('CD.pick_eq', 'CD.size_zero')
+    assert all(any(x in p['keep'] for p in plan['pieces'].values()) for x in lem)
+    P = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005, bundle_size=10**6,
+                    cost=C.size_costs(g, bytes_per_second=10000), bundle_prefix='CDB',
+                    bundle_theorems=set(lem) | {'CD.main', 'CD.not_a_node'})
+    assert C.check_plan(g, P) == []
+    assert all(any(x in b['nodes'] for b in P['bundles']) for x in lem)
+    assert not any(x in p['keep'] for x in lem for p in P['pieces'].values())
+    assert 'CD.main' in P['nodes'] and not any('CD.main' in b['nodes'] for b in P['bundles'])   # a target stays one
+
+
+def test_config_kernel_lemmas_in_bundles_names_the_kernel_decided_theorems(g):
+    cli = _carve_script()
+    assert cli.bundle_theorems({}, g) == set()
+    assert cli.bundle_theorems({'kernel_lemmas_in_bundles': True}, g) == {'CD.Co.rdef_pos'}   # not the instance
+
+
 def test_check_plan_flags_a_definition_missing_from_the_bundles(g, plan):
     # Erdős 3 B006 ("Unknown identifier `A.space`"): a bundle lost a definition one of its own
     # members needs. The check must say which and why.
