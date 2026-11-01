@@ -1503,15 +1503,44 @@ def parse_build_log(text):
     return out
 
 
-def module_costs(g, times, scale=1.5, default=2.0, overhead=0.5):
+_KERNEL_DECIDE = re.compile(r"(?<![\w.'])(?:decide|native_decide)(?![\w'])")
+
+
+def kernel_decided(value_text):
+    """Does a declaration's value (comments stripped) decide something by evaluation?"""
+    return bool(_KERNEL_DECIDE.search(value_text))
+
+
+def kernel_weights(g):
+    """{node: bytes} for the declarations proved by `decide` (`+kernel`, `native_decide`): the
+    sizes of what they name directly, which the kernel evaluates. Their own text is a hundred
+    bytes, so shared by size alone they look free (oaiq-098: 3559 `decide +kernel` lemmas planned
+    as one 55 s bundle took 2806 s)."""
+    out = {}
+    for k, nd in g.nodes.items():
+        info = g.infos.get(nd.module)
+        if info is None:
+            continue
+        c = info.commands[nd.cmd]
+        if c.value_start is None:
+            continue
+        if kernel_decided(strip(info.text_bytes[c.value_start.byte:c.end.byte].decode('utf-8', 'replace'))):
+            out[k] = sum(g.nodes[d].size for d in nd.deps if d != k and d in g.nodes)
+    return out
+
+
+def module_costs(g, times, scale=1.5, default=2.0, overhead=0.5, kernel=None):
     """Each module's elaboration time (from build logs; `default` when unknown), times `scale`,
-    less the import overhead, shared among its declarations by text size."""
+    less the import overhead, shared among its declarations by text size plus `kernel` weight
+    (kernel_weights)."""
+    kernel = kernel or {}
     cost = {}
     for m, keys in g.by_module.items():
-        tot = sum(g.nodes[k].size for k in keys) or 1
+        w = {k: g.nodes[k].size + kernel.get(k, 0) for k in keys}
+        tot = sum(w.values()) or 1
         tm = max(times.get(m, default) * scale - overhead, 0.05)
         for k in keys:
-            cost[k] = tm * g.nodes[k].size / tot
+            cost[k] = tm * w[k] / tot
     return cost
 
 

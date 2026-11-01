@@ -1282,6 +1282,29 @@ def test_measured_bundle_times_rescale_the_estimates_of_their_declarations():
     assert cost['a'] == 1.0                                    # input not mutated
 
 
+def test_kernel_decided_declarations_weigh_what_they_evaluate(g):
+    # `by decide` / `decide +kernel` makes the kernel evaluate the terms the statement names; the
+    # command itself is a hundred bytes. Shared by text size, oaiq-098's 3559 `decide +kernel`
+    # lemmas (Planar packing CachedData) were planned as one 55 s bundle and took 2806 s.
+    w = C.kernel_weights(g)
+    assert w['CD.Co.rdef_pos'] == g.nodes['CD.Co.rdef'].size
+    assert 'CD.Co.rdef' not in w and 'CD.main' not in w
+    assert C.kernel_decided('by decide +kernel') and C.kernel_decided(':= by\n  decide (kernel := true)')
+    assert C.kernel_decided('by native_decide') and C.kernel_decided('by fin_cases i <;> decide')
+    assert not C.kernel_decided('by simp [decide_eq_true_eq]') and not C.kernel_decided('h.decide')
+
+
+def test_module_costs_share_by_size_plus_kernel_weight():
+    from types import SimpleNamespace as NS
+    nodes = {'M.data': NS(size=900), 'M.lem': NS(size=100)}
+    g = NS(by_module={'M': ['M.data', 'M.lem']}, nodes=nodes)
+    plain = C.module_costs(g, {'M': 20.5}, scale=1.0)
+    assert plain['M.lem'] == pytest.approx(2.0)
+    out = C.module_costs(g, {'M': 20.5}, scale=1.0, kernel={'M.lem': 900})
+    assert out['M.lem'] == pytest.approx(20.0 * 1000 / 1900)
+    assert out['M.data'] + out['M.lem'] == pytest.approx(20.0)    # the module total is unchanged
+
+
 def test_measured_times_keyed_as_carve_measure_writes_them():
     # carve_measure.py keys work/times.json by publish item (`bundle:OAIEG012`); calibrate_costs and
     # `carve.py split` looked bundles up by bare name, so Eilenberg–Ganea's 284 s bundle was never
@@ -2636,6 +2659,17 @@ def test_cost_factors_scale_the_declarations_a_slow_piece_kept(g):
     scaled = cli.costs({'cost_factors': {k: 4.0, 'not.a.node': 9.0}}, g)
     assert scaled[k] == pytest.approx(base[k] * 4.0)
     assert all(scaled[x] == base[x] for x in base if x != k)
+
+
+def test_costs_from_build_logs_weigh_kernel_decided_declarations(g, tmp_path):
+    cli = _carve_script()
+    log = tmp_path / 'build.log'
+    log.write_text('✔ [1/1] Built CarveDev.Coer (10.0s)\n')
+    cost = cli.costs({'build_logs': [str(log)], 'time_scale': 1.0}, g)
+    nd, dep = g.nodes['CD.Co.rdef_pos'], g.nodes['CD.Co.rdef']
+    tot = sum(g.nodes[k].size for k in g.by_module['CarveDev.Coer']) + sum(C.kernel_weights(g).get(k, 0)
+                                                                         for k in g.by_module['CarveDev.Coer'])
+    assert cost['CD.Co.rdef_pos'] == pytest.approx(9.5 * (nd.size + dep.size) / tot)
 
 
 def test_split_only_names_the_bundles_to_cut():

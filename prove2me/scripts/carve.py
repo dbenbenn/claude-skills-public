@@ -222,7 +222,7 @@ def costs(cfg, g):
     if not times:
         print('no build logs: costs by size (%d bytes/s)' % cfg.get('bytes_per_second', 2000))
         return apply_cost_factors(C.size_costs(g, cfg.get('bytes_per_second', 2000)), cfg)
-    cost = C.module_costs(g, times, cfg.get('time_scale', 1.5))
+    cost = C.module_costs(g, times, cfg.get('time_scale', 1.5), kernel=C.kernel_weights(g))
     m = cfg.get('measured')
     if m:
         mp = json.load(open(os.path.expanduser(m['plan'])))
