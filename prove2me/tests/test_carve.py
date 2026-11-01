@@ -3078,3 +3078,10 @@ def test_named_notations_export_modules_and_registered_attributes_compile(g, tmp
         d = tmp_path / str(i)
         d.mkdir()
         _compile_in_publish_order(g, _tiny_plan(g, targets, prefix), d)
+
+
+def test_print_sorries_is_a_diagnostic_command():
+    # q145 (Gromov package): `#print sorries foo` (Mathlib's `printSorriesStx`) was kept in a carved bundle, where
+    # `foo` had gone to another item: "Unknown constant"; like `#print axioms` it never belongs in a published file
+    from p2mlib import carve, prune
+    assert 'printSorriesStx' in carve.DIAGNOSTIC and 'printSorriesStx' in prune.DIAGNOSTIC

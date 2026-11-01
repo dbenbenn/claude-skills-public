@@ -95,7 +95,7 @@ def restricted_attribute(txt):
     """Does an `attribute [...]` command set, globally, an attribute only the declaring file may?"""
     return any(e.split()[0] in RESTRICTED_ATTRIBUTES for e in attribute_entries(txt) or ()
                if e.split())
-DIAGNOSTIC = {'check', 'eval', 'print', 'printAxioms', 'reduce', 'check_failure', 'synth',
+DIAGNOSTIC = {'check', 'eval', 'print', 'printAxioms', 'printSorriesStx', 'reduce', 'check_failure', 'synth',
               'evalBang', 'exit'}
 OPENERS = {'namespace', 'section', 'noncomputableSection'}
 
