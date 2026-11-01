@@ -65,6 +65,7 @@ CONFIG.json (paths may use ~):
    "cost_factors": {"OAI.X.lemma": 4.0},      # a declaration's cost times this (carve_pipeline:
                                               # the declarations of a piece measured over its
                                               # plan, by that ratio, for a frozen re-plan)
+   "promote_shared": true,                    # promote a theorem many pieces keep (make_plan)
    "kernel_lemmas_in_bundles": true,          # theorems proved by `decide` become bundle material:
                                               #   checked once, imported by the pieces (q148)
    "promote_private": ["_private.M.0.OAI.X.lemma"],  # private theorems (graph node names) the
@@ -390,7 +391,8 @@ def main(argv):
                         pinned=cfg.get('pinned'),
                         bundles_import_statements=cfg.get('bundles_import_statements', True),
                         promote_private=cfg.get('promote_private', ()),
-                        bundle_theorems=bundle_theorems(cfg, g))
+                        bundle_theorems=bundle_theorems(cfg, g),
+                        promote_shared=cfg.get('promote_shared', False))
         if cfg.get('folded'):
             P = C.fold_statements(P, cfg['folded'])
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)

@@ -175,6 +175,25 @@ def test_bundle_theorems_are_proved_once_in_a_bundle_not_in_every_piece(g, plan)
     assert 'CD.main' in P['nodes'] and not any('CD.main' in b['nodes'] for b in P['bundles'])   # a target stays one
 
 
+def test_promote_shared_makes_a_widely_kept_theorem_a_statement():
+    # q148: seven analytic lemmas were each kept in 1738 pieces; every piece fit its budget alone, so
+    # the greedy pass never promoted them, and the Bernstein pieces they swelled promoted 2700 nodes
+    g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)   # private copy: mutated
+    for t in TARGETS:
+        g.nodes[t].deps.add('CD.simpA')                            # their `simp` uses it: a recorded use
+    cost = C.size_costs(g, bytes_per_second=100000)
+    cost['CD.simpA'] = 6.0
+    kw = dict(budget=10, piece_size=10**6, bundle_budget=10, bundle_size=10**6, cost=cost, bundle_prefix='CDB')
+    P = C.make_plan(g, TARGETS, **kw)
+    assert 'CD.simpA' not in P['nodes'] and sum('CD.simpA' in p['keep'] for p in P['pieces'].values()) == 3
+    Q = C.make_plan(g, TARGETS, promote_shared=True, **kw)
+    assert C.check_plan(g, Q) == []
+    assert 'CD.simpA' in Q['nodes']
+    assert [n for n, p in Q['pieces'].items() if 'CD.simpA' in p['keep']] == ['CD.simpA']
+    cost['CD.simpA'] = 4.0                                    # 4 s kept twice more: under one budget
+    assert 'CD.simpA' not in C.make_plan(g, TARGETS, promote_shared=True, **kw)['nodes']
+
+
 def test_config_kernel_lemmas_in_bundles_names_the_kernel_decided_theorems(g):
     cli = _carve_script()
     assert cli.bundle_theorems({}, g) == set()

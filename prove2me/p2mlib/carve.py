@@ -1893,7 +1893,8 @@ def _pin_chunks(g, pinned, B, taken, extra):
 def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_budget=90.0,
               bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
               external_defs=None, statement_suffix='', external=(), chunker='bands', pinned=None,
-              bundles_import_statements=True, promote_private=(), bundle_theorems=()):
+              bundles_import_statements=True, promote_private=(), bundle_theorems=(),
+              promote_shared=False):
     """The split: bundles, nodes (published statements) and each node's piece.
 
     - Bundle material B: every reachable non-theorem, what reachable statements need, their
@@ -1905,6 +1906,9 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
       (its closure over non-node theorems) costs at most `budget` seconds and `piece_size` bytes.
       A node needs an ASCII public name and a statement that only uses bundle material; a private
       theorem is promoted only when listed in `promote_private` (a forced one always is a node).
+    - `promote_shared`: also promote a theorem kept in several pieces once its copies beyond the
+      first cost a piece's budget, and promote greedily again (the greedy pass sees one piece at a
+      time: q148's seven analytic lemmas sat in 1738 pieces each).
     - `bundle_theorems`: theorems (not targets or forced) made bundle material, so each is proved
       once in a bundle and imported, instead of inside every piece that uses it (carve.py's
       `kernel_lemmas_in_bundles`: the planar packing certificate had 255k `decide +kernel` lemmas,
@@ -2075,20 +2079,36 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
 
     def psize(s):
         return sum(g.nodes[x].size for x in s)
-    over = []
-    memo = {}
-    for n in order:
-        s = fresh(n)
-        while pcost(s) > budget or psize(s) > piece_size:
-            cand = [k for k in kids[n] if k not in nodes and ok_node(k)] or \
-                [x for x in s if x != n and x not in nodes and ok_node(x)]
-            if not cand:
-                over.append(n)
-                break
-            k = max(cand, key=lambda k: (pcost(memo.get(k, {k})), k))
-            nodes.add(k)
+    def promote():
+        over, memo = [], {}
+        for n in order:
             s = fresh(n)
-        memo[n] = s
+            while pcost(s) > budget or psize(s) > piece_size:
+                cand = [k for k in kids[n] if k not in nodes and ok_node(k)] or \
+                    [x for x in s if x != n and x not in nodes and ok_node(x)]
+                if not cand:
+                    over.append(n)
+                    break
+                k = max(cand, key=lambda k: (pcost(memo.get(k, {k})), k))
+                nodes.add(k)
+                s = fresh(n)
+            memo[n] = s
+        return over
+
+    over = promote()
+    shared = set()
+    for _ in range(3 if promote_shared else 0):
+        # a theorem every piece keeps costs its time once per piece: promoted when the copies beyond
+        # the first add up to a piece's budget, then the greedy pass runs again from scratch (q148)
+        uses = collections.Counter(x for n in nodes for x in fresh(n) if x != n)
+        new = {x for x, c in uses.items() if c > 1 and cost.get(x, 0.0) * (c - 1) >= budget
+               and x not in nodes and ok_node(x)}
+        if not new:
+            break
+        shared |= new
+        nodes.clear()
+        nodes.update(set(targets) | set(forced) | shared)
+        over = promote()
     if chunker == 'schedule':
         chunks = chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, fz_chunks + pin_chunks, extra)
     else:
