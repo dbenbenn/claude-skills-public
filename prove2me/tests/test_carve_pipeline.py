@@ -657,6 +657,25 @@ def test_detach_command_runs_the_same_arguments_as_a_user_unit(tmp_path):
     assert cp.detach_command(str(tmp_path / 'carve'), [], 'x', env)[0] == unit   # one unit name per carve
 
 
+def test_snapshot_rev_moves_a_carve_recorded_on_another_snapshot(monkeypatch):
+    # q145: a large built carve takes a tool fix on a private commit (openai-ports.md, "--snapshot <commit>")
+    # instead of HEAD, whose compat change would rebuild every module; `--upgrade --snapshot REV` went to
+    # HEAD, and `--snapshot REV` alone exited "Use --upgrade"
+    import types
+    cp = _cp()
+    calls = []
+    monkeypatch.setattr(cp.snapshot, 'snapshot', lambda rev=None, allow_dirty=False: calls.append(rev) or '/c/' + (rev or 'HEAD'))
+    state = {'snapshot': {'sha': 'aaa', 'path': '/c/aaa'}}
+    for here, up in (('/c/aaa', True), ('/c/aaa', False), (None, True), (None, False)):
+        monkeypatch.setattr(cp.snapshot, 'snapshot_root_of', lambda path, h=here: h)
+        a = types.SimpleNamespace(upgrade=up, snapshot='bbb', allow_dirty=False)
+        assert cp.choose_snapshot(a, state) == '/c/bbb'
+    # already inside the requested snapshot: run there
+    monkeypatch.setattr(cp.snapshot, 'snapshot_root_of', lambda path: '/c/bbb')
+    a = types.SimpleNamespace(upgrade=False, snapshot='bbb', allow_dirty=False)
+    assert cp.choose_snapshot(a, state) == '/c/bbb'
+
+
 def test_wait_reads_the_last_detached_run():
     cp = _cp()
     assert cp.wait_result('') is None

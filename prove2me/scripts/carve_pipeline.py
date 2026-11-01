@@ -324,6 +324,10 @@ def choose_snapshot(a, state):
     """The snapshot this run uses: the one it is inside, else the recorded one (a resume), else HEAD."""
     here = snapshot.snapshot_root_of(os.path.abspath(__file__))
     rec = (state or {}).get('snapshot')
+    if a.snapshot:
+        # an explicit revision wins, from anywhere and with or without --upgrade: a large built carve takes
+        # a tool fix on a private commit rather than a HEAD whose compat change rebuilds every module (q145)
+        return snapshot.snapshot(rev=a.snapshot, allow_dirty=a.allow_dirty)
     if here and a.upgrade:
         # from any snapshot, the old one included (oaiq-034: run through the carve's recorded old
         # snapshot, --upgrade kept it), upgrade means HEAD's; main re-executes into it if it differs
