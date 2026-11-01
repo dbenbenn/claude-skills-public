@@ -544,6 +544,8 @@ def _lines_before(text, pos, n=3):
 _PM_BINDER = re.compile(r"[({][ \t]*([\w'][\w' \t]*?)[ \t]*:[ \t]*((?:[^(){}\n:]*→[ \t]*)?)"
                         r"(?:MeasureTheory\.)?ProbabilityMeasure\b")
 _ATOM = r"(?:[\w.']+|\([^()\n]*\))"
+_PM_LAMBDA = re.compile(r"\bfun[ \t]+([\w']+)[ \t]*:[ \t]*(?:MeasureTheory\.)?ProbabilityMeasure\b[^=\n]*?=>[ \t]*"
+                        r"\1\.map[ \t]+(" + _ARG + ")")
 
 
 def _pm_dot_map(text, defs, lemmas):
@@ -561,9 +563,20 @@ def _pm_dot_map(text, defs, lemmas):
         for m in _PM_BINDER.finditer(seg):
             for n in m.group(1).split():
                 names.append((n, bool(m.group(2).strip())))
+
+        def lam(m, seg=seg):
+            f = m.group(2)
+            if re.match(r"\(\s*(?:[\w']+\s*:=|by\b)", f) or 'aemeasurable' in f.lower():
+                return m.group(0)
+            tac = _aem_tac(_aem_named([f], seg[:m.start()], lemmas))
+            return m.group(0)[:m.start(2) - m.start()] + '(f := %s) (by %s)' % (f, tac)
+        # `fun μ : ProbabilityMeasure X => μ.map f`: the lambda's binder names the type (CircleDomains, q146)
+        new = _PM_LAMBDA.sub(lam, seg)
         if not names:
+            if new != seg:
+                out.append(text[i:a] + new)
+                i = b
             continue
-        new = seg
         for n, applied in dict.fromkeys(names):
             e = re.escape(n)
             if re.search(r"(?:\b(?:fun|λ)(?:[ \t]+[\w']+)*[ \t]+|\b(?:let|intro|rintro|set)[ \t]+)%s(?![\w'])" % e, new):

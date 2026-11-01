@@ -2311,6 +2311,22 @@ def test_probabilitymeasure_dot_map_in_a_def_body_and_an_applied_family():
     assert O.core_rewrites(out) == out
 
 
+def test_typed_lambda_binder_dot_map_gets_its_proof():
+    # CircleDomains (q146): `fun μ : ProbabilityMeasure X => μ.map f` in statements and `let`s; the binder
+    # names the type, so the map takes its proof like a declaration binder's
+    src = ("lemma emb {A B : Type*} {f : A → B} (hfm : MeasurableEmbedding f) :\n"
+           "    IsEmbedding (fun μ : ProbabilityMeasure A => μ.map f) := by\n"
+           "  sorry\n"
+           "lemma meas (f : Ω → T) (hf : Measurable f) :\n"
+           "    Measurable (fun μ : MeasureTheory.ProbabilityMeasure (T 0) => μ.map f) := by\n"
+           "  sorry\n")
+    out = O.core_rewrites(src)
+    assert "(fun μ : ProbabilityMeasure A => μ.map (f := f) (by first | exact hfm.measurable.aemeasurable" in out \
+        or "(fun μ : ProbabilityMeasure A => μ.map (f := f) (by first | " in out
+    assert "(fun μ : MeasureTheory.ProbabilityMeasure (T 0) => μ.map (f := f) (by first | exact hf.aemeasurable" in out
+    assert O.core_rewrites(out) == out
+
+
 def test_dot_map_is_left_alone_unless_a_binder_makes_mu_a_probability_measure():
     src = ("lemma a (μ : Measure X) : μ.map f = 0 := sorry\n"
            "lemma b (μ : ProbabilityMeasure X) : (μ : Measure X).map f = 0 := sorry\n"
@@ -3139,3 +3155,14 @@ def test_additive_combination_becomes_linear_combination_with_abel():
             'syntax (name := AdditiveCombination) "additive_combination"\n'
             "  | `(tactic| additive_combination%$tk $[(norm := $tac)]? $(e)?) =>\n")
     assert O.core_rewrites(keep) == keep
+
+
+def test_compat_has_more_d13f23b_lemmas_from_circle_domains():
+    # d13f23b names missing in 0df444a (CircleDomains, q146)
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for n in ('MeasureTheory.average_nonneg_of_ae', 'MeasureTheory.average_nonneg', 'Set.Finite.isClosed_sUnion',
+              'Finset.frontier_biUnion_subset', 'Set.Finite.frontier_biUnion_subset',
+              'MeasureTheory.Measure.prod_apply₀'):
+        assert 'theorem _root_.%s ' % n in src, n

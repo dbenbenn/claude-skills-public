@@ -668,5 +668,47 @@ theorem _root_.MeasureTheory.average_const_mul {α 𝕜 : Type*} [MeasurableSpac
 theorem _root_.Homeomorph.locallyPathConnectedSpace {X Y : Type*} [TopologicalSpace X]
     [TopologicalSpace Y] [LocallyPathConnectedSpace X] (h : X ≃ₜ Y) : LocallyPathConnectedSpace Y :=
   h.symm.isOpenEmbedding.locallyPathConnectedSpace
+open MeasureTheory in
+/-- Mathlib d13f23b's `MeasureTheory.average_nonneg_of_ae` (CircleDomains, q146). -/
+theorem _root_.MeasureTheory.average_nonneg_of_ae {α E : Type*} [MeasurableSpace α] {μ : Measure α}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [PartialOrder E] [IsOrderedAddMonoid E]
+    [IsOrderedModule ℝ E] [ClosedIciTopology E] {f : α → E} (hf : 0 ≤ᵐ[μ] f) : 0 ≤ ⨍ a, f a ∂μ :=
+  integral_nonneg_of_ae <| hf.filter_mono <| Measure.ae_smul_measure_le _
+open MeasureTheory in
+/-- Mathlib d13f23b's `MeasureTheory.average_nonneg` (CircleDomains, q146). -/
+theorem _root_.MeasureTheory.average_nonneg {α E : Type*} [MeasurableSpace α] {μ : Measure α}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [PartialOrder E] [IsOrderedAddMonoid E]
+    [IsOrderedModule ℝ E] [ClosedIciTopology E] {f : α → E} (hf : 0 ≤ f) : 0 ≤ ⨍ a, f a ∂μ :=
+  integral_nonneg hf
+/-- Mathlib d13f23b's `Set.Finite.isClosed_sUnion` (CircleDomains, q146). -/
+theorem _root_.Set.Finite.isClosed_sUnion {X : Type*} [TopologicalSpace X] {s : Set (Set X)}
+    (hs : s.Finite) (h : ∀ t ∈ s, IsClosed t) : IsClosed (⋃₀ s) := by
+  rw [Set.sUnion_eq_biUnion]; exact hs.isClosed_biUnion h
+/-- Mathlib d13f23b's `Finset.frontier_biUnion_subset` (CircleDomains, q146). -/
+theorem _root_.Finset.frontier_biUnion_subset {X ι : Type*} [TopologicalSpace X] (I : Finset ι)
+    (s : ι → Set X) : frontier (⋃ i ∈ I, s i) ⊆ ⋃ i ∈ I, frontier (s i) := by
+  classical
+  induction I using Finset.induction_on with
+  | empty => simp
+  | insert i I hi ih =>
+    simp only [Finset.mem_insert, Set.iUnion_iUnion_eq_or_left]
+    refine (frontier_union_subset _ _).trans ?_
+    rintro x (hx | hx)
+    · exact Or.inl hx.1
+    · exact Or.inr (ih hx.2)
+/-- Mathlib d13f23b's `Set.Finite.frontier_biUnion_subset` (CircleDomains, q146). -/
+theorem _root_.Set.Finite.frontier_biUnion_subset {X ι : Type*} [TopologicalSpace X] {I : Set ι}
+    (hI : I.Finite) (s : ι → Set X) : frontier (⋃ i ∈ I, s i) ⊆ ⋃ i ∈ I, frontier (s i) := by
+  simpa only [hI.mem_toFinset] using hI.toFinset.frontier_biUnion_subset s
+open MeasureTheory in
+/-- Mathlib d13f23b's `MeasureTheory.Measure.prod_apply₀` (CircleDomains, q146). -/
+theorem _root_.MeasureTheory.Measure.prod_apply₀ {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+    {μ : Measure α} {ν : Measure β} [SFinite ν] {s : Set (α × β)} (hs : NullMeasurableSet s (μ.prod ν)) :
+    μ.prod ν s = ∫⁻ x, ν (Prod.mk x ⁻¹' s) ∂μ := by
+  obtain ⟨t, htm, hst⟩ := hs
+  rw [measure_congr hst, Measure.prod_apply htm]
+  refine lintegral_congr_ae ?_
+  filter_upwards [Measure.ae_ae_of_ae_prod hst] with x hx
+  exact (measure_congr hx).symm
 end OAICompat434
 
