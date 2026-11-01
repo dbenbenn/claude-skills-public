@@ -307,7 +307,7 @@ def load_decl_graph(path, dups=None):
 
 
 def _is_decl_command(c):
-    return bool(c.decl_kind) and c.decl_kind != 'example' or c.short_kind in ('mutual', 'alias', 'deriving') or \
+    return bool(c.decl_kind) and c.decl_kind != 'example' or c.short_kind in ('mutual', 'alias', 'aliasLR', 'deriving') or \
         (bool(c.names) and c.short_kind not in NOTATION | REFUSED)
 
 

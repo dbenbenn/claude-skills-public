@@ -1890,6 +1890,20 @@ def test_a_deriving_instance_command_is_a_declaration_command():
     assert not C._is_decl_command(Cmd())
 
 
+# `alias ⟨PolyConnIn.polyReaches, PolyReaches.polyConnIn⟩ := polyConnIn_iff_polyReaches` (Batteries' iff
+# alias) is an `aliasLR` command: not a declaration command, so its two constants were nobody's node, a
+# theorem using one lost the dependency, and the command stayed in a bundle without the iff it names
+# (CircleDomains q146, Schoenflies PolyLocal: "Unknown constant `polyConnIn_iff_polyReaches`").
+
+def test_an_iff_alias_command_is_a_declaration_command():
+    class Cmd:
+        decl_kind = None
+        short_kind = 'aliasLR'
+        names = []
+
+    assert C._is_decl_command(Cmd())
+
+
 # `open Aux` in Top comes before the `namespace CD.Aux` block Top ends with. Mid made CD.Aux earlier,
 # but a bundle holding only Top's `laterConst` does not import Mid: the `open` is dead there.
 # The carver counted a namespace made by any command of the module as alive for every `open` of
