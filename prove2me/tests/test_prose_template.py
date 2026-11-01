@@ -484,3 +484,24 @@ def test_check_text_kinds_piece_checks_only_the_explanations(tmp_path, capsys, m
     out = capsys.readouterr().out
     assert e.value.code == 1 and 'MISSING piece:OAI.main' in out and 'MISSING statement' not in out, out
     assert read and not any(t.startswith('---') for t in read)          # no prose file was read
+
+
+@pytest.mark.parametrize('text,x', [
+    ('', 'foo'), ('foo', 'foo'), ('a foo b', 'foo'), ('afoo foo', 'foo'), ("foo' foo", 'foo'),
+    ("foo' bar", 'foo'), ('xfoo', 'foo'), ('foo_bar foo.', 'foo'), ('A.foo', 'foo'), ('A.foo', 'A.foo'),
+    ('BA.foo', 'A.foo'), ('é foo', 'foo'), ('éfoo', 'foo'), ('foo₁', 'foo'), ("Q.foo'", 'Q.foo'),
+])
+def test_has_word_agrees_with_the_boundary_regex(text, x):
+    import re
+    want = bool(re.search(r"(?<![\w])%s(?![\w'])" % re.escape(x), text))
+    assert CP.has_word(text, x) == want
+
+
+@pytest.mark.parametrize('text,x', [
+    ('', 'foo'), ('foo_p1', 'foo'), ('foo_p12 x', 'foo'), ('foo_p', 'foo'), ('foo_p1a', 'foo'),
+    ("foo_p1'", 'foo'), ('xfoo_p1 foo_p2', 'foo'), ('afoo_p1', 'foo'), ('foo_p1foo_p2', 'foo'),
+])
+def test_has_word_p_agrees_with_the_regex(text, x):
+    import re
+    want = bool(re.search(r"(?<![\w])%s_p\d+(?![\w'])" % re.escape(x), text))
+    assert CP.has_word_p(text, x) == want

@@ -574,6 +574,42 @@ def stub_comments(texts):
     return sorted(n for n, t in texts.items() if re.search(r'/-|--', t))
 
 
+_WORD = re.compile(r'\w')
+
+
+def _word_at(text, i):
+    return 0 <= i < len(text) and _WORD.match(text[i]) is not None
+
+
+def has_word(text, x):
+    r"""Does `x` occur in `text` as a whole name: not after a word character, not before one or a
+    prime. Same answer as `re.search(r"(?<![\w])x(?![\w'])", text)`, but `str.find` runs at memory
+    speed where the lookbehind regex does not: check-text over 400 MB of generated Lean took 4 h in
+    one regex scan per name (oaiq-106)."""
+    i, n = text.find(x), len(x)
+    while i >= 0:
+        j = i + n
+        if not _word_at(text, i - 1) and not _word_at(text, j) and text[j:j + 1] != "'":
+            return True
+        i = text.find(x, i + 1)
+    return False
+
+
+def has_word_p(text, x):
+    r"""`re.search(r"(?<![\w])x_p\d+(?![\w'])", text)`, by `str.find` (see has_word)."""
+    key = x + '_p'
+    i = text.find(key)
+    while i >= 0:
+        j = i + len(key)
+        k = j
+        while k < len(text) and text[k] in '0123456789':
+            k += 1
+        if k > j and not _word_at(text, i - 1) and not _word_at(text, k) and text[k:k + 1] != "'":
+            return True
+        i = text.find(key, i + 1)
+    return False
+
+
 def missing_names(md_text, local, in_library, skip=(), suffix='', cache=None):
     """The Lean-looking names in backticks found neither in `local` text nor by `in_library`.
     `cache` (a dict kept by the caller for one `local`) memoizes the lookup per name: a carve with
@@ -595,9 +631,9 @@ def missing_names(md_text, local, in_library, skip=(), suffix='', cache=None):
             if cache is not None and key in cache:
                 hit = cache[key]
             else:
-                hit = any(re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(x), local) for x in {nm, last}) \
-                    or (suffix and re.search(r'(?<![\w])%s(?![\w\'])' % re.escape(last + suffix), local)) \
-                    or re.search(r'(?<![\w])%s_p\d+(?![\w\'])' % re.escape(last), local) \
+                hit = any(has_word(local, x) for x in {nm, last}) \
+                    or (suffix and has_word(local, last + suffix)) \
+                    or has_word_p(local, last) \
                     or in_library(last)
                 if cache is not None:
                     cache[key] = hit
