@@ -25,6 +25,7 @@ oai_meta.json: {"title", "date", "family", "commit" (40 hex), "paper" (URL, opti
 "prefixes" (OpenAI module prefixes, e.g. ["OAI.Geometry.HeilbronnTriangle"]), "lean_root"
 (optional: the fetched lean/ tree, to map a flattened module name `Sub_X` back to its path)}.
 """
+import collections
 import hashlib
 import json
 import os
@@ -143,14 +144,21 @@ class Context:
 
     def importers(self, module):
         """(bundles, statements, pieces) of this split whose generated file imports `module`."""
-        bs, ss, ps = [], [], []
-        for f in sorted(os.listdir(self.lib)):
-            if f.endswith('.lean') and module in imports_of(self.read(self.lib, f)):
-                (bs if f.startswith('Def_') else ss).append(f[4:-5])
-        for f in sorted(os.listdir(self.sols)):
-            if f.endswith('.lean') and module in imports_of(self.read(self.sols, f)):
-                ps.append(f[4:-5])
-        return bs, [self.slug_name.get(s, s) for s in ss], [self.slug_name.get(s, s) for s in ps]
+        if not hasattr(self, '_imported_by'):
+            # every generated file's imports, parsed once: re-reading them per item took q148's 2,500-item
+            # split (695 bundles of up to 650 KB) past 40 minutes without one file written
+            self._imported_by = collections.defaultdict(list)
+            for d, kind in ((self.lib, None), (self.sols, 'p')):
+                for f in sorted(os.listdir(d)):
+                    if f.endswith('.lean'):
+                        k = kind or ('b' if f.startswith('Def_') else 's')
+                        for m in set(imports_of(self.read(d, f))):
+                            self._imported_by[m].append((k, f[4:-5]))
+        got = self._imported_by.get(module, [])
+        bs = [n for k, n in got if k == 'b']
+        ss = [self.slug_name.get(n, n) for k, n in got if k == 's']
+        ps = [self.slug_name.get(n, n) for k, n in got if k == 'p']
+        return bs, ss, ps
 
     # names
     def owner(self, name):

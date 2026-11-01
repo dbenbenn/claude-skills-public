@@ -394,6 +394,23 @@ def test_template_forced_gives_a_cost_forced_node_template_prose(tmp_path):
     assert 'explanations/OAI_Fam_named.md' in rep['written']
 
 
+def test_importers_reads_each_generated_file_once(tmp_path, monkeypatch):
+    # q148: `importers` re-read every generated file for every bundle and statement; with 695 bundles of up
+    # to 650 KB the prose step ran over 40 min without writing a file
+    d, _ = make_carve(tmp_path)
+    reads = []
+    real = T.Context.read
+    monkeypatch.setattr(T.Context, 'read', lambda self, *p: (reads.append(os.path.join(*p)), real(self, *p))[1])
+    run(d)
+    ctx = T.Context(str(d))
+    first = ctx.importers('Definitions.Def_FAMQ000')
+    n = len(reads)
+    for _ in range(5):
+        assert ctx.importers('Definitions.Def_FAMQ000') == first
+        ctx.importers('Theorems.Thm_OAI_Fam_named')
+    assert len(reads) == n and first[1]                # parsed once per Context, whatever the number of items
+
+
 def test_check_text_memoizes_name_lookups_across_files():
     import re as _re
     local = 'lemma bar_lemma (x : Nat) : x = x := rfl'
