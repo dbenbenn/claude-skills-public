@@ -181,6 +181,18 @@ def test_config_kernel_lemmas_in_bundles_names_the_kernel_decided_theorems(g):
     assert cli.bundle_theorems({'kernel_lemmas_in_bundles': True}, g) == {'CD.Co.rdef_pos'}   # not the instance
 
 
+def test_kernel_lemmas_in_bundles_takes_only_computational_leaves(monkeypatch):
+    # q148: `bound2 := by … decide` also used analytic lemmas (`ts_contains`, `RBox.lower_lt`); taking
+    # it put 19k non-kernel theorems (Taylor caps, integrals) into bundles with it, 5 statements left
+    from types import SimpleNamespace as NS
+    cli = _carve_script()
+    T = lambda *deps: NS(theorem=True, instance=False, deps=set(deps))
+    nodes = {'leaf': T('data'), 'leaf2': T('leaf', 'data'), 'mixed': T('leaf', 'analytic'),
+             'analytic': T('data'), 'atop': T('mixed'), 'data': NS(theorem=False, instance=False, deps=set())}
+    monkeypatch.setattr(cli.C, 'kernel_weights', lambda g: {'leaf': 1, 'leaf2': 1, 'mixed': 1, 'atop': 1})
+    assert cli.bundle_theorems({'kernel_lemmas_in_bundles': True}, NS(nodes=nodes)) == {'leaf', 'leaf2'}
+
+
 def test_check_plan_flags_a_definition_missing_from_the_bundles(g, plan):
     # Erdős 3 B006 ("Unknown identifier `A.space`"): a bundle lost a definition one of its own
     # members needs. The check must say which and why.

@@ -236,11 +236,19 @@ def costs(cfg, g):
 
 
 def bundle_theorems(cfg, g):
-    """The theorems config `kernel_lemmas_in_bundles` makes bundle material: those proved by `decide`
-    (C.kernel_weights), each then checked once in a bundle instead of in every piece using it."""
+    """The theorems config `kernel_lemmas_in_bundles` makes bundle material: the computational leaves,
+    proved by `decide` (C.kernel_weights) from definitions and other such leaves only, each then checked
+    once in a bundle instead of in every piece using it. A proof that also uses a theorem of another kind
+    stays a statement's business (q148: taking every `decide` proof pulled the analysis into bundles)."""
     if not cfg.get('kernel_lemmas_in_bundles'):
         return set()
-    return {k for k in C.kernel_weights(g) if g.nodes[k].theorem and not g.nodes[k].instance}
+    out = {k for k in C.kernel_weights(g) if g.nodes[k].theorem and not g.nodes[k].instance}
+    while True:
+        bad = {k for k in out if any(d != k and d in g.nodes and g.nodes[d].theorem and d not in out
+                                     for d in g.nodes[k].deps)}
+        if not bad:
+            return out
+        out -= bad
 
 
 def apply_cost_factors(cost, cfg):
