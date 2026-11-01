@@ -2327,6 +2327,29 @@ def test_typed_lambda_binder_dot_map_gets_its_proof():
     assert O.core_rewrites(out) == out
 
 
+def test_variable_and_exists_binders_dot_map_gets_its_proof():
+    # CircleDomains (q146): `variable (μ : ProbabilityMeasure X)` used by later theorems (TerminalArcLaw), and a
+    # statement's `∃ P : ProbabilityMeasure A, P.map K = η` (ProbabilityImageLifting)
+    src = ("variable (μ : ProbabilityMeasure C(PathTime, Sphere)) (hfm : AEMeasurable f (μ : Measure _))\n"
+           "theorem hit_le (x : Sphere) :\n"
+           "    pathHitProbability (μ.map f) x ≤ pathHitProbability μ x := by\n"
+           "  sorry\n"
+           "theorem lift (K : A → B) (hK : Measurable K) (η : ProbabilityMeasure B) :\n"
+           "    ∃ P : ProbabilityMeasure A, P.map K = η := by\n"
+           "  sorry\n")
+    out = O.core_rewrites(src)
+    assert "pathHitProbability (μ.map (f := f) (by first | " in out
+    assert "∃ P : ProbabilityMeasure A, P.map (f := K) (by first | exact hK.aemeasurable" in out
+    assert O.core_rewrites(out) == out
+
+
+def test_variable_binder_is_shadowed_by_a_later_binder():
+    src = ("variable (μ : ProbabilityMeasure X)\n"
+           "lemma a (μ : Measure X) : μ.map f = 0 := sorry\n"
+           "lemma b {ν μ : Measure X} : μ.map f = ν := sorry\n")
+    assert O.core_rewrites(src) == src
+
+
 def test_dot_map_is_left_alone_unless_a_binder_makes_mu_a_probability_measure():
     src = ("lemma a (μ : Measure X) : μ.map f = 0 := sorry\n"
            "lemma b (μ : ProbabilityMeasure X) : (μ : Measure X).map f = 0 := sorry\n"

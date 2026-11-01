@@ -544,6 +544,7 @@ def _lines_before(text, pos, n=3):
 _PM_BINDER = re.compile(r"[({][ \t]*([\w'][\w' \t]*?)[ \t]*:[ \t]*((?:[^(){}\n:]*→[ \t]*)?)"
                         r"(?:MeasureTheory\.)?ProbabilityMeasure\b")
 _ATOM = r"(?:[\w.']+|\([^()\n]*\))"
+_PM_EXISTS = re.compile(r"∃[ \t]+\(?([\w'][\w' \t]*?)[ \t]*:[ \t]*(?:MeasureTheory\.)?ProbabilityMeasure\b")
 _PM_LAMBDA = re.compile(r"\bfun[ \t]+([\w']+)[ \t]*:[ \t]*(?:MeasureTheory\.)?ProbabilityMeasure\b[^=\n]*?=>[ \t]*"
                         r"\1\.map[ \t]+(" + _ARG + ")")
 
@@ -557,12 +558,20 @@ def _pm_dot_map(text, defs, lemmas):
     declaration rebinds (`fun μ`, `let μ`, `intro μ`) is left alone."""
     bounds = [m.start() for m in re.finditer(r"(?m)^(?=\S)", text) if TOP.match(text[m.start():m.start() + 40])] + [len(text)]
     out, i = [], 0
+    var_names = []      # `variable (μ : ProbabilityMeasure X)`: binds μ in every later declaration (q146)
     for a, b in zip(bounds, bounds[1:]):
         seg = text[a:b]
         names = []
         for m in _PM_BINDER.finditer(seg):
             for n in m.group(1).split():
                 names.append((n, bool(m.group(2).strip())))
+        for m in _PM_EXISTS.finditer(seg):     # `∃ P : ProbabilityMeasure A, P.map K = η` (q146)
+            names += [(n, False) for n in m.group(1).split()]
+        if re.match(r"variable\b", seg):
+            var_names += [nm for nm in names if nm not in var_names]
+        else:
+            names += [nm for nm in var_names if nm not in names and not re.search(
+                r"[({\[][ \t]*(?:[\w'][\w' \t]*[ \t])?%s(?:[ \t][\w' \t]*)?[ \t]*:" % re.escape(nm[0]), seg)]
 
         def lam(m, seg=seg):
             f = m.group(2)
