@@ -4315,7 +4315,7 @@ def monomorphize(text):
     reports a statement they keep polymorphic (q151)."""
     names = {u for l in re.findall(r'^[ \t]*universe[ \t]+([^\n]+)', text, re.M) for u in l.split()}
     pat = r'\b(?:Type|Sort)(?:\*|[ \t]+_(?![\w\'])%s)' % (
-        '|[ \t]+(?:%s)(?![\w\'.])' % '|'.join(map(re.escape, sorted(names))) if names else '')
+        r'|[ \t]+(?:%s)(?![\w\'.])' % '|'.join(map(re.escape, sorted(names))) if names else '')
     return re.sub(pat, 'Type', text)
 
 
