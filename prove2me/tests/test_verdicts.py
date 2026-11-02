@@ -62,7 +62,16 @@ def test_decide_splits_after_two_own_timeouts():
 
 
 def test_decide_never_retries_a_wrong_or_broken_proof():
-    for k in ('compile_error', 'wrong', 'refused', 'dependency_oom'):
+    for k in ('compile_error', 'wrong', 'refused'):
         assert V.decide(k, {}) == 'stop'
     assert V.decide('accepted', {}) == 'done'
     assert V.decide('heartbeats', {}) == 'raise_heartbeats'
+
+
+def test_decide_retries_dependency_oom_a_few_times():
+    # q152 (PlanarPacking, 2026-11-02): 30 bundles stopped on their first dependency_oom while siblings with
+    # the same import closure (1,175 s, 1,246 s, 1,444 s of local compile) published: what the worker builds
+    # in parallel decides it, so a few unchanged retries are worth it; then a person moves the heavy proofs
+    assert V.decide('dependency_oom', {}) == 'retry'
+    assert V.decide('dependency_oom', {'dependency_oom': V.DEPENDENCY_OOM_CAP - 1}) == 'retry'
+    assert V.decide('dependency_oom', {'dependency_oom': V.DEPENDENCY_OOM_CAP}) == 'stop'

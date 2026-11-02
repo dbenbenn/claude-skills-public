@@ -14,8 +14,10 @@
   heartbeats     a deterministic heartbeat timeout: raise maxHeartbeats on that declaration.
   dependency_oom FAILED "Failed to compile modules <imports>: ... Lean exited with code 137": the
                  worker was killed (out of memory) building the item's imported bundles, many heavy
-                 ones in parallel. Unchanged retries failed alike (Eilenberg–Ganea 2026-10-25): move
-                 the heavy proofs out of the bundles (publish them as statements) instead.
+                 ones in parallel. Unchanged retries failed alike (Eilenberg–Ganea 2026-10-25), but
+                 on PlanarPacking (q152) siblings with the same import closure published: retried
+                 DEPENDENCY_OOM_CAP times, then move the heavy proofs out of the bundles (publish
+                 them as statements).
   compile_error  CE, or FAILED "... does not compile" for a real reason: fix the file.
   wrong          WA: the solution does not prove the published statement (a target renamed wrong,
                  a signature mismatch, an import clash with the statement's own imports).
@@ -28,6 +30,7 @@ transient and retried one piece 740 times; these rules are why that cannot recur
 import re
 
 OWN_TIMEOUT_CAP = 2      # own timeouts before splitting
+DEPENDENCY_OOM_CAP = 3   # dependency_oom results before stopping for a person (q152)
 TRANSIENT_CAP = 30       # transient failures before giving up for this run (cold-cache p90 was 10)
 
 _TRANSIENT = re.compile(
@@ -74,4 +77,6 @@ def decide(kind, history):
         return 'retry' if n < OWN_TIMEOUT_CAP else 'split'
     if kind == 'heartbeats':
         return 'raise_heartbeats'
+    if kind == 'dependency_oom':
+        return 'retry' if n < DEPENDENCY_OOM_CAP else 'stop'
     return 'stop'
