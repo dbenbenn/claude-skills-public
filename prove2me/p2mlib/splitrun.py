@@ -11,7 +11,12 @@ matter `title:`, optional `source:`), `explanations/<slug>.md` for a piece (chec
 `explanation.problems`). An item whose files are missing or fail a check is blocked, never posted.
 
 State (`state` file, written after every post and result) makes a run resumable: live items are
-never re-posted, in-flight jobs and submissions are polled again. Every run starts with
+never re-posted, in-flight jobs and submissions are polled again. A proof submission still PENDING
+`stale_pending_hours` (config, default 3) after it was sent is lost: the piece is sent again, its
+`also` reason naming the lost submission (our own PENDING proof would trip the live-proof guard), and
+reconcile never adopts a lost one; after LOST_CAP resends the piece gives up for a person (oaiq-050,
+2026-11-02: one submission stayed PENDING for 40 hours while its neighbours had verdicts in 2 minutes,
+and the goal waited on it). Every run starts with
 `reconcile`: each bundle and statement already on the platform under its name is adopted when its
 text is the one we generated (prose not needed), and one with other text stops the whole run
 before anything is posted (LiveMismatch), which is what makes extending a published carve safe;
@@ -47,6 +52,8 @@ from .mission import front_matter
 FINAL_JOB = {'PUBLISHED', 'FAILED', 'ERROR'}
 TERMINAL = {'split', 'stop', 'give_up', 'raise_heartbeats'}
 RAISED_HEARTBEATS = 1000000
+STALE_PENDING_HOURS = 3
+LOST_CAP = 2             # resends of a lost submission before giving up for a person
 BATCH = 10
 
 
@@ -86,8 +93,8 @@ def _first_difference(ours, theirs):
 
 
 class Runner:
-    def __init__(self, cfg, api, sleep=time.sleep, poll_every=20):
-        self.cfg, self.api, self.sleep, self.poll_every = cfg, api, sleep, poll_every
+    def __init__(self, cfg, api, sleep=time.sleep, poll_every=20, clock=time.time):
+        self.cfg, self.api, self.sleep, self.poll_every, self.clock = cfg, api, sleep, poll_every, clock
         self.plan = json.load(open(cfg['plan'], encoding='utf-8'))
         self.ext = set(self.plan.get('external', []))
         order = C.publish_order(self.plan, self.ext)
@@ -277,7 +284,8 @@ class Runner:
                 if proofs is None:
                     continue
                 text = _ws(open(f['file'], encoding='utf-8').read())
-                rows = proofs(f['name'])
+                lost = set(self.state.get(x, {}).get('lost', []))
+                rows = [r for r in proofs(f['name']) if r.get('id') not in lost]
                 mine = [r for r in rows if _ws(r.get('content')) == text]
                 if mine:
                     adopted[x] = mine[0]['id']
@@ -382,6 +390,33 @@ class Runner:
                 if rec.get('status') and rec.get('status') != 'PENDING':
                     rec.setdefault('submission_id', st['sid'])
                     self._result(x, rec, 'verdict')
+                else:
+                    self._check_lost(x, st)
+
+    def _check_lost(self, x, st):
+        """A submission PENDING past the limit is lost: send the piece again, or give up after
+        LOST_CAP resends. A state from before `sent` was recorded is timed from this poll."""
+        now = self.clock()
+        if 'sent' not in st:
+            st['sent'] = now
+            self.save()
+            return
+        hours = float(self.cfg.get('stale_pending_hours', STALE_PENDING_HOURS))
+        if now - st['sent'] < hours * 3600:
+            return
+        n = st['history'].get('lost', 0)
+        st['history']['lost'] = n + 1
+        sid = st.pop('sid')
+        st.pop('sent')
+        st['lost'] = st.get('lost', []) + [sid]
+        st['last'] = 'no verdict after %.1f h: submission %s lost' % (hours, sid)
+        if n < LOST_CAP:
+            st['state'] = 'todo'
+            self.log(x, 'verdict', '%s, sending again' % st['last'])
+        else:
+            st['state'] = 'give_up'
+            self.log(x, 'verdict', 'NEEDS A PERSON: %s (%d resends lost too)' % (st['last'], n))
+        self.save()
 
     def inflight(self):
         return sum(1 for s in self.state.values() if s.get('state') == 'inflight')
@@ -454,6 +489,9 @@ class Runner:
             # comparisons/<slug>.md, "Different from <id>: ..." (sent as the reason) or "Same as <id>: ..."
             # (settled, not sent); submit_all.py's convention (oaiq-068)
             also = open(f['comparison'], encoding='utf-8').read().strip() if os.path.exists(f['comparison']) else ''
+            if st.get('lost') and not also.startswith('Same as'):
+                also = '\n'.join(filter(None, [also, 'resending: our own submission(s) %s never got a verdict' % (
+                    ', '.join(st['lost']))]))
             if also.startswith('Same as'):
                 st.update(state='stop', last='settled: ' + also.split('\n')[0][:300], sha=self.file_sha(x))
                 self.log(x, 'settled', also.split('\n')[0][:200])
@@ -465,7 +503,7 @@ class Runner:
                 raise RuntimeError(disproved_message(bad))
             expl = open(f['text'], encoding='utf-8').read()
             sid = self.api.verify(tid, f['file'], expl, also=also) if also else self.api.verify(tid, f['file'], expl)
-            st.update(state='inflight', sid=sid, sha=self.file_sha(x))
+            st.update(state='inflight', sid=sid, sha=self.file_sha(x), sent=self.clock())
             self.log(x, 'submit piece (try %d)' % (sum(st['history'].values()) + 1), sid)
             self.save()
 

@@ -716,3 +716,106 @@ def test_a_heartbeat_raise_also_updates_the_frozen_copy(split):
     assert (frozen / 'Def_XB001.lean').read_text() == (d / 'out' / 'lib' / 'Def_XB001.lean').read_text()
     assert 'set_option maxHeartbeats 1000000' in (frozen / 'Def_XB001.lean').read_text()
     assert not (frozen / 'Def_XB000.lean').exists()
+
+
+class Clock:
+    """A fake clock that the run's sleep advances: each poll interval is half an hour."""
+
+    def __init__(self):
+        self.t = 1000000.0
+
+    def __call__(self):
+        return self.t
+
+    def sleep(self, secs):
+        self.t += 1800
+
+
+class GuardedApi(FakeApi):
+    """A sent proof is live (PENDING) at once, so the live-proof guard refuses a resend without `also`."""
+
+    def verify(self, tid, path, explanation, also=None):
+        sid = super().verify(tid, path, explanation, also=also)
+        name = self.subs[sid]
+        self.proofs.setdefault(name, []).append(
+            {'id': sid, 'author': 'dbenbenn', 'status': 'PENDING', 'content': open(path).read()})
+        return sid
+
+
+def clocked_run(cfg, api, clock):
+    r = R.Runner(cfg, api, sleep=clock.sleep, clock=clock)
+    return r, r.run()
+
+
+def test_a_submission_pending_past_the_limit_is_sent_again_naming_the_lost_one(split):
+    # oaiq-050 (2026-11-02): one piece's submission stayed PENDING on the platform for 40 hours (its
+    # neighbours had verdicts in 2 minutes); the run polled it forever and the goal waited on it
+    d, cfg = split
+    clock = Clock()
+    api = GuardedApi(script={'verify:A.low_s2': [('PENDING', None)] * 8})
+    r, summary = clocked_run(cfg, api, clock)
+    sends = [x for x in api.posted if x == ('verify', 'A.low_s2')]
+    assert len(sends) == 2
+    first = next(s for s, n in api.subs.items() if n == 'A.low_s2')
+    assert first in api.also['A.low_s2']                          # the reason names the lost submission
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.low']['state'] == 'live' and st['piece:A.low']['lost'] == [first]
+    assert summary['live'] == 7 and not summary['stopped']
+    assert 'no verdict after 3.0 h' in (d / 'PROGRESS.log').read_text()
+
+
+def test_a_slow_verdict_inside_the_limit_is_waited_for(split):
+    d, cfg = split
+    api = GuardedApi(script={'verify:A.low_s2': [('PENDING', None)] * 4})    # two hours
+    r, summary = clocked_run(cfg, api, Clock())
+    assert api.posted.count(('verify', 'A.low_s2')) == 1
+    assert summary['live'] == 7
+
+
+def test_the_limit_comes_from_the_config(split):
+    d, cfg = split
+    api = GuardedApi(script={'verify:A.low_s2': [('PENDING', None)] * 3})    # lost at 1 h, then 30 min
+    r, summary = clocked_run(dict(cfg, stale_pending_hours=1), api, Clock())
+    assert api.posted.count(('verify', 'A.low_s2')) == 2
+
+
+def test_a_submission_lost_again_and_again_waits_for_a_person(split):
+    d, cfg = split
+    api = GuardedApi(script={'verify:A.low_s2': [('PENDING', None)] * 1000})
+    r, summary = clocked_run(cfg, api, Clock())
+    assert api.posted.count(('verify', 'A.low_s2')) == R.LOST_CAP + 1
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.low']['state'] == 'give_up'
+    assert 'piece:A.low' in summary['stopped']
+
+
+def test_an_in_flight_submission_from_an_older_state_is_timed_from_when_this_run_first_saw_it(split):
+    # states written before `sent` was recorded: the clock starts at the first poll, not at zero
+    d, cfg = split
+    clock = Clock()
+    api = GuardedApi(script={'verify:A.low_s2': [('PENDING', None)] * 3})
+    r = R.Runner(cfg, api, sleep=clock.sleep, clock=clock)
+    while not any(n == 'A.low_s2' for n in api.subs.values()):
+        r.step()
+    st = json.loads((d / 'run_state.json').read_text())
+    st['piece:A.low'].pop('sent')
+    (d / 'run_state.json').write_text(json.dumps(st))
+    clock.t += 100 * 3600
+    r2, summary = clocked_run(cfg, api, clock)
+    assert api.posted.count(('verify', 'A.low_s2')) == 1
+    assert summary['live'] == 7
+
+
+def test_a_lost_pending_proof_is_not_adopted_at_a_restart(split):
+    # reconcile adopts a live proof with our text, PENDING included; the lost one must not count
+    d, cfg = split
+    sol = (d / 'out' / 'solutions' / 'Sol_A_low_s2.lean').read_text()
+    api = GuardedApi(published={'A.top': 'TOP', 'XB000': 'b0', 'XB001': 'b1', 'A.low_s2': 's0', 'A.mid_s2': 's1'})
+    api.proofs['A.low_s2'] = [{'id': 'old', 'author': 'dbenbenn', 'status': 'PENDING', 'content': sol}]
+    (d / 'run_state.json').write_text(json.dumps({'piece:A.low': {
+        'state': 'todo', 'history': {'lost': 1}, 'lost': ['old'], 'last': 'no verdict after 3.0 h'}}))
+    r, summary = clocked_run(cfg, api, Clock())
+    assert api.posted.count(('verify', 'A.low_s2')) == 1
+    assert 'old' in api.also['A.low_s2']
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.low']['state'] == 'live' and st['piece:A.low']['id'] != 'old'

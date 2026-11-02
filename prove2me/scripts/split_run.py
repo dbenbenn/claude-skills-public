@@ -3,7 +3,8 @@
 
 usage: split_run.py RUN.json [--go] [--reset ITEM ...] [--max-hours H] [--offline]
 
-RUN.json: {"plan", "out", "prose", "explanations", "state", "log", "source", "tags", "jobs"}
+RUN.json: {"plan", "out", "prose", "explanations", "state", "log", "source", "tags", "jobs",
+"stale_pending_hours" (default 3: a proof PENDING that long is lost and sent again)}
 (paths may start with ~). Without --go it looks the plan's bundles and statements up on the
 platform (reads only) and prints what a run would adopt as already live, any live name whose text
 differs from ours (a run refuses to post anything then), what it would send first and what is
