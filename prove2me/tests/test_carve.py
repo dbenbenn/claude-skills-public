@@ -981,6 +981,30 @@ def test_a_file_over_the_size_cap_loses_its_comments(g, plan, tmp_path):
     assert small                                  # files under the cap keep their comments
 
 
+def test_a_recursive_declarations_self_calls_take_its_rename():
+    # q151 (2026-11-02): `lemma compact_lie_virtually_abelian … termination_by …` calls itself; the piece
+    # renamed the declaration `compact_lie_virtually_abelian_oai` and kept the calls, which Lean had
+    # recorded as references to a local (the recursive function's fvar): "Unknown identifier"
+    from types import SimpleNamespace as NS
+    text = b'theorem rec_thm (n : Nat) : n = n := by\n  have := rec_thm 0\n  have := other_thm\n  rfl\n'
+    a = text.index(b'rec_thm')
+    b2 = text.index(b'rec_thm', a + 1)
+    o = text.index(b'other_thm')
+    idents = [{'role': 'decl', 'name': 'rec_thm', 'start': a, 'end': a + 7},
+              {'role': 'ref', 'name': 'rec_thm', 'start': b2, 'end': b2 + 7},
+              {'role': 'ref', 'name': 'other_thm', 'start': o, 'end': o + 9}]
+    readings = {a: C.Reading((), (a, a + 7), set(), [(a, a + 7, ''), (a, a + 7, 'R.rec_thm')], binder=True),
+                b2: C.Reading((), (b2, b2 + 7), set(), [(b2, b2 + 7, '')]),
+                o: C.Reading((), (o, o + 9), set(), [(o, o + 9, '')])}
+    g = NS(reading=lambda info, c, i: readings[i['start']])
+    cv = C.Carver.__new__(C.Carver)
+    cv.g = g
+    cv._rename_text = lambda *args: []
+    info, c = NS(text_bytes=text), NS(idents=idents, resolved=[])
+    edits = sorted(cv._rename_edits(info, c, 'M', [], {'R.rec_thm': 'rec_thm_oai'}))
+    assert edits == [(a, a + 7, 'rec_thm_oai'), (b2, b2 + 7, 'rec_thm_oai')]
+
+
 # ---------------------------------------------------------------- extending a published carve
 
 def _carve_cli(tmp_path, name, **extra):

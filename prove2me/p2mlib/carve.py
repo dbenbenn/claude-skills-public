@@ -3922,6 +3922,7 @@ class Carver:
         if not rename:
             return edits
         done, rest = set(), []
+        own = {}                  # a renamed declaration of this command, by its name as written
         for i in c.idents or []:
             if i['role'] not in ('decl', 'ref', 'dot'):
                 continue
@@ -3929,8 +3930,16 @@ class Carver:
             if r is None:
                 rest.append(i)
                 continue
-            for a, b, n in r.entries + self._binder_entries(info, c, i, r):
+            ents = r.entries + self._binder_entries(info, c, i, r)
+            # a recursive declaration's call of itself: Lean records it as a local (the function being
+            # defined), so the reading names no constant (q151: `compact_lie_virtually_abelian_oai`
+            # kept its calls of `compact_lie_virtually_abelian`, "Unknown identifier")
+            if i['role'] == 'ref' and i['name'] in own and ents and not any(n for _, _, n in ents):
+                ents = [(i['start'], i['end'], own[i['name']])]
+            for a, b, n in ents:
                 if n in rename:
+                    if i['role'] == 'decl':
+                        own[i['name']] = n
                     span = last_component(info.text_bytes, a, b)
                     if span not in done:
                         done.add(span)
