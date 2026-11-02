@@ -48,6 +48,8 @@ CONFIG.json (paths may use ~):
                                               # handled like external_defs, never carved again
    "statement_suffix": "_s2",                 # published names <name>_s2 (a fresh split of a
                                               # development whose earlier split took the names)
+   "statement_suffixes": {"A.b": "_m"},       # one statement published again as A.b_m (q151)
+   "monomorphic": ["A.b"],                    # statement and piece written at universe 0 (q151)
    "chunker": "schedule",                     # bundles by declaration-level list scheduling
                                               # (shallow); "bands" (default) cuts along modules
    "pinned": {"benign": ["OAI.Higman.IsBenign"]},  # groups of definitions, each its own small
@@ -395,6 +397,8 @@ def main(argv):
                         promote_shared=cfg.get('promote_shared', False))
         if cfg.get('folded'):
             P = C.fold_statements(P, cfg['folded'])
+        if cfg.get('statement_suffixes'):
+            P['statement_suffixes'] = {n: x for n, x in sorted(cfg['statement_suffixes'].items()) if n in P['pieces']}
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)
         json.dump(P, open(out, 'w'), indent=1, sort_keys=True)
         worst = sorted(((p['cost'], n) for n, p in P['pieces'].items()), reverse=True)[:5]

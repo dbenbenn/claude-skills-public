@@ -4186,10 +4186,15 @@ def mark_repaired(g, names):
 
 
 def statement_name(plan, node):
-    """The published name of a node: `<name><suffix>`, or the name itself for an external statement."""
-    if node in plan.get('external', ()) or not plan.get('statement_suffix'):
+    """The published name of a node: `<name><suffix>`, or the name itself for an external statement.
+    `statement_suffixes` ({node: suffix}, config) renames single statements, before the plan-wide
+    `statement_suffix` (q151: live polymorphic statements published again at `Type` as `<name>_m`)."""
+    if node in plan.get('external', ()):
         return pubname(node)
-    return pubname(node) + plan['statement_suffix']
+    one = (plan.get('statement_suffixes') or {}).get(node, '')
+    if not plan.get('statement_suffix') and not one:
+        return pubname(node)
+    return pubname(node) + one + (plan.get('statement_suffix') or '')
 
 
 def _stmt_renames(g, plan, nodes):

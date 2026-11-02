@@ -1010,6 +1010,25 @@ def test_a_recursive_declarations_self_calls_take_its_rename():
     assert edits == [(a, a + 7, 'rec_thm_oai'), (b2, b2 + 7, 'rec_thm_oai')]
 
 
+def test_statement_suffixes_rename_single_statements(g, plan, tmp_path):
+    # q151 (2026-11-02): 15 live universe-polymorphic statements could be neither proved (the verifier's
+    # CoeT fallback) nor folded (the folded piece was 1.27 MB); they are published again at `Type` under
+    # `<name>_m`, and their importers' pieces import the copies
+    node = 'CD.top_pick'
+    importer = [n for n, p in plan['pieces'].items() if node in p['imports']]
+    P = dict(plan, statement_suffixes={node: '_m'})
+    assert C.statement_name(P, node) == 'CD.top_pick_m'
+    assert C.statement_name(P, 'CD.top_aux') == 'CD.top_aux'
+    res = C.generate(g, P, str(tmp_path), monomorphic=[node])
+    stub = open(tmp_path / 'lib' / 'Thm_CD_top_pick_m.lean').read()
+    assert 'theorem top_pick_m {α : Type}' in stub
+    assert not (tmp_path / 'lib' / 'Thm_CD_top_pick.lean').exists()
+    assert (tmp_path / 'solutions' / 'Sol_CD_top_pick_m.lean').exists()
+    for n in importer:
+        txt = open(tmp_path / 'solutions' / ('Sol_%s.lean' % C.slug(C.statement_name(P, n)))).read()
+        assert 'import Theorems.Thm_CD_top_pick_m' in txt
+
+
 # ---------------------------------------------------------------- extending a published carve
 
 def _carve_cli(tmp_path, name, **extra):
