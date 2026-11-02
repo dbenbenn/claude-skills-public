@@ -413,6 +413,12 @@ GEN_READERS = {'measure': ('lib',), 'measure_pieces': ('solutions',)}
 GRAPH_CONFIG_KEYS = ('src', 'roots', 'prefix', 'work', 'external_theorems')   # what `carve.py graph` reads
 
 
+def merged_promote_private(cur, auto):
+    """config `promote_private` with the automatic split's lemmas added; `True` (every private theorem,
+    q152) already covers them."""
+    return True if cur is True else sorted(set(cur or ()) | set(auto))
+
+
 def python_defs(text, names):
     """The source of the top-level definitions and assignments `names` of a Python file, as one string
     (a missing one as `NAME=<missing>`); the whole text if it does not parse."""
@@ -1010,7 +1016,7 @@ class Pipeline:
             if a.get(k):
                 cfg[k] = sorted(set(cfg.get(k) or ()) | set(a[k]))
         if a.get('promote_private'):
-            cfg['promote_private'] = sorted(set(cfg.get('promote_private') or ()) | set(a['promote_private']))
+            cfg['promote_private'] = merged_promote_private(cfg.get('promote_private'), a['promote_private'])
         if a.get('cost_factors'):
             cf = dict(cfg.get('cost_factors') or {})
             for k, v in a['cost_factors'].items():

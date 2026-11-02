@@ -69,10 +69,12 @@ CONFIG.json (paths may use ~):
                                               # plan, by that ratio, for a frozen re-plan)
    "promote_shared": true,                    # promote a theorem many pieces keep (make_plan)
    "kernel_lemmas_in_bundles": true,          # theorems proved by `decide` become bundle material:
-                                              #   checked once, imported by the pieces (q148)
+                                              #   checked once, imported by the pieces (q148); do not
+                                              #   use: closures grow past the verifier (q152)
    "promote_private": ["_private.M.0.OAI.X.lemma"],  # private theorems (graph node names) the
                                               # plan may promote to statements like public ones
-                                              # (carve_pipeline: the private lemmas of a slow piece)
+                                              # (carve_pipeline: the private lemmas of a slow piece);
+                                              # true: every private theorem (q152)
    "folded": ["OAI.X.lemma"],                 # statements merged into their importers' pieces after
                                               # planning (carve.fold_statements; e.g. a polymorphic
                                               # statement the verifier's CoeT fallback rejects)

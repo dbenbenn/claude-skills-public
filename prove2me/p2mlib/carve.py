@@ -1906,7 +1906,8 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     - Nodes: targets and `forced`, plus theorems promoted greedily, bottom-up, until each piece
       (its closure over non-node theorems) costs at most `budget` seconds and `piece_size` bytes.
       A node needs an ASCII public name and a statement that only uses bundle material; a private
-      theorem is promoted only when listed in `promote_private` (a forced one always is a node).
+      theorem is promoted only when listed in `promote_private`, or always when it is `True` (a forced
+      one always is a node).
     - `promote_shared`: also promote a theorem kept in several pieces once its copies beyond the
       first cost a piece's budget, and promote greedily again (the greedy pass sees one piece at a
       time: q148's seven analytic lemmas sat in 1738 pieces each).
@@ -2057,11 +2058,12 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         # the automatic split of a slow piece (carve_pipeline calibrate_pieces) may promote these
         # private lemmas as well, as a `forced` private node name is: published under their public
         # name, deprivatized in the stub (oaiq-091: pieces of 60 and 394 private lemmas, forced by hand)
-        public_ok, allowed = ok_node, set(promote_private)
+        # `True`: every private theorem (q152: 289,505 certificate lemmas leaving the bundles)
+        public_ok, allowed = ok_node, None if promote_private is True else set(promote_private)
 
         def ok_node(k):
             nd = g.nodes[k]
-            return public_ok(k) or (k in allowed and nd.private and nd.theorem and ascii_ok(k)
+            return public_ok(k) or ((allowed is None or k in allowed) and nd.private and nd.theorem and ascii_ok(k)
                                     and nd.sig <= b_or_ext and k not in renames
                                     and not max_only_universes(g, k))
 

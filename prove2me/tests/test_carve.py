@@ -106,6 +106,17 @@ def test_listed_private_lemmas_may_be_promoted_like_public_ones(g, monkeypatch):
     assert h in after['nodes'] and 'CD.main' not in after['over'] and h not in after['pieces']['CD.main']['keep']
 
 
+def test_promote_private_true_allows_every_private_theorem(g, monkeypatch):
+    # q152 (2026-11-02): factoring PlanarPacking's 289,505 private certificate lemmas out of bundles needed
+    # every one listed; `true` allows them all (still only ASCII names, a statement from bundle material)
+    h = '_private.CarveDev.Top.0.CD.helper'
+    monkeypatch.setattr(C, 'collision_renames', lambda g: {})
+    cost = dict(C.size_costs(g, bytes_per_second=10000), **{h: 1.0})
+    kw = dict(budget=0.05, piece_size=10**6, bundle_budget=0.005, bundle_size=10**6, cost=cost, bundle_prefix='PP')
+    after = C.make_plan(g, ['CD.main'], promote_private=True, **kw)
+    assert h in after['nodes'] and 'CD.main' not in after['over']
+
+
 def test_private_names_are_per_module(g):
     a, b = '_private.CarveDev.Mid.0.CD.helper', '_private.CarveDev.Top.0.CD.helper'
     assert a in g.nodes and b in g.nodes

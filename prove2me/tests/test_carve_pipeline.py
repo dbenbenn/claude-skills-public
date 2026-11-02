@@ -1473,6 +1473,13 @@ def test_a_slow_piece_is_measured_again_before_its_automatic_split(env, monkeypa
     assert 'measuring piece:P0 again' in (env.dir / 'logs' / 'calibrate.log').read_text()
 
 
+def test_promote_private_true_survives_the_automatic_split():
+    # q152: `promote_private: true` (every private theorem) is not a list to merge the slow piece's into
+    assert CP.merged_promote_private(True, ['_private.M.0.x']) is True
+    assert CP.merged_promote_private(['b'], ['a', 'b']) == ['a', 'b']
+    assert CP.merged_promote_private(None, ['a']) == ['a']
+
+
 def test_the_automatic_split_may_promote_the_slow_pieces_private_lemmas(env, monkeypatch):
     # oaiq-091: pieces of 60 and 394 private lemmas (`traceLift_*`, `B_ACE_*`); the frozen re-plan could
     # promote public lemmas only, so each private one needed a hand `forced` entry by graph node name
