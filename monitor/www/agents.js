@@ -100,7 +100,8 @@ function quotaChart(id, col, spanSecs, title){
   const next = newest[resetCol];
   const xmax = Math.max(now, next), xmin = xmax - spanSecs;
   const xs = rows.map(r => r[0]), ys = rows.map(r => r[col]);
-  if (xs[xs.length-1] < now && q[q.length-1][col] != null) { xs.push(now); ys.push(ys[ys.length-1]); }
+  // carry the latest value to now, or end on a gap (legend "—") once the window stopped being reported
+  if (xs[xs.length-1] < now) { xs.push(now); ys.push(q[q.length-1][col] != null ? ys[ys.length-1] : null); }
   const opts = {
     width: Math.max(260, el.clientWidth), height: 190,
     tzDate: ts => uPlot.tzDate(new Date(ts*1e3), TZ),
@@ -128,8 +129,9 @@ function drawQuota(){
   const sub = document.getElementById('quota-sub');
   if (!n) { sub.textContent = 'No data yet.'; }
   else {
-    const win = (name, p, r) => p == null ? `${name} not reported` : `${name} ${p.toFixed(0)}% used, resets ${fmtAt(r)}`;
-    sub.textContent = `${win('5-hour window', n[1], n[2])} · ${win('7-day window', n[3], n[4])} · newest record across the agents' transcripts (last sample ${ago(Math.round(last.updated - n[0]))})`;
+    const since = col => { const s = q.filter(r => r[col] != null); return s.length ? ` since ${fmtAt(s[s.length-1][0])}` : ''; };
+    const win = (name, p, r, col) => p == null ? `${name} not reported${since(col)}` : `${name} ${p.toFixed(0)}% used, resets ${fmtAt(r)}`;
+    sub.textContent = `${win('5-hour window', n[1], n[2], 1)} · ${win('7-day window', n[3], n[4], 3)} · newest record across the agents' transcripts (last sample ${ago(Math.round(last.updated - n[0]))})`;
   }
   quotaChart('c-q5', 1, 48*3600, '5-hour window');
   quotaChart('c-q7', 3, 7*86400, '7-day window');
