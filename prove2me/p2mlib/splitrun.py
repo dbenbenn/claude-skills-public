@@ -126,6 +126,18 @@ class Runner:
         edited run_state.json by hand). So does a live piece whose file changed once its comparisons
         note exists (a fold, oaiq-124). States from before `sha` was recorded are left alone."""
         for x, st in list(self.state.items()):
+            if x in self.items and not x.startswith('bundle:') and st.get('state') is not None:
+                # renamed since it was sent (config `statement_suffixes`, q151): the state is keyed by node, so
+                # the old name's statement or proof would count as this item's; states from before `name` was
+                # recorded were sent under the node's plan-wide name
+                n = x.split(':', 1)[1]
+                was = st.get('name') or (C.pubname(n) if n in self.ext else
+                                         C.pubname(n) + (self.plan.get('statement_suffix') or ''))
+                now = self.info(x)['name']
+                if was != now:
+                    self.state.pop(x)
+                    self.log(x, 'restart', 'published name changed from %s: sending it under the new one' % was)
+                    continue
             if x in self.items and st.get('state') in TERMINAL and st.get('sha') and st['sha'] != self.file_sha(x):
                 was = st['state']
                 self.state.pop(x)
@@ -209,6 +221,9 @@ class Runner:
         return self.state.setdefault(item, {'state': 'todo', 'history': {}})
 
     def save(self):
+        for x, st in self.state.items():          # the name each item was sent under (_restart_changed)
+            if x in self.items and not x.startswith('bundle:') and isinstance(st, dict) and 'name' not in st:
+                st['name'] = self.info(x)['name']
         tmp = self.cfg['state'] + '.tmp'
         json.dump(self.state, open(tmp, 'w'), indent=1, sort_keys=True)
         os.replace(tmp, self.cfg['state'])

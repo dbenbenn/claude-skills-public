@@ -277,6 +277,29 @@ def test_a_post_the_platform_fails_with_a_server_error_is_retried(split):
     assert summary['stopped'] == []
 
 
+def test_a_statement_renamed_since_it_went_live_is_published_under_its_new_name(split):
+    # q151 (2026-11-02): config `statement_suffixes` renamed 15 live statements `<name>_m`; the run state,
+    # keyed by node, still read them live (the old statements' ids), so the copies were never posted and
+    # the pieces importing them failed "unknown import"
+    d, cfg = split
+    api = FakeApi()
+    run(cfg, api)                                    # everything live under the old names
+    plan = dict(PLAN, statement_suffixes={'A.low': '_m'})
+    (d / 'plan.json').write_text(json.dumps(plan))
+    (d / 'out' / 'lib' / 'Thm_A_low_m_s2.lean').write_text(
+        'import Mathlib\nimport Definitions.Def_XB000\n\ntheorem low_m_s2 : True := by\n  sorry\n')
+    (d / 'prose' / 'A_low_m_s2.md').write_text('---\ntitle: Lemma low\n---\n\nIt holds.\n')
+    (d / 'out' / 'solutions' / 'Sol_A_low_m_s2.lean').write_text('import Mathlib\n\ntheorem solution : True := trivial\n')
+    (d / 'explanations' / 'A_low_m_s2.md').write_text(EXPL)
+    api.posted.clear()
+    r, summary = run(cfg, api)
+    assert ('thm', 'A.low_m_s2') in api.posted
+    assert ('verify', 'A.low_m_s2') in api.posted
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['statement:A.low']['name'] == 'A.low_m_s2' and st['statement:A.low']['state'] == 'live'
+    assert ('thm', 'A.mid_s2') not in api.posted         # unchanged names stay as they are
+
+
 def test_command_line_is_a_dry_run_without_go(split, capsys):
     import sys
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
@@ -421,7 +444,7 @@ def test_a_piece_whose_proof_is_live_with_our_text_is_adopted(split):
     r, summary = run(cfg, api)
     assert ('verify', 'A.low_s2') not in api.posted
     st = json.loads((d / 'run_state.json').read_text())
-    assert st['piece:A.low'] == {'state': 'live', 'id': 'sub0', 'history': {}}
+    assert st['piece:A.low'] == {'state': 'live', 'id': 'sub0', 'history': {}, 'name': 'A.low_s2'}
 
 
 def test_command_line_dry_run_reads_but_never_writes(split, capsys, monkeypatch):
