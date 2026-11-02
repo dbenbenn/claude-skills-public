@@ -819,3 +819,14 @@ def test_a_lost_pending_proof_is_not_adopted_at_a_restart(split):
     assert 'old' in api.also['A.low_s2']
     st = json.loads((d / 'run_state.json').read_text())
     assert st['piece:A.low']['state'] == 'live' and st['piece:A.low']['id'] != 'old'
+
+
+def test_reconcile_says_how_many_items_it_looks_up_before_sending(split):
+    # q150 (2026-11-02): a restarted publisher spent 14 minutes in silent live-proof lookups (2-3 s an
+    # item) before its first PROGRESS line, and looked hung
+    d, cfg = split
+    run(cfg, FakeApi())
+    lines = (d / 'PROGRESS.log').read_text().splitlines()
+    assert 'reconcile  looking up 7 items' in lines[0] and 'submit' in lines[1]
+    run(cfg, FakeApi())                                           # everything live: nothing to look up, no line
+    assert sum('reconcile' in l for l in (d / 'PROGRESS.log').read_text().splitlines()) == 1

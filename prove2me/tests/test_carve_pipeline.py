@@ -1040,6 +1040,29 @@ def test_upgrade_that_leaves_the_port_rules_alone_does_not_port_again(env):
     assert not _ported(env) and ('carve', 'graph') not in tools_called(env)
 
 
+def test_a_carver_change_runs_gen_again_before_publishing(env):
+    # q145 (2026-11-01): a carver fix (an info command kind missing from DIAGNOSTIC) did not reach the staged
+    # files: the resume re-ran measure on the old gen output, and it took `--redo gen` (25 minutes lost)
+    assert run(env, *ARGS).returncode == 0
+    _commit(env, 'p2mlib/carve.py', open(os.path.join(ROOT, 'p2mlib', 'carve.py')).read() + '\n# a carver fix\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'stale: gen' in r.stdout and 'carver' in r.stdout
+    assert ('carve', 'gen') in tools_called(env) and ('carve', 'graph') not in tools_called(env)
+    assert not _ported(env)
+
+
+def test_once_publishing_started_a_carver_change_keeps_gen(env):
+    assert run(env, *ARGS, '--publish').returncode == 0
+    _commit(env, 'p2mlib/carve.py', open(os.path.join(ROOT, 'p2mlib', 'carve.py')).read() + '\n# a carver fix\n')
+    env.log.write_text('')
+    r = run(env, '--upgrade')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert ('carve', 'gen') not in tools_called(env)
+    assert 'publishing has started' in r.stdout and '--redo gen' in r.stdout
+
+
 def test_changed_port_options_port_again(env):
     assert run(env, *ARGS).returncode == 0
     p = json.load(open(env.dir / 'pipeline.json'))

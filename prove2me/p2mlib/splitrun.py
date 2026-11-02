@@ -218,6 +218,11 @@ class Runner:
         with open(self.cfg['log'], 'a', encoding='utf-8') as f:
             f.write('%s  %s  %s  %s\n' % (time.strftime('%Y-%m-%d %H:%M'), name, action, what))
 
+    def note(self, action, what):
+        """A line of the run itself, not of one item."""
+        with open(self.cfg['log'], 'a', encoding='utf-8') as f:
+            f.write('%s  -  %s  %s\n' % (time.strftime('%Y-%m-%d %H:%M'), action, what))
+
     def live(self, item):
         return self.state.get(item, {}).get('state') == 'live'
 
@@ -271,6 +276,13 @@ class Runner:
         adopted, bad, self.proved_elsewhere = {}, [], {}
         proofs = getattr(self.api, 'live_proofs', None)
         rel = self.released()
+        if write:
+            # q150: 2-3 s a lookup, so a restart with many unsent items is silent for minutes
+            n = sum(1 for x in self.items if self.state.get(x, {}).get('state') not in ('live', 'inflight')
+                    and not self.held(x, rel))
+            if n:
+                self.note('reconcile', 'looking up %d items not yet live on the platform before sending anything '
+                          '(a few seconds each)' % n)
         for x in self.items:
             kind = x.split(':', 1)[0]
             if self.state.get(x, {}).get('state') in ('live', 'inflight') or self.held(x, rel):

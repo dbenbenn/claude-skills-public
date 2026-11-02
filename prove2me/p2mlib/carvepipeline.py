@@ -400,6 +400,9 @@ SNAPSHOT_RULES = {
                                         'p2mlib/oaiport.py'] + _COMPAT),
     'port': ('port rules', ['scripts/oai_port_modules.py', 'p2mlib/oaiport.py'] + _COMPAT),
     'graph': ('LeanInfo tool', ['lean/LeanInfo.lean', 'lean/DeclGraph.lean']),
+    # q145 (2026-11-01): a carver fix reached the staged files only with `--redo gen`; leantext holds the
+    # guard rules gen stops on. Kept like the port once publishing has started
+    'gen': ('carver', ['p2mlib/carve.py', 'scripts/carve.py', 'p2mlib/leantext.py']),
 }
 GRAPH_READERS = ('extdefs', 'plan', 'gen')     # the steps that load the graph (and LeanInfo's readings)
 # q131 (2026-10-30): the steps that read the files gen writes, with the parts of `out/` each reads; a re-run
@@ -640,8 +643,8 @@ class Pipeline:
             # live items froze their text: never re-port under them by ourselves
             if s not in self._kept_rules:
                 self._kept_rules.add(s)
-                print('== note: the skill\'s port rules changed since %s ran, but publishing has started, so '
-                      'the port is kept (`--redo port` re-ports anyway)' % s, flush=True)
+                print('== note: the skill\'s %s changed since %s ran, but publishing has started, so '
+                      'its output is kept (`--redo %s` runs it anyway)' % (SNAPSHOT_RULES[s][0], s, s), flush=True)
             return False
         return True
 
