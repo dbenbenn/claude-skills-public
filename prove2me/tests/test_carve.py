@@ -963,7 +963,12 @@ def test_monomorphic_nodes_are_stated_and_proved_at_type(g, plan, tmp_path):
     assert C.monomorphize('structure S : Type where\n  x : Sort*\nuniverse u v\ndef f (a : Type u) (b : Type _) '
                           '(c : Sort v) (d : Type (max u v)) : Type := a') == (
         'structure S : Type where\n  x : Type\nuniverse u v\ndef f (a : Type) (b : Type) '
-        '(c : Type) (d : Type (max u v)) : Type := a')
+        '(c : Type) (d : Type (max 0 1)) : Type := a')
+    # explicit universe arguments follow the same substitution (q151: `UnitaryReducedVanishing.{u, v} G`
+    # with `G : Type` was "Application type mismatch")
+    assert C.monomorphize('universe u v\nvariable {G : Type u}\ntheorem t (h : P.{u, v} G) (E : Type v) : '
+                          'Q.{max u v} E := sorry') == (
+        'universe u v\nvariable {G : Type}\ntheorem t (h : P.{0, 0} G) (E : Type) : Q.{max 0 0} E := sorry')
 
 
 def test_a_file_over_the_size_cap_loses_its_comments(g, plan, tmp_path):

@@ -4318,14 +4318,23 @@ def solution_tail(g, node, plan=None, mono=False):
 
 
 def monomorphize(text):
-    """`text` with every universe a binder can bind made 0: `Type*`, `Type _`, `Sort*`, `Sort _`, and
-    `Type u` / `Sort u` for a universe `u` the text declares, all become `Type` (so `Sort u` is read at
-    `u := 1`); `Type (max u v)` and other level expressions are left, and the local check still
-    reports a statement they keep polymorphic (q151)."""
+    """`text` with every universe a binder can bind made concrete: `Type*`, `Type _`, `Sort*`, `Sort _`,
+    and `Type u` / `Sort u` for a universe `u` the text declares, all become `Type`; so a declared `u`
+    is 0, or 1 where the text writes `Sort u`, and it is replaced by that number in explicit universe
+    arguments (`P.{u, v}`) and in level expressions (`Type (max u v)`) too (q151)."""
     names = {u for l in re.findall(r'^[ \t]*universe[ \t]+([^\n]+)', text, re.M) for u in l.split()}
+    val = {u: '1' if re.search(r'\bSort[ \t]+%s(?![\w\'.])' % re.escape(u), text) else '0' for u in names}
     pat = r'\b(?:Type|Sort)(?:\*|[ \t]+_(?![\w\'])%s)' % (
         r'|[ \t]+(?:%s)(?![\w\'.])' % '|'.join(map(re.escape, sorted(names))) if names else '')
-    return re.sub(pat, 'Type', text)
+    text = re.sub(pat, 'Type', text)
+    if not names:
+        return text
+    word = re.compile(r"(?<![\w'.])(%s)(?![\w'.])" % '|'.join(map(re.escape, sorted(names))))
+
+    def levels(m):
+        return m.group(1) + word.sub(lambda w: val[w.group(1)], m.group(2)) + m.group(3)
+    text = re.sub(r'(\.\{)([^{}\n]*)(\})', levels, text)
+    return re.sub(r'(\b(?:Type|Sort)[ \t]*\()([^()\n]*)(\))', levels, text)
 
 
 def gen_piece(g, plan, node, collapse_mathlib=True, mono=False):
