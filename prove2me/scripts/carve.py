@@ -444,7 +444,7 @@ def main(argv):
         r = C.generate(g, P, cfg['out'], kinds,
                        names, cfg.get('external', ()), cfg.get('collapse_mathlib', True),
                        patches, repairs=recorded_repairs(cfg), frozen_text=frozen_text,
-                       frozen_stubs=frozen_stubs)
+                       frozen_stubs=frozen_stubs, monomorphic=set(cfg.get('monomorphic', ())))
         for f in r['files']:
             print('%9d  %s' % (r['sizes'][f], f))
         for f, c in r['stale_repairs']:

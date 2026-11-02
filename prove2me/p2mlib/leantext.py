@@ -263,6 +263,9 @@ GUARD_COMMAND = re.compile(r'[ \t]*(?:@\[[^\]\n]*\][ \t]*)?(?:(?:local|scoped)\s
                            r'(macro|macro_rules|syntax|elab|elab_rules|declare_syntax_cat|initialize)\b')
 GUARD_TOKENS = {'prelude': 'disables the automatic Init prelude import (refused even as an identifier)',
                 'initialize': 'arbitrary code execution at module initialization (refused even as an identifier or a field)'}
+# q151 (2026-11-02): "`TermElabM` -- metaprogramming monad -- not supported in submissions" on a bundle
+# that kept an elaborator's helper defs; TacticM and MetaM are the same kind (not yet seen refused)
+GUARD_TOKENS.update({m: 'metaprogramming monad' for m in ('TermElabM', 'TacticM', 'MetaM')})
 _TOKEN = r"(?<![\w'!?₀-ₜ])%s(?![\w'!?₀-ₜ])"
 
 

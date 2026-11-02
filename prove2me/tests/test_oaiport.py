@@ -291,6 +291,18 @@ def test_guard_problems_find_metaprogramming_and_the_prelude_token():
     assert got == [(4, 'prelude'), (5, 'macro'), (6, 'prelude')]
 
 
+def test_guard_problems_find_metaprogramming_monads():
+    # q151 (2026-11-02): a bundle kept the Gromov package's `partial def reifyPoly ... : TermElabM ...`
+    # (the `poly_tendsto` elaborator's helpers, its `elab` already removed) and the platform refused it:
+    # "`TermElabM` -- metaprogramming monad -- not supported in submissions"
+    from p2mlib import leantext as L
+    text = ('/- TermElabM in a comment -/\npartial def reifyPoly (e : Expr) : TermElabM Nat := pure 0\n'
+            'def core : Lean.Elab.Tactic.TacticM Unit := pure ()\ndef m : MetaM Unit := pure ()\n'
+            'def ok (n : Nat) : Nat := n\n')
+    got = [(n, tok) for n, tok, _ in L.guard_problems(text)]
+    assert got == [(2, 'TermElabM'), (3, 'TacticM'), (4, 'MetaM')]
+
+
 def test_ports_rename_identifiers_the_soundness_guard_refuses():
     # WLTime (2026-10-23): OpenAI's TMConsumer.prelude passed every local check and the published
     # bundle failed on the guard; renamed by hand to preludeCode. Both port routes rename it.

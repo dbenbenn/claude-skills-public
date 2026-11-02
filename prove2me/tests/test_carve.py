@@ -946,6 +946,26 @@ def test_patches_apply_to_every_generated_file(g, plan, tmp_path):
     assert res2['patches_unused'] == ['NO SUCH TEXT']
 
 
+def test_monomorphic_nodes_are_stated_and_proved_at_type(g, plan, tmp_path):
+    # q151 (2026-11-02): 34 statements of a Lie-group carve failed the verifier's CoeT fallback (types of
+    # 10^7-10^8 nodes unshared) while every goal was stated over `Type`; a node listed `monomorphic` has
+    # its statement, and its whole piece, at `Type`, and a `solution` with no universe parameters
+    res = C.generate(g, plan, str(tmp_path), monomorphic=['CD.top_pick'])
+    stub = open(tmp_path / 'lib' / 'Thm_CD_top_pick.lean').read()
+    piece = open(tmp_path / 'solutions' / 'Sol_CD_top_pick.lean').read()
+    assert 'theorem top_pick {α : Type} (a : α)' in stub
+    assert 'theorem top_pick_oai {α : Type} (a : α)' in piece
+    assert 'theorem pick_eq {α : Type} (a : α)' in piece
+    assert piece.rstrip().endswith('theorem solution : type_of% @CD.top_pick_oai := @CD.top_pick_oai')
+    other = open(tmp_path / 'lib' / ('Def_%s.lean' % plan['bundles'][0]['name'])).read()
+    assert 'Sort u' in other or 'Type u' in other            # bundles keep their universes
+    assert all('Type*' not in open(f).read() for f in res['files'] if 'top_pick' in f)
+    assert C.monomorphize('structure S : Type where\n  x : Sort*\nuniverse u v\ndef f (a : Type u) (b : Type _) '
+                          '(c : Sort v) (d : Type (max u v)) : Type := a') == (
+        'structure S : Type where\n  x : Type\nuniverse u v\ndef f (a : Type) (b : Type) '
+        '(c : Type) (d : Type (max u v)) : Type := a')
+
+
 # ---------------------------------------------------------------- extending a published carve
 
 def _carve_cli(tmp_path, name, **extra):

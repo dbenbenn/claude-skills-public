@@ -4301,14 +4301,25 @@ def gen_stub(g, plan, node, collapse_mathlib=True):
     return hdr + '\n' + body.strip('\n') + '\n'
 
 
-def solution_tail(g, node, plan=None):
+def solution_tail(g, node, plan=None, mono=False):
     nd = g.nodes[node]
-    lv = '.{%s}' % ', '.join(nd.univ) if nd.univ else ''
+    lv = '.{%s}' % ', '.join(nd.univ) if nd.univ and not mono else ''
     full = (statement_name(plan, node) if plan else pubname(node)) + '_oai'
     return 'theorem solution%s : type_of%% @%s%s := @%s%s\n' % (lv, full, lv, full, lv)
 
 
-def gen_piece(g, plan, node, collapse_mathlib=True):
+def monomorphize(text):
+    """`text` with every universe a binder can bind made 0: `Type*`, `Type _`, `Sort*`, `Sort _`, and
+    `Type u` / `Sort u` for a universe `u` the text declares, all become `Type` (so `Sort u` is read at
+    `u := 1`); `Type (max u v)` and other level expressions are left, and the local check still
+    reports a statement they keep polymorphic (q151)."""
+    names = {u for l in re.findall(r'^[ \t]*universe[ \t]+([^\n]+)', text, re.M) for u in l.split()}
+    pat = r'\b(?:Type|Sort)(?:\*|[ \t]+_(?![\w\'])%s)' % (
+        '|[ \t]+(?:%s)(?![\w\'.])' % '|'.join(map(re.escape, sorted(names))) if names else '')
+    return re.sub(pat, 'Type', text)
+
+
+def gen_piece(g, plan, node, collapse_mathlib=True, mono=False):
     """The node's piece: its keep set carved, OpenAI's own declaration of the node renamed
     `<name>_oai` (the verifier's environment already declares `<name>`; a same-named declaration
     that elaborates even slightly differently gives a locationless WA, Chowla 2026-10-08), and
@@ -4330,11 +4341,13 @@ def gen_piece(g, plan, node, collapse_mathlib=True):
     hdr = header(g, {g.nodes[k].module for k in keep}, p['bundles'],
                  [statement_name(plan, i) for i in p['imports']], collapse_mathlib,
                  extra=_ext_imports(g, plan, keep))
-    return hdr + '\n' + body.rstrip('\n') + '\n\n' + solution_tail(g, node, plan)
+    txt = hdr + '\n' + body.rstrip('\n') + '\n\n' + solution_tail(g, node, plan, mono)
+    return monomorphize(txt) if mono else txt
 
 
 def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, external=(),
-             collapse_mathlib=True, patches=(), repairs=None, frozen_text=None, frozen_stubs=None):
+             collapse_mathlib=True, patches=(), repairs=None, frozen_text=None, frozen_stubs=None,
+             monomorphic=()):
     """Write out/lib/Def_<bundle>.lean, out/lib/Thm_<slug>.lean (not for `external` nodes,
     published by someone else) and out/solutions/Sol_<slug>.lean. Returns {'files', 'sizes',
     'over_cap'} (files over prove2.me's 1 MiB cap), 'patches_unused'}.
@@ -4347,6 +4360,12 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
     `repairs`: {file name: [cut]}, the cuts carve_measure recorded in work/repairs.json, applied
     after the patches, so a regenerated file is the one that was measured (and published);
     a cut that no longer matches is returned in 'stale_repairs' as (file name, cut).
+
+    `monomorphic`: nodes whose statement and whole piece are written at universe 0 (`monomorphize`)
+    with a `solution` that has no universe parameters (config `monomorphic`; q151: the verifier's CoeT
+    fallback refuses universe-polymorphic statements with huge types, and a goal stated over `Type`
+    never needs its intermediates polymorphic). List the pieces importing such a node too: a
+    polymorphic declaration there cannot call it. Bundles keep their universes.
 
     `frozen_stubs`: {file name: text} of live statements, written the same way (a live statement
     cannot change).
@@ -4432,10 +4451,12 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
         external = set(external) | set(plan.get('external', ()))
         if 'stubs' in what and n not in external:
             fn = 'Thm_%s.lean' % slug(statement_name(plan, n))
-            put(os.path.join(out, 'lib', fn), gen_stub(g, plan, n, collapse_mathlib), frozen_stubs.get(fn))
+            txt = gen_stub(g, plan, n, collapse_mathlib)
+            put(os.path.join(out, 'lib', fn), monomorphize(txt) if n in monomorphic else txt,
+                frozen_stubs.get(fn))
         if 'pieces' in what:
             put(os.path.join(out, 'solutions', 'Sol_%s.lean' % slug(statement_name(plan, n))),
-                gen_piece(g, plan, n, collapse_mathlib))
+                gen_piece(g, plan, n, collapse_mathlib, mono=n in monomorphic))
     sizes = {f: os.path.getsize(f) for f in files}
     return {'files': files, 'sizes': sizes, 'over_cap': [f for f, s in sizes.items() if s > SIZE_CAP],
             'patches_unused': [pt['literal_old'] for pt in patches
