@@ -4403,6 +4403,9 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
             if txt != published:
                 drift.append(base)
             txt = published
+        elif len(txt.encode('utf-8')) > SIZE_CAP and base.startswith(('Thm_', 'Sol_')):
+            # q151: a piece four folds made 1,091,190 bytes was 1,016,518 without OpenAI's comments
+            txt = strip(txt)
         if os.path.basename(path).startswith(('Def_', 'Sol_')) and re.search(r'\bsorry\b', strip(txt)):
             raise CarveError('%s still contains sorry (a repaired declaration whose patch did not apply?)' % path)
         # what prove2.me's soundness guard refuses, found before publishing (WLTime 2026-10-23: a

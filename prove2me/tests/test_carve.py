@@ -966,6 +966,21 @@ def test_monomorphic_nodes_are_stated_and_proved_at_type(g, plan, tmp_path):
         '(c : Type) (d : Type (max u v)) : Type := a')
 
 
+def test_a_file_over_the_size_cap_loses_its_comments(g, plan, tmp_path):
+    # q151 (2026-11-02): folding four statements into a live piece made it 1,091,190 bytes, over
+    # prove2.me's 1 MiB cap; without OpenAI's comments and docstrings it was 1,016,518
+    big = '/-- ' + 'x' * (C.SIZE_CAP + 10) + ' -/\n'
+    pat = [{'literal_old': 'theorem double_succ', 'literal_new': big + '-- note\ntheorem double_succ'}]
+    res = C.generate(g, plan, str(tmp_path), patches=pat)
+    hit = [f for f in res['files'] if 'theorem double_succ' in open(f).read()]
+    assert hit and res['over_cap'] == []
+    for f in hit:
+        txt = open(f).read()
+        assert 'xxxx' not in txt and '-- note' not in txt
+    small = [f for f in res['files'] if f not in hit and '-- module' in open(f).read()]
+    assert small                                  # files under the cap keep their comments
+
+
 # ---------------------------------------------------------------- extending a published carve
 
 def _carve_cli(tmp_path, name, **extra):
