@@ -11,7 +11,9 @@ import glob
 import json
 import os
 import re
+import shutil
 import socket
+import subprocess
 import threading
 import time
 import urllib.parse
@@ -55,8 +57,9 @@ def read_psi():
         return None
 
 
-def pressure_alerts(psi, free_gib):
-    """The conditions under which the machine feels frozen. Full = every non-idle task waited."""
+def pressure_alerts(psi, free_gib, disk_free_gib=None):
+    """The conditions under which the machine feels frozen (full = every non-idle task waited), or
+    stops: a full disk (2026-11-01: four agents died and the queue crash-looped for 23 h unseen)."""
     a = []
     if psi:
         if psi[2] > 5:
@@ -67,6 +70,8 @@ def pressure_alerts(psi, free_gib):
             a.append('CPU stalls %.0f%%' % psi[0])
     if free_gib is not None and free_gib < 4:
         a.append('only %.1f GiB of memory and swap free' % free_gib)
+    if disk_free_gib is not None and disk_free_gib < DISK_LOW_GIB:
+        a.append('only %.1f GiB of disk free' % disk_free_gib)
     return a
 
 
@@ -264,6 +269,113 @@ def machine_row(now, procs, meminfo, stat, prev, ncpu=None, clk=CLK, cg=None):
     return row, {'t': now, 'ticks': {p['pid']: p['ticks'] for p in procs}, 'stat': stat, 'cg': cg}
 
 
+# ---- disk ----------------------------------------------------------------------------------
+# dbenbenn 2026-11-02, after the disk filled on 2026-11-01: disk in use over time, split by what holds it.
+# The split needs a walk of millions of files (du, at idle I/O priority), so it runs hourly in its own
+# thread; the total comes from statvfs every sample.
+
+DISK_CATS = ('lean_build', 'lean_lib', 'jobs', 'sources', 'cache')
+DISK_LABELS = {'lean_build': 'Lean build output', 'lean_lib': 'Lean libraries and toolchains',
+               'jobs': 'Agent job scratch', 'sources': 'Repos and sources', 'cache': 'Caches, /tmp, transcripts',
+               'rest': 'Nix store, swap file and the rest'}
+DISK_EVERY = 3600
+DISK_KEEP = 30 * 86400
+DISK_LOW_GIB = 20          # the banner; the OAI queue already holds launches below 40
+IONICE = shutil.which('ionice') or '/run/current-system/sw/bin/ionice'
+
+
+def disk_roots(home=os.path.expanduser('~')):
+    j = lambda *a: os.path.join(home, *a)
+    return {'claude': j('claude'), 'dotclaude': j('.claude'), 'cache': j('.cache'), 'elan': j('.elan'), 'tmp': '/tmp'}
+
+
+def _quiet(cmd):
+    """cmd at idle I/O priority and lowest CPU priority when ionice exists."""
+    return ([IONICE, '-c3'] if os.path.exists(IONICE) else []) + ['nice', '-n19'] + cmd
+
+
+def du(paths, depth=0, exclude=None):
+    """{path: bytes on disk} from `du -x -B1 -d depth` (one walk for all paths; missing paths skipped)."""
+    paths = [p for p in paths if os.path.isdir(p)]
+    if not paths:
+        return {}
+    cmd = ['du', '-x', '-B1', '-d', str(depth)] + (['--exclude=' + exclude] if exclude else []) + ['--'] + paths
+    out = subprocess.run(_quiet(cmd), capture_output=True, text=True).stdout   # unreadable entries: skipped
+    sizes = {}
+    for line in out.splitlines():
+        n, _, p = line.partition('\t')
+        if n.isdigit():
+            sizes[p] = int(n)
+    return sizes
+
+
+def find_lakes(root):
+    """Every outermost .lake directory under root (a library's own .lake inside .lake/packages is not one)."""
+    if not os.path.isdir(root):
+        return []
+    cmd = ['find', root, '-xdev', '(', '-name', '.git', '-prune', ')', '-o',
+           '(', '-name', '.lake', '-type', 'd', '-prune', '-print', ')']
+    return sorted(l for l in subprocess.run(_quiet(cmd), capture_output=True, text=True).stdout.splitlines() if l)
+
+
+def disk_scan(roots=None):
+    """{category: bytes}: Lean build output (.lake outside packages, under ~/claude); Lean libraries and
+    toolchains (.lake/packages, ~/.elan, ~/.cache/mathlib); agent job scratch (~/.claude/jobs); repos and
+    sources (~/claude outside .lake); caches, /tmp and transcripts (the rest of ~/.cache and ~/.claude)."""
+    r = roots or disk_roots()
+    lakes = find_lakes(r['claude'])
+    lk = du(lakes, depth=1)
+    lib = sum(lk.get(os.path.join(l, 'packages'), 0) for l in lakes)
+    build = sum(lk.get(l, 0) for l in lakes) - lib
+    src = du([r['claude']], exclude='.lake').get(r['claude'], 0)
+    dc = du([r['dotclaude']], depth=1)
+    jobs = dc.get(os.path.join(r['dotclaude'], 'jobs'), 0)
+    ca = du([r['cache']], depth=1)
+    mcache = ca.get(os.path.join(r['cache'], 'mathlib'), 0)
+    elan = du([r['elan']]).get(r['elan'], 0)
+    tmp = du([r['tmp']]).get(r['tmp'], 0)
+    return {'lean_build': build, 'lean_lib': lib + elan + mcache, 'jobs': jobs, 'sources': src,
+            'cache': ca.get(r['cache'], 0) - mcache + dc.get(r['dotclaude'], 0) - jobs + tmp}
+
+
+def disk_now(path='/'):
+    """{'used', 'total', 'free'} GiB of the filesystem holding path (free = what a user may still write)."""
+    st = os.statvfs(path)
+    return {'used': round((st.f_blocks - st.f_bfree) * st.f_frsize / G, 1),
+            'total': round(st.f_blocks * st.f_frsize / G, 1), 'free': round(st.f_bavail * st.f_frsize / G, 1)}
+
+
+def disk_row(t, cats, now, secs=None):
+    """One history row: GiB per category, and the rest (OS, Nix store, ...) as what statvfs counts beyond them."""
+    c = {k: round(v / G, 1) for k, v in cats.items()}
+    c['rest'] = round(max(0.0, now['used'] - sum(c.values())), 1)
+    return {'t': t, 'used': now['used'], 'total': now['total'], 'secs': secs, 'cats': c}
+
+
+def disk_due(rows, now):
+    return not rows or now - rows[-1]['t'] >= DISK_EVERY
+
+
+def disk_keep(rows, now):
+    return [r for r in rows if r['t'] >= now - DISK_KEEP]
+
+
+def disk_loop(home):
+    """The hourly category scan, in its own thread: state/disk.json {'rows': [...]}."""
+    p = os.path.join(home, 'state', 'disk.json')
+    while True:
+        try:
+            rows = load_json(p, {}).get('rows', [])
+            if disk_due(rows, time.time()):
+                t0 = time.time()
+                cats = disk_scan()
+                row = disk_row(int(t0), cats, disk_now(), secs=round(time.time() - t0))
+                save_json(p, {'rows': disk_keep(rows, row['t']) + [row]})
+        except Exception as e:                 # a failed scan must not end the thread
+            print('disk scan failed: %r' % e, flush=True)
+        time.sleep(60)
+
+
 def cores_of(p, prev, now):
     if not prev or now <= prev['t'] or p['pid'] not in prev['ticks']:
         return None
@@ -429,7 +541,8 @@ def build_status(now, sections, problems, system, flags, lean, trouble=None):
     free = system.get('free_gib')
     if free is not None:
         free += system.get('swap_free_gib', 0)   # with swap, low free RAM alone is normal under load
-    now_alerts = pressure_alerts(psi, free)
+    disk = (system.get('disk') or {}).get('now') or {}
+    now_alerts = pressure_alerts(psi, free, disk.get('free'))
     for a in now_alerts:
         add_report(trouble, now, a, gap=600)
     trouble[:] = [e for e in trouble if now - e['last'] <= 86400]
@@ -497,6 +610,13 @@ def step(home, now=None):
     system = {'machine': res['machine'], 'psi': res.get('psi', []), 'labels': res['labels'],
               'free_gib': round(mi['MemAvailable'] / G, 1), 'cores_total': os.cpu_count(),
               'swap_free_gib': round(mi.get('SwapFree', 0) / G, 1), 'swap_total_gib': round(mi.get('SwapTotal', 0) / G, 1)}
+    try:
+        dn = disk_now()
+        row['disk'] = dn['used']
+    except OSError:
+        dn = None
+    system['disk'] = {'now': dn, 'rows': load_json(os.path.join(st, 'disk.json'), {}).get('rows', []),
+                      'labels': DISK_LABELS, 'every_secs': DISK_EVERY}
     res['trouble'] = res.get('trouble', [])
     status = build_status(now, secs, problems, system, health_flags(HEALTH_FLAGS, now), lean_view(procs, prev, now),
                           trouble=res['trouble'])
@@ -620,6 +740,7 @@ def main():
         State.status = json.dumps(st, ensure_ascii=False).encode()
     srv = ThreadingHTTPServer(('', PORT), Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
+    threading.Thread(target=disk_loop, args=(home,), daemon=True).start()
     while True:
         try:
             step(home)

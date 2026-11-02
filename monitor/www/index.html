@@ -6,9 +6,9 @@
 <link rel="stylesheet" href="agents.css">
 <script src="vendor/uPlot.iife.min.js"></script>
 <style>
-:root{color-scheme:light;--surface-0:#f5f4f1;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7974;--grid:#e4e3df;--series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#8f5bd6;--series-5:#c99a00;--rest:#c9c8c2;--track:#e9e8e4;--good:#008300;--warn:#b26b00;--alarm:#b42318}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--series-4:#9d6fe0;--series-5:#d4a514;--rest:#4a4a46;--track:#2a2a28;--good:#3fa33f;--warn:#d9922a;--alarm:#c4321f}}
-:root[data-theme="dark"]{color-scheme:dark;--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--series-4:#9d6fe0;--series-5:#d4a514;--rest:#4a4a46;--track:#2a2a28;--good:#3fa33f;--warn:#d9922a;--alarm:#c4321f}
+:root{color-scheme:light;--surface-0:#f5f4f1;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7974;--grid:#e4e3df;--series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#8f5bd6;--series-5:#c99a00;--disk-5:#c99a00;--rest:#c9c8c2;--track:#e9e8e4;--good:#008300;--warn:#b26b00;--alarm:#b42318}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--series-4:#9d6fe0;--series-5:#d4a514;--disk-5:#c98500;--rest:#4a4a46;--track:#2a2a28;--good:#3fa33f;--warn:#d9922a;--alarm:#c4321f}}
+:root[data-theme="dark"]{color-scheme:dark;--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--series-4:#9d6fe0;--series-5:#d4a514;--disk-5:#c98500;--rest:#4a4a46;--track:#2a2a28;--good:#3fa33f;--warn:#d9922a;--alarm:#c4321f}
 body{margin:0;background:var(--surface-0);color:var(--text-primary);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
 main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
 h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14px}
@@ -44,19 +44,22 @@ code{font-size:13px}
 .seg button:first-child{border-left:0}
 .seg button[aria-pressed="true"]{background:var(--series-1);color:#fff}
 .hint{color:var(--text-muted);font-size:12px}
-#zoomed{font:inherit;font-size:13px;background:transparent;color:var(--series-1);border:1px solid var(--series-1);border-radius:7px;padding:3px 10px;cursor:pointer}
+#zoomed,.zoomed{font:inherit;font-size:13px;background:transparent;color:var(--series-1);border:1px solid var(--series-1);border-radius:7px;padding:3px 10px;cursor:pointer}
 /* uPlot: theme its legend and selection */
 .u-legend{font-size:12px;color:var(--text-secondary);text-align:left}
 .u-legend .u-series th{font-weight:500}.u-legend .u-value{font-variant-numeric:tabular-nums;color:var(--text-primary)}
 .u-legend .u-marker{border-radius:2px}
 .u-select{background:rgba(127,127,127,.18)}
+.dtab{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:3px 16px;font-variant-numeric:tabular-nums;font-size:14px;margin-top:10px}
+.dtab .h{color:var(--text-muted);font-size:12px}.dtab .r{text-align:right;color:var(--text-secondary)}.dtab .tot{border-top:1px solid var(--grid);padding-top:3px}
+.dtab .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:7px;vertical-align:-1px}
 </style></head>
 <body><main>
 <h1 id="h1">monitor</h1>
 <p class="sub" id="upd">Loading…</p>
 <div class="alarm" id="alarm" role="alert" hidden></div>
 <div class="inbox" id="inbox" hidden></div>
-<nav class="nav" aria-label="Views"><a href="#t-quota">Subscription quota</a><a href="#t-sys">System resources</a><a href="#t-agents">Headless agents</a><a href="#sections">Work in progress</a></nav>
+<nav class="nav" aria-label="Views"><a href="#t-quota">Subscription quota</a><a href="#t-sys">System resources</a><a href="#t-disk">Disk</a><a href="#t-agents">Headless agents</a><a href="#sections">Work in progress</a></nav>
 <section class="card" aria-labelledby="t-quota">
 <h2 id="t-quota">Subscription quota</h2>
 <p class="chart-sub" id="quota-sub">Loading…</p>
@@ -85,6 +88,18 @@ code{font-size:13px}
 <div id="cleared-box" hidden><h3 style="margin-top:16px" id="t-cleared">Cleared alerts (last 24 h)</h3>
 <p class="chart-sub">Trouble that was in the red banner and has stopped: the condition is gone, the racing jobs are no longer both running, or an OOM kill is over an hour old. Repeats are one row with their worst reading.</p>
 <ul class="cleared" id="cleared"></ul></div>
+</section>
+<section class="card" aria-labelledby="t-disk">
+<h2 id="t-disk">Disk</h2>
+<p class="chart-sub" id="disk-sub">Loading…</p>
+<div class="toolbar">
+  <div class="seg" role="group" aria-label="Disk time range" id="disk-ranges"></div>
+  <button id="disk-zoomed" class="zoomed" hidden>Zoomed in · back to range</button>
+  <span class="hint">Drag across the chart to zoom · double-click to reset · hover for values</span>
+</div>
+<div class="chart"><h3>Disk in use, by what holds it</h3><div id="c-disk"></div></div>
+<div class="dtab" id="disk-table"></div>
+<p class="hint">Categories are measured hourly with <code>du</code> at idle I/O priority; the total and free space come from the filesystem every 30 s. Lean build output: every <code>.lake</code> under ~/claude except its <code>packages</code> (the workspace build, mission repos). Lean libraries and toolchains: <code>.lake/packages</code> (Mathlib and friends), ~/.elan, ~/.cache/mathlib. Agent job scratch: ~/.claude/jobs (carve dirs). Repos and sources: ~/claude outside <code>.lake</code>. Caches, /tmp, transcripts: the rest of ~/.cache, /tmp, and ~/.claude outside jobs. The grey rest is whatever the filesystem counts beyond these: the Nix store, the 32 GiB swap file, other home directories. The banner warns below 20 GiB free; the OAI queue stops launching below 40.</p>
 </section>
 <section class="card" aria-labelledby="t-agents">
 <h2 id="t-agents">Headless agents</h2>
@@ -229,8 +244,67 @@ function drawSystem(sy){
   document.getElementById('lean').innerHTML = L.length ? `<p class="chart-sub">${L.filter(r=>/^lean\b/.test(r.what)).length} Lean, ${L.filter(r=>/^lake\b/.test(r.what)).length} lake</p>` + procTable(L, true) : '<p class="empty">No Lean running.</p>';
 }
 
-window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(() => { if (last) { chartKey = ''; drawSystem(last.system); drawSections(last.sections || []); drawQuota(); } }, 200); });
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (last) { chartKey = ''; drawSystem(last.system); drawSections(last.sections || []); drawQuota(); } });
+// ---- disk: hourly category rows (monitor.disk_scan), its own range (days, not the system charts' hours) ----
+const DISK_GROUPS = ['lean_build', 'lean_lib', 'jobs', 'sources', 'cache', 'rest'];
+const DISK_COLOR = {lean_build: '--series-1', lean_lib: '--series-3', jobs: '--series-2', sources: '--series-4', cache: '--disk-5', rest: '--rest'};
+const DISK_RANGES = [['2 days',172800],['7 days',604800],['30 days',2592000]];
+let diskRange = +store.get('monitor.diskRange', 604800), diskView = null, diskChart = null, diskKey = '';
+const dbox = document.getElementById('disk-ranges');
+dbox.innerHTML = DISK_RANGES.map(([l,s]) => `<button data-s="${s}" aria-pressed="${s===diskRange}">${l}</button>`).join('');
+dbox.onclick = e => { const b = e.target.closest('button'); if (!b) return;
+  diskRange = +b.dataset.s; store.set('monitor.diskRange', diskRange); diskView = null;
+  dbox.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x===b)); diskApply(); };
+document.getElementById('disk-zoomed').onclick = () => { diskView = null; diskApply(); };
+function diskApply(){
+  if (!diskChart) return;
+  const now = last ? last.updated : Date.now()/1000;
+  diskChart.setScale('x', diskView || {min: now - diskRange, max: now});
+  document.getElementById('disk-zoomed').hidden = !diskView;
+}
+const fmtDate = t => new Date(t*1000).toLocaleDateString('en-GB',{timeZone:TZ,weekday:'short',day:'numeric',month:'short'});
+const diskTicks = (u, splits) => (u.scales.x.max - u.scales.x.min) > 3*86400 ? splits.map(fmtDate) : xTicks(u, splits);
+const gib = v => v == null ? '—' : v.toFixed(1) + ' GiB';
+const delta = v => v == null ? '—' : (v >= 0.05 ? '+' : v <= -0.05 ? '−' : '±') + Math.abs(v).toFixed(1) + ' GiB';
+
+function drawDisk(d){
+  const R = (d && d.rows) || [], now = d && d.now, labels = (d && d.labels) || {};
+  const sub = document.getElementById('disk-sub'), lastR = R.length ? R[R.length-1] : null;
+  sub.textContent = (now ? `now ${now.used.toFixed(1)} of ${now.total.toFixed(0)} GiB used · ${now.free.toFixed(1)} GiB free` : 'no reading')
+    + (lastR ? ` · categories last measured ${fmtAt(lastR.t)}${lastR.secs != null ? ` (took ${lastR.secs} s)` : ''}` : ' · first category measurement pending (hourly, about 15 s)');
+  const el = document.getElementById('c-disk');
+  if (!R.length) { el.innerHTML = '<p class="empty">No measurement yet.</p>'; document.getElementById('disk-table').innerHTML = ''; return; }
+  const x = R.map(r => r.t), raw = {};
+  for (const g of DISK_GROUPS) raw[g] = R.map(r => r.cats[g] ?? null);
+  const total = (now && now.total) || lastR.total;
+  const b = stacked(el, 240, x, DISK_GROUPS, raw, g => labels[g] || g, g => DISK_COLOR[g], v => v.toFixed(0), 'GiB', [0, total]);
+  // its own zoom and no cursor sync: the system charts' range is hours, this one days
+  delete b.opts.cursor.sync;
+  b.opts.axes[0].values = diskTicks;
+  b.opts.axes[0].space = 100;          // a day apart at 7 days, so a date is not printed twice
+  b.opts.hooks = {
+    setSelect: [u => { if (u.select.width < 4) return;
+      diskView = {min: u.posToVal(u.select.left, 'x'), max: u.posToVal(u.select.left + u.select.width, 'x')};
+      u.setSelect({left: 0, top: 0, width: 0, height: 0}, false); diskApply(); }],
+    ready: [u => u.over.addEventListener('dblclick', () => { diskView = null; diskApply(); })]};
+  b.opts.series[0].value = (u, v, si, idx) => idx == null ? 'latest' : fmtAt(v);
+  const key = document.documentElement.clientWidth + '|' + matchMedia('(prefers-color-scheme: dark)').matches + '|' + DISK_GROUPS.map(g => labels[g]).join('|');
+  if (diskChart && diskKey === key) diskChart.setData(b.data, false);
+  else { if (diskChart) diskChart.destroy(); el.innerHTML = ''; diskChart = new uPlot(b.opts, b.data, el); diskKey = key; }
+  diskApply();
+  // the table: every category now and its change over a day and a week (also the chart's text view)
+  const ago = s => { const t = lastR.t - s; const r = R.find(r => r.t >= t - 1800); return r && r.t <= t + 1800 ? r : null; };
+  const d1 = ago(86400), d7 = ago(7*86400);
+  const row = (name, sw, v, a, b) => `<span>${sw}${esc(name)}</span><span class="r">${gib(v)}</span><span class="r">${a}</span><span class="r">${b}</span>`;
+  const sw = g => `<i class="sw" style="background:var(${DISK_COLOR[g]})"></i>`;
+  document.getElementById('disk-table').innerHTML =
+    '<span class="h">Category (last measurement)</span><span class="h r">Size</span><span class="h r">Change, 24 h</span><span class="h r">Change, 7 days</span>' +
+    DISK_GROUPS.slice().reverse().map(g => row(labels[g] || g, sw(g), lastR.cats[g],
+      d1 ? delta(lastR.cats[g] - (d1.cats[g] ?? 0)) : '—', d7 ? delta(lastR.cats[g] - (d7.cats[g] ?? 0)) : '—')).join('') +
+    `<span class="tot">In use</span><span class="r tot">${gib(lastR.used)}</span><span class="r tot">${d1 ? delta(lastR.used - d1.used) : '—'}</span><span class="r tot">${d7 ? delta(lastR.used - d7.used) : '—'}</span>`;
+}
+
+window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(() => { if (last) { chartKey = ''; drawSystem(last.system); drawDisk(last.system.disk); drawSections(last.sections || []); drawQuota(); } }, 200); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (last) { chartKey = ''; drawSystem(last.system); drawDisk(last.system.disk); drawSections(last.sections || []); drawQuota(); } });
 
 // ---- page ----
 async function load(){
@@ -256,6 +330,7 @@ async function load(){
   document.getElementById('cleared-box').hidden = !C.length;
   document.getElementById('cleared').innerHTML = C.map(e => `<li><span class="when">${esc(fmtSpan(e.first, e.last))}</span> · ${e.what==='machine'?'':esc(e.what)+': '}${esc(e.text)}${e.what!=='machine' && e.n>1 ? ` · ${e.n} checks` : ''}</li>`).join('');
   drawSystem(s.system);
+  drawDisk(s.system.disk);
   drawSections(s.sections||[]);
   if (typeof drawQuota === 'function') drawQuota();
 }

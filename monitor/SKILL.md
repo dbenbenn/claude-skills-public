@@ -74,11 +74,12 @@ producer unit, and let the section expire.
 ## Reading it from a shell
 
 `~/claude/monitor/state/status.json` is exactly what the page shows: `alerts`; `system.machine` rows
-`{t, total, mem: {group: GiB}, cpu: {group: cores}, load1, swap, swap_total}` (swap in GiB, recorded since 2026-10-30 and charted as "Swap in use"); `system.psi` rows `[t, cpu some, memory
+`{t, total, mem: {group: GiB}, cpu: {group: cores}, load1, swap, swap_total, disk}` (swap in GiB, recorded since 2026-10-30 and charted as "Swap in use"; `disk` = GiB used on /, since 2026-11-02); `system.psi` rows `[t, cpu some, memory
 some, memory full, io some, io full]` (avg10, %); `system.free_gib`, `swap_free_gib`, `swap_total_gib`; `system.lean`; and `sections` with history, rates
-and ETAs. The top banner is for machine trouble only (dbenbenn 2026-10-18): memory full > 5%, I/O full >
+and ETAs; `system.disk` = `{now: {used, total, free}, rows, labels, every_secs}` (the Disk card, below). The top banner is for machine trouble only (dbenbenn 2026-10-18): memory full > 5%, I/O full >
 20%, CPU some > 50%, less than 4 GiB of memory and swap available together (low free RAM alone is
-normal on a box where Lean may fill RAM and spill to swap), and Lean health flags from `lean-health.timer`
+normal on a box where Lean may fill RAM and spill to swap), less than 20 GiB of disk free (`DISK_LOW_GIB`, since
+2026-11-02), and Lean health flags from `lean-health.timer`
 and lean-cap's race reports. **The banner and the red favicon show only trouble going on now**
 (dbenbenn 2026-10-26): a pressure alert in the current sample; a Lean health flag that the latest check
 still reports (checks run every 10 min, so it counts as current for 15); a race while both jobs still run
@@ -89,6 +90,23 @@ pids kept) less than 25 min apart (10 min for pressure alerts) count as one epis
 reading. Pressure episodes persist across samples in `state/resources.json` (`trouble`). Project alerts
 and STALE badges stay in their sections; unreadable section files are listed under the sections
 (`problems` in status.json).
+
+## Disk (2026-11-02)
+
+Added after the disk filled on 2026-11-01 and nothing on the page said so (four agents died, the OAI queue
+crash-looped for 23 h). The **Disk** card below System resources: a stacked chart of disk in use by category
+with its own range (2 / 7 / 30 days; the system charts' range stops at 48 h), and a table of each category's
+size and its change over 24 h and 7 days (also the chart's text view). Categories (`monitor.DISK_CATS`,
+`disk_scan`): **Lean build output** (every outermost `.lake` under ~/claude except its `packages`), **Lean
+libraries and toolchains** (`.lake/packages`, ~/.elan, ~/.cache/mathlib), **agent job scratch** (~/.claude/jobs),
+**repos and sources** (~/claude outside `.lake`), **caches, /tmp, transcripts** (the rest of ~/.cache, /tmp,
+~/.claude outside jobs); grey **Nix store, swap file and the rest** is what statvfs counts beyond them (the
+32 GiB /var/lib/swapfile, /nix, other home dirs). The scan runs hourly in its own thread (`disk_loop`) with
+`du -x -B1` and `find` under `ionice -c3 nice -n19` (ionice by its full NixOS path: the system unit's PATH
+lacks util-linux); about 15 s and under 2% I/O pressure on this box. Rows `{t, used, total, secs, cats}` in
+`state/disk.json`, 30 days. The total and free space come from statvfs every 30 s. The disk-only fifth hue
+`--disk-5` is the reference palette's dark yellow step `#c98500` (validated light and dark); `--series-5`'s dark
+step is above the dark lightness band and stays as it is for the swap chart.
 
 ## Headless agents, quota and logs (no tokens)
 
