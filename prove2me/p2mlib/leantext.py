@@ -260,12 +260,13 @@ def code_only(text):
 # identifier (WLTime 2026-10-23: OpenAI's `def prelude` in a bundle, "`prelude` — disables the
 # automatic Init prelude import, enabling kernel-primitive shadowing"). `notation` is allowed.
 GUARD_COMMAND = re.compile(r'[ \t]*(?:@\[[^\]\n]*\][ \t]*)?(?:(?:local|scoped)\s+)?'
-                           r'(macro|macro_rules|syntax|elab|elab_rules|declare_syntax_cat|initialize)\b')
+                           r'(macro|macro_rules|syntax|elab|elab_rules|declare_syntax_cat|initialize|run_cmd|run_elab|run_meta)\b')
 GUARD_TOKENS = {'prelude': 'disables the automatic Init prelude import (refused even as an identifier)',
                 'initialize': 'arbitrary code execution at module initialization (refused even as an identifier or a field)'}
 # q151 (2026-11-02): "`TermElabM` -- metaprogramming monad -- not supported in submissions" on a bundle
 # that kept an elaborator's helper defs; TacticM and MetaM are the same kind (not yet seen refused)
 GUARD_TOKENS.update({m: 'metaprogramming monad' for m in ('TermElabM', 'TacticM', 'MetaM')})
+GUARD_TOKENS['modifyEnv'] = 'mutates the elaboration environment'   # q151, with `run_cmd`
 _TOKEN = r"(?<![\w'!?₀-ₜ])%s(?![\w'!?₀-ₜ])"
 
 

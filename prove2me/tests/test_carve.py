@@ -3168,3 +3168,15 @@ def test_print_sorries_is_a_diagnostic_command():
     # `foo` had gone to another item: "Unknown constant"; like `#print axioms` it never belongs in a published file
     from p2mlib import carve, prune
     assert 'printSorriesStx' in carve.DIAGNOSTIC and 'printSorriesStx' in prune.DIAGNOSTIC
+
+
+def test_run_cmd_is_dropped_like_a_diagnostic_command():
+    # q151 (2026-11-02): OpenAI's `run_cmd Lean.modifyEnv fun env => Lean.LibrarySuggestions.nameDenyListExt.addEntry
+    # env "polar_offset_nonpos"` was kept in five statements; the platform refused them ("`run_cmd` — arbitrary
+    # elaboration-time code execution", "`modifyEnv` — mutates the elaboration environment")
+    from p2mlib import carve, prune
+    from p2mlib import leantext as L
+    for k in ('runCmd', 'runElab', 'runMeta'):
+        assert k in carve.DIAGNOSTIC and k in prune.DIAGNOSTIC
+    text = 'theorem t : True := trivial\nrun_cmd Lean.modifyEnv fun env => env\n  run_elab pure ()\n'
+    assert [(n, k) for n, k, _ in L.guard_problems(text)] == [(2, 'run_cmd'), (2, 'modifyEnv'), (3, 'run_elab')]

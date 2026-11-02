@@ -96,7 +96,8 @@ def restricted_attribute(txt):
     return any(e.split()[0] in RESTRICTED_ATTRIBUTES for e in attribute_entries(txt) or ()
                if e.split())
 DIAGNOSTIC = {'check', 'eval', 'print', 'printAxioms', 'printSorriesStx', 'reduce', 'check_failure', 'synth',
-              'evalBang', 'exit'}
+              'evalBang', 'exit',
+              'runCmd', 'runElab', 'runMeta'}   # q151: OpenAI's `run_cmd Lean.modifyEnv …` deny-list lines
 OPENERS = {'namespace', 'section', 'noncomputableSection'}
 
 

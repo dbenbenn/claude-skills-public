@@ -17,7 +17,8 @@ import re
 from . import leanedit, names
 from .leantext import strip as leantext_strip
 
-DIAGNOSTIC = {'check', 'eval', 'print', 'printAxioms', 'printSorriesStx', 'reduce', 'check_failure', 'synth', 'evalBang'}
+DIAGNOSTIC = {'check', 'eval', 'print', 'printAxioms', 'printSorriesStx', 'reduce', 'check_failure', 'synth', 'evalBang',
+              'runCmd', 'runElab', 'runMeta'}
 
 
 _OPEN = {'(': ')', '{': '}', '[': ']', '⦃': '⦄'}
