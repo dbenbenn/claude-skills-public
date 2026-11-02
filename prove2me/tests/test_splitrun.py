@@ -254,6 +254,29 @@ def test_a_refused_post_stops_that_item_only(split):
     assert summary['stopped'] == ['bundle:XB001']
 
 
+def test_a_post_the_platform_fails_with_a_server_error_is_retried(split):
+    # q151 (2026-11-02): nine pieces stopped "for a person" on `verify: {"__error": "500 {\"error\":
+    # \"Verification service error: could not store the proof file: Gateway Timeout\"}"}`, the platform's
+    # outage, not the item
+    d, cfg = split
+    fails = {'n': 0}
+
+    class Flaky(FakeApi):
+        def verify(self, tid, path, explanation, also=None):
+            name = next(n for n, i in self.published.items() if i == tid)
+            if name == 'A.low_s2' and fails['n'] < 2:
+                fails['n'] += 1
+                raise RuntimeError('verify: {"__error": "500 {\\"error\\":\\"Verification service error: '
+                                   'could not store the proof file: Gateway Timeout\\"}"}')
+            return FakeApi.verify(self, tid, path, explanation, also)
+    api = Flaky()
+    r, summary = run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert fails['n'] == 2
+    assert st['piece:A.low']['state'] == 'live', st['piece:A.low']
+    assert summary['stopped'] == []
+
+
 def test_command_line_is_a_dry_run_without_go(split, capsys):
     import sys
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))

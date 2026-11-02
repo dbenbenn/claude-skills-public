@@ -34,7 +34,10 @@ _TRANSIENT = re.compile(
     r"Failed to materialize the target's dependencies|Failed to resolve platform imports|"
     r"Internal error while publishing|DB error looking up import|ConnectionTerminated|"
     r"Import parser timed out|Token scanner timed out|urlopen error|Connection(?:Reset|Refused)?Error|Temporary failure|"
-    r"Network is unreachable|No route to host")
+    r"Network is unreachable|No route to host|"
+    # a refused post the platform answered with a server error (q151: "500 ... Verification service
+    # error: could not store the proof file: Gateway Timeout" stopped nine pieces)
+    r"Verification service error|Gateway Time-?out|Bad Gateway|Service Unavailable|__error\W+5\d\d\b")
 _OWN = re.compile(r"Verification timed out|Failed to compile solution module|^Compilation timed out")
 _DEP_OOM = re.compile(r"Failed to compile modules .*exited with code 137", re.S)
 _HEART = re.compile(r"\(deterministic\) timeout|maximum number of heartbeats")

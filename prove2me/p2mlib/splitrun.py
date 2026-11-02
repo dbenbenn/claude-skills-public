@@ -445,6 +445,14 @@ class Runner:
                 self._submit_one(x, stmts)
             except Exception as e:                       # a refused post: this item waits for a person
                 st = self.st(x)
+                hist = st.setdefault('history', {})
+                if V.classify(None, str(e)) == 'transient' and V.decide('transient', hist) == 'retry':
+                    # the platform's server error, not the item (q151): send it again on a later pass
+                    hist['transient'] = hist.get('transient', 0) + 1
+                    st.update(state='todo', last=str(e)[:500])
+                    self.log(x, 'transient', str(e)[:200])
+                    self.save()
+                    continue
                 st.update(state='stop', last=str(e)[:500], sha=self.file_sha(x))
                 self.log(x, 'refused', str(e)[:200])
                 self.save()
