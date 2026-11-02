@@ -799,17 +799,17 @@ back WA. The lessons:
   100-byte `lemma … := by decide +kernel` looked free beside the tables it evaluates (bundle D490: 3,559 such
   lemmas, planned 55 s, measured 2,806 s at ~23 GiB; the all-`def` data bundles were in fact over-planned). Since
   9cc6f1c `carve.kernel_weights` adds the size of what a `decide`/`native_decide` declaration names, and a re-plan
-  (`--from plan`) splits such bundles itself: don't force each lemma. For a port like this, set before the first
-  plan (`config_set`): `kernel_lemmas_in_bundles` (b7749bb, 9047b16: the computational leaves are checked once
-  in bundles instead of inside every piece that uses them; one sat in 54 pieces) and `promote_shared` (90a79b7:
-  promote a theorem whose extra copies, cost × (pieces keeping it − 1), reach one piece budget). Together:
-  7,450 items and 129,000 s of pieces became 2,525 items and 13,365 s. **But mind the import closure** (q152): a
-  cold verifier worker builds an item's whole closure, and with the leaves in bundles the closures grew along the
-  publish order to ~10,000 s of local compile. 76 of 127 publish results were platform compile timeouts (about 13
-  bundles an hour), and D297 (closure 1,647 s) ended `dependency_oom`. Every bundle measured under 90 s: the
-  per-item budget cannot see this. Proposed, not built: `plan` reports each item's closure cost (summed seconds of
-  its transitive bundles) and warns over ~1,000 s; `kernel_lemmas_in_bundles` keeps a lemma in a bundle only while
-  no importer's closure passes that bound, else makes it a statement or a block lemma (Eilenberg–Ganea, above).
+  (`--from plan`) splits such bundles itself: don't force each lemma. `promote_shared` (90a79b7) promotes a
+  theorem whose extra copies, cost × (pieces keeping it − 1), reach one piece budget to a statement: use it when
+  pieces sum to several times the build time. **Do not use `kernel_lemmas_in_bundles`** (b7749bb, 9047b16), which
+  makes the computational leaves bundle material (dbenbenn 2026-11-02: lemmas leave definitions bundles freely;
+  a theorem stays in a bundle only when a definition there needs it). A cold verifier worker builds an item's
+  whole import closure, and q152's closures grew along the publish order to ~10,000 s of local compile: its
+  bundle rate fell from 159 an hour to about 10, with 70% platform compile timeouts, and D297 (closure 1,647 s)
+  ended `dependency_oom`, the slowdown Erdős 3 hit before. Every bundle measured under 90 s: the per-item budget
+  cannot see this. When bundle publishes slow down or time out, re-plan the unpublished part with its lemmas as
+  statements (the live bundles `frozen`) instead of pushing it through. Proposed, not built: `plan` reports each
+  item's closure cost (summed seconds of its transitive bundles) and warns over ~1,000 s.
 - **`gen` stops "OVER 1 MiB"**: the size model plans source bytes, and emitted bundles ran to 1.7× `bundle_size`
   (q146: 650,000 planned, 1,116,227 emitted). Lower `config_set.bundle_size` (450,000 worked). A statement or piece
   over the cap (a fold into a live piece) has its comments stripped by `gen` since 4d96885.
