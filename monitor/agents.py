@@ -289,22 +289,30 @@ FIRST_READ = 256 * 1024
 
 def quota_event(text):
     """The last rate_limit_event's unified windows in text (complete JSON lines):
-    {'five_hour': (util %, resetsAt), 'seven_day': (...)} or None. Utilization is a 0..1 fraction."""
+    {'five_hour': (util %, resetsAt), 'seven_day': (...)}, only the windows the event reports, or None.
+    Utilization is a 0..1 fraction. Since 2026-10-31 the events carry the seven-day window alone."""
     found = None
     for line in text.splitlines():
         if '"rate_limit_event"' not in line:
             continue
         try:
             w = json.loads(line)['rate_limit_info']['unifiedWindows']
-            cur = {k: (round(float(w[k]['utilization']) * 100, 2), int(w[k]['resetsAt'])) for k in ('five_hour', 'seven_day')}
         except (ValueError, KeyError, TypeError):
             continue
-        found = cur
+        cur = {}
+        for k in ('five_hour', 'seven_day'):
+            try:
+                cur[k] = (round(float(w[k]['utilization']) * 100, 2), int(w[k]['resetsAt']))
+            except (KeyError, TypeError, ValueError):
+                pass
+        if cur:
+            found = cur
     return found
 
 
 def update_quota(q, root, now):
-    """q = {'offsets': {path: pos}, 'series': [[t, five %, five reset, seven %, seven reset]]}.
+    """q = {'offsets': {path: pos}, 'series': [[t, five %, five reset, seven %, seven reset]]}, a window
+    the event did not report as None.
     Reads only the new bytes of each transcript that grew; the event from the most recently written
     file wins. Appends a sample when the windows changed or 10 minutes passed. Returns q."""
     offs = q.setdefault('offsets', {})
@@ -336,7 +344,8 @@ def update_quota(q, root, now):
     series = q.setdefault('series', [])
     if best:
         ev = best[1]
-        row = [int(now), ev['five_hour'][0], ev['five_hour'][1], ev['seven_day'][0], ev['seven_day'][1]]
+        five, seven = ev.get('five_hour', (None, None)), ev.get('seven_day', (None, None))
+        row = [int(now), five[0], five[1], seven[0], seven[1]]
         if not series or series[-1][1:] != row[1:] or now - series[-1][0] >= 600:
             series.append(row)
     series[:] = [r for r in series if r[0] >= now - QUOTA_KEEP]

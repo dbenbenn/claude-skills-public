@@ -242,6 +242,20 @@ def test_update_quota_reads_only_new_bytes_and_prefers_newest_file(tmp_path):
     assert str(a / 'transcript.jsonl') not in q['offsets']
 
 
+def rl7(seven, r7=1793289600):
+    """A rate_limit_event as sent since 2026-10-31: only the seven-day window."""
+    return json.dumps({'type': 'rate_limit_event', 'rate_limit_info': {'rateLimitType': 'seven_day', 'unifiedWindows': {
+        'seven_day': {'utilization': seven, 'resetsAt': r7}}}}) + '\n'
+
+
+def test_an_event_with_only_the_seven_day_window_still_counts(tmp_path):
+    # since 2026-10-31 22:24 the records carry no five_hour window; requiring both froze the chart
+    assert A.quota_event(rl7(0.54)) == {'seven_day': (54.0, 1793289600)}
+    make_agent(tmp_path, 'a', transcript=rl(0.1, 0.3) + rl7(0.54))
+    q = A.update_quota({}, str(tmp_path), NOW)
+    assert q['series'] == [[NOW, None, None, 54.0, 1793289600]]
+
+
 def test_update_quota_big_first_file_reads_only_the_tail(tmp_path):
     big = '{"type":"x","pad":"' + 'p' * 1000 + '"}\n'
     make_agent(tmp_path, 'a', transcript=rl(0.9, 0.9) + big * 600 + rl(0.2, 0.4))

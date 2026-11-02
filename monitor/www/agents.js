@@ -86,15 +86,21 @@ function quotaChart(id, col, spanSecs, title){
   const q = last && last.quota ? last.quota.series : [];
   const el = document.getElementById(id);
   if (quotaCharts[id]) { quotaCharts[id].destroy(); delete quotaCharts[id]; }
-  const now = last.updated, rows = q.filter(r => r[0] >= now - spanSecs);
-  if (!rows.length) { el.innerHTML = '<p class="empty">No quota data yet: the sampler reads rate-limit records from the agents\' transcripts.</p>'; return; }
+  // a window the records stopped reporting (the 5-hour one since 2026-10-31) is null: no line, no stale value
+  const now = last.updated, rows = q.filter(r => r[0] >= now - spanSecs && r[col] != null);
+  if (!rows.length) {
+    const seen = q.filter(r => r[col] != null), at = seen.length ? seen[seen.length-1][0] : null;
+    el.innerHTML = at ? `<p class="empty">Not reported by the agents' rate-limit records since ${esc(fmtAt(at))}.</p>`
+                      : '<p class="empty">No quota data yet: the sampler reads rate-limit records from the agents\' transcripts.</p>';
+    return;
+  }
   el.innerHTML = '';
   const newest = rows[rows.length-1], resetCol = col + 1;
-  const resets = [...new Set(q.map(r => r[resetCol]))].filter(t => t > now - spanSecs);
+  const resets = [...new Set(q.map(r => r[resetCol]))].filter(t => t != null && t > now - spanSecs);
   const next = newest[resetCol];
   const xmax = Math.max(now, next), xmin = xmax - spanSecs;
   const xs = rows.map(r => r[0]), ys = rows.map(r => r[col]);
-  if (xs[xs.length-1] < now) { xs.push(now); ys.push(ys[ys.length-1]); }
+  if (xs[xs.length-1] < now && q[q.length-1][col] != null) { xs.push(now); ys.push(ys[ys.length-1]); }
   const opts = {
     width: Math.max(260, el.clientWidth), height: 190,
     tzDate: ts => uPlot.tzDate(new Date(ts*1e3), TZ),
@@ -121,7 +127,10 @@ function drawQuota(){
   const q = last.quota ? last.quota.series : [], n = q.length ? q[q.length-1] : null;
   const sub = document.getElementById('quota-sub');
   if (!n) { sub.textContent = 'No data yet.'; }
-  else sub.textContent = `5-hour window ${n[1].toFixed(0)}% used, resets ${fmtAt(n[2])} · 7-day window ${n[3].toFixed(0)}% used, resets ${fmtAt(n[4])} · newest record across the agents' transcripts (last sample ${ago(Math.round(last.updated - n[0]))})`;
+  else {
+    const win = (name, p, r) => p == null ? `${name} not reported` : `${name} ${p.toFixed(0)}% used, resets ${fmtAt(r)}`;
+    sub.textContent = `${win('5-hour window', n[1], n[2])} · ${win('7-day window', n[3], n[4])} · newest record across the agents' transcripts (last sample ${ago(Math.round(last.updated - n[0]))})`;
+  }
   quotaChart('c-q5', 1, 48*3600, '5-hour window');
   quotaChart('c-q7', 3, 7*86400, '7-day window');
 }
