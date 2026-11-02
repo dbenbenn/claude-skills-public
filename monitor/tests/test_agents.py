@@ -2,6 +2,8 @@
 import json
 import os
 
+import pytest
+
 import agents as A
 
 NOW = 1793010000
@@ -12,7 +14,25 @@ def rl(five, seven, r5=1793012400, r7=1793289600):
         'five_hour': {'utilization': five, 'resetsAt': r5}, 'seven_day': {'utilization': seven, 'resetsAt': r7}}}}) + '\n'
 
 
-def make_agent(root, name, state='running', ended=None, cost=1.5, key='none', transcript=''):
+@pytest.fixture
+def proc(tmp_path, monkeypatch):
+    """A fake /proc: agents are alive only when a test gives them a process."""
+    p = tmp_path / 'proc'
+    p.mkdir()
+    monkeypatch.setattr(A, 'PROC_DIR', str(p))
+    return p
+
+
+def fake_process(proc, *argv):
+    d = proc / str(1000 + len(list(proc.iterdir())))
+    d.mkdir()
+    (d / 'cmdline').write_bytes(b'\0'.join(a.encode() for a in argv) + b'\0')
+
+
+def make_agent(root, name, state='running', ended=None, cost=1.5, key='none', transcript='', proc=None):
+    """An agent directory; with `proc`, a running agent also gets its launcher process (agent.py --dir)."""
+    if proc is not None and state == 'running':
+        fake_process(proc, 'python3', 'agent.py', '--dir', str(root / name), '--name', name)
     d = root / name
     d.mkdir()
     (d / 'meta.json').write_text(json.dumps({'name': name, 'model': 'claude-sonnet-5-5', 'mode': 'dry'}))
@@ -85,9 +105,9 @@ def test_read_range_cap_and_overlong_lines(tmp_path):
 
 # ---- the summary ----
 
-def test_agents_json_shape_grouping_and_auth(tmp_path):
-    make_agent(tmp_path, 'run1')
-    make_agent(tmp_path, 'run2', key='ANTHROPIC_API_KEY')
+def test_agents_json_shape_grouping_and_auth(tmp_path, proc):
+    make_agent(tmp_path, 'run1', proc=proc)
+    make_agent(tmp_path, 'run2', key='ANTHROPIC_API_KEY', proc=proc)
     make_agent(tmp_path, 'fin', state='done', ended='2026-10-26T11:20:00+0100')
     make_agent(tmp_path, 'old', state='done', ended='2026-10-20T11:20:00+0100')
     (tmp_path / 'queue').mkdir()                        # not an agent: no state.json
@@ -227,3 +247,41 @@ def test_update_quota_big_first_file_reads_only_the_tail(tmp_path):
     make_agent(tmp_path, 'a', transcript=rl(0.9, 0.9) + big * 600 + rl(0.2, 0.4))
     q = A.update_quota({}, str(tmp_path), NOW)
     assert q['series'][-1][1] == 20.0
+
+
+def test_a_running_agent_whose_process_is_gone_shows_as_died(tmp_path, proc):
+    # 2026-11-01: a full disk killed four agents before they could write their final state; the card
+    # went on listing them as running next to the live ones (8 shown, 4 real)
+    root = tmp_path / 'agents'
+    root.mkdir()
+    make_agent(root, 'live', proc=proc)
+    make_agent(root, 'dead')
+    make_agent(root, 'long-dead')
+    now = A.parse_time('2026-10-26T12:00:00+0100')
+    os.utime(root / 'dead' / 'transcript.jsonl', (now - 3600, now - 3600))
+    os.utime(root / 'long-dead' / 'transcript.jsonl', (now - 3 * 86400, now - 3 * 86400))
+    out = A.agents_json(str(root), now, jobs=str(tmp_path / 'nojobs'), ports=str(tmp_path / 'noports'))
+    assert [r['name'] for r in out['running']] == ['live']
+    assert [(r['name'], r['state']) for r in out['recent']] == [('dead', 'died')]
+    assert 'no process' in out['recent'][0]['note'] and out['hidden'] == 1
+
+
+def test_the_claude_process_alone_also_counts_as_alive(tmp_path, proc):
+    root = tmp_path / 'agents'
+    root.mkdir()
+    make_agent(root, 'q1')
+    fake_process(proc, 'claude', '-p', '--name', 'headless-q1')
+    out = A.agents_json(str(root), NOW, jobs=str(tmp_path / 'nojobs'), ports=str(tmp_path / 'noports'))
+    assert [r['name'] for r in out['running']] == ['q1']
+
+
+def test_state_view_marks_a_dead_running_agent(tmp_path, proc):
+    root = tmp_path / 'agents'
+    root.mkdir()
+    make_agent(root, 'live', proc=proc)
+    make_agent(root, 'dead')
+    make_agent(root, 'fin', state='done')
+    view = lambda n: json.loads(A.state_view(str(root), n, (root / n / 'state.json').read_bytes()))
+    assert view('live')['state'] == 'running' and view('fin')['state'] == 'done'
+    assert view('dead')['state'] == 'died' and 'no process' in view('dead')['note']
+    assert A.state_view(str(root), 'dead', b'not json') == b'not json'

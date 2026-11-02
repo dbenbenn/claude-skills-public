@@ -4,7 +4,9 @@ file server behind the log viewer, and the subscription-quota sampler.
 Everything is read from files under ~/claude/headless-agents/<name>/ (meta.json, state.json, usage.json,
 last_text.txt, transcript.jsonl, brief.md; written by claude-private/tools/headless-agent) and from the
 carve directories those agents work in (pipeline_state.json from carve_pipeline.py, run_state.json from
-split_run)."""
+split_run). An agent whose state.json says running but that has no process (its launcher `--dir <its
+directory>`, or `claude --name headless-<name>`) is shown as `died`: an agent killed outright (a full
+disk, 2026-11-01) never writes its final state."""
 import datetime
 import glob
 import json
@@ -12,6 +14,8 @@ import os
 import re
 import time
 
+PROC_DIR = '/proc'
+DIED_NOTE = 'no process: died without writing its final state (state.json still says running)'
 AGENTS_DIR = os.environ.get('AGENTS_DIR', os.path.expanduser('~/claude/headless-agents'))
 JOBS_DIR = os.environ.get('JOBS_DIR', os.path.expanduser('~/.claude/jobs'))
 PORTS_DIR = os.environ.get('PORTS_DIR', os.path.expanduser('~/claude/p2m-standalone/openai-ports'))
@@ -185,9 +189,46 @@ def goals_for(name, registry):
     return out
 
 
-def summarize(name, root, now, registry=None, cost_hist=None, jobs=None, ports=None):
+def process_args():
+    """Every argument of every process's command line, as a set (one /proc scan per refresh)."""
+    out = set()
+    for pid in os.listdir(PROC_DIR) if os.path.isdir(PROC_DIR) else []:
+        try:
+            with open(os.path.join(PROC_DIR, pid, 'cmdline'), 'rb') as f:
+                out.update(a.decode(errors='replace').rstrip('/') for a in f.read().split(b'\0') if a)
+        except OSError:
+            continue
+    return out
+
+
+def alive(root, name, args=None):
+    args = process_args() if args is None else args
+    return os.path.join(root, name).rstrip('/') in args or 'headless-' + name in args
+
+
+def checked_state(root, name, st, args=None):
+    """state.json's dict, with a running agent that has no process marked `died`."""
+    if st.get('state') == 'running' and not alive(root, name, args):
+        st = dict(st, state='died', note=DIED_NOTE)
+    return st
+
+
+def state_view(root, name, body):
+    """The bytes /agent/<name>/state.json serves: the file, a dead running agent marked `died`."""
+    try:
+        st = json.loads(body)
+    except ValueError:
+        return body
+    if not isinstance(st, dict):
+        return body
+    got = checked_state(root, name, st)
+    return body if got is st else json.dumps(got, indent=1).encode()
+
+
+def summarize(name, root, now, registry=None, cost_hist=None, jobs=None, ports=None, args=None):
     d = os.path.join(root, name)
     meta, st, us = (load(os.path.join(d, f), {}) for f in ('meta.json', 'state.json', 'usage.json'))
+    st = checked_state(root, name, st, args)
     try:
         last = open(os.path.join(d, 'last_text.txt'), errors='replace').read().strip().replace('\n', ' ')[:300]
     except OSError:
@@ -211,11 +252,11 @@ def summarize(name, root, now, registry=None, cost_hist=None, jobs=None, ports=N
 def agents_json(root, now, registry=None, cost_hist=None, jobs=None, ports=None, queue=None):
     """Running first, then agents that finished in the last 24 h (newest first); `queue` is the OAI queue's
     overview.json (waiting, retry_waiting, running, needs_person), passed through for the card's header."""
-    rows = []
+    rows, args = [], process_args()
     for n in sorted(os.listdir(root)) if os.path.isdir(root) else []:
         if not NAME.match(n) or not os.path.isfile(os.path.join(root, n, 'state.json')):
             continue
-        rows.append(summarize(n, root, now, registry, cost_hist, jobs, ports))
+        rows.append(summarize(n, root, now, registry, cost_hist, jobs, ports, args))
     running = [r for r in rows if r['state'] == 'running']
     recent = [r for r in rows if r['state'] != 'running'
               and now - (r['ended'] or r['active'] or r['started'] or 0) <= FINISHED_WINDOW]

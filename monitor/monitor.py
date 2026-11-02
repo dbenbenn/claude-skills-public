@@ -664,6 +664,8 @@ def agent_file(path, query):
     size = os.path.getsize(p)
     with open(p, 'rb') as f:
         body = f.read(min(limit, AG.MAX_BYTES))
+    if parts[2] == 'state.json':
+        body = AG.state_view(AG.AGENTS_DIR, parts[1], body)
     return 200, body, AG.FILES[parts[2]] + '; charset=utf-8', {'X-Start': 0, 'X-End': len(body), 'X-Size': size}
 
 

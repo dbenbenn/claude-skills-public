@@ -28,6 +28,8 @@ def server(tmp_path, monkeypatch):
     monkeypatch.setattr(A, 'AGENTS_DIR', str(root))
     monkeypatch.setattr(A, 'JOBS_DIR', str(tmp_path / 'jobs'))
     monkeypatch.setattr(A, 'PORTS_DIR', str(tmp_path / 'ports'))
+    (tmp_path / 'proc').mkdir()
+    monkeypatch.setattr(A, 'PROC_DIR', str(tmp_path / 'proc'))
     monkeypatch.setattr(M.State, 'agents', (0, b'{}'))
     monkeypatch.setattr(M.State, 'status', b'{"ok": true}')
     srv = ThreadingHTTPServer(('127.0.0.1', 0), M.Handler)
@@ -59,7 +61,7 @@ def test_pages_and_static_assets(server):
 
 def test_agents_json_route(server):
     base, root = server
-    make_agent(root, 'oaiq-001')
+    make_agent(root, 'oaiq-001', proc=root.parent / 'proc')
     s, b, _ = get(base, '/agents.json')
     d = json.loads(b)
     assert s == 200 and [r['name'] for r in d['running']] == ['oaiq-001'] and d['recent'] == []
@@ -67,7 +69,8 @@ def test_agents_json_route(server):
 
 def test_agent_file_route_allowlist_and_ranges(server):
     base, root = server
-    make_agent(root, 'a1', transcript='l1\nl2\nl3\n')
+    make_agent(root, 'a1', transcript='l1\nl2\nl3\n', proc=root.parent / 'proc')
+    make_agent(root, 'gone')
     (root / 'a1' / 'unit.log').write_text('secret')
     s, b, h = get(base, '/agent/a1/transcript.jsonl')
     assert s == 200 and b == b'l1\nl2\nl3\n' and h['X-End'] == '9' and h['X-Size'] == '9'
@@ -76,6 +79,7 @@ def test_agent_file_route_allowlist_and_ranges(server):
     assert get(base, '/agent/a1/transcript.jsonl?from=-4')[1] == b'l3\n'
     assert get(base, '/agent/a1/transcript.jsonl?from=x')[0] == 400
     assert json.loads(get(base, '/agent/a1/state.json')[1])['state'] == 'running'
+    assert json.loads(get(base, '/agent/gone/state.json')[1])['state'] == 'died'
     assert get(base, '/agent/a1/brief.md')[1] == b'# brief'
     for bad in ('/agent/a1/unit.log', '/agent/a1/last_text.txt', '/agent/../state.json', '/agent/a1/../a1/state.json',
                 '/agent/a1/%2e%2e/a1/state.json', '/agent/nope/state.json', '/agent/a1', '/agent/a1/state.json/x',
