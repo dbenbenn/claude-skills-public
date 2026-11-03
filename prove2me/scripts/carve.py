@@ -388,7 +388,12 @@ def main(argv):
         frozen = None
         if cfg.get('frozen'):
             frozen = (json.load(open(os.path.expanduser(cfg['frozen']['plan']))), cfg['frozen']['bundles'])
-        P = C.make_plan(g, cfg['targets'], cfg.get('forced', ()), cfg.get('budget', 60),
+        # a folded statement is neither forced nor promoted: its importers' pieces are planned with
+        # its proof inside them, as they will be after the fold (q160: forced live folded statements
+        # made seven in-budget pieces that the fold summed into one of 271 s)
+        folded = set(cfg.get('folded', ()))
+        P = C.make_plan(g, cfg['targets'], [f for f in cfg.get('forced', ()) if f not in folded],
+                        cfg.get('budget', 60),
                         cfg.get('piece_size', 700_000), cfg.get('bundle_budget', 90),
                         cfg.get('bundle_size', 650_000), cfg.get('band_width', 4), costs(cfg, g),
                         frozen, cfg.get('bundle_prefix', 'Bundle'),

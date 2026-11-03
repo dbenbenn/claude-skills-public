@@ -130,10 +130,32 @@ def test_folded_statements_are_never_promoted(g):
     assert 'CD.double_succ' not in after['nodes']
 
 
-def test_carve_plan_passes_folded_as_excluded():
-    # scripts/carve.py plan hands config `folded` to make_plan as `exclude` (q160)
-    src = open(os.path.join(HERE, '..', 'scripts', 'carve.py'), encoding='utf-8').read()
-    assert re.search(r"exclude=cfg\.get\('folded'", src)
+def test_carve_plan_plans_folded_forced_nodes_as_part_of_their_importers(tmp_path):
+    # q160: the live folded statements were also `forced` (the pipeline forces every live statement), so
+    # the plan sized each importer's piece with them as boundaries, promoting split points inside each
+    # folded subtree, and the fold then summed seven in-budget pieces into one of 271 s. `carve.py plan`
+    # plans without them (neither forced nor promotable), so the pieces are sized as they will be
+    import shutil
+    import subprocess
+    import sys
+    work = tmp_path / 'work'
+    work.mkdir()
+    shutil.copy(os.path.join(FIX, 'decl_graph.jsonl'), work / 'decl_graph.jsonl')
+    cfg = tmp_path / 'carve.json'
+    cfg.write_text(json.dumps({
+        'src': FIX, 'prefix': 'CarveDev', 'roots': ['CarveDev.Top'], 'targets': TARGETS,
+        'work': str(work), 'out': str(tmp_path / 'out'), 'bundle_prefix': 'CDB',
+        'budget': 0.05, 'bundle_budget': 0.005, 'bytes_per_second': 10000,
+        'forced': ['CD.double_succ'], 'folded': ['CD.double_succ']}))
+    script = os.path.join(os.path.dirname(HERE), 'scripts', 'carve.py')
+    r = subprocess.run([sys.executable, script, 'plan', str(cfg)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    P = json.loads((work / 'plan.json').read_text())
+    g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    want = C.make_plan(g, TARGETS, budget=0.05, bundle_budget=0.005, bundle_prefix='CDB',
+                       cost=C.size_costs(g, bytes_per_second=10000), exclude=['CD.double_succ'])
+    assert P['nodes'] == want['nodes'] and 'CD.double_succ' not in P['nodes']
+    assert P['folded'] == ['CD.double_succ']
 
 
 def test_private_names_are_per_module(g):
