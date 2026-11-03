@@ -50,7 +50,11 @@ CONFIG.json (paths may use ~):
                                               # development whose earlier split took the names)
    "statement_suffixes": {"A.b": "_m"},       # one statement published again as A.b_m (q151)
    "monomorphic": ["A.b"],                    # statement and piece written at universe 0 (q151)
-   "chunker": "schedule",                     # bundles by declaration-level list scheduling
+   "chunker": "schedule",                     # bundles by declaration-level list scheduling;
+                                              # "closure": grouped by what members depend on, so an
+                                              # importer's chain is what it needs (q149, q153)
+   "closure_slack": 5.5,                      # closure chunker: planned seconds a declaration may add
+                                              # to a bundle's chain or its importers' (default budget/10)
                                               # (shallow); "bands" (default) cuts along modules
    "pinned": {"benign": ["OAI.Higman.IsBenign"]},  # groups of definitions, each its own small
                                               # bundle first (after frozen ones), closed under
@@ -396,7 +400,8 @@ def main(argv):
                         bundles_import_statements=cfg.get('bundles_import_statements', True),
                         promote_private=cfg.get('promote_private', ()),
                         bundle_theorems=bundle_theorems(cfg, g),
-                        promote_shared=cfg.get('promote_shared', False))
+                        promote_shared=cfg.get('promote_shared', False),
+                        closure_slack=cfg.get('closure_slack'))
         if cfg.get('folded'):
             P = C.fold_statements(P, cfg['folded'])
         if cfg.get('statement_suffixes'):
@@ -408,6 +413,12 @@ def main(argv):
             len(P['bundles']), len(P['nodes']), len(P['over']), len(P['sorry']), out))
         for c, n in worst:
             print('  %7.1f s  %s' % (c, n))
+        rows = C.chain_report(g, P)
+        print('heaviest bundle import chains (planned s; what importing brings, and what its members need):')
+        for r in rows:
+            print('  %7.1f s  %s (%d bundles; members need %.1f s)' % (r['chain'], r['bundle'], r['bundles'], r['needs']))
+        if any(r['needs'] < r['chain'] / 2 for r in rows) and cfg.get('chunker') != 'closure':
+            print('NOTE: chains well over their members\' need are bundle mixing; "chunker": "closure" removes it')
         probs = C.check_plan(g, P)
         warn_leaks(g, P)
         report_duplicates(g)

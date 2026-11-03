@@ -1806,6 +1806,155 @@ def chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, frozen=(), ex
     return _order_chunks(g, chunks, len(frozen))
 
 
+def chunk_bundles_closure(g, B, cost, bundle_budget, bundle_size, frozen=(), extra=None, slack=None):
+    """Cut bundle material B into bundles grouped by what their members depend on.
+
+    Importing a bundle brings everything it imports, so a bundle mixing declarations with unrelated
+    dependencies makes every importer pay for all of them (q149, MutuallyUnbiased: bundle D228's chain
+    was 1.64 GB of .olean while its own declarations needed 0.05 GB; the verifier's cold workers build
+    or load an item's whole chain, and chains near 0.9 GB time out). Declarations go in DFS post-order;
+    each joins the open bundle (one holding a dependency, or one whose import closure is exactly what
+    it needs) that costs least: what the bundle's importers would newly pay plus what the
+    declaration's importers would pay beyond its own need, in planned seconds. Over `slack` (default
+    a tenth of the budget), it starts a bundle of its own. `frozen` chunks come first, unchanged."""
+    slack = 0.1 * bundle_budget if slack is None else slack
+    extra = extra or {}
+    chunks = [list(f) for f in frozen]
+    where = {k: i for i, ch in enumerate(chunks) for k in ch}
+    rest = set(B) - set(where)
+    deps = {k: sorted(d for d in g.nodes[k].deps | extra.get(k, set()) if d in B and d != k) for k in B}
+    bcost = [sum(cost.get(k, 0.0) for k in ch) for ch in chunks]
+    bsize = [sum(g.nodes[k].size for k in ch) for ch in chunks]
+    imports = [{where[d] for k in ch for d in deps.get(k, ()) if d in where and where[d] != i}
+               for i, ch in enumerate(chunks)]
+    nfz = len(chunks)
+    clos = []
+    for i in range(nfz):                   # frozen and pinned chunks come imports-first
+        c = 1 << i
+        for j in imports[i]:
+            c |= clos[j] if j < i else 1 << j
+        clos.append(c)
+    importers = collections.defaultdict(set)
+    bykey = collections.defaultdict(set)   # import closure (without the bundle itself) -> open bundles
+
+    def weight(bits):
+        w = 0.0
+        while bits:
+            low = bits & -bits
+            w += bcost[low.bit_length() - 1]
+            bits ^= low
+        return w
+
+    def key(b):
+        return clos[b] & ~(1 << b)
+
+    def grow(b, add):
+        todo = [b]
+        while todo:
+            x = todo.pop()
+            if clos[x] | add == clos[x]:
+                continue
+            bykey[key(x)].discard(x)
+            clos[x] |= add
+            bykey[key(x)].add(x)
+            todo += importers[x]
+
+    order, seen = [], set()
+    for r in sorted(rest):
+        if r in seen:
+            continue
+        seen.add(r)
+        stack = [(r, iter([d for d in deps[r] if d in rest]))]
+        while stack:
+            n, it = stack[-1]
+            nx = next(it, None)
+            if nx is None:
+                order.append(n)
+                stack.pop()
+            elif nx not in seen:
+                seen.add(nx)
+                stack.append((nx, iter([d for d in deps[nx] if d in rest])))
+    for k in order:
+        c, sz = cost.get(k, 0.0), g.nodes[k].size
+        ds = {where[d] for d in deps[k] if d in where}
+        need = 0
+        for d in ds:
+            need |= clos[d]
+        best = None
+        for b in [x for x in ds if x >= nfz] + sorted(bykey.get(need, ())):
+            if bcost[b] + c > bundle_budget or bsize[b] + sz > bundle_size:
+                continue
+            others = 0
+            for d in ds:
+                if d != b:
+                    others |= clos[d]
+            if others >> b & 1:
+                continue                   # b would import a bundle that imports b
+            score = (weight(need & ~clos[b]) + weight(key(b) & ~need), -bcost[b], b)
+            if best is None or score < best:
+                best = score
+        if best is not None and best[0] <= slack:
+            b = best[2]
+            add = need & ~clos[b]
+            new = ds - {b} - imports[b]
+            for d in new:
+                importers[d].add(b)
+            imports[b] |= new
+            if add:
+                grow(b, add)
+        else:
+            b = len(chunks)
+            chunks.append([]); bcost.append(0.0); bsize.append(0)
+            imports.append(set(ds)); clos.append(need | (1 << b))
+            for d in ds:
+                importers[d].add(b)
+            bykey[key(b)].add(b)
+        chunks[b].append(k)
+        bcost[b] += c
+        bsize[b] += sz
+        where[k] = b
+    return _order_chunks(g, [chunks[i] for i in range(nfz)] + [sorted(ch) for ch in chunks[nfz:]], nfz)
+
+
+def chain_report(g, plan, top=5):
+    """The `top` bundles with the heaviest import chains: [{bundle, chain, needs, bundles}], chain and
+    needs in planned seconds. `chain` is what importing the bundle brings (itself and everything it
+    imports, transitively); `needs` is the part its own members' dependencies reach. A chain well over
+    its need is mixing, which `"chunker": "closure"` removes (q149: MutuallyUnbiased's longest chain fell
+    from 3,433 s to 601 s); a chain that is all need is the development's own weight (q153's aggregate
+    tables). Verifier workers start failing near 0.75-0.9 GB of chain .olean (q149)."""
+    B = {b['name']: b for b in plan['bundles']}
+    where = {k: b['name'] for b in plan['bundles'] for k in b['nodes']}
+    memo = {}
+
+    def chain(n):
+        if n not in memo:
+            c = {n}
+            for i in B[n].get('imports', []):
+                if i in B:
+                    c |= chain(i)
+            memo[n] = frozenset(c)
+        return memo[n]
+    cost = lambda names: sum(B[x].get('cost', 0.0) for x in names)
+    for n in B:                      # bottom-up, so the recursion stays shallow
+        chain(n)
+    worst = sorted(B, key=lambda n: (-cost(chain(n)), n))[:top]
+    rows = []
+    for n in worst:
+        seen, todo, reach = set(), list(B[n]['nodes']), {n}
+        while todo:
+            x = todo.pop()
+            if x in seen or x not in g.nodes:
+                continue
+            seen.add(x)
+            if x in where:
+                reach.add(where[x])
+            todo += [d for d in g.nodes[x].deps if d in where]
+        rows.append({'bundle': n, 'chain': round(cost(chain(n)), 1), 'needs': round(cost(reach), 1),
+                     'bundles': len(chain(n))})
+    return rows
+
+
 def _order_chunks(g, chunks, nfrozen):
     """Chunks topologically sorted by their dependencies (frozen ones first, as given)."""
     where = {k: i for i, ch in enumerate(chunks) for k in ch}
@@ -1895,7 +2044,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
               bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
               external_defs=None, statement_suffix='', external=(), chunker='bands', pinned=None,
               bundles_import_statements=True, promote_private=(), bundle_theorems=(),
-              promote_shared=False):
+              promote_shared=False, closure_slack=None):
     """The split: bundles, nodes (published statements) and each node's piece.
 
     - Bundle material B: every reachable non-theorem, what reachable statements need, their
@@ -1990,7 +2139,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         B = g.closure(seeds, stop=stmts) | {k for ch in fz_chunks for k in ch}
         B |= g.extra_roots(B, set())
         B -= set(ext) | stmts
-    extra = implicit_deps(g, B, B) if chunker == 'schedule' else {}
+    extra = implicit_deps(g, B, B) if chunker in ('schedule', 'closure') else {}
     for ch in fz_chunks:
         # a published bundle's imports are fixed: implicit dependencies are for new material only
         # (oaiq-088: a frozen member 'used' a lemma of a new bundle that needs the frozen bundle)
@@ -2114,6 +2263,9 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         over = promote()
     if chunker == 'schedule':
         chunks = chunk_bundles_schedule(g, B, cost, bundle_budget, bundle_size, fz_chunks + pin_chunks, extra)
+    elif chunker == 'closure':
+        chunks = chunk_bundles_closure(g, B, cost, bundle_budget, bundle_size, fz_chunks + pin_chunks, extra,
+                                       closure_slack)
     else:
         chunks = chunk_bundles(g, B, cost, bundle_budget, bundle_size, band_width, fz_chunks + pin_chunks)
     if frozen:
@@ -2152,7 +2304,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             b['statements'] = sts
 
     def need(keys):
-        ex = implicit_deps(g, keys, B) if chunker == 'schedule' else {}
+        ex = implicit_deps(g, keys, B) if chunker in ('schedule', 'closure') else {}
         return {bidx[d] for x in keys for d in g.nodes[x].deps | ex.get(x, set()) | {x} if d in bidx}
     pieces, stubs = {}, {}
     for n in sorted(nodes):

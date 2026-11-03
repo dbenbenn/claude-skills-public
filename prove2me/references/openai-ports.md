@@ -670,6 +670,16 @@ back WA. The lessons:
   - **Shallow bundles: `"chunker": "schedule"`.** Bands over modules follow the module DAG (163
     levels of bundle material); declaration-level list scheduling gives about 16 for the same
     material. Depth is what a cold verifier pays.
+  - **Mixed bundles: `"chunker": "closure"`** (2026-11-03). Importing a bundle brings everything it
+    imports, and `schedule` puts declarations with unrelated dependencies side by side, so an importer
+    can pay for chains it never uses. MutuallyUnbiased (q149, all definitions): bundle D228 brought
+    1.64 GB of .olean while its members needed 0.05 GB, and bundles failed on the server from about
+    0.75-0.9 GB of chain. `closure` groups declarations by what they depend on (a declaration joins
+    the bundle that adds least to its own and its importers' chains, else starts one; `closure_slack`,
+    default budget/10): on q149's material the longest chain fell from 3,433 s to 601 s for 58% more
+    bundles. It does not help when the chains are real need (q153 PlanarPacking, once its lemmas left
+    the bundles: 525 bundles instead of 133 for no gain), so keep `schedule` there. `plan` prints
+    the heaviest chains and what their members need, and says when the gap is mixing.
   - **Bundles hold only what definitions need.** The carver already keeps helper theorems out of
     bundles except those a definition uses (a definitions bundle may import a published statement,
     `import Theorems.Thm_…`, per prove.md's Platform Imports: config `bundles_import_statements`,

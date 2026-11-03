@@ -3191,3 +3191,91 @@ def test_run_cmd_is_dropped_like_a_diagnostic_command():
         assert k in carve.DIAGNOSTIC and k in prune.DIAGNOSTIC
     text = 'theorem t : True := trivial\nrun_cmd Lean.modifyEnv fun env => env\n  run_elab pure ()\n'
     assert [(n, k) for n, k, _ in L.guard_problems(text)] == [(2, 'run_cmd'), (2, 'modifyEnv'), (3, 'run_elab')]
+
+
+# ---- the closure chunker (q149/q153, 2026-11-03): bundles grouped by what their members depend on ----
+
+def _ns_graph(deps, cost):
+    from types import SimpleNamespace as NS
+    nodes = {k: NS(deps=set(v), size=100, module='M') for k, v in deps.items()}
+    return NS(nodes=nodes), dict(cost)
+
+
+def _chunk_closures(g, chunks):
+    where = {k: i for i, ch in enumerate(chunks) for k in ch}
+    imps = [{where[d] for k in ch for d in g.nodes[k].deps if d in where and where[d] != i} for i, ch in enumerate(chunks)]
+    clos = []
+    for i in range(len(chunks)):                       # chunks come imports-first
+        assert all(j < i for j in imps[i]), 'chunk %d imports a later one' % i
+        c = {i}
+        for j in imps[i]:
+            c |= clos[j]
+        clos.append(c)
+    return where, clos
+
+
+def _tables_and_uses():
+    # 40 heavy tables, one aggregate over all of them, and light declarations each using two light bases
+    deps, cost = {}, {}
+    for i in range(40):
+        deps['T%02d' % i], cost['T%02d' % i] = [], 10.0
+        deps['L%02d' % i], cost['L%02d' % i] = [], 0.5
+    for i in range(40):
+        deps['use%02d' % i], cost['use%02d' % i] = ['L%02d' % i, 'L%02d' % ((i + 1) % 40)], 0.5
+    deps['agg'], cost['agg'] = ['T%02d' % i for i in range(40)], 1.0
+    deps['top'], cost['top'] = ['agg', 'use00'], 1.0
+    return deps, cost
+
+
+def test_closure_chunker_never_makes_a_light_declaration_pay_for_a_heavy_chain():
+    # q149: MutuallyUnbiased bundle D228 imported a 1.64 GB chain while its own declarations needed 0.05 GB:
+    # the schedule chunker put declarations with unrelated dependencies together, and every importer
+    # paid for all of them
+    deps, cost = _tables_and_uses()
+    g, cost = _ns_graph(deps, cost)
+    B = set(deps)
+
+    def worst_light(chunks):
+        where, clos = _chunk_closures(g, chunks)
+        return max(sum(cost[k] for i in clos[where['use%02d' % j]] for k in chunks[i]) for j in range(40))
+    sched = C.chunk_bundles_schedule(g, B, cost, 30.0, 10**6)
+    clo = C.chunk_bundles_closure(g, B, cost, 30.0, 10**6)
+    assert worst_light(sched) > 300                     # some light use sits on the aggregate's chain
+    # what remains is co-membership (a bundle's own other members), bounded by the budget per bundle
+    assert worst_light(clo) <= 2 * 30.0
+    assert sorted(k for ch in clo for k in ch) == sorted(B)
+    assert all(sum(cost[k] for k in ch) <= 30.0 for ch in clo)
+
+
+def test_closure_chunker_keeps_fixed_chunks_first_and_unchanged():
+    deps, cost = _tables_and_uses()
+    g, cost = _ns_graph(deps, cost)
+    fixed = [['T00', 'T01'], ['L00']]
+    clo = C.chunk_bundles_closure(g, set(deps), cost, 30.0, 10**6, frozen=fixed)
+    assert clo[:2] == fixed
+    assert sorted(k for ch in clo for k in ch) == sorted(deps)
+    _chunk_closures(g, clo)                              # acyclic, imports first
+
+
+def test_closure_chunker_through_make_plan(g):
+    p = C.make_plan(g, ['CD.uses_sized'], budget=0.05, piece_size=10**6, bundle_budget=0.0001,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='S', chunker='closure')
+    assert C.check_plan(g, p) == []
+    where = {k: b['name'] for b in p['bundles'] for k in b['nodes']}
+    assert 'CD.sizedZero' in where and 'CD.Space.size_eq' in where   # silent simp lemmas stay visible
+
+
+def test_chain_report_names_the_heaviest_bundle_chains_and_their_mixing():
+    # q149/q153: a bundle's chain (everything importing it brings) against what its own members need
+    deps, cost = _tables_and_uses()
+    g, cost = _ns_graph(deps, cost)
+    chunks = C.chunk_bundles_schedule(g, set(deps), cost, 30.0, 10**6)
+    bundles = [{'name': 'X%d' % i, 'nodes': ch, 'cost': sum(cost[k] for k in ch),
+                'imports': sorted({'X%d' % j for k in ch for d in g.nodes[k].deps
+                                   for j, c2 in enumerate(chunks) if d in c2 and j != i})}
+               for i, ch in enumerate(chunks)]
+    rows = C.chain_report(g, {'bundles': bundles}, top=3)
+    assert len(rows) == 3 and rows[0]['chain'] >= rows[1]['chain'] >= rows[2]['chain']
+    assert rows[0]['chain'] > 300 and all(r['needs'] <= r['chain'] for r in rows)
+    assert set(rows[0]) == {'bundle', 'chain', 'needs', 'bundles'}
