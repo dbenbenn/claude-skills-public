@@ -2044,7 +2044,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
               bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
               external_defs=None, statement_suffix='', external=(), chunker='bands', pinned=None,
               bundles_import_statements=True, promote_private=(), bundle_theorems=(),
-              promote_shared=False, closure_slack=None):
+              promote_shared=False, closure_slack=None, exclude=()):
     """The split: bundles, nodes (published statements) and each node's piece.
 
     - Bundle material B: every reachable non-theorem, what reachable statements need, their
@@ -2057,6 +2057,8 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
       A node needs an ASCII public name and a statement that only uses bundle material; a private
       theorem is promoted only when listed in `promote_private`, or always when it is `True` (a forced
       one always is a node).
+    - `exclude`: theorems never promoted (carve.py passes config `folded`: a folded statement is
+      merged back into its importers after planning, so promoting it splits nothing; q160).
     - `promote_shared`: also promote a theorem kept in several pieces once its copies beyond the
       first cost a piece's budget, and promote greedily again (the greedy pass sees one piece at a
       time: q148's seven analytic lemmas sat in 1738 pieces each).
@@ -2197,6 +2199,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     renames = collision_renames(g)
 
     b_or_ext = B | set(ext)
+    excluded = set(exclude)
 
     def ok_node(k):
         nd = g.nodes[k]
@@ -2204,7 +2207,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         # get "stuck at solving universe constraint" there (oaiq-124); it stays in its importers'
         # pieces, as `fold` would put it
         return nd.theorem and not nd.private and ascii_ok(k) and nd.sig <= b_or_ext and \
-            k not in renames and not max_only_universes(g, k)
+            k not in renames and k not in excluded and not max_only_universes(g, k)
 
     for t in sorted(nodes):
         if not g.nodes[t].theorem or g.nodes[t].sig - B - set(ext):
@@ -2222,7 +2225,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         def ok_node(k):
             nd = g.nodes[k]
             return public_ok(k) or ((allowed is None or k in allowed) and nd.private and nd.theorem and ascii_ok(k)
-                                    and nd.sig <= b_or_ext and k not in renames
+                                    and nd.sig <= b_or_ext and k not in renames and k not in excluded
                                     and not max_only_universes(g, k))
 
     def fresh(n):

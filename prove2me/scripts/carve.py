@@ -401,9 +401,13 @@ def main(argv):
                         promote_private=cfg.get('promote_private', ()),
                         bundle_theorems=bundle_theorems(cfg, g),
                         promote_shared=cfg.get('promote_shared', False),
-                        closure_slack=cfg.get('closure_slack'))
+                        closure_slack=cfg.get('closure_slack'),
+                        exclude=cfg.get('folded', ()))
         if cfg.get('folded'):
-            P = C.fold_statements(P, cfg['folded'])
+            # a folded node the plan did not make a statement (it is `exclude`d from promotion) has
+            # nothing to fold; it is still recorded as folded
+            P = C.fold_statements(P, [n for n in cfg['folded'] if n in P['pieces']])
+            P['folded'] = sorted(set(P.get('folded', [])) | set(cfg['folded']))
         if cfg.get('statement_suffixes'):
             P['statement_suffixes'] = {n: x for n, x in sorted(cfg['statement_suffixes'].items()) if n in P['pieces']}
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)

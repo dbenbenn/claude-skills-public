@@ -117,6 +117,25 @@ def test_promote_private_true_allows_every_private_theorem(g, monkeypatch):
     assert h in after['nodes'] and 'CD.main' not in after['over']
 
 
+def test_folded_statements_are_never_promoted(g):
+    # q160 (Kadison similarity): config `folded` lists statements the verifier cannot check (CoeT WA);
+    # the plan promoted them as split points all the same, and fold_statements merged them straight
+    # back, so the automatic split of a slow piece returned it unchanged (271 s, three verifier
+    # timeouts). `exclude` keeps them out of the greedy promotion, which then picks other lemmas
+    kw = dict(budget=0.05, piece_size=10**6, bundle_budget=0.005, bundle_size=10**6,
+              cost=C.size_costs(g, bytes_per_second=10000), bundle_prefix='CDB')
+    before = C.make_plan(g, TARGETS, **kw)
+    assert 'CD.double_succ' in before['nodes']
+    after = C.make_plan(g, TARGETS, exclude=['CD.double_succ'], **kw)
+    assert 'CD.double_succ' not in after['nodes']
+
+
+def test_carve_plan_passes_folded_as_excluded():
+    # scripts/carve.py plan hands config `folded` to make_plan as `exclude` (q160)
+    src = open(os.path.join(HERE, '..', 'scripts', 'carve.py'), encoding='utf-8').read()
+    assert re.search(r"exclude=cfg\.get\('folded'", src)
+
+
 def test_private_names_are_per_module(g):
     a, b = '_private.CarveDev.Mid.0.CD.helper', '_private.CarveDev.Top.0.CD.helper'
     assert a in g.nodes and b in g.nodes
