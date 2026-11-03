@@ -82,6 +82,9 @@ CONFIG.json (paths may use ~):
    "folded": ["OAI.X.lemma"],                 # statements merged into their importers' pieces after
                                               # planning (carve.fold_statements; e.g. a polymorphic
                                               # statement the verifier's CoeT fallback rejects)
+   "no_promote": ["OAI.X.lemma"],             # theorems the plan never promotes to statements (q160:
+                                              # the lemmas of accepted pieces, so a re-plan for one
+                                              # slow piece splits only that one)
    "repaired": {"OAI.Erdos3.x": ["OAI.Erdos3.y"]},  # stubbed sorry a patch replaces: name -> what the patched proof uses (or a plain list)
                                               # (generation refuses a file still containing sorry)
    "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
@@ -407,7 +410,7 @@ def main(argv):
                         bundle_theorems=bundle_theorems(cfg, g),
                         promote_shared=cfg.get('promote_shared', False),
                         closure_slack=cfg.get('closure_slack'),
-                        exclude=cfg.get('folded', ()))
+                        exclude=sorted(folded | set(cfg.get('no_promote', ()))))
         if cfg.get('folded'):
             # a folded node the plan did not make a statement (it is `exclude`d from promotion) has
             # nothing to fold; it is still recorded as folded

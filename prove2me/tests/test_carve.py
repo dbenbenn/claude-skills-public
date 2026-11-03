@@ -156,6 +156,17 @@ def test_carve_plan_plans_folded_forced_nodes_as_part_of_their_importers(tmp_pat
                        cost=C.size_costs(g, bytes_per_second=10000), exclude=['CD.double_succ'])
     assert P['nodes'] == want['nodes'] and 'CD.double_succ' not in P['nodes']
     assert P['folded'] == ['CD.double_succ']
+    # config `no_promote`: theorems the plan never promotes either (q160: the lemmas of accepted live
+    # pieces, so a re-plan for one slow piece splits only that piece)
+    cfg.write_text(json.dumps({
+        'src': FIX, 'prefix': 'CarveDev', 'roots': ['CarveDev.Top'], 'targets': TARGETS,
+        'work': str(work), 'out': str(tmp_path / 'out'), 'bundle_prefix': 'CDB',
+        'budget': 0.05, 'bundle_budget': 0.005, 'bytes_per_second': 10000,
+        'no_promote': ['CD.size_via_coord']}))
+    r = subprocess.run([sys.executable, script, 'plan', str(cfg)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    P = json.loads((work / 'plan.json').read_text())
+    assert 'CD.size_via_coord' not in P['nodes'] and 'CD.double_succ' in P['nodes']
 
 
 def test_private_names_are_per_module(g):
