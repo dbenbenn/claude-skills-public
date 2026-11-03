@@ -410,6 +410,21 @@ def test_pinned_definitions_get_their_own_small_bundle_closed_under_dependencies
     assert C.check_plan(g, p2) == []
 
 
+def test_an_oversize_pinned_group_is_cut_into_bundles_of_the_size_limit(g):
+    # PlanarPacking q153 (2026-11-03): a forced fact's proof needed 92,000 table definitions, which
+    # pinning kept as one 60 MB bundle (prove2.me refuses over 1 MiB; `gen` stopped "OVER 1 MiB").
+    # A group over bundle_size or bundle_budget is cut like any bundle material, in dependency order.
+    pin = {'a': ['CD.Space.size', 'CD.Space.coord']}
+    p = C.make_plan(g, ['CD.main', 'CD.size_zero'], forced=['CD.size_zero'], budget=0.05, piece_size=10**6,
+                    bundle_budget=1.0, bundle_size=150, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='P', chunker='schedule', pinned=pin)
+    held = {'CD.Space', 'CD.Space.size', 'CD.Space.coord', 'CD.Space.size_eq'}
+    parts = [b for b in p['bundles'] if held & set(b['nodes'])]
+    assert len(parts) >= 2 and held == {n for b in parts for n in b['nodes']}
+    assert all(sum(g.nodes[n].size for n in b['nodes']) <= 150 for b in parts)
+    assert C.check_plan(g, p) == []
+
+
 def test_pinning_refuses_what_is_not_bundle_material(g):
     with pytest.raises(C.CarveError, match='CD.double_succ'):
         _pinned_plan(g, [['CD.double_succ']])

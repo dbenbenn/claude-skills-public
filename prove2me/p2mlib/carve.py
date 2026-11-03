@@ -2167,6 +2167,15 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             if grp:
                 groups.append(grp)
         pin_chunks = pin_chunks + groups
+    # a group over the limits is cut like any bundle material (q153 PlanarPacking: one group of 92,000
+    # table definitions was a 60 MB bundle, over prove2.me's 1 MiB cap)
+    cut = []
+    for ch in pin_chunks:
+        if len(ch) > 1 and (sum(g.nodes[k].size for k in ch) > bundle_size or sum(cost.get(k, 0.0) for k in ch) > bundle_budget):
+            cut += chunk_bundles_schedule(g, set(ch), cost, bundle_budget, bundle_size, (), extra)
+        else:
+            cut.append(ch)
+    pin_chunks = cut
     T = reach - B - set(ext)
     kids = {k: [d for d in g.nodes[k].deps if d in T] for k in T}
     order, seen = [], set()
