@@ -2174,3 +2174,195 @@ def test_slow_pieces_release_nothing_without_publish(env, monkeypatch):
     assert r.returncode == 1 and "step 'calibrate_pieces'" in r.stderr, r.stdout + r.stderr
     assert not (env.dir / 'publish' / 'release.json').exists()
     assert not any(l.startswith('systemd-run') for l in _raw(env))
+
+
+def test_pieces_that_bundles_wait_for_are_measured_and_released_first(env, monkeypatch):
+    # q153 (2026-11-04): 114 of 241 bundles imported (directly or through others) 25 statements, which a
+    # bundle may import only once Proved; their pieces were held until all 2,936 pieces were measured,
+    # so bundle publishing stopped for ~10 h after an hour. Those pieces go first, released at once.
+    plan = _overlap_carve(env, monkeypatch, pieces={'P0': (10, 30), 'P1': (40, 20)})
+    plan['bundles'][1]['statements'] = ['P1']
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure_pieces')
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = [(c['tool'], c['argv']) for c in calls(env)]
+    first = seq.index(('carve_measure', ['config.json', '--keep-going', '--kinds', 'piece', '--only', 'piece:P1']))
+    full = seq.index(('carve_measure', ['config.json', '--keep-going', '--kinds', 'piece']))
+    assert first < full
+    assert json.load(open(env.dir / 'publish' / 'release.json'))['pieces'] == ['piece:P1']
+    assert 'bundles wait for' in r.stdout
+
+
+def test_without_publish_the_waited_for_pieces_are_not_measured_apart(env, monkeypatch):
+    plan = _overlap_carve(env, monkeypatch, pieces={'P0': (10, 30), 'P1': (40, 20)})
+    plan['bundles'][1]['statements'] = ['P1']
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    assert run(env, *ARGS_NEW, '--stop-after', 'measure_pieces').returncode == 0
+    assert not any('--only' in c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure')
+
+
+# ---------------------------------------------------------------- re-plans of a published carve (q160)
+# Kadison similarity (2026-11-03): the automatic frozen re-plan for one slow piece also re-shaped four
+# accepted live pieces, wanting six new statements only they would import; split_run never resends a live
+# piece without a comparison note, so those six would have gone live as Open orphans. And in overlap mode
+# the new statements of a re-plan were posted before measure_pieces ran the CoeT check: 3 of 14 failed it
+# after they were live.
+
+def _run_state(env, states):
+    (env.dir / 'publish').mkdir(parents=True, exist_ok=True)
+    (env.dir / 'publish' / 'run_state.json').write_text(json.dumps(
+        {k: dict({'state': v}, **({'id': 'x'} if v == 'live' else {})) for k, v in states.items()}))
+
+
+def test_live_pieces_are_those_sent_and_not_waiting_for_a_person(env):
+    _run_state(env, {'piece:A': 'live', 'piece:B': 'inflight', 'piece:C': 'stop', 'piece:D': 'todo',
+                     'statement:E': 'live', 'bundle:F': 'live'})
+    assert CP.live_pieces(str(env.dir)) == {'A', 'B'}
+    assert CP.live_pieces(str(env.tmp / 'nowhere')) == set()
+
+
+def test_no_promote_of_a_frozen_replan_is_the_live_pieces_lemmas_less_the_slow_pieces():
+    plan = {'pieces': {'P0': {'keep': ['P0', 'shared', 'b']}, 'P1': {'keep': ['P1', 'a', 'shared']},
+                       'P2': {'keep': ['P2', 'c']}}}
+    older = {'pieces': {'P1': {'keep': ['P1', 'a', 'a_old']}}}
+    # statements (P1) are statements already; what the slow piece keeps may be promoted; P2 is not live
+    assert CP.protected_keeps([plan, older, None], {'P1'}, ['P0']) == {'a', 'a_old'}
+    assert CP.protected_keeps([plan], set(), ['P0']) == set()
+
+
+def _reshaped_plans():
+    ref = {'bundles': [], 'external': [],
+           'pieces': {'P0': {'keep': ['P0', 'x', 's'], 'imports': []}, 'P1': {'keep': ['P1', 'y', 'z'], 'imports': []},
+                      'P2': {'keep': ['P2', 'w'], 'imports': []}}}
+    new = {'bundles': [], 'external': [], 'folded': ['P2'],
+           'pieces': {'P0': {'keep': ['P0', 'x'], 'imports': ['N2']}, 'N2': {'keep': ['N2', 's'], 'imports': ['N3']},
+                      'N3': {'keep': ['N3'], 'imports': []},
+                      'P1': {'keep': ['P1', 'y'], 'imports': ['N1']}, 'N1': {'keep': ['N1', 'z'], 'imports': []}}}
+    return ref, new
+
+
+def test_a_replan_that_reshapes_a_live_piece_is_reported_with_its_orphan_statements():
+    ref, new = _reshaped_plans()
+    reshaped, orphans = CP.live_piece_changes(ref, new, {'P1', 'P2'})
+    # P2 was folded on purpose; P1 lost z to N1, which nothing that will be sent imports
+    assert sorted(reshaped) == ['P1'] and 'z' in reshaped['P1'] and 'N1' in reshaped['P1']
+    assert orphans == {'N1': ['P1']}                    # N2 and N3 hang off P0, which is not live
+    # a live piece whose comparison note exists is sent again, and so imports its new statements
+    assert CP.live_piece_changes(ref, new, {'P1'}, resent={'P1'})[1] == {}
+    # a new statement imported by a live piece and by one still to be sent is no orphan
+    new['pieces']['P0']['imports'].append('N1')
+    reshaped, orphans = CP.live_piece_changes(ref, new, {'P1'})
+    assert sorted(reshaped) == ['P1'] and orphans == {}
+
+
+def test_the_automatic_split_keeps_promotion_inside_the_slow_piece(env, monkeypatch):
+    plan = _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30), 'P2': (40, 30)},
+                          seq=[{}, {}, {}, {}, {'piece:P0': _t(40)}])
+    plan['pieces']['P0']['keep'].append('shared')
+    plan['pieces']['P1']['keep'].append('shared')
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    _run_state(env, {'piece:P1': 'live', 'piece:P2': 'stop'})
+    r = run(env, *ARGS_NEW, '--config-set', '{"no_promote": ["user_x"]}', '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['auto_config']['no_promote'] == ['lemma_P1']      # P1's own lemma; `shared` is the slow piece's too
+    cfg = json.load(open(env.dir / 'config.json'))
+    assert cfg['no_promote'] == ['lemma_P1', 'user_x']
+    assert 'no_promote' in (env.dir / 'logs' / 'calibrate.log').read_text()
+    # a re-run config keeps it (pipeline_state.json auto_config), with the user's own
+    assert run(env, '--redo', 'config', '--stop-after', 'config').returncode == 0
+    assert json.load(open(env.dir / 'config.json'))['no_promote'] == ['lemma_P1', 'user_x']
+
+
+PLAN_HOOK = textwrap.dedent('''
+    if os.environ.get('STUB_PLAN_JSON') and open(os.environ['STUB_LOG']).read().count('"argv": ["plan"') > int(os.environ.get('STUB_PLAN_AFTER', '0')):
+        open(os.path.join(os.getcwd(), 'carve_work', 'plan.json'), 'w').write(os.environ['STUB_PLAN_JSON'])
+''')
+
+
+def _reshape_live_p1(plan, also_p0=False):
+    """P1 (live) gives its lemma to a new statement N1; with also_p0, P0 (not live) imports N1 too."""
+    import copy
+    new = copy.deepcopy(plan)
+    new['pieces']['P1'] = dict(new['pieces']['P1'], keep=['P1'], imports=['N1'])
+    new['pieces']['N1'] = {'cost': 5, 'keep': ['N1', 'lemma_P1'], 'bundles': ['B0'], 'imports': []}
+    new['stubs']['N1'] = {'bundles': ['B0']}
+    if also_p0:
+        new['pieces']['P0'] = dict(new['pieces']['P0'], imports=['N1'])
+    return new
+
+
+def test_a_replan_that_leaves_a_new_statement_only_live_pieces_import_stops_before_publishing(env, monkeypatch):
+    plan = _overlap_carve(env, monkeypatch)
+    assert run(env, *ARGS_NEW, '--publish', '--stop-after', 'publish_early').returncode == 0
+    _run_state(env, {'piece:P1': 'live'})
+    monkeypatch.setenv('STUB_HOOK_carve_plan', PLAN_HOOK)
+    monkeypatch.setenv('STUB_PLAN_JSON', json.dumps(_reshape_live_p1(plan)))
+    r = run(env, '--redo', 'plan', '--publish')
+    assert r.returncode == 1 and "step 'plan'" in r.stderr, r.stdout + r.stderr
+    assert 'piece:P1' in r.stderr and 'N1' in r.stderr and 'no_promote' in r.stderr and 'comparisons' in r.stderr
+    assert sum(1 for l in _raw(env) if l.startswith('systemd-run')) == 1       # nothing more went out
+    assert ('carve', 'gen') not in tools_called(env)[tools_called(env).index(('carve', 'plan'), 1):]
+    # a comparison note for P1 answers it: split_run sends P1 again, and P1 then imports N1
+    (env.dir / 'publish' / 'comparisons').mkdir()
+    (env.dir / 'publish' / 'comparisons' / 'P1.md').write_text('Different from x: ...\n')
+    r = run(env, '--redo', 'plan', '--stop-after', 'plan')
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_a_replan_that_reshapes_a_live_piece_without_orphans_goes_on_with_a_note(env, monkeypatch):
+    plan = _overlap_carve(env, monkeypatch)
+    assert run(env, *ARGS_NEW, '--publish', '--stop-after', 'publish_early').returncode == 0
+    _run_state(env, {'piece:P1': 'live'})
+    monkeypatch.setenv('STUB_HOOK_carve_plan', PLAN_HOOK)
+    monkeypatch.setenv('STUB_PLAN_JSON', json.dumps(_reshape_live_p1(plan, also_p0=True)))
+    r = run(env, '--redo', 'plan', '--stop-after', 'plan')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'live piece' in r.stdout and 'piece:P1' in r.stdout
+
+
+def _replan_adds_n1(env, monkeypatch, plan):
+    """The automatic frozen re-plan of slow P0 promotes its lemma to a new statement N1."""
+    import copy
+    new = copy.deepcopy(plan)
+    new['pieces']['P0'] = dict(new['pieces']['P0'], keep=['P0'], imports=['N1'])
+    new['pieces']['N1'] = {'cost': 5, 'keep': ['N1', 'lemma_P0'], 'bundles': ['B0'], 'imports': []}
+    new['stubs']['N1'] = {'bundles': ['B0']}
+    monkeypatch.setenv('STUB_HOOK_carve_plan', PLAN_HOOK)
+    monkeypatch.setenv('STUB_PLAN_JSON', json.dumps(new))
+    monkeypatch.setenv('STUB_PLAN_AFTER', '1')
+
+
+def test_new_statements_of_a_replan_wait_until_their_pieces_are_measured(env, monkeypatch):
+    plan = _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)},
+                          seq=[{}, {}, {}, {'statement:N1': _t(5)}, {'piece:P0': _t(40), 'piece:N1': _t(20)}])
+    _replan_adds_n1(env, monkeypatch, plan)
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    lines = _raw(env)
+    bg = [i for i, l in enumerate(lines) if l.startswith('systemd-run')]
+    pieces = [i for i, l in enumerate(lines) if '"--kinds", "piece"' in l]
+    assert len(bg) == 2 and len(pieces) == 3
+    assert bg[1] > pieces[2]                  # the second publisher (with N1) only after N1's piece measured
+    assert 'N1' in r.stdout and 'measure_pieces' in r.stdout
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert 'publish_held' not in st
+    assert 'N1' in json.load(open(env.dir / 'published' / 'plan.json'))['stubs']
+
+
+def test_new_statements_of_a_replan_whose_pieces_fail_are_never_posted(env, monkeypatch):
+    plan = _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)},
+                          seq=[{}, {}, {}, {'statement:N1': _t(5)}, {'piece:P0': _t(40), 'piece:N1': _t(20)}])
+    _replan_adds_n1(env, monkeypatch, plan)
+    monkeypatch.setenv('STUB_HOOK_carve_measure_config_json', textwrap.dedent('''
+        if '--kinds' in sys.argv and sys.argv[sys.argv.index('--kinds') + 1] == 'piece' and \\
+                open(os.environ['STUB_LOG']).read().count('"piece"') >= 3:
+            print('piece:N1 FAIL: the verifier rejects this universe-polymorphic statement: its CoeT fallback')
+            sys.exit(1)
+    ''') + MEASURE_HOOK)
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1 and "step 'measure_pieces'" in r.stderr, r.stdout + r.stderr
+    assert sum(1 for l in _raw(env) if l.startswith('systemd-run')) == 1
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['publish_held']['statements'] == ['N1'] and st['steps']['publish_early']['status'] == 'skipped'
+    assert 'N1' not in json.load(open(env.dir / 'published' / 'plan.json'))['stubs']

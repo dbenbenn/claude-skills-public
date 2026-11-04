@@ -736,7 +736,11 @@ back WA. The lessons:
      transitive-closure size at about 1/3, 1/2, 5/6 of the total; oaiq-031, oaiq-074). Verifier data
      (oaiq-078): pieces at 118-126 s local CPU timed out three times; 93.7, 99.6 and 102.7 s passed first time,
      so the real limit is about 100-110 s, below `PIECE_CAP` (120 s since 2026-10-29, above the limit on purpose so that a borderline piece is tried before it is
-     split). Chains of `decide +kernel` theorems are worse: pieces at 97-130 s (oaiq-084) and 147-186 s
+     split). Whole-file solutions (Blueprint assemblies, not carves) agree (q159): 77 s and 100 s of sequential
+     CPU accepted first time, 108-142 s timed out twice, 71 s after a speed-up accepted. Measure `%U` under
+     `lake env lean -DElab.async=false`: default parallel elaboration showed 45 s wall for the 140 s file. The
+     cheapest gains there were explicit-function `comp_left` terms (a 5 s failed unification became 0.1 s) and
+     explicit terms for `nlinarith`/`positivity`. Chains of `decide +kernel` theorems are worse: pieces at 97-130 s (oaiq-084) and 147-186 s
      (oaiq-047) timed out three times each; forcing every kernel theorem the piece keeps (or a fraction of them,
      evenly spaced: `~/claude/p2m-standalone/openai-ports/oaiq-047/resplit_prep.py`) brought them to 85-97 s and all passed first time. In a
      kernel-heavy carve, force them at the first plan rather than after the verifier's timeouts. Big carves take
@@ -819,7 +823,13 @@ back WA. The lessons:
   ended `dependency_oom`, the slowdown Erdős 3 hit before. Every bundle measured under 90 s: the per-item budget
   cannot see this. When bundle publishes slow down or time out, re-plan the unpublished part with its lemmas as
   statements (the live bundles `frozen`) instead of pushing it through. Proposed, not built: `plan` reports each
-  item's closure cost (summed seconds of its transitive bundles) and warns over ~1,000 s.
+  item's closure cost (summed seconds of its transitive bundles) and warns over ~1,000 s. Closure *bytes* look
+  like a second ceiling (q149, oaiq-106): every published bundle's closure was ≤ 0.74 GB of .olean, D186 at
+  0.87 GB (local 15-30 s, 39 direct imports) hit "Module compilation timed out after 300s" 30+ times, and the 31
+  bundles above it (1.5 GB and up) never published, while same-sized files with one import did. One carve's
+  correlation, not a platform-stated limit: `carve_measure.py` records each item's closure bytes and warns over
+  0.7 GB. A goal piece that must import the whole development (several GB) is then blocked by the platform, not by
+  drift: say so in RESUME rather than retrying.
 - **`gen` stops "OVER 1 MiB"**: the size model plans source bytes, and emitted bundles ran to 1.7× `bundle_size`
   (q146: 650,000 planned, 1,116,227 emitted). Lower `config_set.bundle_size` (450,000 worked). A statement or piece
   over the cap (a fold into a live piece) has its comments stripped by `gen` since 4d96885.
@@ -914,6 +924,15 @@ back WA. The lessons:
      `Type`-only importers. Compute it on the folded plan and iterate (folding changes imports); q151's script is
      in its RESUME.md (worth a `carve.py` subcommand).
   3. Fold, last: folding makes the importers' pieces slow, the second blocker this family hit.
+  **Pre-screen split points on a CoeT-prone family** (C*-algebra or Hilbert-space towers; q160): in overlap mode
+  statements are posted as soon as they are measured, before `measure_pieces` runs the CoeT check, so a re-plan
+  that promotes heavy theorems leaves Open orphans (3 of 14 there; the next re-plan's 5 all failed too, caught
+  only because it ran `--stop-after measure_pieces` without `--publish`). Before the first `--publish`, read every
+  candidate's `Expr.sizeWithoutSharing` with `#eval` from one Lean file importing the built port (7 s for 238
+  theorems; it equals COE_CHECK's number): every failure was ≥ 2.6e7 nodes and every pass ≤ 3.2e6 (q129: 1.9e7
+  failed, 8.5e6 passed). Put every theorem over 1e7 in `config_set.no_promote`; q160's next plan passed all 16 new
+  pieces on the first measure. Proposed, not built: `graph` records the size and the planner never promotes a
+  polymorphic theorem over ~1e7, as with `max_only_universes`.
   CoeT failures come in families: after `measure_pieces` fails, list every FAIL of the run (`awk '$1=="piece" &&
   $4=="FAIL"'` from the run's `====` line) and treat them together (oaiq-122: 19 of 51 pieces, folded in three
   20-minute rounds from the driver's tail). Folding: `carve.py fold CONFIG NODE…` (config `folded`) folds the statement into every importer's
@@ -952,6 +971,11 @@ back WA. The lessons:
 
 From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
 
+- **Pieces that bundles wait for go first** (2026-11-04, q153): a bundle that imports a statement publishes only
+  once it is Proved, and those statements' pieces used to wait until every piece was measured (q153: bundle
+  publishing stopped after an hour, with 114 of 241 bundles waiting ~10 h on 25 small pieces). With `--publish`,
+  `measure_pieces` now measures those pieces first (`carve_measure.py --only`) and releases the ones within the
+  limit to the background publisher (started if none runs), then measures the rest.
 - **Overlap-mode carves freeze themselves** (2026-10-29): once `publish_early` ran, config `frozen` and `forced`
   already hold the published plan, bundles and statements (`pipeline_state.json` `auto_config`), and a slow piece
   gets its frozen re-plan automatically (previous section). Only what is published or being published is
@@ -962,6 +986,14 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   the early-publish plan wrote into `published/lib` but never sent are locked too, so `gen` keeps their old text:
   with no publisher running, move the unposted ones out of `published/lib` (keep a backup) before the `gen` that
   should change them (q151).
+- **After renaming published items, dry-run split_run first** (q151): config `statement_suffixes` (f42edbc) renamed
+  15 live statements `<name>_m`, but the run state is keyed by node, so the old ids still counted as live, the `_m`
+  statements were never posted and their importers failed "unknown import". Since e4d2383 an item records the name it
+  was sent under and is sent again when that changed; still run `split_run.py RUN.json` without `--go` after any
+  rename and check the renamed items appear under "would send now", and stop a publisher running an older snapshot
+  (it kept sending `_m` pieces against the old ids). Platform 5xx answers (Gateway Timeout, "Verification service
+  error") are transient since 69c9fd3 (q151: an hour of them stopped 71 pieces "for a person"); pieces stopped that
+  way on an older snapshot need `--go --reset piece:X`.
 - **Frozen bundles keep their old imports** (20365e5): with `frozen`, published bundles keep their old plan's
   imports, and `check_plan` no longer reports their inferred needs or cycles, unless the frozen carve used another
   external bundle (`frozen_external_conflicts`) (oaiq-120).

@@ -159,6 +159,63 @@ def posted(rec):
     return isinstance(rec, dict) and (rec.get('state', 'todo') != 'todo' or bool(rec.get('history')) or bool(rec.get('id')))
 
 
+def live_pieces(d):
+    """The nodes whose pieces carve DIR's publisher has sent and not handed to a person (publish/run_state.json
+    `piece:NODE` live or in flight): the platform has, or is judging, their text, and split_run never sends
+    a live one again without a comparison note."""
+    rs = _load_json(os.path.join(d, 'publish', 'run_state.json')) or {}
+    return {x.split(':', 1)[1] for x, v in rs.items()
+            if x.startswith('piece:') and isinstance(v, dict) and v.get('state') in ('live', 'inflight')}
+
+
+def protected_keeps(plans, live, slow):
+    """config `no_promote` for a frozen re-plan of the `slow` pieces: every declaration the `live` pieces keep
+    in any of `plans` (None skipped), less what the slow pieces keep and less the statements themselves.
+    q160 (Kadison similarity, 2026-11-03): the automatic re-plan for one slow piece also re-shaped four
+    accepted live pieces, wanting six new statements only they would import (Open orphans: a live piece
+    is never sent again); confined to the slow piece it made 14, every one reached from it."""
+    plans = [p for p in plans if p]
+    keep = {x for p in plans for n in live for x in ((p.get('pieces') or {}).get(n) or {}).get('keep', ())}
+    keep -= {x for p in plans for n in slow for x in ((p.get('pieces') or {}).get(n) or {}).get('keep', ())}
+    return keep - {n for p in plans for n in p.get('pieces') or {}}
+
+
+def live_piece_changes(ref, new, live, resent=()):
+    """What plan `new` changes in the live pieces of plan `ref` (the one they were sent from):
+    ({node: why} of live pieces re-shaped, {statement: [live importers]} of the orphans), an orphan being
+    a statement new in `new` that no piece still to be sent (not live, or live and `resent`: its comparison
+    note makes split_run send it again) or bundle imports, directly or through other new statements. A live
+    piece folded on purpose (`new['folded']`) is not re-shaped. q160: a re-shaped live piece keeps its
+    published proof, so the statements only it would import stay Open with nothing to prove them."""
+    rp, np_ = ref.get('pieces') or {}, new.get('pieces') or {}
+    fresh = set(np_) - set(rp) - set(new.get('external') or ())
+    reshaped = {}
+    for n in sorted(set(live) & set(rp)):
+        if n not in np_:
+            if n not in (new.get('folded') or ()):
+                reshaped[n] = 'no longer a statement of the plan'
+            continue
+        lost = sorted(set(rp[n].get('keep', ())) - set(np_[n].get('keep', ())))
+        if lost:
+            to = sorted(set(np_[n].get('imports', ())) & fresh)
+            reshaped[n] = '%d declaration(s) moved out (%s%s)%s' % (
+                len(lost), ', '.join(lost[:5]), ', ...' if len(lost) > 5 else '',
+                ' into new statement(s) %s' % ', '.join(to) if to else '')
+    sent = [n for n in np_ if n not in fresh and (n not in live or n in resent)]
+    todo = [x for n in sent for x in np_[n].get('imports', ())]
+    todo += [x for b in new.get('bundles') or () for x in b.get('statements', ())]
+    reached = set()
+    while todo:
+        x = todo.pop()
+        if x in reached:
+            continue
+        reached.add(x)
+        if x in fresh:
+            todo += np_[x].get('imports', ())
+    orphans = {s: sorted(n for n in live if s in (np_.get(n) or {}).get('imports', ())) for s in sorted(fresh - reached)}
+    return reshaped, orphans
+
+
 def locked_files(d, running=False):
     """The out/lib files of carve DIR that are published or being published, so that no step may change
     them: those publish_early froze (published/lib, as far as they are items of published/plan.json),
@@ -1006,13 +1063,14 @@ class Pipeline:
         """What the pipeline itself set once publishing began (pipeline_state.json `auto_config`), over
         config.json: `frozen` (the published plan, its bundles, their published text), `forced` and
         `template_forced` (the published statements, so a re-plan keeps them; unions with what the
-        user forced), `cost_factors` (pieces measured over their plan) and `promote_private` (their private
-        lemmas, which the plan may then promote like public ones). Re-applied whenever
+        user forced), `cost_factors` (pieces measured over their plan), `promote_private` (their private
+        lemmas, which the plan may then promote like public ones) and `no_promote` (the lemmas of live
+        pieces, which it may not; unions with the user's). Re-applied whenever
         config.json is rewritten from pipeline.json, so a re-run `config` cannot unfreeze a carve."""
         a = self.state.get('auto_config') or {}
         if a.get('frozen'):
             cfg['frozen'] = dict(cfg.get('frozen') or {}, **a['frozen'])
-        for k in ('forced', 'template_forced'):
+        for k in ('forced', 'template_forced', 'no_promote'):
             if a.get(k):
                 cfg[k] = sorted(set(cfg.get(k) or ()) | set(a[k]))
         if a.get('promote_private'):
@@ -1165,8 +1223,30 @@ class Pipeline:
         self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *self.measure_flags(), *kinds)])
 
     def step_measure_pieces(self):
+        gates = self.gate_pieces() if self.p.get('go') else []
+        if gates:
+            # q153: bundles that import a statement publish only once it is Proved, so its piece is measured
+            # and released first instead of after every other piece (bundles had stalled ~10 h)
+            self.run_cmds('measure_pieces', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
+                                                       '--kinds', 'piece', '--only', ','.join(gates))])
+            print(self.release_pieces(gates, 'measure_pieces',
+                                      'the pieces of statements bundles wait for').strip() or
+                  '== none of the %d piece(s) bundles wait for measured within budget' % len(gates), flush=True)
         self.run_cmds('measure_pieces', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
                                                    '--kinds', 'piece')])
+
+    def gate_pieces(self):
+        """The pieces of the statements a bundle imports (a bundle may import a statement only once it is
+        Proved), not yet live: ['piece:NODE', ...]."""
+        got = self.calibrate_inputs() or (None,)
+        cfg = got[0] or json.load(open(os.path.join(self.d, 'config.json')))
+        _, plan_path, _ = self.work_paths(cfg)
+        if not os.path.exists(plan_path):
+            return []
+        plan = json.load(open(plan_path))
+        live = self.live_items()
+        want = {n for b in plan.get('bundles', []) for n in b.get('statements', [])}
+        return sorted('piece:' + n for n in want if n in (plan.get('pieces') or {}) and 'piece:' + n not in live)
 
     def work_paths(self, cfg):
         work = os.path.expanduser(cfg.get('work') or os.path.join(self.d, 'carve_work'))
@@ -1527,16 +1607,34 @@ class Pipeline:
             return ''
         fast = sorted('piece:' + n for n in plan.get('pieces') or {}
                       if (times.get('piece:' + n) or {}).get('ok') and 'piece:' + n not in slow)
+        return self.release_pieces(fast, 'calibrate_pieces', 'within budget', held=slow)
+
+    def release_pieces(self, items, step, what, held=()):
+        """Release `items` (pieces, measured) that measured ok and within the limit, through the pieces'
+        gates, to the background publisher (started if none runs): publish/release.json lists them, adding
+        to an earlier release for the same plan. Returns the line for the log ('' when nothing goes)."""
+        cfg, plan, times, _, _ = self.calibrate_inputs()
+        limit = cfg.get('budget', 55) * LIMIT_FACTOR
+        ok = [x for x in items if (times.get(x) or {}).get('ok')]
+        # calibrate_pieces has judged the slow ones (`held`); otherwise the limit decides here
+        fast = sorted(x for x in ok if x not in held) if held else \
+            sorted(x for x in ok if (times[x].get('secs') or 0) <= limit)
         if not fast:
             return ''
         try:
-            self.pieces_gates('calibrate_pieces')
+            self.pieces_gates(step)
         except StepFailed as e:
-            return ('\nThe %d piece(s) within budget were not released: their gates failed: %s'
-                    % (len(fast), str(e).splitlines()[0]))
+            return ('\nThe %d piece(s) %s were not released: their gates failed: %s'
+                    % (len(fast), what, str(e).splitlines()[0]))
         P = os.path.join(self.d, 'publish')
         sha = hashlib.sha1(open(os.path.join(P, 'plan.json'), 'rb').read()).hexdigest()
-        rel = {'plan_sha': sha, 'pieces': fast, 'held': sorted(slow), 'released': _now()}
+        try:
+            old = json.load(open(os.path.join(P, 'release.json')))
+        except (OSError, ValueError):
+            old = {}
+        if old.get('plan_sha') == sha and isinstance(old.get('pieces'), list):
+            fast = sorted(set(fast) | set(old['pieces']))
+        rel = {'plan_sha': sha, 'pieces': fast, 'held': sorted(held), 'released': _now()}
         tmp = os.path.join(P, 'release.json.tmp')
         json.dump(rel, open(tmp, 'w'), indent=1)
         os.replace(tmp, os.path.join(P, 'release.json'))
@@ -1549,8 +1647,8 @@ class Pipeline:
             self.freeze_published()
             self.start_publisher()
             how = 'a background publisher was started for them'
-        return ('\nReleased now (publish/release.json; %s): %d piece(s) within budget, %s; held: %s.'
-                % (how, len(fast), ', '.join(fast), ', '.join(sorted(slow))))
+        return ('\nReleased now (publish/release.json; %s): %d piece(s), %s, %s%s.'
+                % (how, len(fast), what, ', '.join(fast), '; held: ' + ', '.join(sorted(held)) if held else ''))
 
     def source_line(self):
         m = json.load(open(self.meta))

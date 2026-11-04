@@ -6,7 +6,7 @@ elaboration (Elab.async=false; q128: heartbeat timeouts the verifier reported sh
 
 usage: carve_measure.py CONFIG.json [--force] [--keep-going] [--dir D] [--no-repair]
                          [--no-edge-check] [--drop-false-edges] [--allow-false-edges]
-                         [--kinds bundle,statement|piece]
+                         [--kinds bundle,statement|piece] [--only ITEM,...]
        carve_measure.py CONFIG.json --profile bundle:NAME[,statement:NAME ...] [--dir D]
   -> <work>/times.json, the input of `carve.py split CONFIG.json TIMES.json`,
      <work>/edges.json and <work>/false_edges.json (the edge check)
@@ -51,9 +51,20 @@ the context-command repairs) and re-measures the file.
 records the diagnosis (serialization-, kernel- or elaboration-bound, naming the declaration) in
 <work>/profiles.json: carve_pipeline's calibrate asks for it when splitting cannot shrink a bundle.
 
+--only ITEM[,...] measures only those items (carve_pipeline: the pieces of statements bundles wait for, first).
 --kinds measures only those items (carve_pipeline's overlap mode: bundles and statements first, which
 freeze at publish, then the pieces against their .olean files from the first run in D/olean). Without
 pieces, no statement is reported orphaned (nothing that imports one has been read yet).
+
+Each times.json record also holds the item's import closure: closure_bytes, the .olean bytes of its
+transitive Solutions/Definitions/Theorems imports (not Mathlib, not its own .olean; a piece's are those
+of its verifier-form file), closure_modules, and closure_missing (imports with no .olean found). One
+over CLOSURE_WARN_BYTES is reported with a WARNING line and in a summary at the end; it never fails
+the run (q149/oaiq-106).
+
+The JSON state files (times.json, repairs.json, edges.json, false_edges.json, profiles.json) are
+written atomically (write_json). One found cut off mid-entry (q149: a disk-full crash) keeps its
+complete entries; the original is kept as <file>.truncated, and the dropped items are measured again.
 """
 import hashlib
 import importlib.util
@@ -102,6 +113,110 @@ def copy_published(ws, olean, mods):
 
 
 
+# q149/oaiq-106 (2026-11): every bundle the platform published had an import closure of at most
+# 0.74 GB (OAIQ106D199); D186 (0.87 GB, 17 MB itself) timed out ("Module compilation timed out after
+# 300s") 30+ times. One carve's correlation, not a confirmed platform limit: reported, never enforced.
+CLOSURE_WARN_BYTES = 700 * 10 ** 6
+CLOSURE_ROOTS = ('Solutions.', 'Definitions.', 'Theorems.')
+
+
+def write_json(path, obj, **kw):
+    """json.dump through a temporary file in the same directory, fsync'd, then os.replace: a crash
+    mid-write (q149: disk full) leaves the previous file whole, never one cut mid-entry."""
+    tmp = '%s.tmp%d' % (path, os.getpid())
+    try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(obj, f, **kw)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
+def _skip_ws(text, i):
+    while i < len(text) and text[i] in ' \t\r\n':
+        i += 1
+    return i
+
+
+def recover_object(text):
+    """The complete top-level entries of a JSON object cut off mid-way ({} if none), or None when the
+    text is no object."""
+    dec = json.JSONDecoder()
+    i = _skip_ws(text, 0)
+    if text[i:i + 1] != '{':
+        return None
+    out, i = {}, i + 1
+    while True:
+        try:
+            k, i = dec.raw_decode(text, _skip_ws(text, i))
+            i = _skip_ws(text, i)
+            if not isinstance(k, str) or text[i:i + 1] != ':':
+                return out
+            v, i = dec.raw_decode(text, _skip_ws(text, i + 1))
+        except ValueError:
+            return out
+        out[k] = v
+        i = _skip_ws(text, i)
+        if text[i:i + 1] != ',':
+            return out
+        i += 1
+
+
+def load_json(path, default):
+    """A JSON state file, or `default` when there is none. One cut off mid-entry (q149: a disk-full
+    crash truncated times.json) keeps its complete entries: the original is kept as
+    <path>.truncated (.1, .2, ... beside an earlier one) and the repaired file written in its place."""
+    if not os.path.exists(path):
+        return default
+    text = open(path, encoding='utf-8').read()
+    try:
+        return json.loads(text)
+    except ValueError:
+        got = recover_object(text)
+    if got is None:
+        sys.exit('%s is not valid JSON and holds no object to recover; repair it by hand (drop the partial '
+                 'entry and close the JSON) or delete it to measure everything again' % path)
+    keep, k = path + '.truncated', 0
+    while os.path.exists(keep):
+        k += 1
+        keep = '%s.truncated.%d' % (path, k)
+    shutil.copy(path, keep)
+    write_json(path, got, indent=1)
+    print('WARNING %s was cut off mid-entry: kept its %d complete entries and dropped the partial one '
+          '(original kept as %s)' % (path, len(got), keep), file=sys.stderr, flush=True)
+    return got
+
+
+def import_closure(text, imports_of, olean_of):
+    """{closure_bytes, closure_modules[, closure_missing]} for a file's text: the .olean bytes of its
+    transitive Solutions/Definitions/Theorems imports, each once (imports_of(module) -> its imports,
+    olean_of(module) -> its .olean path or None)."""
+    seen, todo = set(), [m for m in EC.imports(text) if m.startswith(CLOSURE_ROOTS)]
+    while todo:
+        m = todo.pop()
+        if m not in seen:
+            seen.add(m)
+            todo.extend(x for x in imports_of(m) if x.startswith(CLOSURE_ROOTS) and x not in seen)
+    size, missing = 0, 0
+    for m in seen:
+        p = olean_of(m)
+        if p:
+            size += os.path.getsize(p)
+        else:
+            missing += 1
+    rec = {'closure_bytes': size, 'closure_modules': len(seen)}
+    if missing:
+        rec['closure_missing'] = missing
+    return rec
+
+
+def gb(n):
+    return '%.2f GB' % (n / 1e9)
+
+
 def reapply(text, cuts):
     """(text with the recorded cuts made, the cuts that are stale). `carve.py gen` already makes
     them, so a cut whose text is gone counts as made; stale is one still there that no longer
@@ -126,11 +241,11 @@ class Measure:
             os.makedirs(x, exist_ok=True)
         self.ext = set(self.plan.get('external', []))
         self.times_path = os.path.join(self.cfg['work'], 'times.json')
-        self.times = json.load(open(self.times_path)) if os.path.exists(self.times_path) else {}
+        self.times = load_json(self.times_path, {})
         self.rp_path = os.path.join(self.cfg['work'], 'repairs.json')
-        self.repairs = json.load(open(self.rp_path)) if os.path.exists(self.rp_path) else {}
+        self.repairs = load_json(self.rp_path, {})
         self.edges_path = os.path.join(self.cfg['work'], 'edges.json')
-        self.edges = json.load(open(self.edges_path)) if os.path.exists(self.edges_path) else {}
+        self.edges = load_json(self.edges_path, {})
         self.bundle_names = [b['name'] for b in self.plan.get('bundles', [])]
         self.edge_dir = os.path.join(self.d, 'edge')
         self.allow_false = False
@@ -175,7 +290,7 @@ class Measure:
 
     def record(self, src, cuts):
         self.repairs.setdefault(os.path.basename(src), []).extend(cuts)
-        json.dump(self.repairs, open(self.rp_path, 'w'), indent=1, ensure_ascii=False)
+        write_json(self.rp_path, self.repairs, indent=1, ensure_ascii=False)
         for c in cuts:
             print('REPAIR', os.path.basename(src), '|', c.replace('\n', ' ')[:160], flush=True)
 
@@ -237,6 +352,13 @@ class Measure:
         return module is None or os.path.exists(self.olean_path(module))
 
     def measure(self, item, env, force=False, repair=True):
+        """The item's record (compiled, or cached), with its import closure (import_closure)."""
+        r = self._measure(item, env, force, repair)
+        if r is not None:
+            r.update(self.import_closure(item) or {})
+        return r
+
+    def _measure(self, item, env, force=False, repair=True):
         kind, n = item.split(':', 1)
         src, mod = self.item_files(kind, n)
         self.apply_recorded(src)
@@ -269,6 +391,40 @@ class Measure:
                 open(src, 'w', encoding='utf-8').write(sol_new)
             self.record(src, cut)
         return r
+
+    def module_olean(self, m):
+        """A module's .olean: this carve's D/olean (its own modules and the published ones copied
+        there), else the workspace build; None when neither has it."""
+        for root in (self.olean, os.path.join(self.ws, '.lake', 'build', 'lib', 'lean')):
+            p = os.path.join(root, *m.split('.')) + '.olean'
+            if os.path.exists(p):
+                return p
+        return None
+
+    def module_imports(self, m):
+        """imports_of, cached while the source file is unchanged (closures share most modules)."""
+        p = self.module_file(m)
+        try:
+            st = os.stat(p)
+        except OSError:
+            return []
+        memo = self.__dict__.setdefault('_imports_memo', {})
+        k = (p, st.st_mtime_ns, st.st_size)
+        if k not in memo:
+            memo[k] = EC.imports(open(p, encoding='utf-8').read())
+        return memo[k]
+
+    def import_closure(self, item):
+        """import_closure of the item's file (a piece: its verifier-form file, D/chk), or None when
+        the file is not there."""
+        kind, n = item.split(':', 1)
+        src, mod = self.item_files(kind, n)
+        path = src if mod else os.path.join(self.chk, 'Chk_%s.lean' % C.slug(C.statement_name(self.plan, n)))
+        try:
+            text = open(path, encoding='utf-8').read()
+        except OSError:
+            return None
+        return import_closure(text, self.module_imports, self.module_olean)
 
     # ------------------------------------------------------------ the edge check
 
@@ -332,7 +488,7 @@ class Measure:
         res.update(key=key, file=os.path.basename(src), scan_secs=round(secs, 1),
                    compile_secs=round(self.edge_compile_secs, 1))
         self.edges[item] = res
-        json.dump(self.edges, open(self.edges_path, 'w'), indent=1)
+        write_json(self.edges_path, self.edges, indent=1)
         return res
 
     def drop_edges(self, item, res):
@@ -349,14 +505,15 @@ class Measure:
         self.record(src, applied)
         return True
 
-    def scope(self, kinds=None):
-        """The items a run with these --kinds measures: the plan's, of those kinds, less the external
-        statements (someone else's)."""
+    def scope(self, kinds=None, only=None):
+        """The items a run with these --kinds (and --only items) measures: the plan's, of those kinds, less
+        the external statements (someone else's)."""
         out = set()
         for wave in C.publish_order(self.plan, self.ext)['waves']:
             for item in wave:
                 kind, n = item.split(':', 1)
-                if (kind == 'statement' and n in self.ext) or (kinds and kind not in kinds):
+                if (kind == 'statement' and n in self.ext) or (kinds and kind not in kinds) or \
+                        (only is not None and item not in only):
                     continue
                 out.add(item)
         return out
@@ -389,18 +546,18 @@ class Measure:
             secs = (self.times.get(item) or {}).get('secs')
         k, msg = diagnose_profile(prof, secs, nodes)
         path = os.path.join(self.cfg['work'], 'profiles.json')
-        allp = json.load(open(path)) if os.path.exists(path) else {}
+        allp = load_json(path, {})
         allp[item] = {'kind': k, 'message': msg, 'secs': secs, 'log': log, 'profile': prof,
                       'key': self.cache_key(src)}
-        json.dump(allp, open(path, 'w'), indent=1)
+        write_json(path, allp, indent=1)
         print('%s: %s' % (item, msg), flush=True)
         return allp[item]
 
-    def run_all(self, force=False, keep_going=False, repair=True, edges=True, drop=False, kinds=None):
+    def run_all(self, force=False, keep_going=False, repair=True, edges=True, drop=False, kinds=None, only=None):
         copy_published(self.ws, self.olean, imported_modules(self.cfg, self.plan))
         env = self.env()
         ok = True
-        scope = self.scope(kinds)
+        scope = self.scope(kinds, only)
         for wave in C.publish_order(self.plan, self.ext)['waves']:
             for item in wave:
                 if item not in scope:
@@ -409,9 +566,14 @@ class Measure:
                 for attempt in range(2):
                     r = self.measure(item, env, force, repair)
                     self.times[item] = r
-                    json.dump(self.times, open(self.times_path, 'w'), indent=1)
+                    write_json(self.times_path, self.times, indent=1)
                     print('%-9s %6.1f s %s %s %s' % (kind, r['secs'], 'ok' if r['ok'] else 'FAIL', n,
                                                      (r['errors'][:1] or [''])[0][-200:]), flush=True)
+                    if attempt == 0 and r.get('closure_bytes', 0) > CLOSURE_WARN_BYTES:
+                        print('  WARNING import closure %s over the %.1f GB soft limit: %s (%d modules); '
+                              'q149/oaiq-106 bundles over ~0.74 GB timed out publishing (report only)' % (
+                                  gb(r['closure_bytes']), CLOSURE_WARN_BYTES / 1e9, item,
+                                  r.get('closure_modules', 0)), flush=True)
                     if not (r['ok'] and edges):
                         break
                     e = self.edge_check(item, env, force)
@@ -426,6 +588,12 @@ class Measure:
                     ok = False
                     if not keep_going:
                         return False
+        big = sorted((i for i in scope if (self.times.get(i) or {}).get('closure_bytes', 0) > CLOSURE_WARN_BYTES),
+                     key=lambda i: -self.times[i]['closure_bytes'])
+        if big:
+            print('import closure over %.1f GB: %d item%s (%s); report only, see q149/oaiq-106' % (
+                CLOSURE_WARN_BYTES / 1e9, len(big), '' if len(big) == 1 else 's',
+                ', '.join('%s %s' % (i, gb(self.times[i]['closure_bytes'])) for i in big[:10])), flush=True)
         if edges:
             # only this run's items: with --kinds, another kind's records (a piece's, from an earlier
             # full measure) are not this run's to judge (oaiq-081: phase 1 failed on stale piece edges)
@@ -440,9 +608,9 @@ class Measure:
             rep = edge_report(self.plan, {**{i: e for i, e in self.edges.items()
                                              if i in self.times and i in scope and i not in failed},
                                           **unchecked_records(texts)})
-            if kinds and 'piece' not in kinds:
+            if (kinds and 'piece' not in kinds) or only is not None:
                 rep['orphaned_statements'] = []
-            json.dump(rep, open(os.path.join(self.cfg['work'], 'false_edges.json'), 'w'), indent=1)
+            write_json(os.path.join(self.cfg['work'], 'false_edges.json'), rep, indent=1)
             print_edge_report(rep)
             if failing_false_edges(rep) and not self.allow_false:
                 ok = False
@@ -606,7 +774,7 @@ def print_edge_report(rep):
 
 
 def main(argv):
-    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] not in ('--dir', '--kinds', '--profile'))]
+    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] not in ('--dir', '--kinds', '--profile', '--only'))]
     if len(pos) != 1:
         sys.exit(__doc__)
     from p2mlib import runlock
@@ -618,8 +786,9 @@ def main(argv):
         return
     m.allow_false = '--allow-false-edges' in argv
     kinds = [k for k in (opt(argv, '--kinds') or '').split(',') if k] or None
+    only = {x for x in (opt(argv, '--only') or '').split(',') if x} if '--only' in argv else None
     ok = m.run_all('--force' in argv, '--keep-going' in argv, '--no-repair' not in argv,
-                   '--no-edge-check' not in argv, '--drop-false-edges' in argv, kinds)
+                   '--no-edge-check' not in argv, '--drop-false-edges' in argv, kinds, only)
     print('done' if ok else 'FAILED')
     sys.exit(0 if ok else 1)
 
