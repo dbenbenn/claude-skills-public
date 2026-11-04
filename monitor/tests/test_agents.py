@@ -177,6 +177,9 @@ def test_phases_find_carve_dirs_and_count_live_items(tmp_path):
     assert (d['t1']['live'], d['t1']['total']) == (2, 3) and d['t1']['current'] == 'publish'
     assert d['ag']['live'] is None
     assert A.phases_for('other', str(jobs), str(ports)) is None
+    # the carve's own monitoring section (carvemonitor.section_id), whose phase history the card charts
+    import hashlib
+    assert d['t1']['section'] == 'carve-' + hashlib.sha1(os.path.realpath(str(t1)).encode()).hexdigest()[:10]
 
 
 

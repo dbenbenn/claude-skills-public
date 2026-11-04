@@ -44,3 +44,7 @@
 .qov ul{margin:4px 0 0;padding-left:18px}.qov li{margin:2px 0;overflow-wrap:anywhere}
 .qov li small{color:var(--text-muted)}
 .pl .lab.earlier{font-style:italic}
+
+.pl .items{display:inline-flex;align-items:center;gap:6px}
+.pl .livespark{display:inline-flex;align-items:center}
+.pl .livespark .spark{display:block;margin:0}

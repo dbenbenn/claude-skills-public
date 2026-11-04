@@ -9,6 +9,7 @@ directory>`, or `claude --name headless-<name>`) is shown as `died`: an agent ki
 disk, 2026-11-01) never writes its final state."""
 import datetime
 import glob
+import hashlib
 import json
 import os
 import re
@@ -156,7 +157,9 @@ def dir_view(d, label, earlier=None):
         if isinstance(r, dict):
             live, total = items_live(r)
             break
-    return dict(v, name=label, earlier=earlier, live=live, total=total,
+    # the carve's monitoring section (prove2me carvemonitor.section_id): the card charts its history
+    sec = 'carve-' + hashlib.sha1(os.path.realpath(d).encode()).hexdigest()[:10]
+    return dict(v, name=label, earlier=earlier, live=live, total=total, section=sec,
                 mtime=int(os.path.getmtime(os.path.join(d, 'pipeline_state.json'))))
 
 

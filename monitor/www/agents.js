@@ -1,16 +1,31 @@
 // Agents view and quota charts for index.html. Globals used: esc, fmtAt, ago, css, uPlot, TZ, xTicks, last.
 let agentsData = null;
-const sparkSvg = (series, w=110, h=24) => {
+// `top`: the value at the top edge (default the series' maximum); a progress line scaled to its total
+// shows a stall as a flat line short of the top
+const sparkSvg = (series, w=110, h=24, top=null, label='cost over time') => {
   if (!series || series.length < 2) return '';
-  const t0 = series[0][0], t1 = series[series.length-1][0], hi = Math.max(...series.map(p=>p[1])) || 1;
+  const t0 = series[0][0], t1 = series[series.length-1][0], hi = top || Math.max(...series.map(p=>p[1])) || 1;
   const pts = series.map(p => `${((p[0]-t0)/Math.max(1,t1-t0)*(w-2)+1).toFixed(1)},${(h-1-(p[1]/hi)*(h-2)).toFixed(1)}`).join(' ');
-  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="cost over time"><polyline points="${pts}"/></svg>`;
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label)}"><polyline points="${pts}"/></svg>`;
 };
+// the carve's publish progress from its monitoring section's phase history (index.html's `last`)
+function liveSpark(d){
+  const sec = d.section && last && (last.sections || []).find(s => s.id === d.section);
+  const h = sec && sec.history && sec.history['Publish (live)'];
+  const ph = sec && (sec.phases || []).find(p => p.name === 'Publish (live)');
+  if (!h || h.length < 2 || !ph) return '';
+  // the phase counts bundles, statements and pieces of the whole plan (the card's own count, the run
+  // state's bundles and pieces so far). Scaled to its own maximum: a stall shows as a flat tail
+  const [t, n] = h[h.length - 1], first = h.find(p => p[1] > 0);
+  const tip = `${n} of ${ph.total} bundles, statements and pieces live at ${fmtAt(t)}` +
+    (first ? `; the first went live ${fmtAt(first[0])}` : '') + '. Click for the full chart';
+  return `<a class="livespark" href="#h-${esc(d.section)}" title="${esc(tip)}">${sparkSvg(h, 96, 20, null, 'items live over time')}</a>`;
+}
 const fmtUsd = c => c == null ? '—' : '$' + (c >= 100 ? c.toFixed(0) : c.toFixed(2));
 const shortModel = m => (m || '').replace(/^claude-/, '');
 
 function stagesHtml(d){
-  const items = d.total != null ? `<span class="items">${d.live} / ${d.total} items live</span>` : '';
+  const items = d.total != null ? `<span class="items">${liveSpark(d)}${d.live} / ${d.total} items live</span>` : '';
   const lab = d.earlier ? `<span class="lab earlier" title="carve of the earlier batch ${esc(d.earlier)}, which this retry resumes">${esc(d.name)}</span>` : `<span class="lab">${esc(d.name)}</span>`;
   return `<div class="pl">${lab}<div class="stages" role="list">` +
     d.stages.map(s => `<i role="listitem" class="${s.status}${s.name === d.current ? ' cur' : ''}" title="${esc(s.name)}: ${s.status}">${esc(s.name)}</i>`).join('') +
