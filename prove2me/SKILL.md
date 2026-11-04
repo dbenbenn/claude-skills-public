@@ -271,7 +271,10 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   the milestones' natural-language statements (dbenbenn, 2026-09-30).
 - Backticked Lean names in the prose must be live: `draft.py verify` resolves every backticked
   head name (`Monod.H ⊥` -> `Monod.H`) against the mission's declarations, `#check` with its
-  imports, and the platform, and reports a renamed or removed name as BAD.
+  imports, and the platform, and reports a renamed or removed name as BAD. It looks every
+  `prove2.me/theorems/<uuid>` link up in the API too: the site's page answers 200 for any id, so
+  only the API shows an invented one (strong convergence, 2026-11-04: the right 8-digit prefix
+  with a made-up tail). Copy a theorem id from an API reply; never complete one from its prefix.
 - No phrase lifted from the platform's rulebook ("the shape of the truth", "who cares and why"):
   the rules say what a section must contain, not how to word it, and their register is not the
   description's.

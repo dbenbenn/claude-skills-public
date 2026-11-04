@@ -660,6 +660,37 @@ def declared_name_mismatch(items):
     return out
 
 
+def dead_platform_links(items, miles, desc, call):
+    """[(where, why)] for each prove2.me theorem link whose id the API does not have, or deprecated.
+
+    The site's theorem page is a client-side app that answers 200 for any id, so a link checker sees
+    nothing wrong; the strong-convergence Draft (2026-11-04) linked A. Markov's inequality as
+    `32a96b9b-9a79-45f8-8b95-…`, the real eight-digit prefix with an invented tail, and the human
+    found it in review. Every `prove2.me/theorems/<uuid>` in the uploaded prose is looked up once."""
+    texts = [('description', desc)]
+    for k, it in items.items():
+        for f in ('natural_language_statement', 'source'):
+            if it.get(f):
+                texts.append((k, it[f]))
+    for k, (t, d) in miles.items():
+        texts.append((k + ' milestone', t + '\n' + d))
+    uuid = r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    cache, out = {}, []
+    for where, t in texts:
+        for tid in sorted(set(re.findall(r'prove2\.me/theorems/(%s)' % uuid, t))):
+            if tid not in cache:
+                r = call('GET', '/theorems/' + tid)
+                if not isinstance(r, dict) or '__error' in r or not r.get('theorem_name'):
+                    cache[tid] = 'links a theorem id the platform does not have: ' + tid
+                elif r.get('deprecated_at'):
+                    cache[tid] = 'links the deprecated theorem %s (%s)' % (r['theorem_name'], tid)
+                else:
+                    cache[tid] = None
+            if cache[tid]:
+                out.append((where, cache[tid]))
+    return out
+
+
 def main():
     if len(sys.argv) < 3 or sys.argv[2] not in ('verify', 'upload', 'prune'):
         sys.exit(__doc__)
@@ -686,6 +717,7 @@ def main():
         bad += double_backslash(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
         bad += extraction_math(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read())
         bad += deprecated_refs(M, its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
+        bad += dead_platform_links(its, mls, open(os.path.join(mdir, 'description.md'), encoding='utf-8').read(), call)
         import decisions
         bad += decisions.check(mdir)
         # the workspace's statement modules are the plan: a proof compiled against a stale stub

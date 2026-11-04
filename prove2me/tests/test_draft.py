@@ -225,3 +225,27 @@ def test_prune_deletes_only_items_the_repo_dropped(mdir, monkeypatch, capsys):
     assert 'gone' not in json.loads((mdir / 'proposal.json').read_text())['items']
     bad, _, _ = D.diff(D.load(str(mdir)), str(mdir), fake.call, json.loads((mdir / 'proposal.json').read_text()))
     assert bad == []
+
+
+def test_theorem_link_to_a_missing_or_deprecated_id_flagged():
+    # strong convergence 2026-11-04: "[theorem 32a96b9b](…/theorems/32a96b9b-9a79-45f8-8b95-…)" had a
+    # made-up tail after the real 8-digit prefix; the site page answers 200 for any id, so only the
+    # API shows it is missing
+    good, gone, old = ('32a96b9b-9a79-45f8-b11d-509e881b6335', '32a96b9b-9a79-45f8-8b95-ca285990778c',
+                       '11111111-2222-3333-4444-555555555555')
+    live = {good: {'theorem_name': 'markov_inequality_interval'},
+            old: {'theorem_name': 'old', 'deprecated_at': '2026-10-01'}}
+    asked = []
+
+    def call(m, p, b=None):
+        asked.append(p)
+        tid = p.rsplit('/', 1)[1]
+        return live[tid] if tid in live else {'__error': '404 {"error":"Theorem not found"}'}
+
+    items = {'a': {'natural_language_statement': 'See [theorem](https://prove2.me/theorems/%s).' % good},
+             'b': {'source': 'https://prove2.me/theorems/%s' % gone}}
+    miles = {'m': ('T', 'Proved ([theorem 32a96b9b](https://prove2.me/theorems/%s)).' % gone)}
+    desc = 'Also https://prove2.me/theorems/%s and again https://prove2.me/theorems/%s.' % (old, good)
+    out = D.dead_platform_links(items, miles, desc, call)
+    assert sorted(w for w, _ in out) == ['b', 'description', 'm milestone']
+    assert sorted(asked) == sorted('/theorems/' + t for t in (good, gone, old))   # each id looked up once
