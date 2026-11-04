@@ -118,9 +118,13 @@ def test_pdftotext_math_in_quotes_flagged():
     items = {'a': {'natural_language_statement': 'JMMS, p. 2: “setting F (X) to be the direct limit of F (Y ) as Y runs”'},
              'b': {'natural_language_statement': 'p. 14: “On = {x0 , g1−1 x0 · · · , gn−1 x0 }.”'},
              'c': {'natural_language_statement': 'p. 2: “setting $F(X)$ to be the direct limit of $F(Y)$” and F (X) outside quotes'},
-             'd': {'natural_language_statement': 'p. 4: “Is the group IET amenable?”'}}
+             'd': {'natural_language_statement': 'p. 4: “Is the group IET amenable?”'},
+             # Guth-Maynard, 2026-11-05: a citation key is not a lost subscript
+             'e': {'natural_language_statement': 'p. 50: “(see [M3, Corollary 11.4]) and [B5] and [M2, page 142]”'},
+             'f': {'natural_language_statement': 'p. 50: “see [M3] where x0 appears”'}}
     where = [w for w, _ in D.extraction_math(items, {}, '')]
     assert 'a' in where and 'b' in where and 'c' not in where and 'd' not in where
+    assert 'e' not in where and 'f' in where
 
 
 def test_title_mismatch_and_goal_quote(mdir):
