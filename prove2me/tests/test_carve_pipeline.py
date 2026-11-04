@@ -2302,7 +2302,8 @@ def test_a_replan_that_leaves_a_new_statement_only_live_pieces_import_stops_befo
     assert r.returncode == 1 and "step 'plan'" in r.stderr, r.stdout + r.stderr
     assert 'piece:P1' in r.stderr and 'N1' in r.stderr and 'no_promote' in r.stderr and 'comparisons' in r.stderr
     assert sum(1 for l in _raw(env) if l.startswith('systemd-run')) == 1       # nothing more went out
-    assert ('carve', 'gen') not in tools_called(env)[tools_called(env).index(('carve', 'plan'), 1):]
+    seq = tools_called(env)
+    assert seq[-1] == ('carve', 'plan') and seq.count(('carve', 'plan')) == 2      # stopped at the plan, no gen
     # a comparison note for P1 answers it: split_run sends P1 again, and P1 then imports N1
     (env.dir / 'publish' / 'comparisons').mkdir()
     (env.dir / 'publish' / 'comparisons' / 'P1.md').write_text('Different from x: ...\n')
@@ -2341,9 +2342,12 @@ def test_new_statements_of_a_replan_wait_until_their_pieces_are_measured(env, mo
     assert r.returncode == 0, r.stdout + r.stderr
     lines = _raw(env)
     bg = [i for i, l in enumerate(lines) if l.startswith('systemd-run')]
-    pieces = [i for i, l in enumerate(lines) if '"--kinds", "piece"' in l]
-    assert len(bg) == 2 and len(pieces) == 3
-    assert bg[1] > pieces[2]                  # the second publisher (with N1) only after N1's piece measured
+    pieces = [i for i, l in enumerate(lines) if '"carve_measure"' in l and '"--kinds", "piece"' in l]
+    replan = [i for i, l in enumerate(lines) if '"argv": ["plan"' in l][1]
+    assert len(pieces) == 3 and replan < pieces[2]
+    # publishers before the re-plan (the first pass, the re-measure pass); after it, only once N1's piece measured
+    after = [i for i in bg if i > replan]
+    assert len(bg) == 3 and len(after) == 1 and after[0] > pieces[2]
     assert 'N1' in r.stdout and 'measure_pieces' in r.stdout
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert 'publish_held' not in st
@@ -2362,7 +2366,9 @@ def test_new_statements_of_a_replan_whose_pieces_fail_are_never_posted(env, monk
     ''') + MEASURE_HOOK)
     r = run(env, *ARGS_NEW, '--publish')
     assert r.returncode == 1 and "step 'measure_pieces'" in r.stderr, r.stdout + r.stderr
-    assert sum(1 for l in _raw(env) if l.startswith('systemd-run')) == 1
+    lines = _raw(env)
+    replan = [i for i, l in enumerate(lines) if '"argv": ["plan"' in l][1]
+    assert not [l for l in lines[replan:] if l.startswith('systemd-run')]    # no publisher after the re-plan
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert st['publish_held']['statements'] == ['N1'] and st['steps']['publish_early']['status'] == 'skipped'
     assert 'N1' not in json.load(open(env.dir / 'published' / 'plan.json'))['stubs']

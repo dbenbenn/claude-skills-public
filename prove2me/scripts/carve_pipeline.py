@@ -76,9 +76,17 @@ failure after publish_early stops the driver at once and leaves the publisher ru
 resumed driver waits for it before its final publish. Slow items: a statement stops, as ever; bundles over the
 limit re-plan globally only when many are (a systematic cost-model error) and nothing is published, else each is
 split alone (`carve.py split --only`, the rest of the plan kept); once published, a slow piece gets one frozen
-re-plan with its own declarations costed at its measured ratio (config `cost_factors`), and stops for a person
+re-plan with its own declarations costed at its measured ratio (config `cost_factors`) and the lemmas of live
+pieces kept out of it (config `no_promote`: what the live or in-flight pieces of publish/run_state.json keep, less
+what the slow pieces keep; q160), and stops for a person
 when that cannot help, first releasing the pieces within budget (their gates run, publish/release.json lists
 them, a background publisher sends them; q129). Without --publish the pieces are measured all the same and nothing is posted.
+After any re-plan of a published carve: `plan` (and publish_prep, pieces_prep, for a re-plan by hand) compares
+the plan with publish/plan.json and stops when a live piece is re-shaped into new statements only live pieces
+would import (Open orphans: a live piece is never sent again without publish/comparisons/<slug>.md), and notes a
+re-shaped live piece otherwise; and publish_early holds the statements new since published/plan.json until
+measure_pieces has measured their pieces (the CoeT check), then starts the publisher itself (q160: 3 of a
+re-plan's 14 new statements failed that check after they were live).
 
 Long runs: --detach starts the same run as its own systemd user unit (carve-<hash>, output appended to
 DIR/logs/driver.log) and returns at once; --wait [MINUTES] (default 100) then blocks until that run

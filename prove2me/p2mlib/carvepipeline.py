@@ -1154,6 +1154,43 @@ class Pipeline:
 
     def step_plan(self):
         self.run_cmds('plan', [self.tool('carve', 'plan', 'config.json')])
+        self.check_live_pieces('plan')
+
+    def check_live_pieces(self, step):
+        """Once publishing began, a re-plan must not re-shape a live piece (live_pieces) into new statements
+        that nothing still to be sent imports: they would go live as Open orphans, since split_run never
+        sends a live piece again without a comparison note (q160). Compares the plan with publish/plan.json
+        (else published/plan.json), the plan the pieces were sent from; stops on orphans before anything is
+        generated or published, and notes a re-shaped live piece whose new statements other pieces import."""
+        if not self.publishing_started():
+            return
+        live = live_pieces(self.d)
+        ref = _load_json(os.path.join(self.d, 'publish', 'plan.json')) or \
+            _load_json(os.path.join(self.published_dir(), 'plan.json'))
+        cfg = self.read_config()
+        new = _load_json(self.work_paths(cfg)[1]) if cfg is not None else None
+        if not (live and ref and new):
+            return
+        from . import carve as CV
+        cmp_dir = os.path.join(self.d, 'publish', 'comparisons')
+        resent = {n for n in live if n in (new.get('pieces') or {}) and
+                  os.path.exists(os.path.join(cmp_dir, CV.slug(CV.statement_name(new, n)) + '.md'))}
+        reshaped, orphans = live_piece_changes(ref, new, live, resent)
+        if orphans:
+            raise StepFailed(
+                "step '%s': the new plan re-shapes live piece(s), and %d new statement(s) would be imported by live "
+                "pieces only, so they would go live as Open orphans (q160):\n  %s\nlive piece(s) changed:\n  %s\n"
+                "Keep their lemmas out of the plan: pipeline.json `config_set.no_promote` (the declarations the live "
+                "pieces keep; the automatic split of a slow piece sets this itself), then resume; or, to send a live "
+                "piece again in its new form, write publish/comparisons/<slug>.md for it first."
+                % (step, len(orphans), '\n  '.join('%s (imported by %s)' % (s, ', '.join('piece:' + n for n in imp) or
+                                                                           'other new statements only')
+                                                   for s, imp in orphans.items()),
+                   '\n  '.join('piece:%s: %s' % x for x in reshaped.items())))
+        for n, why in reshaped.items():
+            print('== %s: NOTE live piece piece:%s changed in the new plan (%s); its new statements are imported by '
+                  'pieces still to be sent, and the live proof stays as it is%s' % (
+                      step, n, why, ' (its comparison note sends it again)' if n in resent else ''), flush=True)
 
     def step_gen(self):
         self.set_thawed()
@@ -1234,6 +1271,18 @@ class Pipeline:
                   '== none of the %d piece(s) bundles wait for measured within budget' % len(gates), flush=True)
         self.run_cmds('measure_pieces', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
                                                    '--kinds', 'piece')])
+        held = self.state.pop('publish_held', None)
+        if held and self.p.get('go'):
+            # every piece measured and checked (a failure stops above, nothing posted): the held publish_early
+            # goes now, as it would have before the pieces (q160)
+            print('== measure_pieces: the pieces of the %d statement(s) publish_early held passed; publishing them '
+                  'now' % len(held.get('statements') or ()), flush=True)
+            if self.publisher_running():
+                print('== a publisher already runs on this carve; it goes on (new items wait for the final publish)',
+                      flush=True)
+            else:
+                self.publish_early_now()
+        self.save()
 
     def gate_pieces(self):
         """The pieces of the statements a bundle imports (a bundle may import a statement only once it is
@@ -1492,7 +1541,8 @@ class Pipeline:
         with the profiling hint). Once anything is published nothing is re-planned globally: each
         slow piece is split by a frozen re-plan in which only its own declarations cost more (config
         `cost_factors`, its measured / planned ratio; its private lemmas may be promoted too, config
-        `promote_private`), once; a piece still slow after that, or whose
+        `promote_private`; the lemmas of live pieces may not be, config `no_promote`), once; a piece still
+        slow after that, or whose
         statement alone is slow (its type is the cost), stops for a person."""
         got = self.calibrate_inputs()
         if got is None:
@@ -1566,6 +1616,24 @@ class Pipeline:
             a['cost_factors'] = cf
             if pp:
                 a['promote_private'] = sorted(pp)
+            # promotion only inside the slow pieces: the lemmas of live pieces stay where they are (q160: the
+            # re-plan re-shaped four accepted pieces, six new statements only they would import, Open orphans).
+            # Recomputed each round; the user's config_set no_promote stays
+            slow = [n for n, _, _ in auto]
+            live_p = live_pieces(self.d) - set(slow)
+            np_ = protected_keeps([plan, _load_json(os.path.join(self.d, 'publish', 'plan.json')),
+                                   _load_json(os.path.join(self.published_dir(), 'plan.json'))], live_p, slow)
+            prev = set(a.get('no_promote') or ())
+            user = set((self.p.get('config_set') or {}).get('no_promote') or ())
+            cfg['no_promote'] = sorted((set(cfg.get('no_promote') or ()) - prev) | user | np_)
+            if np_:
+                a['no_promote'] = sorted(np_)
+            else:
+                a.pop('no_promote', None)
+            if not cfg['no_promote']:
+                cfg.pop('no_promote')
+            lines.append('promoting only inside the slow piece(s): %d declaration(s) of %d live piece(s) kept out '
+                         'of the re-plan (config no_promote)' % (len(np_), len(live_p)))
             self.state['piece_replans'] = k + 1
             lines.append('splitting %d piece(s) by a frozen re-plan (%d/%d), their declarations costed at their '
                          'measured ratio: %s' % (len(auto), k + 1, MAX_REPLANS,
@@ -1643,6 +1711,9 @@ class Pipeline:
             same = os.path.exists(pub) and hashlib.sha1(open(pub, 'rb').read()).hexdigest() == sha
             how = ('the running background publisher sends them' if same else 'a publisher on an earlier plan '
                    'still runs and does not send them: once it ends, run again with --publish')
+        elif self.held_statements():
+            # a publisher now would post a re-plan's new statements before their pieces are measured (q160)
+            how = 'the publisher starts once measure_pieces has measured the new statements\' pieces'
         else:
             self.freeze_published()
             self.start_publisher()
@@ -1658,6 +1729,7 @@ class Pipeline:
     def step_publish_prep(self):
         # once publishing began, publish/ is read by a publisher: sync it, never rebuild it
         sync = ['--sync'] if self.overlap() and self.publishing_started() else []
+        self.check_live_pieces('publish_prep')            # a re-plan by hand (carve.py plan) as well
         self.run_cmds('publish_prep', [self.tool('carve_prep', 'publish-prep', self.d, self.source_line(),
                                                  self.p.get('tags') or 'openai-math', *sync)])
 
@@ -1725,11 +1797,36 @@ class Pipeline:
         go to the platform from a background publisher, its own systemd user unit, while the pieces
         are measured. Before it starts, what it will publish is frozen: published/ keeps the plan and
         the files, and config `frozen`, `forced` (the statements) and `template_forced` are set
-        (pipeline_state.json `auto_config`), so no later step re-plans or rewrites them."""
+        (pipeline_state.json `auto_config`), so no later step re-plans or rewrites them.
+        After a re-plan of the frozen part (new statements), it waits for measure_pieces (held_statements)."""
         if self.publisher_running():
             print('== a publisher already runs on this carve; it goes on (new items wait for the final publish)',
                   flush=True)
             return None
+        held = self.held_statements()
+        if held:
+            self.state['publish_held'] = {'at': _now(), 'statements': held}
+            print('== publish_early: held until measure_pieces has measured their pieces (the CoeT check): %d new '
+                  'statement(s) since the published plan, %s%s' % (len(held), ', '.join(held[:10]),
+                                                                  ', ...' if len(held) > 10 else ''), flush=True)
+            return 'skipped'
+        self.publish_early_now()
+
+    def held_statements(self):
+        """The statements a re-plan added since publish_early froze the published part (publish/plan.json less
+        published/plan.json), while measure_pieces has not run on this plan: they wait for it, since only it
+        runs the verifier's CoeT check (a piece's). q160 (2026-11-03): 3 of a re-plan's 14 new statements failed
+        that check after the background publisher had posted them, Open orphans now. A carve's first
+        publish_early is not held: nothing is frozen yet, and its statements go while the pieces are measured."""
+        if not (self.state.get('auto_config') or {}).get('frozen'):
+            return []
+        if (self.state['steps'].get('measure_pieces') or {}).get('status') == 'done':
+            return []
+        new = _load_json(os.path.join(self.d, 'publish', 'plan.json')) or {}
+        old = _load_json(os.path.join(self.published_dir(), 'plan.json')) or {}
+        return sorted(set(new.get('stubs') or {}) - set(old.get('stubs') or {}) - set(new.get('external') or ()))
+
+    def publish_early_now(self):
         if not os.path.exists(os.path.join(self.d, 'publish', 'run_early.json')):
             # publish_prep ran from a skill before overlap mode (a classic carve switched after it): the
             # background publisher would die at once on the missing file
@@ -1800,6 +1897,7 @@ class Pipeline:
 
     def pieces_gates(self, step):
         meta = ['--meta', self.meta, '--lean-root', self.lean_src]
+        self.check_live_pieces(step)
         self.run_cmds(step, [
             self.tool('carve_prep', 'publish-prep', self.d, self.source_line(), self.p.get('tags') or 'openai-math', '--sync'),
             self.tool('carve_prep', 'prose-template', self.d, *meta),

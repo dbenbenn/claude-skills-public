@@ -84,7 +84,9 @@ CONFIG.json (paths may use ~):
                                               # statement the verifier's CoeT fallback rejects)
    "no_promote": ["OAI.X.lemma"],             # theorems the plan never promotes to statements (q160:
                                               # the lemmas of accepted pieces, so a re-plan for one
-                                              # slow piece splits only that one)
+                                              # slow piece splits only that one; carve_pipeline's
+                                              # automatic split of a slow piece adds the lemmas of
+                                              # the live pieces, less the slow ones', itself)
    "repaired": {"OAI.Erdos3.x": ["OAI.Erdos3.y"]},  # stubbed sorry a patch replaces: name -> what the patched proof uses (or a plain list)
                                               # (generation refuses a file still containing sorry)
    "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
