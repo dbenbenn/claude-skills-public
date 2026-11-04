@@ -2,6 +2,15 @@
 """Which untracked files in the prove2me workspace exist nowhere we keep work.
 
 usage: workspace_audit.py [--min-age DAYS] [--near FRACTION] [--list KINDS] [--json PATH] [--quiet]
+                          [--include-oai]
+       workspace_audit.py --folder NAME [--folder NAME ...]
+
+Before calling any prover Part lost, run:  workspace_audit.py --folder <FOLDER>
+(FOLDER as in `import Solutions.<FOLDER>.Blueprint`). It takes about a second: no git index, no
+Lean; it lists every .lean file under Solutions/<FOLDER>/ (tracked or not, any age) as `copy`, with
+the path of a byte-identical file under some mission repo's proofs/, or `no-copy`. A `no-copy`
+file may be the only copy of finished work: read it before re-proving anything (q157, 2026-11-03:
+a sorry-free Solutions/JM31/PartC.lean was declared lost after a look at jm-mission/proofs/ only).
 
 The workspace is a clone of the platform's repo, so everything we put there is untracked; its
 `git status` cannot say whether a file was ever copied back to a mission repo. This sorts every
@@ -16,6 +25,14 @@ untracked file into one kind:
   near-copy   a .lean file at least --near (default 0.9) of whose substantive lines occur in some
               file in that GitHub history: an earlier or later draft of committed work
   unbacked    everything else: read it before deleting it
+
+A second report, "no copy under a mission repo's proofs/", takes every .lean file under each
+Solutions/<FOLDER>/ (ports excluded unless --include-oai: Solutions/OAI* and any folder holding a
+carve's CARVE_OWNER file, whose only source tree is the carve directory) and lists the ones with
+no byte-identical file in a proofs/ directory, at any depth, of a git repo directly under ~/claude
+(the mission repos and p2m-standalone; not the workspace itself). It reads working trees, so an uncommitted copy counts here: the question is where a copy
+can be found, while `backed` above asks whether it is pushed. Files directly in Solutions/ are not
+in a folder and are left to the first report. --quiet prints the count by folder.
 
 Read-only: no Lean, no platform calls, nothing written outside the index cache
 (~/.cache/p2m/workspace_audit, keyed by each repo's remote-tracking refs). sync_workspace.py runs
@@ -40,6 +57,8 @@ sys.path.insert(0, os.path.dirname(HERE))
 from p2mlib.workspace import workspace, DRAFTS, CARVE_OWNER  # noqa: E402
 
 CACHE = os.path.expanduser('~/.cache/p2m/workspace_audit')
+MISSION_ROOT = '~/claude'
+PRUNE = ('.lake', '.git', 'node_modules')   # never walked by the copies report
 ROOTS = ('~/claude', '~')
 SKIP_DIRS = ('.lake', '.claude', 'node_modules', 'archive')
 TOOLING = (DRAFTS, DRAFTS + '.lock')
@@ -187,6 +206,94 @@ def audit(ws, idx, min_age_days=2, near=0.9, now=None):
     return out
 
 
+def mission_repos(root=None, exclude=()):
+    """Git repos directly under root (default MISSION_ROOT), minus the excluded paths (the workspace)."""
+    root = os.path.expanduser(root or MISSION_ROOT)
+    skip = {os.path.realpath(e) for e in exclude}
+    out = []
+    for name in sorted(os.listdir(root)):
+        d = os.path.join(root, name)
+        if os.path.isdir(d) and os.path.exists(os.path.join(d, '.git')) and os.path.realpath(d) not in skip:
+            out.append(d)
+    return out
+
+
+def lean_files(top):
+    """Every .lean file under top, not descending into PRUNE directories."""
+    for d, subdirs, files in os.walk(top):
+        subdirs[:] = sorted(s for s in subdirs if s not in PRUNE)
+        for f in sorted(files):
+            if f.endswith('.lean'):
+                yield os.path.join(d, f)
+
+
+def digest(path):
+    with open(path, 'rb') as f:
+        return hashlib.sha1(f.read()).hexdigest()
+
+
+@dataclass
+class Copy:
+    path: str          # relative to the workspace
+    size: int
+    mtime: float
+    copy: str = None   # absolute path of a byte-identical file under some repo's proofs/, else None
+
+
+def solution_folders(ws, folders=None, include_oai=False):
+    """The Solutions/<FOLDER> names to check: the given ones (checked to exist), else every folder.
+    Ports (Solutions/OAI*, and any folder a carve owns through CARVE_OWNER, e.g. Q146_CD) are left
+    out unless include_oai: their source tree is the carve directory, never a proofs/."""
+    sol = os.path.join(ws, 'Solutions')
+    if folders:
+        names = [f.strip('/')[len('Solutions/'):] if f.strip('/').startswith('Solutions/') else f.strip('/')
+                 for f in folders]
+        missing = [n for n in names if not os.path.isdir(os.path.join(sol, n))]
+        if missing:
+            raise SystemExit('no such workspace folder: ' + ', '.join('Solutions/' + n for n in missing))
+        return names
+    return [n for n in sorted(os.listdir(sol)) if os.path.isdir(os.path.join(sol, n))
+            and n not in PRUNE and (include_oai or not (n.startswith('OAI')
+                                                         or os.path.exists(os.path.join(sol, n, CARVE_OWNER))))]
+
+
+def folder_copies(ws, repos, folders=None, include_oai=False):
+    """A Copy for every .lean file under the chosen Solutions/<FOLDER>s. Repo files are hashed only
+    when their size matches a workspace file's, so one folder costs a directory walk, not a read of
+    every proof."""
+    out = []
+    for name in solution_folders(ws, folders, include_oai):
+        for full in lean_files(os.path.join(ws, 'Solutions', name)):
+            st = os.stat(full)
+            out.append(Copy(os.path.relpath(full, ws), st.st_size, st.st_mtime))
+    sizes = {c.size for c in out}
+    found = {}
+    for repo in repos:
+        for d, subdirs, files in os.walk(repo):
+            subdirs[:] = sorted(s for s in subdirs if s not in PRUNE)
+            if 'proofs' not in os.path.relpath(d, repo).split(os.sep):
+                continue
+            for f in sorted(files):
+                p = os.path.join(d, f)
+                if f.endswith('.lean') and os.path.getsize(p) in sizes:
+                    found.setdefault(digest(p), p)
+    for c in out:
+        c.copy = found.get(digest(os.path.join(ws, c.path)))
+    return out
+
+
+def copies_report(copies, verbose=False):
+    """Lines for the no-copy report; verbose (the --folder form) also lists the copies and where they are."""
+    lines = []
+    for c in sorted(copies, key=lambda c: c.copy is not None):     # no-copy first, otherwise in walk order
+        day = time.strftime('%Y-%m-%d', time.localtime(c.mtime))
+        if c.copy is None:
+            lines.append('no-copy %s %7d  %s' % (day, c.size, c.path))
+        elif verbose:
+            lines.append('copy    %s %7d  %s = %s' % (day, c.size, c.path, c.copy))
+    return lines
+
+
 def summary(records):
     c = Counter(r.kind for r in records)
     return 'workspace audit: %d untracked -- %s' % (len(records), ', '.join('%s %d' % (k, c[k]) for k in KINDS if c[k]))
@@ -199,8 +306,22 @@ def main(argv=None):
     ap.add_argument('--list', default='unbacked', help='kinds to list file by file (comma-separated, or "none")')
     ap.add_argument('--json', help='write every record here')
     ap.add_argument('--quiet', action='store_true', help='summary plus the unbacked count by directory')
+    ap.add_argument('--folder', action='append', metavar='NAME',
+                    help='only the copies report, for Solutions/NAME (repeatable); fast: no git index')
+    ap.add_argument('--include-oai', action='store_true',
+                    help='copies report: also the port folders (Solutions/OAI*, carve-owned ones)')
     a = ap.parse_args(argv)
     ws = workspace()
+    repos = mission_repos(exclude=(ws,))
+    if a.folder:
+        cs = folder_copies(ws, repos, folders=a.folder)
+        for name in solution_folders(ws, a.folder):
+            mine = [c for c in cs if c.path.startswith('Solutions/%s/' % name)]
+            print('Solutions/%s: %d .lean files, %d with no copy under a mission repo\'s proofs/ (%d repos searched)'
+                  % (name, len(mine), sum(c.copy is None for c in mine), len(repos)))
+            for line in copies_report(mine, verbose=True):
+                print('  ' + line)
+        return
     idx = Index.build(find_repos(), backed=github, cache_dir=CACHE)
     recs = audit(ws, idx, a.min_age, a.near)
     print(summary(recs) + ' (index: %d GitHub repos)' % len(idx.repos))
@@ -213,11 +334,22 @@ def main(argv=None):
                          for r in unb)
             print('  unbacked by directory: ' + ', '.join('%s %d' % kv for kv in by.most_common(8)))
             print('  run scripts/workspace_audit.py for the file list before deleting anything there')
+    nocopy = [c for c in folder_copies(ws, repos, include_oai=a.include_oai) if c.copy is None]
+    if a.quiet:
+        if nocopy:
+            by = Counter(c.path.split('/')[1] for c in nocopy)
+            print('  no copy under a mission repo\'s proofs/: %d .lean files in %d Solutions folders (%s)'
+                  % (len(nocopy), len(by), ', '.join('%s %d' % kv for kv in by.most_common(8))))
+            print('  run scripts/workspace_audit.py --folder NAME before calling any work there lost')
         return
     kinds = [] if a.list == 'none' else a.list.split(',')
     for r in sorted((r for r in recs if r.kind in kinds), key=lambda r: (r.kind, r.path)):
         cov = '' if r.coverage is None else ' %3d%%' % round(100 * r.coverage)
         print('%-10s %s %7d%s  %s' % (r.kind, time.strftime('%Y-%m-%d', time.localtime(r.mtime)), r.size, cov, r.path))
+    print('no copy under a mission repo\'s proofs/ (%d repos searched%s): %d .lean files'
+          % (len(repos), '' if a.include_oai else '; OAI and carve port folders excluded', len(nocopy)))
+    for line in copies_report(nocopy):
+        print(line)
 
 
 if __name__ == '__main__':

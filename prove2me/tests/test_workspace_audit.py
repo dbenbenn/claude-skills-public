@@ -162,3 +162,137 @@ def test_partial_clones_are_skipped(world):
     WA.git(world['repo'], 'config', 'remote.origin.promisor', 'true')
     idx = WA.Index.build([world['repo']], backed=lambda url: True, cache_dir=None)
     assert idx.repos == [] and idx.blobs == set()
+
+
+# --- copies: does a Solutions/<FOLDER> file have a byte-identical copy in some mission repo's proofs/?
+# q157 (2026-11-03): a sorry-free Solutions/JM31/PartC.lean sat untracked in the workspace, and the
+# RESUME called it lost after checking only jm-mission/proofs/.
+
+PART_C = 'theorem part_c_main_result (n : Nat) : n ≤ n * 1 := by\n  simp\n'
+
+
+@pytest.fixture
+def missions(tmp_path):
+    """root/ holding two mission repos, a non-repo folder, and the workspace (itself a repo)."""
+    root = tmp_path / 'claude'
+    for r in ('jm-mission', 'p2m-standalone', 'prove2me_workspace'):
+        os.makedirs(str(root / r / '.git'))
+    ws = str(root / 'prove2me_workspace')
+    jm = str(root / 'jm-mission')
+    write(os.path.join(jm, 'proofs', 's31', 'PartA.lean'), PROOF)
+    write(os.path.join(jm, 'proofs', 's31', 'PartB.lean'), PART_C.replace('part_c', 'part_b'))
+    write(os.path.join(ws, 'Solutions', 'JM31', 'PartA.lean'), PROOF)
+    write(os.path.join(ws, 'Solutions', 'JM31', 'PartB.lean'), PART_C.replace('part_c', 'part_b'))
+    write(os.path.join(ws, 'Solutions', 'JM31', 'PartC.lean'), PART_C)
+    return dict(root=str(root), ws=ws, jm=jm, sa=str(root / 'p2m-standalone'))
+
+
+def copies(m, folders=None, include_oai=False):
+    repos = WA.mission_repos(m['root'], exclude=(m['ws'],))
+    return {f.path: f for f in WA.folder_copies(m['ws'], repos, folders=folders, include_oai=include_oai)}
+
+
+def test_mission_repos_are_the_repos_directly_under_root(missions):
+    os.makedirs(os.path.join(missions['root'], 'notes'))                        # not a repo
+    os.makedirs(os.path.join(missions['root'], 'jm-mission', 'sub', '.git'))    # nested: not direct
+    names = [os.path.basename(r) for r in WA.mission_repos(missions['root'], exclude=(missions['ws'],))]
+    assert names == ['jm-mission', 'p2m-standalone']
+
+
+def test_workspace_only_part_is_reported(missions):
+    fs = copies(missions, folders=['JM31'])
+    assert fs['Solutions/JM31/PartC.lean'].copy is None
+    assert fs['Solutions/JM31/PartA.lean'].copy == os.path.join(missions['jm'], 'proofs', 's31', 'PartA.lean')
+    assert fs['Solutions/JM31/PartB.lean'].copy is not None
+
+
+def test_copy_may_have_another_name_and_sit_deep_in_a_standalone_folder(missions):
+    write(os.path.join(missions['sa'], 'openai-ports', 'q157', 'proofs', 'x', 'C_final.lean'), PART_C)
+    assert copies(missions, folders=['JM31'])['Solutions/JM31/PartC.lean'].copy.endswith('C_final.lean')
+
+
+def test_one_changed_byte_is_not_a_copy(missions):
+    write(os.path.join(missions['jm'], 'proofs', 's31', 'PartC.lean'), PART_C + '\n')
+    assert copies(missions, folders=['JM31'])['Solutions/JM31/PartC.lean'].copy is None
+
+
+def test_only_proofs_trees_count(missions):
+    write(os.path.join(missions['jm'], 'statements', 'PartC.lean'), PART_C)
+    write(os.path.join(missions['jm'], '.lake', 'proofs', 'PartC.lean'), PART_C)
+    write(os.path.join(missions['jm'], 'proofs', '.lake', 'build', 'PartC.lean'), PART_C)
+    assert copies(missions, folders=['JM31'])['Solutions/JM31/PartC.lean'].copy is None
+
+
+def test_the_workspace_is_not_its_own_backup(missions):
+    write(os.path.join(missions['ws'], 'proofs', 'PartC.lean'), PART_C)
+    assert copies(missions, folders=['JM31'])['Solutions/JM31/PartC.lean'].copy is None
+
+
+def test_every_folder_but_oai_ports_by_default(missions):
+    write(os.path.join(missions['ws'], 'Solutions', 'OAIQ1_X', 'Main.lean'), 'theorem oai_port_only : True := trivial\n')
+    write(os.path.join(missions['ws'], 'Solutions', 'Viterbo', 'deep', 'P.lean'), 'theorem vit_only_here : True := trivial\n')
+    write(os.path.join(missions['ws'], 'Solutions', 'Sol_top.lean'), 'theorem top_level_sol : True := trivial\n')
+    write(os.path.join(missions['ws'], 'Solutions', 'JM31', '.lake', 'build', 'x.lean'), 'junk\n')
+    write(os.path.join(missions['ws'], 'Solutions', 'JM31', 'notes.md'), 'not lean\n')
+    fs = copies(missions)
+    assert 'Solutions/Viterbo/deep/P.lean' in fs and 'Solutions/JM31/PartC.lean' in fs
+    assert not any(p.startswith('Solutions/OAI') for p in fs)
+    assert 'Solutions/Sol_top.lean' not in fs                  # not in a folder
+    assert not any('.lake' in p or p.endswith('.md') for p in fs)
+    assert 'Solutions/OAIQ1_X/Main.lean' in copies(missions, include_oai=True)
+
+
+def test_carve_owned_folders_count_as_oai_ports(missions):
+    # Solutions/Q146_CD (2,921 files) is a carve port without the OAI prefix; its source is the carve dir
+    write(os.path.join(missions['ws'], 'Solutions', 'Q146_CD', 'Main.lean'), 'theorem carve_port_only : True := trivial\n')
+    write(os.path.join(missions['ws'], 'Solutions', 'Q146_CD', WA.CARVE_OWNER), '{"carve": "/x"}')
+    assert 'Solutions/Q146_CD/Main.lean' not in copies(missions)
+    assert 'Solutions/Q146_CD/Main.lean' in copies(missions, include_oai=True)
+    assert 'Solutions/Q146_CD/Main.lean' in copies(missions, folders=['Q146_CD'])
+
+
+def test_a_named_oai_folder_is_reported(missions):
+    write(os.path.join(missions['ws'], 'Solutions', 'OAIQ1_X', 'Main.lean'), 'theorem oai_port_only : True := trivial\n')
+    assert copies(missions, folders=['OAIQ1_X'])['Solutions/OAIQ1_X/Main.lean'].copy is None
+
+
+def test_folder_names_are_normalised_and_checked(missions):
+    assert 'Solutions/JM31/PartC.lean' in copies(missions, folders=['Solutions/JM31/'])
+    with pytest.raises(SystemExit):
+        copies(missions, folders=['NoSuchFolder'])
+
+
+@pytest.fixture
+def main_env(missions, monkeypatch):
+    monkeypatch.setattr(WA, 'workspace', lambda: missions['ws'])
+    monkeypatch.setattr(WA, 'MISSION_ROOT', missions['root'])
+    return missions
+
+
+def test_folder_mode_lists_the_workspace_only_part_and_skips_the_git_index(main_env, monkeypatch, capsys):
+    def no_index(*a, **k):
+        raise AssertionError('--folder must not build the git index')
+    monkeypatch.setattr(WA.Index, 'build', no_index)
+    WA.main(['--folder', 'JM31'])
+    out = capsys.readouterr().out
+    assert 'Solutions/JM31: 3 .lean files, 1 with no copy' in out
+    nocopy = [l.strip() for l in out.splitlines() if l.strip().startswith('no-copy')]
+    assert len(nocopy) == 1 and nocopy[0].endswith('Solutions/JM31/PartC.lean')
+    assert 'proofs/s31/PartA.lean' in out                       # where the copies are
+
+
+def test_full_report_has_a_no_copy_section(main_env, monkeypatch, capsys):
+    monkeypatch.setattr(WA, 'find_repos', lambda: [])
+    monkeypatch.setattr(WA, 'CACHE', None)
+    WA.main([])
+    out = capsys.readouterr().out
+    assert 'no copy under a mission repo' in out and 'Solutions/JM31/PartC.lean' in out
+    assert 'PartA.lean' not in out.split('no copy under a mission repo', 1)[1]
+
+
+def test_quiet_counts_no_copy_files_by_folder(main_env, monkeypatch, capsys):
+    monkeypatch.setattr(WA, 'find_repos', lambda: [])
+    monkeypatch.setattr(WA, 'CACHE', None)
+    WA.main(['--quiet'])
+    out = capsys.readouterr().out
+    assert 'no copy under a mission repo' in out and 'JM31 1' in out
