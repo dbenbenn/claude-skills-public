@@ -925,6 +925,22 @@ it, so the steps provably fit together. Then give each prover its own file and i
 verbatim as `chk_<name>`, with helpers in a per-step namespace. Four opus provers closed C9's steps
 in under eight minutes each, and the assembly compiled on the first try.
 
+**"Blocked: needs <named theorem>" is not a verdict until the used consequence has been looked at.**
+Before recording such a blocker, or leaving a reduction resting on a deep cited leaf, write down
+what the proof actually uses from that theorem, then spend one pass looking for an elementary or
+separately citable proof of just that consequence. The blocker stands only if that pass fails, and
+RESUME says what was tried. Two Viterbo retries (2026-11-03):
+- q161: `maxSystolicRatio_mono_and_exists_eq` was recorded "needs Williamson's normal form and
+  John's ellipsoid, each a library project". What it used was one symplectic plane with small
+  projection area; a max-volume simplex frame, its skew Gram matrix and symplectic transvections
+  gave that, and a 9-Part Blueprint closed in about 35 minutes of prover time.
+- q162: the 2-product formula was reduced to a capacity statement implying Gromov non-squeezing,
+  but used only translation, scaling and monotonicity of c_EHZ on convex domains. Monotonicity
+  follows from Clarke's dual action principle (length form), which was published standalone
+  (54be58ac, named theorems stand alone), proved in about two hours with no Sobolev spaces, and
+  the dependant resubmitted onto it. A cited conjunction ("is a capacity" ∧ "is attained") is the
+  typical case: dependants usually use one property.
+
 The same pattern scales to whole theorems. In a **Blueprint**, the definitions are concrete, every
 lemma is `sorry`, and the main theorem is proved from those lemmas. The provers write
 `Part<X>.lean` files that restate their lemmas verbatim under `namespace <NS>.Part<X>`, and they
@@ -971,6 +987,11 @@ What made it work:
   namespace, told not to read the other), and stop the slower one.
 - **Run `assemble_blueprint.py` on the parts already finished** while the rest still run. Interim
   assemblies catch name and scope problems early.
+- **Copy each Part into the repo's `proofs/` as it lands**, not at the end: provers write into the
+  workspace, and a killed run leaves finished Parts there untracked (q157, Viterbo maxsys).
+  `workspace_audit.py --folder FOLDER` lists any without a copy.
+- **Every prover or helper brief says "do not spawn agents"** when the run has an agent cap: a q159
+  helper briefed to "optimize" spawned five of its own.
 
 **Naming rules for check blocks:**
 - `build_solutions.py` drops every declaration named `chk_…` except the target's. A Blueprint lemma

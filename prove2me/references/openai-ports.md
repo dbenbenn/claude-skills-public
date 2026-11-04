@@ -1088,6 +1088,14 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   port (`oai_port_modules.py … --ws SCRATCH`, on the carve's own snapshot), and turn what you find into patches
   first. A patch made by an `mkpatches.py` from before 83161d7 can hold an `import Solutions.` line in its `old`,
   which counts 0 under filter_patches' placeholder folder: check before resuming.
+- **Before calling a prover part lost, look in the workspace too** (q157): oaiq-108's RESUME said JM Lemma 3.1's
+  Part C "was never written", having checked only the mission repo; a complete, sorry-free 746-line
+  `Solutions/JM31/PartC.lean` sat untracked in the workspace, which saved the retry an hour of Opus work.
+  `workspace_audit.py --folder FOLDER` (the name in `import Solutions.<FOLDER>.Blueprint`, under a second) lists
+  each file there as `copy … = <repo path>` or `no-copy`; copy every `no-copy` part into the repo's `proofs/`
+  before anything else, and a RESUME that calls work lost names both places it checked. `sync_workspace`'s summary
+  counts no-copy files by folder (ports excluded). The first sweep found Viterbo's MSPartM/N/S2 only in the
+  workspace (recorded in viterbo-mission 0736f2d).
 - **A carve a full disk killed** (q150, 2026-11-01): the driver's and publisher's last log lines are an `OSError:
   [Errno 28]` traceback in `save()`, with a 0-byte `*.tmp` beside intact state files (write-then-rename). Check
   that `pipeline_state.json` and `publish/run_state.json` parse, then resume on the carve's *own* snapshot with
