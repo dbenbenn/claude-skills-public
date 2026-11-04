@@ -429,34 +429,35 @@ def dead_lean_refs(M, mdir, its, mls, desc, call):
         left = [h for i, h in enumerate(left) if start + i in badlines]
     out = []
     for h in left:
-        if '.' in h:
-            # the platform's search is flaky: the same query has answered with the theorem at
-            # limit=20 and with nothing at limit=100 (2026-09-30). Try the short and the full
-            # name, three rounds, and call a name dead only when every answer misses it.
-            found, errored = False, False
-            # the exact-name filter first: the keyword search had not indexed two theorems published
-            # an hour earlier (markov-heat-kernels, 2026-10-04)
-            try:
-                r = call('GET', '/theorems?theorem_name=' + urllib.parse.quote(h))
-                items = r.get('theorems', []) if isinstance(r, dict) else r
-                found = any(t.get('theorem_name') == h for t in items or [])
-            except Exception:  # noqa: BLE001
-                pass
-            for _ in range(0 if found else 3):
-                for q in (h.split('.')[-1], h):
-                    try:
-                        r = call('GET', '/theorems?q=' + urllib.parse.quote(q) + '&limit=20')
-                    except Exception:  # noqa: BLE001 -- an unreachable platform is not a dead name
-                        errored = True
-                        continue
-                    items = r.get('theorems', r.get('items', r.get('data', []))) if isinstance(r, dict) else r
-                    if any(t.get('theorem_name') == h for t in items or []):
-                        found = True
-                        break
-                if found:
+        # every name, dotted or not: a published theorem may live in the root namespace
+        # (strong convergence, 2026-11-04: `markov_inequality_interval` was reported dead).
+        # The platform's search is flaky: the same query has answered with the theorem at
+        # limit=20 and with nothing at limit=100 (2026-09-30). Try the short and the full
+        # name, three rounds, and call a name dead only when every answer misses it.
+        found, errored = False, False
+        # the exact-name filter first: the keyword search had not indexed two theorems published
+        # an hour earlier (markov-heat-kernels, 2026-10-04)
+        try:
+            r = call('GET', '/theorems?theorem_name=' + urllib.parse.quote(h))
+            items = r.get('theorems', []) if isinstance(r, dict) else r
+            found = any(t.get('theorem_name') == h for t in items or [])
+        except Exception:  # noqa: BLE001
+            pass
+        for _ in range(0 if found else 3):
+            for q in dict.fromkeys((h.split('.')[-1], h)):
+                try:
+                    r = call('GET', '/theorems?q=' + urllib.parse.quote(q) + '&limit=20')
+                except Exception:  # noqa: BLE001 -- an unreachable platform is not a dead name
+                    errored = True
+                    continue
+                items = r.get('theorems', r.get('items', r.get('data', []))) if isinstance(r, dict) else r
+                if any(t.get('theorem_name') == h for t in items or []):
+                    found = True
                     break
-            if found or errored:
-                continue
+            if found:
+                break
+        if found or errored:
+            continue
         out.append((refs[h], 'names `%s`, which no longer resolves (renamed or removed?)' % h))
     return out
 

@@ -160,15 +160,20 @@ def test_verify_finds_a_published_theorem_by_exact_name(env, monkeypatch):
     statements_layout(mdir)
     _probe_fails_everything(monkeypatch, draft)
 
+    # a theorem in the root namespace is looked up too (strong convergence, 2026-11-04: the published
+    # `markov_inequality_interval` was reported dead because only dotted names reached the platform)
     def call(m, p, b=None):
-        if p.startswith('/theorems?theorem_name=Other.lemma_x'):
-            return {'theorems': [{'theorem_name': 'Other.lemma_x'}]}
+        for n in ('Other.lemma_x', 'markov_inequality_interval'):
+            if p == '/theorems?theorem_name=' + n:
+                return {'theorems': [{'theorem_name': n}]}
         return {'theorems': []}
     M = draft.load(mdir)
     its, mls, _, _ = draft.desired(M, mdir)
-    bad = draft.dead_lean_refs(M, mdir, its, mls, 'Cites `Other.lemma_x` and `Other.lemma_gone`.', call)
+    bad = draft.dead_lean_refs(M, mdir, its, mls, 'Cites `Other.lemma_x` and `Other.lemma_gone`, '
+                               '`markov_inequality_interval` and `root_lemma_gone`.', call)
     named = ' '.join(b[1] for b in bad)
     assert 'Other.lemma_x`' not in named and 'Other.lemma_gone' in named
+    assert 'markov_inequality_interval' not in named and 'root_lemma_gone' in named
 
 
 def test_verify_resolves_names_from_a_companion_package(env, monkeypatch, tmp_path):
