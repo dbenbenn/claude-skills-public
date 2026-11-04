@@ -1,5 +1,8 @@
 """build_solution.py: which imports of the merged modules are carried into the solution."""
 import os
+
+import pytest
+
 import build_solution as BS
 
 
@@ -134,3 +137,59 @@ def test_wrapper_applies_the_dev_theorem_when_the_target_name_is_not_declared():
     assert BS.dev_theorem(text, 'TaoBR.restr_zero_of_restr') == 'TaoBR.restr_zero_of_restr_dev'
     text2 = 'namespace TaoBR\ntheorem restr_zero_of_restr (n : Nat) : True := trivial\nend TaoBR\n'
     assert BS.dev_theorem(text2, 'TaoBR.restr_zero_of_restr') == 'TaoBR.restr_zero_of_restr'
+
+
+SUB_NAMESPACE_DEV = '''section
+namespace TaoBR
+namespace RSU
+/-- the development's theorem -/
+theorem restr_sparse_of_restr_uniform_dev (n : Nat) : True := trivial
+end RSU
+end TaoBR
+end
+'''
+
+
+def test_dev_theorem_in_a_sub_namespace_is_found_by_its_last_component():
+    # 2026-11-03 (q158): the development's theorem was TaoBR.RSU.restr_sparse_of_restr_uniform_dev;
+    # the wrapper applied the non-existent TaoBR.restr_sparse_of_restr_uniform_dev and
+    # resolve_imports died on an unrelated parse error in a scratch file it deleted
+    assert (BS.dev_theorem(SUB_NAMESPACE_DEV, 'TaoBR.restr_sparse_of_restr_uniform')
+            == 'TaoBR.RSU.restr_sparse_of_restr_uniform_dev')
+
+
+def test_dev_theorem_prefers_the_targets_own_dev_name_and_sees_aliases():
+    # the lesson's fix, an alias in the target's namespace, is used as written
+    text = SUB_NAMESPACE_DEV + ('\nnamespace TaoBR\nalias restr_sparse_of_restr_uniform_dev := '
+                                'RSU.restr_sparse_of_restr_uniform_dev\nend TaoBR\n')
+    assert (BS.dev_theorem(text, 'TaoBR.restr_sparse_of_restr_uniform')
+            == 'TaoBR.restr_sparse_of_restr_uniform_dev')
+
+
+def test_dev_theorem_missing_fails_up_front():
+    # a commented-out declaration does not count, nor does the target's short name elsewhere
+    text = ('/- theorem foo_dev : True := trivial -/\nnamespace Other\n'
+            'theorem foo (n : Nat) : True := trivial\nend Other\n')
+    with pytest.raises(SystemExit) as e:
+        BS.dev_theorem(text, 'N.foo')
+    msg = str(e.value)
+    assert 'no `N.foo_dev` in the development' in msg and 'alias' in msg
+
+
+def test_dev_theorem_ambiguous_lists_the_candidates():
+    text = ('namespace N.A\ntheorem foo_dev : True := trivial\nend N.A\n'
+            'namespace N.B\nlemma foo_dev : True := trivial\nend N.B\n')
+    with pytest.raises(SystemExit) as e:
+        BS.dev_theorem(text, 'N.foo')
+    assert 'N.A.foo_dev' in str(e.value) and 'N.B.foo_dev' in str(e.value)
+
+
+def test_dev_theorem_warns_when_the_development_declares_the_target(capsys):
+    # the verifier's trap (references/verifier-failures.md): a solution file declaring the target's
+    # full name with a different signature gets a locationless WA
+    text = 'namespace TaoBR\ntheorem restr_zero_of_restr (n : Nat) : True := trivial\nend TaoBR\n'
+    assert BS.dev_theorem(text, 'TaoBR.restr_zero_of_restr') == 'TaoBR.restr_zero_of_restr'
+    assert 'declares the target' in capsys.readouterr().err
+    BS.dev_theorem('namespace TaoBR\ntheorem restr_zero_of_restr_dev : True := trivial\nend TaoBR\n',
+                   'TaoBR.restr_zero_of_restr')
+    assert capsys.readouterr().err == ''

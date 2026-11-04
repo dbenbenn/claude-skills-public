@@ -109,6 +109,21 @@ def proved(ns, name):
     return False
 
 
+def error_context(out, txt, ctx=2, limit=10):
+    """Each `FILE:LINE:COL: error: ...` of Lean's output `out` (the first `limit`), with the lines of
+    `txt` around LINE, the offending one marked `>`. The scratch file used to be deleted before its
+    errors were shown, so an "unexpected token '('" at line 18 could not be looked at (q158,
+    2026-11-03)."""
+    L = txt.split('\n')
+    blocks = []
+    for m in list(re.finditer(r'^\S*?:(\d+):(\d+): error: .*$', out, re.M))[:limit]:
+        n = int(m.group(1))
+        rows = ['%s %4d | %s' % ('>' if k == n else ' ', k, L[k - 1])
+                for k in range(max(1, n - ctx), min(len(L), n + ctx) + 1)]
+        blocks.append('\n'.join([m.group(0)] + rows))
+    return '\n\n'.join(blocks)
+
+
 def header(ws, prefix, modules, imports, ns):
     """The import lines: every bundle Definitions/<prefix>*.lean, then each --module as given (the
     development's own bundle and published-theorem imports, which the merge strips), then each
@@ -143,6 +158,14 @@ def main():
     imports, inline = list(a.imports), []
     body = open(a.body, encoding='utf-8').read()
     scratch = os.path.join(ws, 'scratch', 'resolve_imports_%d.lean' % os.getpid())
+    last = {'out': '', 'txt': ''}
+
+    def fail(msg):
+        """Stop, showing the last round's errors in context and keeping its file for a look."""
+        ctx = error_context(last['out'], last['txt'])
+        if ctx:
+            print(ctx)
+        sys.exit('%s\n(the last round\'s file is kept: %s)' % (msg, scratch))
 
     def build():
         hdr = header(ws, prefix, a.modules, imports, a.ns)
@@ -162,6 +185,7 @@ def main():
         # autoImplicit off, as the verifier compiles (`lake env lean` ignores the lakefile's options)
         out = subprocess.run(['lake', 'env', 'lean', '-DautoImplicit=false', scratch], cwd=ws,
                              capture_output=True, text=True).stdout
+        last.update(out=out, txt=txt)
         unk = sorted(set(re.findall(r'Unknown (?:identifier|constant) `(?:%s\.)?([^`]+)`' % a.ns, out)))
         errs = [l for l in out.split('\n') if 'error' in l]
         print('round %d: %d errors, unknown %s' % (it, len(errs), unk), flush=True)
@@ -176,18 +200,20 @@ def main():
                                      open(f, encoding='utf-8').read(), re.M):
                     hits.append((f, m.group(1)))
             if len(hits) != 1:
-                sys.exit('invalid field `%s`: %d candidate declarations %s; copy the right one in by hand'
-                         % (fld, len(hits), [h[1] for h in hits]))
+                fail('invalid field `%s`: %d candidate declarations %s; copy the right one in by hand'
+                     % (fld, len(hits), [h[1] for h in hits]))
             if hits[0] not in inline:
                 inline.insert(0, hits[0]); print('  inline', hits[0][1], os.path.relpath(hits[0][0], a.src))
         if fields:
             continue
         if not unk:
             open(a.out, 'w', encoding='utf-8').write(txt)
-            os.remove(scratch)
             if errs:
-                print('\n'.join(errs[:20]))
-                sys.exit('remaining errors are not unknown names; fix them by hand')
+                if not error_context(out, txt):        # no located error to show in context
+                    print('\n'.join(errs[:20]))
+                fail('remaining errors are not unknown names; fix them by hand (line numbers are '
+                     'those of %s too)' % a.out)
+            os.remove(scratch)
             print('wrote %s: %d imports, %d inlined' % (a.out, len(imports), len(inline)))
             return
         for n in unk:
@@ -199,13 +225,13 @@ def main():
                 if not s and '.' in n and n.rsplit('.', 1)[0] != a.ns:
                     # declared inside `namespace X` rather than as `theorem X.name`: copying it into
                     # the --ns block would rename it, so stop and say so
-                    sys.exit('%s is in another namespace and not importable; merge its module instead' % n)
+                    fail('%s is in another namespace and not importable; merge its module instead' % n)
                 if not s and '.' in n:
                     n = n.rsplit('.', 1)[1]; s = find_src(a.src, n)
                 if not s:
-                    sys.exit('cannot find a source for %s' % n)
+                    fail('cannot find a source for %s' % n)
                 inline.insert(0, (s, n)); print('  inline', n, os.path.relpath(s, a.src))
-    sys.exit('gave up after %d rounds' % a.max_iter)
+    fail('gave up after %d rounds' % a.max_iter)
 
 
 if __name__ == '__main__':

@@ -168,17 +168,50 @@ def module_body(text):
     return text[header_end(text):]
 
 
+ALIAS = re.compile(r'^(?:(?:private|protected)\s+)?alias\s+(\S+)\s*:=')
+
+
+def declared_names(text):
+    """The full names `text` declares (theorems, defs, ..., and `alias`es), namespaces taken into
+    account and comments ignored: oaiport.declarations over the comment-blanked lines, plus the
+    `alias X := Y` commands it does not list."""
+    from p2mlib.leantext import code_only
+    from p2mlib.names import qualify
+    from p2mlib.oaiport import declarations, ns_by_line
+    lines = code_only(text).split('\n')
+    out = [full for full, _h, _s, _e, _ns in declarations(lines) if full]
+    nsl = ns_by_line(lines)
+    out += [qualify(nsl[i], m.group(1)) for i, l in enumerate(lines) for m in [ALIAS.match(l)] if m]
+    return out
+
+
 def dev_theorem(text, target):
     """The development's theorem the wrapper applies: TARGET itself when the merged text declares
-    it, else TARGET_dev when that is declared (the usual name of a development's copy). Applying the
-    published name when only `_dev` exists makes resolve_imports inline the target's own sorried
-    statement (oaiq-111, 2026-10-29)."""
-    short = target.rsplit('.', 1)[-1]
-    if re.search(r'\btheorem\s+' + re.escape(short) + r'\s', text):
+    it, else TARGET_dev, else the one declaration whose last component is `<short>_dev` (the usual
+    name of a development's copy). Applying the published name when only `_dev` exists makes
+    resolve_imports inline the target's own sorried statement (oaiq-111, 2026-10-29); applying
+    TARGET_dev when the theorem is `NS.Sub.<short>_dev` makes it try to inline a name that does not
+    exist, and fail on an unrelated error (q158, 2026-11-03). No such declaration, or several:
+    stop here. Declaring TARGET itself is the verifier's "declares the target's full name" trap
+    (references/verifier-failures.md): warned about."""
+    from p2mlib.names import short
+    decls = declared_names(text)
+    if target in decls:
+        print('warning: the development declares the target %s itself; with a signature that differs '
+              'from the published one the verifier answers a locationless WA. Rename it to %s_dev.'
+              % (target, short(target)), file=sys.stderr)
         return target
-    if re.search(r'\btheorem\s+' + re.escape(short) + r'_dev\b', text):
+    if target + '_dev' in decls:
         return target + '_dev'
-    return target
+    hits = sorted({d for d in decls if short(d) == short(target) + '_dev'})
+    if len(hits) == 1:
+        return hits[0]
+    if hits:
+        sys.exit('several `%s_dev` declarations in the development: %s; add `alias %s_dev := <the right '
+                 'one>` in namespace %s' % (short(target), ', '.join(hits), short(target),
+                                             target.rsplit('.', 1)[0]))
+    sys.exit('no `%s_dev` in the development (nor `%s` itself, nor any `*.%s_dev`); add an alias '
+             '`alias %s_dev := <its theorem>`' % (target, target, short(target), target))
 
 
 def wrap_module(text):
@@ -237,7 +270,9 @@ def main():
             print('  drop', n)
         text = '\n'.join(lines)
 
-    # 3. the solution wrapper, from the published statement
+    # 3. the solution wrapper, from the published statement; the theorem it applies is found first,
+    # so a development without one stops here rather than inside resolve_imports
+    dev = dev_theorem(text, a.target)
     t = published(a.target)
     fs = t['formal_statement']
     # a root-level `solution` (prune_solution and the verifier look for exactly that name); the
@@ -246,7 +281,6 @@ def main():
     fs2, n = re.subn(r'\btheorem\s+' + re.escape(short) + r'\b', 'theorem solution', fs, count=1)
     if n != 1:
         sys.exit('cannot find `theorem %s` in the published formal_statement' % short)
-    dev = dev_theorem(text, a.target)
     tactic = ('exact %s %s' % (dev, a.args)) if a.args else ('apply %s <;> assumption' % dev)
     fs2, n = re.subn(r':=\s*by\s+sorry\s*', lambda _: ':= by\n  %s\n' % tactic, fs2, count=1)
     if n != 1:

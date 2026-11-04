@@ -75,3 +75,19 @@ def test_header_carries_raw_modules_before_named_theorems(tmp_path):
     assert h == ['import Definitions.Def_QFS_A', 'import Definitions.Def_Monod_PiecewiseProjective',
                  'import Theorems.Thm_CannonFloydParry_bijOn_dyadic', 'import Theorems.Thm_N_x',
                  'import Mathlib', '']
+
+
+def test_error_context_shows_the_offending_lines():
+    # 2026-11-03 (q158): "unexpected token '('" at line 18 of a scratch file that was then deleted;
+    # the failure must show the line itself
+    txt = '\n'.join('line %d' % i for i in range(1, 31))
+    out = ('/ws/scratch/resolve_imports_7.lean:18:4: error: unexpected token \'(\'; expected term\n'
+           '/ws/scratch/resolve_imports_7.lean:3:0: warning: unused variable\n')
+    ctx = RI.error_context(out, txt)
+    assert "18:4: error: unexpected token '('" in ctx
+    assert '>   18 | line 18' in ctx and '    16 | line 16' in ctx and '    20 | line 20' in ctx
+    assert 'line 21' not in ctx and 'warning' not in ctx
+
+
+def test_error_context_without_located_errors_is_empty():
+    assert RI.error_context('no errors here\n', 'a\nb\n') == ''
