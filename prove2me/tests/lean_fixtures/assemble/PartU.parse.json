@@ -1,0 +1,157 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 18,
+    "col": 18,
+    "line": 1
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 107,
+    "col": 42,
+    "line": 4
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 80,
+      "col": 15,
+      "line": 4
+     },
+     "start": {
+      "byte": 73,
+      "col": 8,
+      "line": 4
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "BP.PartU.four_eq"
+   ],
+   "namespace": "BP.PartU",
+   "opens": [],
+   "start": {
+    "byte": 20,
+    "col": 0,
+    "line": 3
+   },
+   "value_start": {
+    "byte": 101,
+    "col": 36,
+    "line": 4
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "end": {
+    "byte": 121,
+    "col": 12,
+    "line": 6
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "BP.PartU",
+   "opens": [],
+   "start": {
+    "byte": 109,
+    "col": 0,
+    "line": 6
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 153,
+    "col": 30,
+    "line": 8
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.printAxioms",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 123,
+    "col": 0,
+    "line": 8
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 154,
+    "col": 0,
+    "line": 9
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 154,
+    "col": 0,
+    "line": 9
+   }
+  }
+ ],
+ "decls": [],
+ "file": "PartU.lean",
+ "messages": [],
+ "mode": "parse"
+}

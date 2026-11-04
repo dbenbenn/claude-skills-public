@@ -945,11 +945,23 @@ The same pattern scales to whole theorems. In a **Blueprint**, the definitions a
 lemma is `sorry`, and the main theorem is proved from those lemmas. The provers write
 `Part<X>.lean` files that restate their lemmas verbatim under `namespace <NS>.Part<X>`, and they
 follow a shared brief that holds the mathematics part by part. `scripts/assemble_blueprint.py
-BLUEPRINT OUT PARTS…` merges the result into one file:
+BLUEPRINT OUT PARTS… [--target NAME]` merges the result into one file:
 - every `Solutions.*` helper module the Blueprint or a Part imports is inlined, so the assembled
-  file never keeps `import Solutions.` (42aa390; oaiq-121 spliced it by hand);
+  file never keeps `import Solutions.` (42aa390; oaiq-121 spliced it by hand), except a Part
+  listed on the command line, which is assembled once as a Part ahead of its importers (list
+  every Part, including one another Part imports; q155 hit "already declared" before);
 - every stub becomes `alias foo := Part<X>.foo`;
-- every Part declaration is placed by a dependency sort, after the Blueprint items it mentions.
+- every Part declaration is placed by a dependency sort, after the Blueprint items it mentions;
+- a Part may import the Blueprint module, or be **copy-header**: import only Mathlib,
+  `Definitions.*` and `Theorems.*`, with the Blueprint's text and its assumed `sorry` stubs copied
+  at its head, so each prover compiles alone in seconds (q159: 20 Parts on Tao §4). The copies
+  are checked verbatim against the Blueprint and dropped; a changed copy is refused. Briefs say:
+  copy Blueprint text but never change it, and prove targets only in `Part<X>`;
+- `--target <published name>`, when the Blueprint proves the published theorem under that name,
+  renames it `_dev` and appends `theorem solution`; then `prune_solution.py --check`.
+
+Stacking one assembled Blueprint on another (q159's `pbr` over `parab`) is still by hand: its
+stubs from the other Blueprint are kept with a warning.
 
 Placing a Part's chunks by position fails in both directions. A helper defined before a
 late-stubbed target can be used by an early one, and a helper can mention a definition that the

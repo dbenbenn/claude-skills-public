@@ -1,0 +1,304 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 61,
+    "col": 61,
+    "line": 1
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 75,
+    "col": 12,
+    "line": 3
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 63,
+    "col": 0,
+    "line": 3
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "end": {
+    "byte": 116,
+    "col": 18,
+    "line": 6
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 105,
+      "col": 7,
+      "line": 6
+     },
+     "start": {
+      "byte": 102,
+      "col": 4,
+      "line": 6
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "BP.two"
+   ],
+   "namespace": "BP",
+   "opens": [],
+   "start": {
+    "byte": 77,
+    "col": 0,
+    "line": 5
+   },
+   "value_start": {
+    "byte": 112,
+    "col": 14,
+    "line": 6
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 156,
+    "col": 7,
+    "line": 9
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 132,
+      "col": 14,
+      "line": 8
+     },
+     "start": {
+      "byte": 126,
+      "col": 8,
+      "line": 8
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "BP.two_eq"
+   ],
+   "namespace": "BP",
+   "opens": [],
+   "start": {
+    "byte": 118,
+    "col": 0,
+    "line": 8
+   },
+   "value_start": {
+    "byte": 143,
+    "col": 25,
+    "line": 8
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 203,
+    "col": 7,
+    "line": 12
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 173,
+      "col": 15,
+      "line": 11
+     },
+     "start": {
+      "byte": 166,
+      "col": 8,
+      "line": 11
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "BP.four_eq"
+   ],
+   "namespace": "BP",
+   "opens": [],
+   "start": {
+    "byte": 158,
+    "col": 0,
+    "line": 11
+   },
+   "value_start": {
+    "byte": 190,
+    "col": 32,
+    "line": 11
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 296,
+    "col": 31,
+    "line": 15
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 216,
+      "col": 11,
+      "line": 14
+     },
+     "start": {
+      "byte": 213,
+      "col": 8,
+      "line": 14
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "BP.top"
+   ],
+   "namespace": "BP",
+   "opens": [],
+   "start": {
+    "byte": 205,
+    "col": 0,
+    "line": 14
+   },
+   "value_start": {
+    "byte": 259,
+    "col": 54,
+    "line": 14
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "end": {
+    "byte": 304,
+    "col": 6,
+    "line": 17
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "BP",
+   "opens": [],
+   "start": {
+    "byte": 298,
+    "col": 0,
+    "line": 17
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 305,
+    "col": 0,
+    "line": 18
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 305,
+    "col": 0,
+    "line": 18
+   }
+  }
+ ],
+ "decls": [],
+ "file": "Blueprint.lean",
+ "messages": [],
+ "mode": "parse"
+}

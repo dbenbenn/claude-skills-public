@@ -3,6 +3,7 @@
 
 usage: python3 tests/record_fixtures.py [NAME ...]   (default: every fixture test_leaninfo replays)
        python3 tests/record_fixtures.py carve       (the carver's CarveDev development, test_carve)
+       python3 tests/record_fixtures.py assemble    (assemble/*.lean, parse-only, test_assemble_blueprint)
 
 Run after changing lean/LeanInfo.lean, then read `git diff tests/lean_fixtures`: the diff is the
 change in what the tool reports, and test_tool_reproduces_recording pins it."""
@@ -34,6 +35,20 @@ def record(name):
         print('recorded', name + suffix)
 
 
+def record_assemble():
+    """Record lean_fixtures/assemble/<Name>.parse.json (parse-only) for every <Name>.lean there: the
+    copy-header Blueprint and Parts test_assemble_blueprint replays without Lean."""
+    d = os.path.join(FIX, 'assemble')
+    for f in sorted(os.listdir(d)):
+        if f.endswith('.lean'):
+            data = leaninfo.raw(os.path.join(d, f), parse_only=True)
+            data.pop('build_ms', None)
+            data['file'] = f
+            with open(os.path.join(d, f[:-5] + '.parse.json'), 'w', encoding='utf-8') as out:
+                json.dump(data, out, ensure_ascii=False, indent=1, sort_keys=True)
+            print('recorded assemble/' + f[:-5] + '.parse')
+
+
 def record_carve():
     """Compile lean_fixtures/carve/CarveDev (core Lean only) into a scratch directory, then record
     DeclGraph's output and each module's LeanInfo (parse-only, --idents) beside the sources."""
@@ -47,4 +62,4 @@ def record_carve():
 
 if __name__ == '__main__':
     for n in sys.argv[1:] or REPLAYED:
-        record_carve() if n == 'carve' else record(n)
+        record_carve() if n == 'carve' else record_assemble() if n == 'assemble' else record(n)

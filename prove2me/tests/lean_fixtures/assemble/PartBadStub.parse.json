@@ -1,0 +1,283 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 12,
+    "col": 12,
+    "line": 1
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "end": {
+    "byte": 32,
+    "col": 18,
+    "line": 3
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 21,
+      "col": 7,
+      "line": 3
+     },
+     "start": {
+      "byte": 18,
+      "col": 4,
+      "line": 3
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "BP.two"
+   ],
+   "namespace": "BP",
+   "opens": [],
+   "start": {
+    "byte": 14,
+    "col": 0,
+    "line": 3
+   },
+   "value_start": {
+    "byte": 28,
+    "col": 14,
+    "line": 3
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 97,
+    "col": 37,
+    "line": 6
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 74,
+      "col": 14,
+      "line": 6
+     },
+     "start": {
+      "byte": 68,
+      "col": 8,
+      "line": 6
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "BP.two_eq"
+   ],
+   "namespace": "BP",
+   "opens": [],
+   "start": {
+    "byte": 60,
+    "col": 0,
+    "line": 6
+   },
+   "value_start": {
+    "byte": 89,
+    "col": 29,
+    "line": 6
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 0
+    }
+   ],
+   "end": {
+    "byte": 105,
+    "col": 6,
+    "line": 8
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "BP",
+   "opens": [],
+   "start": {
+    "byte": 99,
+    "col": 0,
+    "line": 8
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 131,
+    "col": 24,
+    "line": 10
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 107,
+    "col": 0,
+    "line": 10
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 4
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "end": {
+    "byte": 191,
+    "col": 58,
+    "line": 12
+   },
+   "ids": [
+    {
+     "end": {
+      "byte": 148,
+      "col": 15,
+      "line": 12
+     },
+     "start": {
+      "byte": 141,
+      "col": 8,
+      "line": 12
+     }
+    }
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "names": [
+    "BP.PartBadStub.four_eq"
+   ],
+   "namespace": "BP.PartBadStub",
+   "opens": [],
+   "start": {
+    "byte": 133,
+    "col": 0,
+    "line": 12
+   },
+   "value_start": {
+    "byte": 171,
+    "col": 38,
+    "line": 12
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 4
+    }
+   ],
+   "end": {
+    "byte": 211,
+    "col": 18,
+    "line": 14
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.end",
+   "names": [],
+   "namespace": "BP.PartBadStub",
+   "opens": [],
+   "start": {
+    "byte": 193,
+    "col": 0,
+    "line": 14
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "end": {
+    "byte": 212,
+    "col": 0,
+    "line": 15
+   },
+   "ids": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "start": {
+    "byte": 212,
+    "col": 0,
+    "line": 15
+   }
+  }
+ ],
+ "decls": [],
+ "file": "PartBadStub.lean",
+ "messages": [],
+ "mode": "parse"
+}
