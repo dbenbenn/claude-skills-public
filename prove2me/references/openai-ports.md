@@ -925,7 +925,8 @@ back WA. The lessons:
      in its RESUME.md (worth a `carve.py` subcommand).
   3. Fold, last: folding makes the importers' pieces slow, the second blocker this family hit.
   **Pre-screen split points on a CoeT-prone family** (C*-algebra or Hilbert-space towers; q160): in overlap mode
-  statements are posted as soon as they are measured, before `measure_pieces` runs the CoeT check, so a re-plan
+  statements were posted as soon as they were measured, before `measure_pieces` ran the CoeT check (since 2f6bb06 a
+  re-plan's new statements wait for it), so a re-plan
   that promotes heavy theorems leaves Open orphans (3 of 14 there; the next re-plan's 5 all failed too, caught
   only because it ran `--stop-after measure_pieces` without `--publish`). Before the first `--publish`, read every
   candidate's `Expr.sizeWithoutSharing` with `#eval` from one Lean file importing the built port (7 s for 238
@@ -986,6 +987,16 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   the early-publish plan wrote into `published/lib` but never sent are locked too, so `gen` keeps their old text:
   with no publisher running, move the unposted ones out of `published/lib` (keep a backup) before the `gen` that
   should change them (q151).
+- **A re-plan only reshapes what is not live** (q160, 2f6bb06). oaiq-075's slow piece (163 s, three verifier
+  timeouts) came back from the automatic split unchanged: seven folded CoeT statements were also `forced`, so the
+  plan sized seven 40 s slices and the fold summed them into one 271 s piece (fixed: folded nodes are neither
+  promoted nor forced, 6c5e107, bca342a). With that fixed, the re-plan reshaped four accepted live pieces to want
+  six new statements only they would import, which split_run never resends without a comparison note: Open
+  orphans. Now the automatic re-plan writes config `no_promote` = the keeps of live pieces less the slow pieces'
+  (plus `config_set.no_promote`, ed0d656); `plan` refuses, once publishing has begun, a plan whose new statement
+  is imported only by live pieces (remedy: `no_promote`, or a `comparisons/` note to resend that piece); and a
+  re-plan's new statements and bundles wait for `measure_pieces` (its CoeT check) before the publisher posts
+  them. A hand re-plan after publishing: diff the new pieces against `publish/plan.json` first.
 - **After renaming published items, dry-run split_run first** (q151): config `statement_suffixes` (f42edbc) renamed
   15 live statements `<name>_m`, but the run state is keyed by node, so the old ids still counted as live, the `_m`
   statements were never posted and their importers failed "unknown import". Since e4d2383 an item records the name it
