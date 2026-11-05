@@ -126,8 +126,16 @@ def stage(mdir, name, page_spec=None, force=False):
                 os.path.join(d, 'brief.md'))
     # the item's own page, the mission's context pages, and the item's own context pages -- where
     # the notions its sentence uses are defined (Γ ∉ EG's auditor could not see EG's definition)
-    want = (pages(page_spec or T['page']) + ([] if own else pages(getattr(M, 'CONTEXT_PAGES', '')))
+    # a cited result: `page` is the citing paper's page and `audit_pages` the cited paper's; the
+    # auditor gets both, the citing page tagged `citing-` (strong convergence 2026-11-05: five
+    # stagings had the citing page added by hand)
+    cited = own and T.get('audit_pages') and not page_spec
+    want = (pages(page_spec or (T['audit_pages'] if cited else T['page']))
+            + ([] if own else pages(getattr(M, 'CONTEXT_PAGES', '')))
             + pages(T.get('context_pages', '')))
+    citing_pdf = os.path.join(mdir, getattr(M, 'SOURCE_PDF', '') or '') if cited else ''
+    if citing_pdf and not os.path.isfile(citing_pdf):
+        citing_pdf = ''
     # pages are the source's own numbers (what `source` cites); a journal reprint's PDF starts
     # elsewhere, so mission.py sets PDF_PAGE_OFFSET = PDF page - printed page (CFP: -213)
     off = T.get('pdf_page_offset', 0) if own else getattr(M, 'PDF_PAGE_OFFSET', 0)
@@ -142,6 +150,8 @@ def stage(mdir, name, page_spec=None, force=False):
             want += ['%s p. %d' % (tag, p) for p in pages(part_pages)]
     else:
         render_pages(pdf, sorted(set(want)), off, d)
+    if citing_pdf:
+        render_pages(citing_pdf, pages(T['page']), getattr(M, 'PDF_PAGE_OFFSET', 0), d, tag='citing')
     with open(os.path.join(d, 'source.md'), 'w', encoding='utf-8') as f:
         if T.get('bundle'):
             where = ('; '.join('%s pp. %s' % (os.path.basename(pp), pg) for pp, pg, _ in parts) if parts
@@ -154,6 +164,14 @@ def stage(mdir, name, page_spec=None, force=False):
             for q in quote:
                 f.write('> %s\n\n' % ' '.join(q.split()))
         f.write('Page images of %s are in this directory.\n' % ', '.join(map(str, want if parts else sorted(set(want)))))
+        if citing_pdf:
+            f.write('\n## Which paper is which\n\nThe sentences quoted above are from the *citing paper*, '
+                    '%s, p. %s; its page images are the files `citing-page-*.png`.\n\nThe result under '
+                    'audit is the one it cites from %s, pp. %s; those page images are the files '
+                    '`page-*.png`. List the claims of the cited result in the form the citing paper '
+                    'applies it, marking where the cited paper\'s own statement says more or less than '
+                    'the citing sentence.\n' % (os.path.basename(citing_pdf), T['page'],
+                                                os.path.basename(pdf), T['audit_pages']))
     print('Work only inside %s. Everything below is relative to it.\n\n'
           'Read brief.md and do PHASE 1 only: read source.md and the page images, write claims.md,\n'
           'then reply in at most five lines. There is no formalization in your directory yet, and\n'

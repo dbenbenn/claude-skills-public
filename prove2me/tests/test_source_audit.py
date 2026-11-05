@@ -151,3 +151,28 @@ def test_stage_force_restages_unworked_but_never_discards_claims(mdir):
     with pytest.raises(SystemExit, match='claims.md'):
         SRC.stage(str(mdir), 't1', force=True)           # a phase-1 result is never discarded
     assert os.path.exists(os.path.join(d, 'claims.md'))
+
+
+def test_stage_external_renders_cited_and_citing_pages(mdir, monkeypatch):
+    # strong convergence wave 2 (2026-11-05): for a cited result the auditor needs the cited paper's
+    # pages (audit_pages, in that paper's numbering) AND the citing paper's page that quotes it; both
+    # were added to five stagings by hand, and the Source line named the cited PDF with the citing page
+    (mdir / 'cited.pdf').write_bytes(b'%PDF fake')
+    s = (mdir / 'mission.py').read_text()
+    (mdir / 'mission.py').write_text(
+        s + "\nfor _T in THEOREMS:\n    if _T['name'] == 't1':\n"
+            "        _T.update(source_pdf='cited.pdf', audit_pages='5-6', page='31')\n")
+    calls = []
+
+    def fake_run(args, check=False, **k):
+        calls.append((os.path.basename(args[-2]), int(args[2]), os.path.basename(args[-1])))
+        open(args[-1] + '.png', 'w').write('img')
+        return types.SimpleNamespace(returncode=0)
+    monkeypatch.setattr(SRC.subprocess, 'run', fake_run)
+    SRC.stage(str(mdir), 't1')
+    assert sorted(calls) == [('cited.pdf', 5, 'page-005'), ('cited.pdf', 6, 'page-006'),
+                             ('paper.pdf', 31, 'citing-page-031')]
+    d = os.path.join(SRC.ROOT, SRC.slug(str(mdir), 't1'))
+    src = open(os.path.join(d, 'source.md')).read()
+    assert 'citing paper' in src and 'paper.pdf, p. 31' in src and 'cited.pdf' in src
+    assert 'citing-page-*.png' in src and 'pp. 5-6' in src
