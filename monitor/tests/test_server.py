@@ -137,3 +137,43 @@ def test_inbox_files_are_served_read_only(server, tmp_path, monkeypatch):
     for bad in ('/inbox/0/link.md', '/inbox/0/.hidden.md', '/inbox/0/..%2Fprivate.txt', '/inbox/0/../private.txt',
                 '/inbox/1/oaiq-031-lesson.md', '/inbox/x/oaiq-031-lesson.md', '/inbox/0/absent.md'):
         assert get(base, bad)[0] == 404, bad
+
+
+def post(base, path, body, headers=None):
+    h = {'Content-Type': 'application/json', 'X-Monitor-Request': '1'}
+    h.update(headers or {})
+    h = {k: v for k, v in h.items() if v is not None}
+    req = urllib.request.Request(base + path, data=body if isinstance(body, bytes) else json.dumps(body).encode(),
+                                 headers=h, method='POST')
+    try:
+        r = urllib.request.urlopen(req)
+        return r.status, json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read() or b'{}')
+
+
+def test_missions_route_and_requests(server, tmp_path, monkeypatch):
+    base, _ = server
+    home = tmp_path / 'home'
+    home.mkdir()
+    monkeypatch.setattr(M.State, 'home', str(home))
+    assert json.loads(get(base, '/missions.json')[1]) == {'missions': []}
+    (home / 'missions.json').write_text('{"missions": [{"key": "gm"}], "updated": 5}')
+    assert json.loads(get(base, '/missions.json')[1])['missions'][0]['key'] == 'gm'
+
+    s, r = post(base, '/request', {'action': 'start', 'key': 'gm'})
+    assert s == 202 and r['queued'].endswith('-gm')
+    files = list((home / 'requests').iterdir())
+    assert len(files) == 1 and json.loads(files[0].read_text())['action'] == 'start'
+
+    port = base.rsplit(':', 1)[1]
+    assert post(base, '/request', {'action': 'check', 'key': 'gm'}, {'Origin': 'http://127.0.0.1:' + port})[0] == 202
+    # refused: no custom header, a form body, another origin, a bad action or key, too large, another path
+    assert post(base, '/request', {'action': 'check', 'key': 'gm'}, {'X-Monitor-Request': None})[0] == 403
+    assert post(base, '/request', b'action=check&key=gm', {'Content-Type': 'application/x-www-form-urlencoded'})[0] == 403
+    assert post(base, '/request', {'action': 'check', 'key': 'gm'}, {'Origin': 'http://evil.example'})[0] == 403
+    assert post(base, '/request', {'action': 'rm', 'key': 'gm'})[0] == 400
+    assert post(base, '/request', {'action': 'check', 'key': '../x'})[0] == 400
+    assert post(base, '/request', b'{' + b' ' * 2000 + b'}')[0] == 413
+    assert post(base, '/status.json', {'action': 'check', 'key': 'gm'})[0] == 404
+    assert len(list((home / 'requests').iterdir())) == 2

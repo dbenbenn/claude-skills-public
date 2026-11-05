@@ -4,6 +4,7 @@
 <link rel="icon" id="favicon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="vendor/uPlot.min.css">
 <link rel="stylesheet" href="agents.css">
+<link rel="stylesheet" href="glance.css">
 <script src="vendor/uPlot.iife.min.js"></script>
 <style>
 :root{color-scheme:light;--surface-0:#f5f4f1;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7974;--grid:#e4e3df;--series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#8f5bd6;--series-5:#c99a00;--disk-5:#c99a00;--rest:#c9c8c2;--track:#e9e8e4;--good:#008300;--warn:#b26b00;--alarm:#b42318}
@@ -14,8 +15,6 @@ main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
 h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14px}
 .card{background:var(--surface-1);border-radius:10px;padding:14px 16px;margin:0 0 14px}
 .alarm{background:var(--alarm);color:#fff;padding:10px 14px;border-radius:8px;margin:0 0 14px}
-.inbox{border:1px solid var(--grid);border-left:4px solid var(--good);background:var(--surface-1);padding:8px 14px;border-radius:8px;margin:0 0 14px;font-size:14px}
-.inbox.waiting{border-left-color:var(--warn)}.inbox b{font-weight:600}.inbox .items{color:var(--text-secondary);font-size:13px;overflow-wrap:anywhere}.inbox .items a{color:var(--series-1)}
 .alarm b{display:block;margin-bottom:2px}.alarm ul{margin:0;padding-left:18px}.alarm li{overflow-wrap:anywhere}
 .ph{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--grid);cursor:pointer}
 .ph:first-child{border-top:0}.ph.sel .n{text-decoration:underline;text-underline-offset:3px}
@@ -58,17 +57,25 @@ code{font-size:13px}
 <h1 id="h1">monitor</h1>
 <p class="sub" id="upd">Loading…</p>
 <div class="alarm" id="alarm" role="alert" hidden></div>
-<div class="inbox" id="inbox" hidden></div>
-<nav class="nav" aria-label="Views"><a href="#t-quota">Subscription quota</a><a href="#t-sys">System resources</a><a href="#t-disk">Disk</a><a href="#t-agents">Headless agents</a><a href="#sections">Work in progress</a></nav>
-<section class="card" aria-labelledby="t-quota">
-<h2 id="t-quota">Subscription quota</h2>
-<p class="chart-sub" id="quota-sub">Loading…</p>
-<div class="qgrid">
-<div class="chart"><h3>5-hour window (last 48 h)</h3><div id="c-q5"></div></div>
-<div class="chart"><h3>7-day window (last 7 days)</h3><div id="c-q7"></div></div>
-</div>
-<p class="hint">Utilization of the Claude subscription as reported in the agents' rate-limit records. Solid lines mark past resets, the dashed line the next one. Steps change only while some agent is running.</p>
+<nav class="nav" aria-label="Views"><a href="#t-needs">Needs you</a><a href="#t-missions">Missions</a><a href="#t-agents">Headless agents</a><a href="#sections">Work in progress</a><a href="#t-sys">System</a><a href="#t-disk">Disk</a><a href="#t-quota">Quota</a></nav>
+<section class="glance" id="glance" aria-label="At a glance"></section>
+<section class="card" aria-labelledby="t-needs">
+<h2 id="t-needs">Needs you</h2>
+<div id="needs"><p class="empty">Loading…</p></div>
 </section>
+<section class="card" aria-labelledby="t-missions">
+<h2 id="t-missions">Missions in flight</h2>
+<p class="chart-sub" id="missions-sub">Loading…</p>
+<div id="missions"></div>
+</section>
+<section class="card" aria-labelledby="t-agents">
+<h2 id="t-agents">Headless agents</h2>
+<p class="chart-sub" id="agents-sub">Loading…</p>
+<div class="qov" id="queue-ov" hidden></div>
+<div id="agents-box"></div>
+</section>
+<div id="sections"></div>
+<p class="meta" id="problems" hidden></p>
 <section class="card" aria-labelledby="t-sys">
 <h2 id="t-sys">System resources</h2>
 <p class="chart-sub">The whole machine, split by what uses it; sampled every 30 s · times in Berlin time (CET/CEST). Memory: each category's own process memory (file cache excluded): Lean (Lean, lake, the Lean slots), queue workers (the queue supervisor, headless agents and detached carve drivers), Claude sessions (interactive ones and their tools); the rest is everything else in use.</p>
@@ -101,14 +108,12 @@ code{font-size:13px}
 <div class="dtab" id="disk-table"></div>
 <p class="hint">Categories are measured hourly with <code>du</code> at idle I/O priority; the total and free space come from the filesystem every 30 s. Lean build output: every <code>.lake</code> under ~/claude except its <code>packages</code> (the workspace build, mission repos). Lean libraries and toolchains: <code>.lake/packages</code> (Mathlib and friends), ~/.elan, ~/.cache/mathlib. Agent job scratch: ~/.claude/jobs (carve dirs). Repos and sources: ~/claude outside <code>.lake</code>. Caches, /tmp, transcripts: the rest of ~/.cache, /tmp, and ~/.claude outside jobs. The grey rest is whatever the filesystem counts beyond these: the Nix store, the 32 GiB swap file, other home directories. The banner warns below 20 GiB free; the OAI queue stops launching below 40.</p>
 </section>
-<section class="card" aria-labelledby="t-agents">
-<h2 id="t-agents">Headless agents</h2>
-<p class="chart-sub" id="agents-sub">Loading…</p>
-<div class="qov" id="queue-ov" hidden></div>
-<div id="agents-box"></div>
+<section class="card" aria-labelledby="t-quota">
+<h2 id="t-quota">Subscription quota</h2>
+<p class="chart-sub" id="quota-sub">Loading…</p>
+<div class="chart"><h3>7-day window (last 7 days)</h3><div id="c-q7"></div></div>
+<p class="hint">Utilization of the Claude subscription as reported in the agents' rate-limit records. Solid lines mark past resets, the dashed line the next one. Steps change only while some agent is running. The agents' records stopped reporting the 5-hour window on 31 Oct, so it is no longer charted.</p>
 </section>
-<div id="sections"></div>
-<p class="meta" id="problems" hidden></p>
 <details><summary>Adding a section</summary><p>Any job can add its own section: write <code>~/claude/monitor/sections/&lt;id&gt;.json</code>, e.g. with
 <code>python3 ~/.claude/skills/monitor/section.py set my-job --title 'My job' --phase 'Items=3/10'</code>. The <code>monitor</code> skill has the details.</p></details>
 </main>
@@ -179,9 +184,10 @@ function stacked(el, height, x, groups, raw, labelOf, colorOf, fmt, unit, yRange
   for (const g of groups) { acc = acc.map((a, i) => raw[g][i] == null ? null : (a ?? 0) + raw[g][i]); cum.push(acc); }
   const order = groups.map((g, i) => i).reverse();
   const series = order.map(i => ({label: labelOf(groups[i]), stroke: css(colorOf(groups[i])), fill: css(colorOf(groups[i])), width: 1,
-    value: (u, v, si, idx) => { const j = idx ?? lastIdx(u), r = raw[groups[i]][j]; return r == null ? '—' : fmt(r) + ' ' + unit; }}));
+    // u._raw: upsert reuses a chart and only swaps its data, so the legend must not keep the first build's values
+    value: (u, v, si, idx) => { const j = idx ?? lastIdx(u), r = (u._raw || raw)[groups[i]][j]; return r == null ? '—' : fmt(r) + ' ' + unit; }}));
   const data = [x, ...order.map(i => cum[i])];
-  return {opts: baseOpts(el, height, series, yRange, fmt), data};
+  return {opts: baseOpts(el, height, series, yRange, fmt), data, raw};
 }
 
 function lines(el, height, x, defs, fmt, unit, yRange){
@@ -192,11 +198,12 @@ function lines(el, height, x, defs, fmt, unit, yRange){
 
 function upsert(id, built){
   const el = document.getElementById(id);
-  if (charts[id] && charts[id]._key === built.key) { charts[id].setData(built.data, false); return; }
+  if (charts[id] && charts[id]._key === built.key) { charts[id]._raw = built.raw; charts[id].setData(built.data, false); return; }
   if (charts[id]) charts[id].destroy();
   el.innerHTML = '';
   charts[id] = new uPlot(built.opts, built.data, el);
   charts[id]._key = built.key;
+  charts[id]._raw = built.raw;
 }
 
 
@@ -288,8 +295,8 @@ function drawDisk(d){
     ready: [u => u.over.addEventListener('dblclick', () => { diskView = null; diskApply(); })]};
   b.opts.series[0].value = (u, v, si, idx) => idx == null ? 'latest' : fmtAt(v);
   const key = document.documentElement.clientWidth + '|' + matchMedia('(prefers-color-scheme: dark)').matches + '|' + DISK_GROUPS.map(g => labels[g]).join('|');
-  if (diskChart && diskKey === key) diskChart.setData(b.data, false);
-  else { if (diskChart) diskChart.destroy(); el.innerHTML = ''; diskChart = new uPlot(b.opts, b.data, el); diskKey = key; }
+  if (diskChart && diskKey === key) { diskChart._raw = b.raw; diskChart.setData(b.data, false); }
+  else { if (diskChart) diskChart.destroy(); el.innerHTML = ''; diskChart = new uPlot(b.opts, b.data, el); diskKey = key; diskChart._raw = b.raw; }
   diskApply();
   // the table: every category now and its change over a day and a week (also the chart's text view)
   const ago = s => { const t = lastR.t - s; const r = R.find(r => r.t >= t - 1800); return r && r.t <= t + 1800 ? r : null; };
@@ -319,13 +326,6 @@ async function load(){
   const pr = document.getElementById('problems'), P = s.problems || [];
   pr.hidden = !P.length; pr.textContent = P.length ? 'Section files the page could not read: ' + P.join('; ') : '';
   al.innerHTML = s.alerts.length ? `<b>${esc(s.host||'machine')} needs attention</b><ul>${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>` : '';
-  const IB = s.inboxes || [], ib = document.getElementById('inbox');
-  ib.hidden = !IB.length;
-  ib.className = 'inbox' + (IB.some(e => e.count) ? ' waiting' : '');
-  const age = n => n == null ? '' : n < 3600 ? Math.round(n/60) + ' min' : n < 172800 ? Math.round(n/3600) + ' h' : Math.round(n/86400) + ' days';
-  ib.innerHTML = IB.map((e, i) => e.missing ? `<div><b>${esc(e.label)}</b>: directory missing (${esc(e.dir)})</div>`
-    : e.count ? `<div><b>${esc(e.label)}: ${e.count} waiting</b> · oldest ${esc(age(e.oldest_s))}<div class="items">${e.items.map(n => `<a href="/inbox/${i}/${encodeURIComponent(n)}" target="_blank" rel="noopener">${esc(n)}</a>`).join(' · ')}${e.count > e.items.length ? ' …' : ''}</div></div>`
-    : `<div><b>${esc(e.label)}</b>: empty</div>`).join('');
   const C = s.cleared || [];
   document.getElementById('cleared-box').hidden = !C.length;
   document.getElementById('cleared').innerHTML = C.map(e => `<li><span class="when">${esc(fmtSpan(e.first, e.last))}</span> · ${e.what==='machine'?'':esc(e.what)+': '}${esc(e.text)}${e.what!=='machine' && e.n>1 ? ` · ${e.n} checks` : ''}</li>`).join('');
@@ -333,6 +333,7 @@ async function load(){
   drawDisk(s.system.disk);
   drawSections(s.sections||[]);
   if (typeof drawQuota === 'function') drawQuota();
+  if (typeof drawGlance === 'function') { drawGlance(); drawNeeds(); }
 }
 
 function procTable(rows, withCwd){
@@ -413,4 +414,5 @@ function sectionChart(s, card){
 
 load(); setInterval(load, 30000);
 </script>
-<script src="agents.js"></script></body></html>
+<script src="agents.js"></script>
+<script src="glance.js"></script></body></html>

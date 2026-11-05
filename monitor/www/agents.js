@@ -56,13 +56,23 @@ function agentCard(a){
 function drawAgents(){
   const box = document.getElementById('agents-box');
   if (!box || !agentsData) return;
-  const A = agentsData, grp = (t, rows) => rows.length ? `<div class="agrp">${t} (${rows.length})</div>` + rows.map(agentCard).join('') : '';
-  box.innerHTML = grp('Running', A.running) + grp('Finished in the last 24 h', A.recent) ||
-    '<p class="empty">No headless agents are running or finished in the last 24 h.</p>';
-  if (!A.running.length && !A.recent.length) box.innerHTML = '<p class="empty">No headless agents are running or finished in the last 24 h.</p>';
+  const A = agentsData;
+  // finished agents fold away (remembered per browser): the running ones are what is watched
+  const fin = box.querySelector('details.afin'), finOpen = fin ? fin.open : store.get('monitor.finishedOpen', '0') === '1';
+  box.innerHTML = (A.running.length ? `<div class="agrp">Running (${A.running.length})</div>` + A.running.map(agentCard).join('') : '<p class="empty">No headless agent is running.</p>') +
+    (A.recent.length ? `<details class="afin"${finOpen ? ' open' : ''}><summary class="agrp">Finished in the last 24 h (${A.recent.length})</summary>${A.recent.map(agentCard).join('')}</details>` : '');
+  box.querySelector('details.afin')?.addEventListener('toggle', e => store.set('monitor.finishedOpen', e.target.open ? '1' : '0'));
   drawQueue(A.queue);
+  if (typeof drawNeeds === 'function') drawNeeds();
   document.getElementById('agents-sub').textContent = `${A.running.length} running · ${A.recent.length} finished in 24 h${A.hidden ? ' · ' + A.hidden + ' older hidden' : ''} · cost is list price (estimate until the run ends)`;
 }
+
+// one queue group as a list row (also the Needs-you card's)
+const queueLi = r => `<li><b>${esc(r.label)}</b> <small>${esc(r.module)}</small>` +
+    (r.why ? ` · ${esc(r.why)}` : '') + (r.held_by ? ` · held by overlap with ${esc(r.held_by)}` : '') +
+    (r.last_batch ? ` · last batch <a href="page/agent.html?name=${encodeURIComponent(r.last_batch)}">${esc(r.last_batch)}</a>` : '') +
+    (r.goals && r.goals.length ? ` · ${r.goals.length} goal${r.goals.length > 1 ? 's' : ''} open` : '') +
+    (r.resume ? `<br><small>notes: ${esc(r.resume)}</small>` : '') + '</li>';
 
 // the OAI queue's overview.json: what waits to be picked up and what the queue will not retry by itself
 function drawQueue(Q){
@@ -72,20 +82,15 @@ function drawQueue(Q){
   el.hidden = false;
   const c = Q.counts, slots = Q.retry_slots || [0, 0];
   const tile = (n, lab, title, warn) => `<div class="tile${warn ? ' warn' : ''}" title="${esc(title)}"><div class="num">${n}</div><div class="lab">${esc(lab)}</div></div>`;
-  const li = r => `<li><b>${esc(r.label)}</b> <small>${esc(r.module)}</small>` +
-    (r.why ? ` · ${esc(r.why)}` : '') + (r.held_by ? ` · held by overlap with ${esc(r.held_by)}` : '') +
-    (r.last_batch ? ` · last batch <a href="page/agent.html?name=${encodeURIComponent(r.last_batch)}">${esc(r.last_batch)}</a>` : '') +
-    (r.goals && r.goals.length ? ` · ${r.goals.length} goal${r.goals.length > 1 ? 's' : ''} open` : '') +
-    (r.resume ? `<br><small>notes: ${esc(r.resume)}</small>` : '') + '</li>';
+  const li = queueLi;
   const opened = new Set([...el.querySelectorAll('details[open]')].map(d => d.dataset.k));
   const list = (rows, t) => rows && rows.length ? `<details data-k="${esc(t)}"${opened.has(t) ? ' open' : ''}><summary>${esc(t)} (${rows.length})</summary><ul>${rows.map(li).join('')}</ul></details>` : '';
   el.innerHTML =
     tile(c.waiting, 'new groups waiting', 'Open target groups not yet tried, in queue order') +
     tile(c.retry_waiting, `retries waiting · ${slots[0]}/${slots[1]} retry slots busy`, `Attempted groups with notes and a retry left (${Q.retry_attempts} allowed); they launch on the retry model once nothing new waits and a retry slot is free`) +
     tile(c.running, 'batches running', (Q.running || []).map(b => b.name).join(', ')) +
-    tile(c.needs_person, 'need a person', 'Attempted, still Open, and the queue will not retry them by itself: retry spent, no notes, or on no_retry', c.needs_person > 0) +
+    `<a class="tilelink" href="#t-needs">${tile(c.needs_person, 'need a person', 'Attempted, still Open, and the queue will not retry them by itself: retry spent, no notes, or on no_retry. Listed under Needs you', c.needs_person > 0)}</a>` +
     tile(c.proved, 'groups proved', 'Target groups whose goals are all Proved') +
-    list(Q.needs_person, 'Need a person: the queue will not retry these by itself') +
     list(Q.retry_waiting, 'Retries waiting') + list(Q.waiting, 'New groups waiting') +
     `<p class="hint" style="grid-column:1/-1;margin:0">OAI queue ${Q.stop ? '<b>STOP set</b> · ' : ''}as of ${esc(fmtAt(Q.updated))}</p>`;
 }
@@ -146,9 +151,8 @@ function drawQuota(){
   else {
     const since = col => { const s = q.filter(r => r[col] != null); return s.length ? ` since ${fmtAt(s[s.length-1][0])}` : ''; };
     const win = (name, p, r, col) => p == null ? `${name} not reported${since(col)}` : `${name} ${p.toFixed(0)}% used, resets ${fmtAt(r)}`;
-    sub.textContent = `${win('5-hour window', n[1], n[2], 1)} · ${win('7-day window', n[3], n[4], 3)} · newest record across the agents' transcripts (last sample ${ago(Math.round(last.updated - n[0]))})`;
+    sub.textContent = `${win('7-day window', n[3], n[4], 3)} · newest record across the agents' transcripts (last sample ${ago(Math.round(last.updated - n[0]))})`;
   }
-  quotaChart('c-q5', 1, 48*3600, '5-hour window');
   quotaChart('c-q7', 3, 7*86400, '7-day window');
 }
 

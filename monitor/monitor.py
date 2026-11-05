@@ -576,6 +576,7 @@ class State:
     costs = {}                      # agent -> [[t, cost]], from the sampler
     agents = (0, b'{}')             # (time, body) cache of /agents.json
     inboxes_conf = os.path.expanduser('~/claude/monitor/inboxes.json')   # step() sets MONITOR_HOME's
+    home = os.path.expanduser('~/claude/monitor')                       # main() sets MONITOR_HOME
 
 
 def step(home, now=None):
@@ -700,7 +701,66 @@ def agents_body(now=None):
     return State.agents[1]
 
 
+REQUEST_ACTIONS = ('check', 'start')
+REQUEST_KEY = re.compile(r'^[a-z0-9][a-z0-9-]{0,30}$')
+
+
+def missions_body():
+    """MONITOR_HOME/missions.json as written by the mission tracker (claude-private/tools/mission-tracker),
+    or an empty list when no tracker runs."""
+    try:
+        return open(os.path.join(State.home, 'missions.json'), 'rb').read()
+    except OSError:
+        return b'{"missions": []}'
+
+
+def post_request(headers, body):
+    """(status, reply) for POST /request: queue {action, key} for the mission tracker as a file in
+    MONITOR_HOME/requests/. The page never runs anything itself; the tracker validates the key against
+    its missions and decides. Only same-origin script requests pass: a custom header (which a
+    cross-site form cannot send without a preflight this server never answers), a JSON body, a small
+    one, and an Origin, when sent, naming this host."""
+    if headers.get('X-Monitor-Request') != '1' or not (headers.get('Content-Type') or '').startswith('application/json'):
+        return 403, {'error': 'not a page request'}
+    origin, host = headers.get('Origin'), headers.get('Host') or ''
+    if origin and urllib.parse.urlparse(origin).netloc != host:
+        return 403, {'error': 'cross-origin'}
+    if len(body) > 1024:
+        return 413, {'error': 'too large'}
+    try:
+        r = json.loads(body)
+    except ValueError:
+        return 400, {'error': 'bad json'}
+    if not isinstance(r, dict) or r.get('action') not in REQUEST_ACTIONS or not REQUEST_KEY.match(str(r.get('key', ''))):
+        return 400, {'error': 'want {action: check|start, key}'}
+    d = os.path.join(State.home, 'requests')
+    os.makedirs(d, exist_ok=True)
+    rid = '%d-%s' % (time.time_ns(), r['key'])
+    save_json(os.path.join(d, rid + '.json'), {'action': r['action'], 'key': r['key'], 'at': int(time.time())})
+    return 202, {'queued': rid}
+
+
 class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        path = self.path.partition('?')[0]
+        try:
+            n = int(self.headers.get('Content-Length') or 0)
+            if path != '/request':
+                code, reply = 404, {'error': 'not found'}
+            elif n > 1024:
+                code, reply = 413, {'error': 'too large'}
+            else:
+                code, reply = post_request(self.headers, self.rfile.read(n))
+        except Exception as e:                 # noqa: BLE001
+            code, reply = 500, {'error': repr(e)}
+        body = json.dumps(reply).encode()
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         path, _, query = self.path.partition('?')
         extra = {}
@@ -710,6 +770,8 @@ class Handler(BaseHTTPRequestHandler):
                 body = State.status
             elif path == '/agents.json':
                 body = agents_body()
+            elif path == '/missions.json':
+                body = missions_body()
             elif path.startswith('/agent/'):
                 code, body, ctype, extra = agent_file(path, query)
             elif path.startswith('/inbox/'):
@@ -737,6 +799,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     home = S.home_dir()
+    State.home = home
     st = load_json(os.path.join(home, 'state', 'status.json'), None)
     if st:
         State.status = json.dumps(st, ensure_ascii=False).encode()

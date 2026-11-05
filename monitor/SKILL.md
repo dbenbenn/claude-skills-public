@@ -110,10 +110,11 @@ step is above the dark lightness band and stays as it is for the swap chart.
 
 ## Headless agents, quota and logs (no tokens)
 
-The main page has two more cards around the system charts (quota above them since 2026-10-31, agents below):
+The main page has two more cards (their order is in "Page layout" below):
 
-- **Subscription quota**: the 5-hour window (last 48 h) and the 7-day window (last 7 days) as step charts,
-  with reset markers (solid = past, dashed = next). The sampler (`agents.update_quota`) reads only the new
+- **Subscription quota**: the 7-day window (last 7 days) as a step chart (the 5-hour window, not reported
+  by the agents' records since 2026-10-31, was dropped from the page on 2026-11-05; status.json keeps its
+  column), with reset markers (solid = past, dashed = next). The sampler (`agents.update_quota`) reads only the new
   bytes of each `~/claude/headless-agents/*/transcript.jsonl` and takes the `rate_limit_event`
   (`rate_limit_info.unifiedWindows.{five_hour,seven_day}.{utilization,resetsAt}`) from the most recently
   written file. Utilization is a 0..1 fraction there; it is stored and shown as %. The series
@@ -156,6 +157,39 @@ must resolve inside that directory, responses are capped at 512 KiB. For transcr
 (negative = from the end) and the reply holds whole lines only, with `X-Start`, `X-End`, `X-Size` headers: poll
 again from `X-End`. Code: `agents.py` (summary, phases, safe paths, quota); tests `test_agents.py`,
 `test_server.py`.
+
+## Page layout (2026-11-05)
+
+dbenbenn watches the load and quota but scrolled past the charts to reach the agents and "need a
+person", so the page reads top-down by what wants attention (`www/glance.js`, `www/glance.css`):
+
+1. **Glance tiles**: memory, CPU, load, swap, stalls, disk free, 7-day quota, each a number, one line
+   and a 3-hour sparkline (7 days for quota), amber or red at the banner's thresholds (disk amber
+   below 40 GiB free, where the OAI queue stops); each links to its detailed chart.
+2. **Needs you**: one list of everything waiting for a person: missions waiting on him or ready to
+   start, section alerts (with the section's state when not running), STALE sections, unreadable
+   section files, the OAI queue's need-a-person groups, and the inboxes (which had their own box
+   above the nav before). "Nothing needs you right now" when empty.
+3. **Missions in flight** (below).
+4. **Headless agents**: queue tiles (the need-a-person tile links to Needs you), the running agents;
+   the finished ones fold into a `<details>` whose open state the browser remembers.
+5. The work-in-progress sections, then the detailed **System resources**, **Disk** and **Quota** cards.
+
+**Missions in flight.** `GET /missions.json` serves `MONITOR_HOME/missions.json`, written by the mission
+tracker (`~/claude/claude-private/tools/mission-tracker`, user unit `mission-tracker.service`; its README
+has the steps). Each mission is a row of five steps (Submit, publish, After Submit, review, After
+approval) with who each waits on, and two buttons: **Check now** (the tracker asks prove2.me) and
+**Start/Retry** a Claude step (a headless agent; the page asks for confirmation). Buttons `POST /request`
+`{action: check|start, key}`; the monitor only writes the request to `MONITOR_HOME/requests/` and never
+runs anything itself. It accepts a request only with the header `X-Monitor-Request: 1` and a JSON
+content type (a cross-site form can send neither without a preflight this server never answers), a
+body of at most 1 KiB, and an `Origin`, when present, naming this host (`post_request`, tested in
+`test_server.py`). The page then polls `/missions.json` until the mission's `pending.rid` matches the
+id the POST returned (a phone's clock may differ from the box's).
+
+**Stacked-chart legends** read `u._raw`, which `upsert` (and the disk chart) refresh along with the data:
+a reused chart's legend otherwise kept the values of the page's first load (2026-11-05: a tab open
+since the morning showed queue workers at 1.2 GiB beside an 18 GiB band).
 
 ## Changing the monitor
 

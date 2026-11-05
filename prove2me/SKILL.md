@@ -804,6 +804,12 @@ does not.
 
 ## Expansion 10 — the human audit and Submit
 
+**Register the Draft with the mission tracker at hand-over**, where the machine has one (the monitoring
+page's Missions card; `tracker.py add KEY --proposal ID --repo DIR --memory FILE`, with this mission's
+own `--after-submit` and `--after-approval` tasks: its readings package, its queue groups, its pending
+live fixes). The human then sees Submit, publishing and review on the card and starts the after-Submit
+and post-approval steps there with one click, instead of telling a session that the mission moved.
+
 The human confirms each draft item on the platform and clicks Submit. **Submit is asynchronous**:
 one publish job per item, compiled one at a time in `item_order` (about two minutes per theorem
 on a busy queue, under a minute on a quiet one). Until the last job finishes the proposal still
