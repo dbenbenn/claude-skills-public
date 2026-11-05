@@ -443,6 +443,10 @@ and new `carve.py` inside one carve. So:
     the global re-plan at a larger `time_scale` as before; otherwise each slow bundle is split alone
     (`carve.py split CONFIG TIMES --limit BUDGET --only NAMES`, up to three rounds): every other bundle keeps its
     declarations, name and imports, so only the files importing the split one change and are measured again.
+    Unpublished bundles are over at 80 s local even when the budget allows more (`BUNDLE_OWN_LIMIT`, 17a5cac): q172's
+    literal-heavy data bundles at 83–88.6 s hit the server's own 300 s timeout. For a bundle a few seconds over
+    that few items import, `accept_over` is the cheap exit; a split round costs a full `gen` plus a re-measure
+    (q154: about 8 h). Calibrate warns when an excused bundle gates 5 or more items (q154 E001: 6 tries).
   - **A slow piece** in `calibrate_pieces`, nothing published: as before (a uniform overrun re-plans at the ratio, a
     lone one stops with the profiling hint). Once published, nothing is re-planned globally: each slow piece gets
     one frozen re-plan in which only its own declarations (`keep` in the plan) cost its measured / planned ratio
@@ -822,8 +826,9 @@ back WA. The lessons:
   bundle rate fell from 159 an hour to about 10, with 70% platform compile timeouts, and D297 (closure 1,647 s)
   ended `dependency_oom`, the slowdown Erdős 3 hit before. Every bundle measured under 90 s: the per-item budget
   cannot see this. When bundle publishes slow down or time out, re-plan the unpublished part with its lemmas as
-  statements (the live bundles `frozen`) instead of pushing it through. Proposed, not built: `plan` reports each
-  item's closure cost (summed seconds of its transitive bundles) and warns over ~1,000 s. Closure *bytes* look
+  statements (the live bundles `frozen`) instead of pushing it through. `plan` and `check` give each heavy chain a
+  verdict against the 300 s cold build, and calibrate warns on measured chain sums over 150 s (17a5cac; q154: 576 s
+  measured against 369 s planned, the plan's chains ran 1.5x; retries on warm workers cleared about 340 s). Closure *bytes* look
   like a second ceiling (q149, oaiq-106): every published bundle's closure was ≤ 0.74 GB of .olean, D186 at
   0.87 GB (local 15-30 s, 39 direct imports) hit "Module compilation timed out after 300s" 30+ times, and the 31
   bundles above it (1.5 GB and up) never published, while same-sized files with one import did. One carve's
@@ -950,8 +955,12 @@ back WA. The lessons:
   can add it to every module naming `Matrix` (`matrix_default_instance=True`), off by default: one failure in
   about 11,000 such modules, and the attribute rides along in every bundle carved from them.
 - **Platform lexer timeouts** ("Token scanner timed out after 10s", "Import parser timed out after 5s") on small
-  statements are platform load and retried automatically (2675af1); an item an older snapshot stopped:
+  statements, and on big bundles (q154: E079, 670 KB), are platform load and retried automatically (2675af1);
+  each cleared on the second attempt. An item an older snapshot stopped:
   `split_run.py publish/run.json --go --reset statement:NAME` once (oaiq-089).
+- **`gen` is silent for hours** on a few thousand nodes (q154: 3.5 h): the out/lib file count stays still and the
+  process sits at 95–100% CPU. That is not a hang. A watcher on a carve's logs must not match `rror`, since
+  calibrate's "no systematic error" line contains it: use `Traceback|FAIL|Killed`.
 - **Unused imports of a definitions bundle are kept** (oaiq-075, 733702b). carve_measure reports them and fails
   or cuts only false edges between statements: a later bundle's `attribute [-instance]` line can name an
   instance it sees only through that import, and cutting it broke 17 items with "Unknown constant".
@@ -987,6 +996,17 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   the early-publish plan wrote into `published/lib` but never sent are locked too, so `gen` keeps their old text:
   with no publisher running, move the unposted ones out of `published/lib` (keep a backup) before the `gen` that
   should change them (q151).
+- **Splitting one stopped bundle by hand after publish_early** (q172, 17a5cac):
+  1. Let the publisher end, or (on a HOLD from a worker) stop it and the driver: a running publisher locks every
+     unsent item of its plan.
+  2. `carve.py split config.json work/times.json --limit 55 --only X`. When the parts form a chain, the top part
+     keeps the name X and no importer changes. Otherwise the tool writes the changed importers into
+     `pipeline.json` `thaw`. The old plan is kept as `work/plan.pre_split[.N].json`.
+  3. Copy `out/lib` aside, then run `carve_pipeline.py DIR --upgrade --keep-port --publish --detach` (add
+     `--redo gen` for a carve last generated before 301958e).
+  4. Diff out/lib against the copy: only X, the new parts and any thawed importers may change. A posted
+     importer cannot change, so that case needs a re-plan.
+  5. split_run sends X again by itself, since its text changed after it stopped.
 - **A re-plan only reshapes what is not live** (q160, 2f6bb06). oaiq-075's slow piece (163 s, three verifier
   timeouts) came back from the automatic split unchanged: seven folded CoeT statements were also `forced`, so the
   plan sized seven 40 s slices and the fold summed them into one 271 s piece (fixed: folded nodes are neither
