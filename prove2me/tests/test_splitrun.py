@@ -852,6 +852,50 @@ def test_an_in_flight_submission_from_an_older_state_is_timed_from_when_this_run
     assert summary['live'] == 7
 
 
+def test_a_publish_job_compiling_past_the_limit_is_sent_again(split):
+    # q172 (2026-11-05): two definition jobs stayed COMPILING on the platform for 8 hours; the run polled
+    # them forever, they held two of its four slots, and with something in flight the run never ended
+    d, cfg = split
+    api = FakeApi(script={'XB001': [('COMPILING', None)] * 8})
+    r, summary = clocked_run(cfg, api, Clock())
+    assert api.posted.count(('def', 'XB001')) == 2
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['bundle:XB001']['state'] == 'live' and len(st['bundle:XB001']['lost']) == 1
+    assert summary['live'] == 7 and not summary['stopped']
+    assert 'no result after 3.0 h' in (d / 'PROGRESS.log').read_text()
+
+
+def test_a_stale_publish_job_whose_item_went_live_meanwhile_is_adopted(split):
+    # the stuck job may have published after all: a resend would only be refused as "name taken"
+    d, cfg = split
+
+    class LateApi(FakeApi):
+        def job(self, jid):
+            if self.jobs[jid] == ('def', 'XB001'):
+                self.published['XB001'] = 'id-late'     # live on the platform, the job record never says so
+                self.polls = getattr(self, 'polls', 0) + 1
+                assert self.polls < 50, 'a stale job polled forever'
+                return {'status': 'COMPILING'}
+            return super().job(jid)
+
+    api = LateApi()
+    r, summary = clocked_run(cfg, api, Clock())
+    assert api.posted.count(('def', 'XB001')) == 1
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['bundle:XB001']['state'] == 'live' and st['bundle:XB001']['id'] == 'id-late'
+    assert summary['live'] == 7
+
+
+def test_a_publish_job_lost_again_and_again_waits_for_a_person(split):
+    d, cfg = split
+    api = FakeApi(script={'XB001': [('COMPILING', None)] * 1000})
+    r, summary = clocked_run(cfg, api, Clock())
+    assert api.posted.count(('def', 'XB001')) == R.LOST_CAP + 1
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['bundle:XB001']['state'] == 'give_up'
+    assert 'bundle:XB001' in summary['stopped']
+
+
 def test_a_lost_pending_proof_is_not_adopted_at_a_restart(split):
     # reconcile adopts a live proof with our text, PENDING included; the lost one must not count
     d, cfg = split

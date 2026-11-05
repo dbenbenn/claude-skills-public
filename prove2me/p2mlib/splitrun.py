@@ -412,6 +412,8 @@ class Runner:
                 rec = self.api.job(st['job'])
                 if rec.get('status') in FINAL_JOB:
                     self._result(x, rec, 'publish')
+                else:
+                    self._check_lost_job(x, st)
             else:
                 rec = self.api.verdict(st['sid'])
                 if rec.get('status') and rec.get('status') != 'PENDING':
@@ -443,6 +445,42 @@ class Runner:
         else:
             st['state'] = 'give_up'
             self.log(x, 'verdict', 'NEEDS A PERSON: %s (%d resends lost too)' % (st['last'], n))
+        self.save()
+
+    def _check_lost_job(self, x, st):
+        """A publish job (bundle or statement) unfinished past the limit is lost, like a submission: q172
+        (2026-11-05), two definition jobs stayed COMPILING for 8 hours, held two of the run's slots, and with
+        something in flight the run never ended. If the item is live under its name with our text meanwhile it
+        is adopted; else it is sent again, and after LOST_CAP resends it waits for a person."""
+        now = self.clock()
+        if 'sent' not in st:
+            st['sent'] = now
+            self.save()
+            return
+        hours = float(self.cfg.get('stale_pending_hours', STALE_PENDING_HOURS))
+        if now - st['sent'] < hours * 3600:
+            return
+        f = self.info(x)
+        rec = self.api.existing(f['kind'], f['name'])
+        if rec and os.path.exists(f['file']) and same_as_ours(f['kind'], rec, open(f['file'], encoding='utf-8').read()):
+            st.pop('job')
+            st.pop('sent')
+            st.update(state='live', id=rec['id'])
+            self.log(x, 'publish', 'job unfinished after %.1f h, but live under its name: adopted %s' % (hours, rec['id']))
+            self.save()
+            return
+        n = st['history'].get('lost', 0)
+        st['history']['lost'] = n + 1
+        job = st.pop('job')
+        st.pop('sent')
+        st['lost'] = st.get('lost', []) + [job]
+        st['last'] = 'no result after %.1f h: publish job %s lost' % (hours, job)
+        if n < LOST_CAP:
+            st['state'] = 'todo'
+            self.log(x, 'publish', '%s, sending again' % st['last'])
+        else:
+            st['state'] = 'give_up'
+            self.log(x, 'publish', 'NEEDS A PERSON: %s (%d resends lost too)' % (st['last'], n))
         self.save()
 
     def inflight(self):
@@ -508,7 +546,7 @@ class Runner:
                 'definition': open(f['file'], encoding='utf-8').read(),
                 'natural_language_statement': body, 'source': source,
                 'tags': self.cfg.get('tags', [])})
-            st.update(state='inflight', job=job, sha=self.file_sha(x))
+            st.update(state='inflight', job=job, sha=self.file_sha(x), sent=self.clock())
             self.log(x, 'submit-definition', 'job %s' % job)
             self.save()
         elif f['kind'] == 'statement':
@@ -572,7 +610,7 @@ class Runner:
                           'tags': self.cfg.get('tags', [])})
         jobs = self.api.submit_problems(probs)
         for x, job in zip(batch, jobs):
-            self.st(x).update(state='inflight', job=job, sha=self.file_sha(x))
+            self.st(x).update(state='inflight', job=job, sha=self.file_sha(x), sent=self.clock())
             self.log(x, 'submit-problem', 'job %s' % job)
         self.save()
 
