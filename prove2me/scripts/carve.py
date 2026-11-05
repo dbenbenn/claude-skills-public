@@ -8,7 +8,12 @@ usage: carve.py graph CONFIG.json                  # DeclGraph + LeanInfo of eve
        carve.py order CONFIG.json                  # the publish DAG, as concurrent waves
        carve.py split CONFIG.json TIMES.json [--limit 60] [--only B1,B2]   # cut only the bundles
                                                    # measured over LIMIT s local (-j1), or only those
-                                                   # named; the rest stay as they are
+                                                   # named; the rest stay as they are. With --only, parts
+                                                   # forming a chain leave the old name on the top part
+                                                   # (importers unchanged); else the changed importers
+                                                   # go into pipeline.json `thaw` once publish_early ran.
+                                                   # The old plan: work/plan.pre_split.json (older
+                                                   # copies plan.pre_split.N.json)
        carve.py fold  CONFIG.json NODE ...         # NODEs stop being statements: their pieces go into
                                                    # every importer's piece (plan in place, config `folded`)
 
@@ -278,6 +283,62 @@ def apply_cost_factors(cost, cfg):
     return out
 
 
+def print_chains(g, P, cfg):
+    """The heaviest bundle import chains of plan P, each with its verdict against the server's 300 s."""
+    rows = C.chain_report(g, P)
+    print('heaviest bundle import chains (planned s; what importing brings, and what its members need; '
+          'a cold verifier worker builds the whole chain within the item\'s %d s):' % C.SERVER_COLD)
+    for r in rows:
+        print('  %7.1f s  %s (%d bundles; members need %.1f s): %s' % (
+            r['chain'], r['bundle'], r['bundles'], r['needs'], C.chain_verdict(r['chain'])))
+    if any(r['needs'] < r['chain'] / 2 for r in rows) and cfg.get('chunker') != 'closure':
+        print('NOTE: chains well over their members\' need are bundle mixing; "chunker": "closure" removes it')
+    if rows and rows[0]['chain'] > C.CHAIN_WARN:
+        print('WARNING: chains over %d s planned; q154\'s measured chains ran 1.5x its plan (369 s planned, 576 s '
+              'measured) and cold-worker retries cleared up to ~340 s local (q172). calibrate re-checks them '
+              'measured; re-plan before publish_early if they stay far over' % C.CHAIN_WARN)
+
+
+def keep_backup(path, tag):
+    """The path to save the plan at `path` under before changing it: PLAN<tag>.json, an older copy there
+    first moved to the first free PLAN<tag>.N.json (q172: a second split round overwrote the first's)."""
+    base = path[:-5] + tag
+    if os.path.exists(base + '.json'):
+        i = 1
+        while os.path.exists('%s.%d.json' % (base, i)):
+            i += 1
+        os.replace(base + '.json', '%s.%d.json' % (base, i))
+    return base + '.json'
+
+
+def changed_importer_files(P, Q, split):
+    """The out/lib files (Def_*.lean, Thm_*.lean) of plan P's bundles and statements, other than the
+    `split` bundles themselves, whose imports differ in plan Q."""
+    old = {b['name']: b for b in P['bundles']}
+    out = ['Def_%s.lean' % b['name'] for b in Q['bundles']
+           if b['name'] in old and b['name'] not in split and b.get('imports') != old[b['name']].get('imports')]
+    ext = set(Q.get('external') or ())
+    out += ['Thm_%s.lean' % C.slug(C.statement_name(Q, n)) for n, st in sorted((Q.get('stubs') or {}).items())
+            if n not in ext and n in (P.get('stubs') or {}) and st.get('bundles') != P['stubs'][n].get('bundles')]
+    return sorted(out)
+
+
+def thaw_importers(config_path, files):
+    """Add `files` to pipeline.json `thaw` beside a carve_pipeline config once publish_early has frozen
+    the plan (published/plan.json): a frozen file never posted is locked until thawed, so gen would keep
+    its old imports (q172, OAIQ106E011's seven importers). False when there is no such carve."""
+    d = os.path.dirname(os.path.abspath(config_path))
+    pp = os.path.join(d, 'pipeline.json')
+    if not (os.path.exists(pp) and os.path.exists(os.path.join(d, 'published', 'plan.json'))):
+        return False
+    p = json.load(open(pp))
+    p['thaw'] = sorted(set(p.get('thaw') or ()) | set(files))
+    tmp = pp + '.tmp'
+    json.dump(p, open(tmp, 'w'), indent=1)
+    os.replace(tmp, pp)
+    return True
+
+
 def bundles_to_split(bundles, times, limit, only=None):
     """The bundles `carve.py split` cuts: measured over `limit`, or (with `only`) just those named."""
     slow = C.slow_bundles(bundles, times, limit)
@@ -375,11 +436,14 @@ def main(argv):
         overhead = cfg.get('import_overhead', 5.0)
         cost = C.calibrate_costs(costs(cfg, g), P['bundles'], times, scale, overhead)
         # calibrated costs leave out the import overhead, so the budget does too
-        Q = C.split_bundles(g, P, slow, cost, (limit - overhead) * scale, cfg.get('bundle_prefix'))
+        # --only (a stopped or late slow bundle): when the parts form a chain the top part keeps the old
+        # name, so its importers keep their text (q172)
+        Q = C.split_bundles(g, P, slow, cost, (limit - overhead) * scale, cfg.get('bundle_prefix'),
+                            top_keeps_name=bool(only))
         probs = C.check_plan(g, Q)
         if probs:
             sys.exit('split plan inconsistent:\n' + '\n'.join(probs[:20]))
-        backup = plan_path(cfg)[:-5] + '.pre_split.json'
+        backup = keep_backup(plan_path(cfg), '.pre_split')
         json.dump(P, open(backup, 'w'), indent=1)
         json.dump(Q, open(plan_path(cfg), 'w'), indent=1)
         old = {b['name'] for b in P['bundles']}
@@ -388,6 +452,11 @@ def main(argv):
                 b['name'] for b in Q['bundles'] if b['name'] == n or
                 (b['name'] not in old and set(b['nodes']) <= set(next(x for x in P['bundles'] if x['name'] == n)['nodes'])))))
         print('%d bundles -> %d; old plan saved as %s' % (len(P['bundles']), len(Q['bundles']), backup))
+        changed = changed_importer_files(P, Q, slow)
+        if changed:
+            print('importers whose imports change (%d): %s' % (len(changed), ' '.join(changed)))
+            if only and thaw_importers(argv[2], changed):
+                print('listed them in pipeline.json `thaw`: publish_early froze them, and gen must regenerate them')
     elif cmd == 'plan':
         g = load_graph(cfg)
         frozen = None
@@ -427,12 +496,7 @@ def main(argv):
             len(P['bundles']), len(P['nodes']), len(P['over']), len(P['sorry']), out))
         for c, n in worst:
             print('  %7.1f s  %s' % (c, n))
-        rows = C.chain_report(g, P)
-        print('heaviest bundle import chains (planned s; what importing brings, and what its members need):')
-        for r in rows:
-            print('  %7.1f s  %s (%d bundles; members need %.1f s)' % (r['chain'], r['bundle'], r['bundles'], r['needs']))
-        if any(r['needs'] < r['chain'] / 2 for r in rows) and cfg.get('chunker') != 'closure':
-            print('NOTE: chains well over their members\' need are bundle mixing; "chunker": "closure" removes it')
+        print_chains(g, P, cfg)
         probs = C.check_plan(g, P)
         warn_leaks(g, P)
         report_duplicates(g)
@@ -461,7 +525,9 @@ def main(argv):
         print('folded %s; pieces that change (resubmit them, --replaces their live proofs): %s' % (
             ' '.join(rest), ' '.join(changed)))
     elif cmd == 'check':
-        probs = C.check_plan(load_graph(cfg), json.load(open(plan_path(cfg))))
+        g, P = load_graph(cfg), json.load(open(plan_path(cfg)))
+        probs = C.check_plan(g, P)
+        print_chains(g, P, cfg)
         print('\n'.join(probs) or 'plan OK')
         sys.exit(1 if probs else 0)
     elif cmd == 'gen':

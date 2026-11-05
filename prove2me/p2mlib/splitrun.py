@@ -2,7 +2,8 @@
 
 Items come from `carve.publish_order`: `bundle:NAME` (POST /submit-definition), `statement:NODE`
 (POST /submit-problem, in batches) and `piece:NODE` (POST /verify). An item goes once everything it
-imports is live. Every result goes through `verdicts.classify` / `decide`: transients retry
+imports is live; bundles go first, but while a statement or piece is ready bundles hold at most
+`jobs` - 1 slots (q172: retrying bundles kept 827 ready statements unsent for 5 hours). Every result goes through `verdicts.classify` / `decide`: transients retry
 unchanged, own timeouts split after two, WA/CE stop for a person, and a stopped item holds back
 only what depends on it.
 
@@ -487,9 +488,17 @@ class Runner:
         return sum(1 for s in self.state.values() if s.get('state') == 'inflight')
 
     def submit(self, items):
-        room = self.cfg.get('jobs', 8) - self.inflight()
+        jobs = self.cfg.get('jobs', 8)
+        room = jobs - self.inflight()
         if self.max_items is not None:
             room = min(room, self.max_items - self.sent)
+        if jobs >= 2 and any(not x.startswith('bundle:') for x in items):
+            # one slot stays for statements and pieces while any are ready: bundles go first, but q172 had
+            # four bundles cycling through cold-worker retries while 827 ready statements waited 5 hours
+            busy = sum(1 for x, s in self.state.items() if x.startswith('bundle:') and s.get('state') == 'inflight')
+            nb = max(0, min(room, jobs - 1 - busy))
+            bundles = [x for x in items if x.startswith('bundle:')]
+            items = bundles[:nb] + [x for x in items if not x.startswith('bundle:')]
         items = items[:max(room, 0)]
         self.sent += len(items)
         stmts = []

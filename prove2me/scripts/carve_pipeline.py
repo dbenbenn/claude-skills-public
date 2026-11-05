@@ -57,14 +57,19 @@ a warning naming the module count). A re-run `config` that changes config.json r
 (from graph if a key graph reads changed). Step `config` fails at once if DIR/oai_meta.json is missing or
 its `prefixes` do not match the sources and the root module.
 
-`calibrate` reads what `measure` found: an item (not frozen) measured over 1.6 x the budget raises
+`calibrate` reads what `measure` found: an item (not frozen) measured over 1.6 x the budget (an unpublished
+bundle over 80 s, BUNDLE_OWN_LIMIT: q172's data bundles of 83-88.6 s timed out on the server's own 300 s) raises
 config `time_scale` to scale x (its measured seconds / its planned cost), forgets plan..measure and
 runs them again (cached files are not re-measured), at most twice; then it stops and lists the
 offenders. A piece (a proof: resubmittable) measured under 120 s (PIECE_CAP) never counts: submit it as is and
 split only after two real verifier timeouts. Another item is excused the same way by listing it
-(`bundle:NAME`) in pipeline.json `accept_over`. Nothing is published before it. See p2mlib.carvepipeline.calibration.
+(`bundle:NAME`) in pipeline.json `accept_over` (warned when many items import it). It also sums the measured
+times over each unpublished bundle's import chain and warns, never stops, over 150 s (a cold verifier worker builds
+the chain within the item's 300 s; q154). Nothing is published before it. See p2mlib.carvepipeline.calibration.
 A file publish_early froze but never sent stays locked; pipeline.json `thaw` (out/lib file names) lets gen
-regenerate it, e.g. the importers of a bundle split by hand (`carve.py split --only`; then `--redo gen`).
+regenerate it, e.g. the importers of a bundle split by hand (`carve.py split --only` lists them there itself when
+its parts do not form a chain; when they do, the top part keeps the old name and no importer changes; then
+`--redo gen`).
 
 Overlap mode (pipeline.json "overlap": true; dbenbenn 2026-10-29, "a slow proof really shouldn't need to block
 submitting definition bundles"): measure, calibrate, publish_prep, prose, check_text and dryrun cover the

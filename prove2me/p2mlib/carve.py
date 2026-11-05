@@ -1916,15 +1916,9 @@ def chunk_bundles_closure(g, B, cost, bundle_budget, bundle_size, frozen=(), ext
     return _order_chunks(g, [chunks[i] for i in range(nfz)] + [sorted(ch) for ch in chunks[nfz:]], nfz)
 
 
-def chain_report(g, plan, top=5):
-    """The `top` bundles with the heaviest import chains: [{bundle, chain, needs, bundles}], chain and
-    needs in planned seconds. `chain` is what importing the bundle brings (itself and everything it
-    imports, transitively); `needs` is the part its own members' dependencies reach. A chain well over
-    its need is mixing, which `"chunker": "closure"` removes (q149: MutuallyUnbiased's longest chain fell
-    from 3,433 s to 601 s); a chain that is all need is the development's own weight (q153's aggregate
-    tables). Verifier workers start failing near 0.75-0.9 GB of chain .olean (q149)."""
-    B = {b['name']: b for b in plan['bundles']}
-    where = {k: b['name'] for b in plan['bundles'] for k in b['nodes']}
+def bundle_chains(plan):
+    """{bundle: frozenset of the plan's bundles importing it brings, itself included, transitively}."""
+    B = {b['name']: b for b in plan.get('bundles') or ()}
     memo = {}
 
     def chain(n):
@@ -1935,9 +1929,40 @@ def chain_report(g, plan, top=5):
                     c |= chain(i)
             memo[n] = frozenset(c)
         return memo[n]
-    cost = lambda names: sum(B[x].get('cost', 0.0) for x in names)
-    for n in B:                      # bottom-up, so the recursion stays shallow
+    for n in B:                      # in plan order (imports first), so the recursion stays shallow
         chain(n)
+    return memo
+
+
+CHAIN_WARN = 150        # s: a chain over this is a defect to re-plan before publish_early (q154)
+SERVER_COLD = 300       # s: the verifier's limit, which a cold worker spends building the whole chain
+
+
+def chain_verdict(secs):
+    """A bundle chain's verdict against the server's 300 s cold build. A verifier worker without the
+    imported bundles' .olean builds them all inside the item's 300 s ("Module compilation timed out
+    after 300s"): q154's plan said 369 s and its measured chains ran 1.5x the plan, up to 576 s local;
+    E004 (3 s of its own, 244 s of chain) took 9 tries. Retries on warm workers cleared chains up to
+    about 340 s local (q172), so this warns, never stops."""
+    if secs <= CHAIN_WARN:
+        return 'fits'
+    if secs <= SERVER_COLD:
+        return 'WARN over %d s: expect cold-worker retries' % CHAIN_WARN
+    return 'WARN over the %d s cold build: many retries; re-plan before publish_early if you can' % SERVER_COLD
+
+
+def chain_report(g, plan, top=5):
+    """The `top` bundles with the heaviest import chains: [{bundle, chain, needs, bundles}], chain and
+    needs in planned seconds. `chain` is what importing the bundle brings (itself and everything it
+    imports, transitively); `needs` is the part its own members' dependencies reach. A chain well over
+    its need is mixing, which `"chunker": "closure"` removes (q149: MutuallyUnbiased's longest chain fell
+    from 3,433 s to 601 s); a chain that is all need is the development's own weight (q153's aggregate
+    tables). Verifier workers start failing near 0.75-0.9 GB of chain .olean (q149)."""
+    B = {b['name']: b for b in plan['bundles']}
+    where = {k: b['name'] for b in plan['bundles'] for k in b['nodes']}
+    chains = bundle_chains(plan)
+    chain = chains.__getitem__
+    cost = lambda names: sum(B[x].get('cost', 0.0) for x in names)
     worst = sorted(B, key=lambda n: (-cost(chain(n)), n))[:top]
     rows = []
     for n in worst:
@@ -2427,13 +2452,18 @@ def resolve_piece_cycles(g, plan):
     return changed
 
 
-def split_bundles(g, plan, names, cost, budget, bundle_prefix=None):
+def split_bundles(g, plan, names, cost, budget, bundle_prefix=None, top_keeps_name=False):
     """The plan with each bundle in `names` cut into balanced parts of cost at most about `budget`
     (in dependency order, so a part rests only on earlier parts), and every other bundle kept as
     it is: same declarations, same name; only import lists and the bundles statements and pieces
     import are recomputed. The first part keeps the bundle's name, the others take new names.
     A measured re-plan reshuffles every bundle; this touches only the slow ones (Erdős 3 v2,
-    2026-10-17: 11 of 298 bundles over 60 s local)."""
+    2026-10-17: 11 of 298 bundles over 60 s local).
+
+    `top_keeps_name`: when the last part reaches every other part through its imports (the parts form
+    a chain), it keeps the old name instead, and whatever imported the old bundle imports it still,
+    getting the other parts through it: no importer's text changes (q172: after publish_early, a
+    split of OAIQ106E011 changed seven importers, each locked as frozen)."""
     prefix = bundle_prefix or plan.get('bundle_prefix', 'Bundle')
     B = {k for b in plan['bundles'] for k in b['nodes']}
     extra = implicit_deps(g, B, B)
@@ -2445,7 +2475,7 @@ def split_bundles(g, plan, names, cost, budget, bundle_prefix=None):
             nxt[0] += 1
         used.add(bundle_name(prefix, nxt[0]))
         return bundle_name(prefix, nxt[0])
-    chunks, cnames = [], []
+    chunks, cnames, top_of = [], [], {}
     for b in plan['bundles']:
         if b['name'] not in names:
             chunks.append(list(b['nodes']))
@@ -2482,9 +2512,16 @@ def split_bundles(g, plan, names, cost, budget, bundle_prefix=None):
             cur.append(x)
             cc += c
         parts.append(cur)
+        top = top_keeps_name and _parts_form_chain(g, parts, extra)
+        mine_names = []
         for i, part in enumerate(parts):
             chunks.append(part)
-            cnames.append(b['name'] if i == 0 else fresh_name())
+            keep = (i == len(parts) - 1) if top else (i == 0)
+            mine_names.append(b['name'] if keep else fresh_name())
+        cnames += mine_names
+        if top:
+            for x in mine_names[:-1]:
+                top_of[x] = b['name']
     bidx = {k: j for j, ch in enumerate(chunks) for k in ch}
     bimp = [set() for _ in chunks]
     for j, ch in enumerate(chunks):
@@ -2492,6 +2529,9 @@ def split_bundles(g, plan, names, cost, budget, bundle_prefix=None):
             for d in g.nodes[k].deps | extra.get(k, set()):
                 if d in bidx and bidx[d] != j:
                     bimp[j].add(bidx[d])
+    # a bundle outside a chain-split group imports its top part (the old name) for any part it needs
+    for j in range(len(chunks)):
+        bimp[j] = _to_tops(bimp[j], cnames, top_of, cnames[j])
     # a part may now be needed by a bundle listed before it: order the chunks topologically,
     # keeping the plan's order wherever it is already valid
     order, state = [], {}
@@ -2531,17 +2571,45 @@ def split_bundles(g, plan, names, cost, budget, bundle_prefix=None):
 
     def need(keys):
         ex = implicit_deps(g, keys, B)
-        return {bidx[d] for x in keys for d in g.nodes[x].deps | ex.get(x, set()) | {x} if d in bidx}
+        return _to_tops({bidx[d] for x in keys for d in g.nodes[x].deps | ex.get(x, set()) | {x} if d in bidx},
+                        cnames, top_of)
     pieces = {}
     for n, pc in plan['pieces'].items():
         keep = set(pc['keep'])
         pieces[n] = dict(pc, bundles=[cnames[i] for i in sorted(_reduce(bimp, need(keep - B)))])
     stubs = {}
     for n in plan['stubs']:
-        sb = {bidx[d] for d in g.nodes[n].sig if d in bidx}
+        sb = _to_tops({bidx[d] for d in g.nodes[n].sig if d in bidx}, cnames, top_of)
         stubs[n] = {'bundles': [cnames[i] for i in sorted(_reduce(bimp, sb))]}
     out['pieces'], out['stubs'] = pieces, stubs
     return out
+
+
+def _parts_form_chain(g, parts, extra):
+    """Does the last of `parts` (in dependency order) reach every other part through what its
+    declarations use?"""
+    if len(parts) < 2:
+        return False
+    where = {k: i for i, p in enumerate(parts) for k in p}
+    imp = [{where[d] for k in p for d in g.nodes[k].deps | extra.get(k, set()) if d in where and where[d] != i}
+           for i, p in enumerate(parts)]
+    seen, todo = set(), [len(parts) - 1]
+    while todo:
+        i = todo.pop()
+        if i not in seen:
+            seen.add(i)
+            todo += imp[i]
+    return len(seen) == len(parts)
+
+
+def _to_tops(ks, cnames, top_of, own=None):
+    """Chunk indices `ks` with each lower part of a chain split replaced by its group's top part (which
+    has the old name), unless the importer `own` is itself a part of that group."""
+    if not top_of:
+        return ks
+    idx = {n: i for i, n in enumerate(cnames)}
+    own_top = top_of.get(own, own)
+    return {idx[top_of[cnames[i]]] if cnames[i] in top_of and top_of[cnames[i]] != own_top else i for i in ks}
 
 
 def _bundle_closure(bimp, ks):

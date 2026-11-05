@@ -52,15 +52,23 @@ SYSTEMATIC_FRACTION = 0.25   # bundles over the limit: a systematic cost-model e
 MAX_BUNDLE_SPLITS = 3   # rounds of splitting single slow bundles before a person looks
 STATEMENT_SHARE = 0.5   # a slow piece whose statement alone compiles in this share of its time is slow
                         # by its type (oaiq-075: 316 s of 328 in .olean serialization): no split helps
+BUNDLE_OWN_LIMIT = 80   # s local: an unpublished bundle over this is split (or excused), even under budget x 1.6.
+                        # q154/q172 (2026-11-04): data bundles (numeric literals, typeclass-bound) measured 83.3,
+                        # 87.7 and 88.6 s against the 88 s limit hit the server's own "Compilation timed out after
+                        # 300s" 2, 3 and 1 times; E011 stopped for a person with 24 bundles behind it
+ACCEPT_BUSY = 5         # accept_over on a bundle this many items import gets a warning: E001 (88.6 s) took 6 tries
 PIECE_CAP = 120         # a piece (resubmittable) is excused below this; dbenbenn 2026-10-29 (was 150): a slow
                         # submit costs only wall-clock, a needless re-plan hours; verifier data: 94-103 s passed,
                         # 118-126 s timed out 3x (oaiq-078), 125 s and 162 s passed on a retry (oaiq-047, -085),
                         # 192 s timed out 3x (oaiq-031)
 
 
-def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR, accepted=()):
+def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR, accepted=(),
+                bundle_limit=BUNDLE_OWN_LIMIT):
     """Does the cost model's `scale` (time_scale) fit this carve's measured times?
-    Returns {'over': [(item, secs, cost)], 'ratio', 'new_scale', 'limit', 'measured', 'slowest'}.
+    Returns {'over': [(item, secs, cost)], 'ratio', 'new_scale', 'limit', 'bundle_limit', 'measured',
+    'slowest', 'statements_over', 'excused': [(item, secs)] (accept_over)}. A bundle is over at
+    min(limit, `bundle_limit`) (BUNDLE_OWN_LIMIT).
 
     Batch 3 (2026-10-25): the first plans of QuarticPowerFree and KirchbergRordam were made with the
     default scale and measured at 85-128 s per bundle against a budget of 55 s; a 128 s bundle timed
@@ -73,7 +81,8 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
     under the limit never lower the scale: a pessimistic estimate costs a few more bundles, a
     timeout costs three publish attempts."""
     limit = budget * limit_factor
-    over, measured, slowest = [], 0, None
+    blimit = min(limit, bundle_limit or limit)
+    over, measured, slowest, excused = [], 0, None, []
     items = [('bundle:' + b['name'], b['name'], b.get('cost') or 0) for b in plan.get('bundles', [])]
     items += [('piece:' + n, n, p.get('cost') or 0) for n, p in (plan.get('pieces') or {}).items()]
     for key, name, cost in items:
@@ -89,8 +98,10 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
             # freeze at publish
             continue
         if key in accepted and t['secs'] <= ACCEPT_CAP:
+            if t['secs'] > (blimit if key.startswith('bundle:') else limit) and name not in frozen:
+                excused.append((key, t['secs']))
             continue                                   # pipeline.json accept_over
-        if t['secs'] > limit and name not in frozen:
+        if t['secs'] > (blimit if key.startswith('bundle:') else limit) and name not in frozen:
             over.append((key, t['secs'], cost))
     # a statement over the limit publishes, but every verify that imports it compiles its module and
     # fails (opus-kadison, oaiq-039: 110 s and 176 s); re-planning cannot shrink it and accept_over does
@@ -105,8 +116,70 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
             statements_over.append(('statement:' + n, t['secs']))
     ratio = max((secs / max(cost, 1.0) for _, secs, cost in over), default=1.0)
     new_scale = round(min(MAX_SCALE, max(scale * 1.1, scale * ratio)), 1) if over else scale
-    return {'over': over, 'ratio': ratio, 'new_scale': new_scale, 'limit': limit, 'measured': measured,
-            'slowest': slowest, 'statements_over': statements_over}
+    return {'over': over, 'ratio': ratio, 'new_scale': new_scale, 'limit': limit, 'bundle_limit': blimit,
+            'measured': measured, 'slowest': slowest, 'statements_over': statements_over, 'excused': excused}
+
+
+def measured_chains(plan, times, skip=()):
+    """[(secs, bundle, members, unmeasured)], heaviest first: for each bundle not in `skip` (published), the
+    local -j1 times of times.json summed over its import chain (itself and every bundle it imports,
+    transitively; published ones included, as a cold verifier worker builds them too). q154: the plan's
+    heaviest chain was 369 s, measured 576 s; 29 of 196 chains were over 300 s."""
+    from . import carve as CV
+    out = []
+    for n, chain in CV.bundle_chains(plan).items():
+        if n in skip:
+            continue
+        secs, missing = 0.0, 0
+        for x in chain:
+            t = times.get('bundle:' + x) or times.get(x)
+            if t and t.get('ok'):
+                secs += t['secs']
+            else:
+                missing += 1
+        out.append((round(secs, 1), n, len(chain), missing))
+    return sorted(out, key=lambda r: (-r[0], r[1]))
+
+
+def importers(plan, name):
+    """(bundles, statements) of the plan whose import chain holds bundle `name` (itself not counted)."""
+    from . import carve as CV
+    chains = CV.bundle_chains(plan)
+    nb = sum(1 for n, c in chains.items() if n != name and name in c)
+    ns = sum(1 for st in (plan.get('stubs') or {}).values()
+             if any(name in chains.get(b, ()) for b in st.get('bundles') or ()))
+    return nb, ns
+
+
+def chain_lines(plan, times, res, skip=(), top=5):
+    """calibrate.log lines: the measured chain sums against the server's 300 s cold build (a warning over
+    CHAIN_WARN, never a stop: q172's retries cleared chains up to ~340 s), and a warning for each bundle
+    accept_over excuses that many items import."""
+    from . import carve as CV
+    rows = measured_chains(plan, times, skip)
+    lines = []
+    if rows:
+        warn = [r for r in rows if r[0] > CV.CHAIN_WARN]
+        cold = [r for r in rows if r[0] > CV.SERVER_COLD]
+        lines.append('  chains (local -j1 times summed over each unpublished bundle\'s imports): heaviest %.0f s '
+                     '(%s); %d of %d over %d s, %d over the server\'s %d s cold build' % (
+                         rows[0][0], rows[0][1], len(warn), len(rows), CV.CHAIN_WARN, len(cold), CV.SERVER_COLD))
+        for secs, n, k, missing in warn[:top]:
+            lines.append('    %7.1f s  %s (%d bundles%s): %s' % (secs, n, k, ', %d unmeasured' % missing if missing else '',
+                                                          CV.chain_verdict(secs)))
+        if warn:
+            lines.append('  WARNING: a cold verifier worker builds the whole chain inside the item\'s 300 s ("Module '
+                         'compilation timed out"); retries cleared chains up to ~340 s local (q172). Over %d s, '
+                         're-plan (chunker closure, a smaller bundle_budget) before publish_early if you can' % CV.CHAIN_WARN)
+    for key, secs in res.get('excused') or ():
+        if not key.startswith('bundle:'):
+            continue
+        nb, ns = importers(plan, key.split(':', 1)[1])
+        if nb + ns >= ACCEPT_BUSY:
+            lines.append('  WARNING: accept_over excuses %s (%.1f s, limit %.0f s) and %d bundle(s) and %d statement(s) '
+                         'import it: an own-time timeout on the server stops all of them (q154 E001, 88.6 s: 6 tries); '
+                         'prefer a split round while nothing is published' % (key, secs, res['bundle_limit'], nb, ns))
+    return lines
 
 
 def published_drift(lib, published_lib):
@@ -1408,10 +1481,19 @@ class Pipeline:
         return log
 
     def calibrate_head(self, cfg, res, what=''):
-        lines = ['%s: %smeasured %d items against budget %g (limit %.0f s), slowest %s' % (
-            _now(), what, res['measured'], cfg.get('budget', 55), res['limit'], res['slowest'])]
+        lines = ['%s: %smeasured %d items against budget %g (limit %.0f s, unpublished bundles %.0f s), slowest %s' % (
+            _now(), what, res['measured'], cfg.get('budget', 55), res['limit'], res.get('bundle_limit', res['limit']),
+            res['slowest'])]
         for key, secs, cost in res['over']:
             lines.append('  over: %s measured %.0f s, planned %.0f s' % (key, secs, cost))
+        return lines
+
+    def chain_warnings(self, plan, times, res, frozen):
+        """chain_lines, its WARNING lines also on stderr (they never stop the step)."""
+        lines = chain_lines(plan, times, res, frozen)
+        for l in lines:
+            if 'WARNING' in l:
+                print('calibrate:%s' % l, file=sys.stderr, flush=True)
         return lines
 
     def step_calibrate(self):
@@ -1423,7 +1505,7 @@ class Pipeline:
             return self.calibrate_frozen_part(cfg, plan, times, fz, times_path)
         res = calibration(plan, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
                           accepted=self.p.get('accept_over') or ())
-        lines = self.calibrate_head(cfg, res)
+        lines = self.calibrate_head(cfg, res) + self.chain_warnings(plan, times, res, fz)
         log = os.path.join(self.d, 'logs', 'calibrate.log')
         if res['statements_over']:
             self.calibrate_log(lines + ['  statement over: %s measured %.0f s' % x for x in res['statements_over']])
@@ -1495,7 +1577,7 @@ class Pipeline:
         part = dict(plan, pieces={})
         res = calibration(part, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
                           accepted=self.p.get('accept_over') or ())
-        lines = self.calibrate_head(cfg, res, 'bundles and statements: ')
+        lines = self.calibrate_head(cfg, res, 'bundles and statements: ') + self.chain_warnings(plan, times, res, fz)
         log = os.path.join(self.d, 'logs', 'calibrate.log')
         if res['statements_over']:
             self.calibrate_log(lines + ['  statement over: %s measured %.0f s' % x for x in res['statements_over']])

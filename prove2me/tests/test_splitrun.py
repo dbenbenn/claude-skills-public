@@ -333,6 +333,24 @@ def test_bundles_go_before_statements_and_pieces(split):
     assert api.posted[-1] == ('def', 'XB001')
 
 
+def test_one_slot_stays_for_statements_while_bundles_retry(split):
+    # q172: four bundles cycling through cold-worker retries held all four slots and 827 ready statements
+    # went unsent for 5 hours; with a statement ready, bundles hold at most jobs - 1 slots
+    d, cfg = split
+    api = FakeApi(published={'A.top': 'TOP', 'XB000': 'id-XB000'})
+    r = R.Runner(dict(cfg, jobs=3), api, sleep=lambda s: None)
+    r.state['bundle:ZZ1'] = r.state['bundle:ZZ2'] = {'state': 'inflight', 'history': {}}
+    assert r.submit(['bundle:XB001', 'statement:A.low']) == 1
+    assert api.posted == [('thm', 'A.low_s2')]
+    # with no statement or piece ready, a bundle takes the last slot
+    r.state['statement:A.low']['state'] = 'live'
+    assert r.submit(['bundle:XB001']) == 1 and api.posted[-1] == ('def', 'XB001')
+    # one job only: nothing is reserved
+    r1 = R.Runner(dict(cfg, jobs=1, state=str(d / 'rs1.json')), FakeApi(published=api.published), sleep=lambda s: None)
+    assert r1.submit(['bundle:XB001', 'statement:A.low']) == 1
+    assert r1.api.posted == [('def', 'XB001')]
+
+
 def test_a_bundle_importing_a_statement_waits_for_its_accepted_proof(split):
     # carve's bundles_import_statements: XB001 imports the statement A.low, which the platform
     # allows only once A.low is Proved (2026-10-18). publish_order makes the bundle wait for the

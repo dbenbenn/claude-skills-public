@@ -320,7 +320,8 @@ def test_calibration_scales_by_the_worst_item_over_the_limit():
     r = CP.calibration(_plan({'B0': 55, 'B1': 55, 'B2': 30}, {'P': 50}),
                        {'bundle:B0': _t(85), 'bundle:B1': _t(128), 'bundle:B2': _t(20), 'piece:P': _t(90)},
                        1.2, 55)
-    assert [x[0] for x in r['over']] == ['bundle:B1']             # a piece under the cap is resubmittable
+    # a piece under the cap is resubmittable; B0 (85 s) is over the unpublished bundles' own limit (q172)
+    assert [x[0] for x in r['over']] == ['bundle:B0', 'bundle:B1']
     assert r['new_scale'] == round(1.2 * 128 / 55, 1) == 2.8
     # the old key form of times.json (the bare bundle name) counts
     assert CP.calibration(_plan({'B0': 55}), {'B0': _t(128)}, 1.2, 55)['over']
@@ -588,6 +589,73 @@ def test_calibration_excuses_accepted_items_under_the_hard_cap():
     assert CP.calibration(plan, times, 8.0, 55, accepted=['bundle:B0'])['over'] == []
     # the hard cap still applies to an accepted item
     assert CP.calibration(plan, {'bundle:B0': _t(250)}, 8.0, 55, accepted=['bundle:B0'])['over']
+
+
+def test_calibration_holds_unpublished_bundles_to_their_own_time_limit():
+    # q154/q172: data bundles measured 83.3, 87.7 and 88.6 s (limit 1.6 x 55 = 88 s) hit the server's own
+    # "Compilation timed out after 300s"; an unpublished bundle over BUNDLE_OWN_LIMIT (80 s) is over
+    plan = _plan({'B0': 55, 'B1': 55, 'B2': 55}, {'P': 50})
+    times = {'bundle:B0': _t(83.3), 'bundle:B1': _t(79), 'bundle:B2': _t(87.7), 'piece:P': _t(85)}
+    r = CP.calibration(plan, times, 1.5, 55, frozen=['B2'])
+    assert [x[0] for x in r['over']] == ['bundle:B0'] and r['bundle_limit'] == 80 and r['limit'] == 88
+    # a smaller budget's own limit is lower still
+    assert CP.calibration(_plan({'B': 30}), {'bundle:B': _t(60)}, 1.5, 35)['bundle_limit'] == 35 * 1.6
+    # accept_over excuses it, and says so
+    r = CP.calibration(plan, times, 1.5, 55, accepted=['bundle:B0'])
+    assert [x[0] for x in r['over']] == ['bundle:B2'] and r['excused'] == [('bundle:B0', 83.3)]
+
+
+def _chain_plan():
+    # E001 <- E004 <- six importers; D stands alone
+    bundles = [{'name': 'E001', 'imports': []}, {'name': 'E004', 'imports': ['E001']}]
+    bundles += [{'name': 'I%d' % i, 'imports': ['E004']} for i in range(6)]
+    bundles += [{'name': 'D', 'imports': []}]
+    return {'bundles': bundles, 'stubs': {'s': {'bundles': ['I0']}, 't': {'bundles': ['D']}}}
+
+
+def test_measured_chains_sum_local_times_over_each_bundles_imports():
+    # q154: the plan's heaviest chain was 369 s, the measured one 576 s; E004 (3 s of its own) timed out
+    # six times as a cold worker built E001 and the rest within its 300 s
+    plan = _chain_plan()
+    times = {'bundle:E001': _t(88.6), 'bundle:E004': _t(3.1), 'bundle:D': _t(10)}
+    times.update({'bundle:I%d' % i: _t(70) for i in range(5)})
+    rows = CP.measured_chains(plan, times, skip=['E001'])
+    assert rows[0] == (161.7, 'I0', 3, 0)
+    assert (91.7, 'E004', 2, 0) in rows and not any(r[1] == 'E001' for r in rows)
+    assert next(r for r in rows if r[1] == 'I5') == (91.7, 'I5', 3, 1)        # I5 unmeasured
+    assert CP.importers(plan, 'E001') == (7, 1) and CP.importers(plan, 'D') == (0, 1)
+
+
+def test_chain_lines_warn_of_heavy_chains_and_of_accepting_a_bundle_many_items_import():
+    plan = _chain_plan()
+    times = {'bundle:E001': _t(88.6), 'bundle:E004': _t(3.1), 'bundle:D': _t(10)}
+    times.update({'bundle:I%d' % i: _t(70 + 200 * (i == 0)) for i in range(6)})
+    res = CP.calibration(plan, times, 1.5, 55, accepted=['bundle:E001'])
+    assert res['over'] == [('bundle:I0', 270, 0)]
+    lines = CP.chain_lines(plan, times, res)
+    text = '\n'.join(lines)
+    assert 'heaviest 362 s (I0); 6 of 9 over 150 s, 1 over the server\'s 300 s cold build' in text
+    assert 'cold build' in next(l for l in lines if 'I0 (3 bundles)' in l)
+    assert 'WARNING: a cold verifier worker' in text
+    assert 'accept_over excuses bundle:E001 (88.6 s, limit 80 s) and 7 bundle(s) and 1 statement(s)' in text
+    # light chains, and an excused bundle few items import: no warning
+    light = {k: _t(20) for k in times}
+    r2 = CP.calibration(plan, dict(light, **{'bundle:D': _t(85)}), 1.5, 55, accepted=['bundle:D'])
+    assert not any('WARNING' in l for l in CP.chain_lines(plan, dict(light, **{'bundle:D': _t(85)}), r2))
+
+
+def test_calibrate_logs_measured_chains_and_goes_on(env, monkeypatch):
+    # a warning, never a stop: q172's cold-worker retries cleared chains up to ~340 s local
+    bundles = {'B%d' % i: (55, 70) for i in range(4)}
+    plan = _overlap_carve(env, monkeypatch, bundles=bundles)
+    for i, b in enumerate(plan['bundles']):
+        b['imports'] = ['B%d' % (i - 1)] if i else []
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    r = run(env, *ARGS_NEW, '--stop-after', 'calibrate')
+    assert r.returncode == 0, r.stdout + r.stderr
+    log = (env.dir / 'logs' / 'calibrate.log').read_text()
+    assert 'heaviest 280 s (B3); 2 of 4 over 150 s' in log and 'fits the model' in log
+    assert 'calibrate:  WARNING: a cold verifier worker' in r.stderr
 
 
 # ---- lean_src must be the root's import closure (2026-10-27) -------------------------------------

@@ -798,7 +798,9 @@ def test_command_line_plan_gen_order(tmp_path):
         return r.stdout
     out = run('plan', str(cfg))
     assert 'bundles' in out and 'PROBLEM' not in out
-    assert 'plan OK' in run('check', str(cfg))
+    assert re.search(r'members need [\d.]+ s\): fits$', out, re.M), out     # each chain's verdict (q154)
+    chk = run('check', str(cfg))
+    assert 'plan OK' in chk and 'heaviest bundle import chains' in chk
     run('gen', str(cfg))
     assert (tmp_path / 'out' / 'solutions' / 'Sol_CD_main.lean').exists()
     assert not (tmp_path / 'out' / 'lib' / 'Thm_CD_main.lean').exists()      # external
@@ -816,6 +818,10 @@ def test_command_line_plan_gen_order(tmp_path):
     assert len(Q['bundles']) > len(P['bundles'])
     assert json.loads((work / 'plan.pre_split.json').read_text()) == P
     assert 'plan OK' in run('check', str(cfg))
+    # a second round keeps the first round's backup (q172)
+    run('split', str(cfg), str(tmp_path / 'times.json'), '--limit', '60')
+    assert json.loads((work / 'plan.pre_split.1.json').read_text()) == P
+    assert json.loads((work / 'plan.pre_split.json').read_text()) == Q
 
 
 def test_command_line_pinned(tmp_path):
@@ -3346,3 +3352,124 @@ def test_chain_report_names_the_heaviest_bundle_chains_and_their_mixing():
     assert len(rows) == 3 and rows[0]['chain'] >= rows[1]['chain'] >= rows[2]['chain']
     assert rows[0]['chain'] > 300 and all(r['needs'] <= r['chain'] for r in rows)
     assert set(rows[0]) == {'bundle', 'chain', 'needs', 'bundles'}
+
+
+def _split_graph(deps):
+    from types import SimpleNamespace as NS
+    nodes = {k: NS(deps=set(v), sig=set(v), size=100, module='M', attributed=False, instance=False)
+             for k, v in deps.items()}
+    return NS(nodes=nodes, closure_mask={'M': 0})
+
+
+def _split_plan(xdeps):
+    # P0 <- X (four declarations) <- C1 (needs x1 only), C2 (needs x4); statement s needs x1
+    deps = {'base': [], 'c1': ['x1'], 'c2': ['x4'], 's': ['x1']}
+    deps.update(xdeps)
+    g = _split_graph(deps)
+    plan = {'bundles': [{'name': 'B000', 'nodes': ['base'], 'imports': []},
+                        {'name': 'B001', 'nodes': ['x1', 'x2', 'x3', 'x4'], 'imports': ['B000']},
+                        {'name': 'B002', 'nodes': ['c1'], 'imports': ['B001']},
+                        {'name': 'B003', 'nodes': ['c2'], 'imports': ['B001']}],
+            'stubs': {'s': {'bundles': ['B001']}},
+            'pieces': {'s': {'keep': ['s'], 'bundles': ['B001'], 'imports': []}}}
+    return g, plan, {k: 10.0 for k in deps}
+
+
+def test_split_only_leaves_the_old_name_on_the_top_of_a_chain_and_importers_unchanged():
+    # q172: OAIQ106E011 split after publish_early into E011 + E196 (E196 importing E011); seven importers
+    # changed to import E196 and stayed locked as frozen. Given the old name, the top part is what they
+    # import, and they get the lower part through it: no importer's text changes
+    g, plan, cost = _split_plan({'x1': ['base'], 'x2': ['x1'], 'x3': ['x2'], 'x4': ['x3']})
+    q = C.split_bundles(g, plan, ['B001'], cost, 25.0, 'B', top_keeps_name=True)
+    new = {b['name']: b for b in q['bundles']}
+    assert len(new) == 5 and sorted(new['B001']['nodes']) == ['x3', 'x4']
+    low = next(n for n in new if n not in {'B000', 'B001', 'B002', 'B003'})
+    assert sorted(new[low]['nodes']) == ['x1', 'x2'] and new[low]['imports'] == ['B000']
+    assert new['B001']['imports'] == [low]
+    for n in ('B002', 'B003'):
+        assert new[n]['imports'] == ['B001']              # unchanged, though B002 needs only the low part
+    assert q['stubs']['s']['bundles'] == ['B001'] and q['pieces']['s']['bundles'] == ['B001']
+    pos = {b['name']: i for i, b in enumerate(q['bundles'])}
+    assert all(pos[i] < pos[b['name']] for b in q['bundles'] for i in b['imports'])
+    # without the flag the first part keeps the name, and B003 (needing x4) imports the new part
+    q0 = C.split_bundles(g, plan, ['B001'], cost, 25.0, 'B')
+    assert sorted({b['name']: b for b in q0['bundles']}['B001']['nodes']) == ['x1', 'x2']
+
+
+def test_split_only_of_independent_parts_keeps_the_name_on_the_first_part():
+    # parts that do not form a chain: no part reaches all the others, so the importers must change
+    g, plan, cost = _split_plan({'x1': ['base'], 'x2': ['base'], 'x3': ['base'], 'x4': ['base']})
+    q = C.split_bundles(g, plan, ['B001'], cost, 25.0, 'B', top_keeps_name=True)
+    new = {b['name']: b for b in q['bundles']}
+    assert sorted(new['B001']['nodes']) == ['x1', 'x2']
+    assert new['B003']['imports'] != ['B001']
+    cli = _carve_script()
+    assert cli.changed_importer_files(plan, q, ['B001']) == ['Def_B003.lean']
+
+
+def test_chain_verdict_against_the_servers_cold_build():
+    # q154: plan 369 s, measured up to 576 s; cold-worker retries cleared ~340 s (q172): a warning, never a stop
+    assert C.chain_verdict(120) == 'fits'
+    assert C.chain_verdict(200).startswith('WARN over %d s' % C.CHAIN_WARN)
+    assert 'cold build' in C.chain_verdict(369) and 'publish_early' in C.chain_verdict(369)
+    plan = {'bundles': [{'name': 'A', 'imports': []}, {'name': 'B', 'imports': ['A']},
+                        {'name': 'C', 'imports': ['B']}, {'name': 'D', 'imports': []}]}
+    ch = C.bundle_chains(plan)
+    assert ch['C'] == {'A', 'B', 'C'} and ch['D'] == {'D'}
+
+
+def test_split_only_thaws_changed_importers_once_published_and_keeps_every_old_plan(tmp_path):
+    # q172: after publish_early the importers a split changes are frozen and never posted: gen keeps their
+    # old imports unless pipeline.json `thaw` lists them; and a second split overwrote plan.pre_split.json
+    cli = _carve_script()
+    g, plan, cost = _split_plan({'x1': ['base'], 'x2': ['base'], 'x3': ['base'], 'x4': ['base']})
+    cfgp = tmp_path / 'config.json'
+    cfgp.write_text('{}')
+    assert cli.thaw_importers(str(cfgp), ['Def_B003.lean']) is False        # not a published carve
+    (tmp_path / 'pipeline.json').write_text(json.dumps({'thaw': ['Def_Z.lean'], 'folder': 'F'}))
+    assert cli.thaw_importers(str(cfgp), ['Def_B003.lean']) is False        # nothing frozen yet
+    (tmp_path / 'published').mkdir()
+    (tmp_path / 'published' / 'plan.json').write_text('{}')
+    assert cli.thaw_importers(str(cfgp), ['Def_B003.lean', 'Thm_s.lean']) is True
+    p = json.loads((tmp_path / 'pipeline.json').read_text())
+    assert p['thaw'] == ['Def_B003.lean', 'Def_Z.lean', 'Thm_s.lean'] and p['folder'] == 'F'
+    plan_p = str(tmp_path / 'plan.json')
+    assert cli.keep_backup(plan_p, '.pre_split') == str(tmp_path / 'plan.pre_split.json')
+    (tmp_path / 'plan.pre_split.json').write_text('first')
+    assert cli.keep_backup(plan_p, '.pre_split') == str(tmp_path / 'plan.pre_split.json')
+    assert (tmp_path / 'plan.pre_split.1.json').read_text() == 'first'
+    (tmp_path / 'plan.pre_split.json').write_text('second')
+    cli.keep_backup(plan_p, '.pre_split')
+    assert (tmp_path / 'plan.pre_split.2.json').read_text() == 'second'
+
+
+def test_command_line_split_only_keeps_a_consistent_plan(tmp_path):
+    import shutil
+    import subprocess
+    import sys
+    work = tmp_path / 'work'
+    work.mkdir()
+    shutil.copy(os.path.join(FIX, 'decl_graph.jsonl'), work / 'decl_graph.jsonl')
+    cfg = tmp_path / 'carve.json'
+    cfg.write_text(json.dumps({'src': FIX, 'prefix': 'CarveDev', 'roots': ['CarveDev.Top'],
+                               'targets': TARGETS, 'external': ['CD.main'], 'work': str(work),
+                               'out': str(tmp_path / 'out'), 'bundle_prefix': 'CDB', 'chunker': 'schedule',
+                               'budget': 0.05, 'bundle_budget': 0.05, 'bytes_per_second': 10000}))
+    script = os.path.join(os.path.dirname(HERE), 'scripts', 'carve.py')
+
+    def run(*a):
+        r = subprocess.run([sys.executable, script] + list(a), capture_output=True, text=True)
+        assert r.returncode == 0, r.stdout + r.stderr
+        return r.stdout
+    run('plan', str(cfg))
+    P = json.loads((work / 'plan.json').read_text())
+    big = max(P['bundles'], key=lambda b: len(b['nodes']))
+    assert len(big['nodes']) > 1
+    times = {b['name']: {'secs': 99.0 if b is big else 1.0, 'ok': True} for b in P['bundles']}
+    (tmp_path / 'times.json').write_text(json.dumps(times))
+    out = run('split', str(cfg), str(tmp_path / 'times.json'), '--limit', '60', '--only', big['name'])
+    assert 'split %s' % big['name'] in out
+    Q = json.loads((work / 'plan.json').read_text())
+    assert len(Q['bundles']) > len(P['bundles']) and big['name'] in {b['name'] for b in Q['bundles']}
+    assert 'plan OK' in run('check', str(cfg))
+    assert not (tmp_path / 'pipeline.json').exists()
