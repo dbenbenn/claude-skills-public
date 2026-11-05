@@ -990,16 +990,32 @@ BLUEPRINT OUT PARTS… [--target NAME]` merges the result into one file:
 - every `Solutions.*` helper module the Blueprint or a Part imports is inlined, so the assembled
   file never keeps `import Solutions.` (42aa390; oaiq-121 spliced it by hand), except a Part
   listed on the command line, which is assembled once as a Part ahead of its importers (list
-  every Part, including one another Part imports; q155 hit "already declared" before);
-- every stub becomes `alias foo := Part<X>.foo`;
-- every Part declaration is placed by a dependency sort, after the Blueprint items it mentions;
+  every Part, including one another Part imports; q155 hit "already declared" before); a helper
+  that imports the Blueprint or a Part is assembled as a Part, after what it uses (q188);
+- every stub becomes `alias foo := Part<X>.foo`, and so does an unfinished Blueprint proof
+  (one containing `sorry`) that a Part restates with the same elaborated type (q187);
+- every Part declaration is placed by a dependency sort, after the Blueprint items it mentions and
+  after the first declaration of any namespace its `open` names (q181); `#print`/`#check`/`#eval`
+  lines are dropped, hoisted `universe` lines are not repeated (q167), and scopes a Part leaves open
+  are closed (q182);
 - a Part may import the Blueprint module, or be **copy-header**: import only Mathlib,
   `Definitions.*` and `Theorems.*`, with the Blueprint's text and its assumed `sorry` stubs copied
   at its head, so each prover compiles alone in seconds (q159: 20 Parts on Tao §4). The copies
-  are checked verbatim against the Blueprint and dropped; a changed copy is refused. Briefs say:
-  copy Blueprint text but never change it, and prove targets only in `Part<X>`;
+  are checked verbatim against the Blueprint and dropped; a changed copy is refused, and a stub
+  proved under the Blueprint's own name with the same statement is moved into `Part<X>` (q195).
+  Briefs say: copy Blueprint text but never change it, and prove targets in `Part<X>`;
 - `--target <published name>`, when the Blueprint proves the published theorem under that name,
-  renames it `_dev` and appends `theorem solution`; then `prune_solution.py --check`.
+  renames it `_dev` (a unique theorem with that last component in a sub-namespace is called as
+  it is, q165) and appends `theorem solution`; then `prune_solution.py --check`;
+- the output is then elaborated: an error, or a leftover `sorry` (each named) without
+  `--allow-sorry`, exits nonzero, and `prune_solution.py` refuses input that does not elaborate
+  (it used to fall back to name-based pruning and delete load-bearing declarations, q167).
+
+When an assembly still fails for Parts that import one another, the staged route is reliable,
+because Lean checks the layering. Build a `Defs` module (the Blueprint minus its stubs), then the Parts
+as real modules, then one stage module per stub group with each stub an `alias` of its Part. Merge them
+with `merge.py` (q188: 5,073 lines passed `prune_solution.py --check` first time;
+strong-convergence-mission `proofs/exists_linearization/final/`).
 
 Stacking one assembled Blueprint on another (q159's `pbr` over `parab`) is still by hand: its
 stubs from the other Blueprint are kept with a warning.
