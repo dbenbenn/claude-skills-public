@@ -19,7 +19,7 @@ function liveSpark(d){
   const [t, n] = h[h.length - 1], first = h.find(p => p[1] > 0);
   const tip = `${n} of ${ph.total} bundles, statements and pieces live at ${fmtAt(t)}` +
     (first ? `; the first went live ${fmtAt(first[0])}` : '') + '. Click for the full chart';
-  return `<a class="livespark" href="#h-${esc(d.section)}" title="${esc(tip)}">${sparkSvg(h, 96, 20, null, 'items live over time')}</a>`;
+  return `<a class="livespark" href="${hrefFor(isLive((last && last.sections || []).find(x => x.id === d.section) || {state: 'running'}), 'h-' + d.section)}" title="${esc(tip)}">${sparkSvg(h, 96, 20, null, 'items live over time')}</a>`;
 }
 const fmtUsd = c => c == null ? '—' : '$' + (c >= 100 ? c.toFixed(0) : c.toFixed(2));
 const shortModel = m => (m || '').replace(/^claude-/, '');
@@ -39,8 +39,8 @@ function agentCard(a){
   if (a.phases) ph = a.phases.dirs.map(stagesHtml).join('');
   else if ((a.goals || []).length) ph = '<div class="pl"><span class="lab">pipeline</span><span class="items">setting up</span></div>';
   const stCls = a.state === 'running' ? 'running' : a.state === 'done' ? 'done' : 'failed';
-  return `<article class="ag">
-    <div class="head"><a class="name" href="page/agent.html?name=${encodeURIComponent(a.name)}" title="Open the log">${esc(a.name)}</a>
+  return `<article class="ag" id="ag-${esc(a.name)}">
+    <div class="head"><a class="name" href="/page/agent.html?name=${encodeURIComponent(a.name)}" title="Open the log">${esc(a.name)}</a>
       <span class="badge ${stCls}">${esc(String(a.state).toUpperCase())}</span>
       <span class="badge">${esc(shortModel(a.model) || '?')}</span>
       <span class="badge ${a.auth === 'key' ? 'key' : 'sub'}" title="${a.auth === 'key' ? 'API key: pays per token' : 'Claude subscription'}">${a.auth === 'key' ? 'API KEY' : 'SUBSCRIPTION'}</span>
@@ -57,20 +57,24 @@ function drawAgents(){
   const box = document.getElementById('agents-box');
   if (!box || !agentsData) return;
   const A = agentsData;
-  // finished agents fold away (remembered per browser): the running ones are what is watched
-  const fin = box.querySelector('details.afin'), finOpen = fin ? fin.open : store.get('monitor.finishedOpen', '0') === '1';
-  box.innerHTML = (A.running.length ? `<div class="agrp">Running (${A.running.length})</div>` + A.running.map(agentCard).join('') : '<p class="empty">No headless agent is running.</p>') +
-    (A.recent.length ? `<details class="afin"${finOpen ? ' open' : ''}><summary class="agrp">Finished in the last 24 h (${A.recent.length})</summary>${A.recent.map(agentCard).join('')}</details>` : '');
-  box.querySelector('details.afin')?.addEventListener('toggle', e => store.set('monitor.finishedOpen', e.target.open ? '1' : '0'));
-  drawQueue(A.queue);
+  // the main page shows the running agents, the Finished page the ones that ended in the last 24 h
+  if (VIEW === 'main') {
+    box.innerHTML = (A.running.length ? A.running.map(agentCard).join('') : '<p class="empty">No headless agent is running.</p>') +
+      (A.recent.length ? `<p class="more"><a href="/page/done.html#t-agents">${A.recent.length} finished in the last 24 h →</a></p>` : '');
+    drawQueue(A.queue);
+  } else {
+    box.innerHTML = A.recent.length ? A.recent.map(agentCard).join('') : '<p class="empty">No headless agent finished in the last 24 h.</p>';
+  }
   if (typeof drawNeeds === 'function') drawNeeds();
-  document.getElementById('agents-sub').textContent = `${A.running.length} running · ${A.recent.length} finished in 24 h${A.hidden ? ' · ' + A.hidden + ' older hidden' : ''} · cost is list price (estimate until the run ends)`;
+  if (typeof drawFinishedLinks === 'function') drawFinishedLinks();
+  document.getElementById('agents-sub').textContent = (VIEW === 'main' ? `${A.running.length} running · ` : `${A.recent.length} finished in the last 24 h · `) +
+    `${A.hidden ? A.hidden + ' older hidden · ' : ''}cost is list price (estimate until the run ends)`;
 }
 
 // one queue group as a list row (also the Needs-you card's)
 const queueLi = r => `<li><b>${esc(r.label)}</b> <small>${esc(r.module)}</small>` +
     (r.why ? ` · ${esc(r.why)}` : '') + (r.held_by ? ` · held by overlap with ${esc(r.held_by)}` : '') +
-    (r.last_batch ? ` · last batch <a href="page/agent.html?name=${encodeURIComponent(r.last_batch)}">${esc(r.last_batch)}</a>` : '') +
+    (r.last_batch ? ` · last batch <a href="/page/agent.html?name=${encodeURIComponent(r.last_batch)}">${esc(r.last_batch)}</a>` : '') +
     (r.goals && r.goals.length ? ` · ${r.goals.length} goal${r.goals.length > 1 ? 's' : ''} open` : '') +
     (r.resume ? `<br><small>notes: ${esc(r.resume)}</small>` : '') + '</li>';
 
@@ -96,8 +100,8 @@ function drawQueue(Q){
 }
 
 async function loadAgents(){
-  try { agentsData = await (await fetch('agents.json?' + Date.now())).json(); } catch (e) { return; }
-  drawAgents();
+  try { agentsData = await (await fetch('/agents.json?' + Date.now())).json(); } catch (e) { return; }
+  keepScroll(drawAgents);
 }
 
 // ---- quota ----
@@ -144,7 +148,7 @@ function quotaChart(id, col, spanSecs, title){
 }
 
 function drawQuota(){
-  if (!last) return;
+  if (!last || !document.getElementById('c-q7')) return;
   const q = last.quota ? last.quota.series : [], n = q.length ? q[q.length-1] : null;
   const sub = document.getElementById('quota-sub');
   if (!n) { sub.textContent = 'No data yet.'; }

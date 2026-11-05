@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>monitor: finished</title>
+<link rel="icon" id="favicon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/vendor/uPlot.min.css">
+<link rel="stylesheet" href="/agents.css">
+<link rel="stylesheet" href="/glance.css">
+<script src="/vendor/uPlot.iife.min.js"></script>
+<link rel="stylesheet" href="/main.css"></head>
+<body data-view="done"><main>
+<h1 id="h1">monitor: finished work</h1>
+<p class="sub" id="upd">Loading…</p>
+<div class="alarm" id="alarm" role="alert" hidden></div>
+<nav class="nav" aria-label="Views"><a href="/">← Back to the monitor</a><a href="#t-missions">Missions</a><a href="#t-agents">Headless agents</a><a href="#sections">Work sections</a></nav>
+<p class="chart-sub">What has ended: headless agents and work sections from the last 24 hours (a done or failed section expires after a day), and missions completed in the last 3 days. A red alert of a section here is also listed under Needs you on the main page.</p>
+<section class="card" aria-labelledby="t-missions">
+<h2 id="t-missions">Completed missions</h2>
+<p class="chart-sub" id="missions-sub">Loading…</p>
+<div id="missions"></div>
+</section>
+<section class="card" aria-labelledby="t-agents">
+<h2 id="t-agents">Headless agents, finished</h2>
+<p class="chart-sub" id="agents-sub">Loading…</p>
+<div id="agents-box"></div>
+</section>
+<h2 id="t-secs" style="margin:18px 0 8px">Work sections, done or failed</h2>
+<div id="sections"></div>
+<p class="meta" id="problems" hidden></p>
+</main>
+<script src="/main.js"></script>
+<script src="/agents.js"></script>
+<script src="/glance.js"></script></body></html>

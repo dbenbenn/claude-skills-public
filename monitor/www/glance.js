@@ -68,8 +68,8 @@ function drawNeeds(){
     else if (m.waits === 'start') rows.push({text: `<a href="#m-${esc(m.key)}">${esc(m.title)}</a>: ${esc(cur.title)} is ready to start`, tag: 'mission'});
   }
   for (const s of last.sections || []) {
-    for (const a of s.alerts || []) rows.push({text: `<a href="#h-${esc(s.id)}">${esc(s.title)}</a>${s.state === 'running' ? '' : ' (' + esc(s.state) + ')'}: <span class="atext">${esc(a)}</span>`, tag: 'alert'});
-    if (s.stale) rows.push({text: `<a href="#h-${esc(s.id)}">${esc(s.title)}</a> is stale: no update for ${Math.round(s.age_secs / 60)} min`, tag: 'stale'});
+    for (const a of s.alerts || []) rows.push({text: `<a href="${hrefFor(isLive(s), 'h-' + s.id)}">${esc(s.title)}</a>${s.state === 'running' ? '' : ' (' + esc(s.state) + ')'}: <span class="atext">${esc(a)}</span>`, tag: 'alert'});
+    if (s.stale) rows.push({text: `<a href="${hrefFor(isLive(s), 'h-' + s.id)}">${esc(s.title)}</a> is stale: no update for ${Math.round(s.age_secs / 60)} min`, tag: 'stale'});
   }
   for (const p of last.problems || []) rows.push({text: 'Unreadable section file: ' + esc(p), tag: 'section'});
   const Q = agentsData && agentsData.queue;
@@ -129,15 +129,18 @@ function drawMissions(){
     el.innerHTML = ''; return;
   }
   const stale = Date.now()/1000 - D.updated > 300;
-  sub.innerHTML = (stale ? `<b class="warntxt">The mission tracker last wrote ${esc(ago(Math.round(Date.now()/1000 - D.updated)))}: is mission-tracker.service running?</b> ` : '') +
+  if (VIEW === 'done') { sub.textContent = 'Missions whose five steps are all done; each leaves this list 3 days after completing.'; }
+  else sub.innerHTML = (stale ? `<b class="warntxt">The mission tracker last wrote ${esc(ago(Math.round(Date.now()/1000 - D.updated)))}: is mission-tracker.service running?</b> ` : '') +
     `From hand-over to post-approval cleanup. prove2.me is checked every ${Math.round((D.auto_every || 900) / 60)} min and when you click Check now; ` +
     'Start runs that step as a headless Claude agent (subscription), which marks the step done when it finishes.';
-  el.innerHTML = D.missions.length ? D.missions.map(missionCard).join('') : '<p class="empty">No mission is between hand-over and cleanup.</p>';
+  // complete missions are on the Finished page
+  const M = D.missions.filter(m => m.complete === (VIEW === 'done'));
+  el.innerHTML = M.length ? M.map(missionCard).join('') : `<p class="empty">${VIEW === 'main' ? 'No mission is between hand-over and cleanup.' : 'No mission completed in the last 3 days.'}</p>`;
 }
 
 async function loadMissions(){
-  try { missionsData = await (await fetch('missions.json?' + Date.now())).json(); } catch (e) { return; }
-  drawMissions(); drawNeeds();
+  try { missionsData = await (await fetch('/missions.json?' + Date.now())).json(); } catch (e) { return; }
+  keepScroll(() => { drawMissions(); drawNeeds(); if (typeof drawFinishedLinks === 'function') drawFinishedLinks(); });
 }
 
 document.addEventListener('click', async e => {
@@ -146,9 +149,9 @@ document.addEventListener('click', async e => {
   const key = b.dataset.key, action = b.dataset.act;
   if (action === 'start' && !confirm(`Start a headless Claude agent (on the subscription) for “${b.dataset.step}” of ${key}?`)) return;
   pendingClicks[key] = {action};
-  drawMissions();
+  keepScroll(drawMissions);
   try {
-    const r = await fetch('request', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Monitor-Request': '1'}, body: JSON.stringify({action, key})});
+    const r = await fetch('/request', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Monitor-Request': '1'}, body: JSON.stringify({action, key})});
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || r.status);
     pendingClicks[key].rid = j.queued;
@@ -161,7 +164,7 @@ document.addEventListener('click', async e => {
     if (m && m.pending && m.pending.rid === pendingClicks[key].rid) break;
   }
   delete pendingClicks[key];
-  drawMissions();
+  keepScroll(drawMissions);
 });
 
 loadMissions(); setInterval(loadMissions, 30000);

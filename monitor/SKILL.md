@@ -187,6 +187,22 @@ body of at most 1 KiB, and an `Origin`, when present, naming this host (`post_re
 `test_server.py`). The page then polls `/missions.json` until the mission's `pending.rid` matches the
 id the POST returned (a phone's clock may differ from the box's).
 
+**Finished page** `/page/done.html` (2026-11-05, dbenbenn: "move completed tasks into a linked subpage"): the
+headless agents that ended in the last 24 h, the done and failed sections (they expire after a day), and the
+complete missions. The main page keeps only running agents, sections that are running, waiting or paused, and
+missions in progress; the nav's "Finished (N)" and a line under the sections link there. Both pages are the same
+script, `www/main.js` (it was inline in index.html) with `www/main.css`, switched by `<body data-view>`; each card
+draws only when its element exists. Links between them go through `hrefFor`, and every fetch and asset path is
+absolute, since done.html lives under /page/.
+
+**Scroll position.** Every redraw (status every 30 s, agents every 15 s, missions every 30 s, a phase click, a
+width change) runs inside `keepScroll`: it finds the element at the top of the viewport, the nearest ancestor with
+an id (agent cards are `ag-<name>`, missions `m-<key>`, sections `sec-<id>`) and the child-index path down to it,
+redraws, and scrolls by however far that element moved. Native scroll anchoring is off (`overflow-anchor: none`)
+so the two never correct twice. Before this (2026-11-05), a card above the reader that changed height made the
+page jump, and phones, which fire `resize` when the address bar hides, redrew every chart while scrolling;
+resize now redraws only on a real width change.
+
 **Stacked-chart legends** read `u._raw`, which `upsert` (and the disk chart) refresh along with the data:
 a reused chart's legend otherwise kept the values of the page's first load (2026-11-05: a tab open
 since the morning showed queue workers at 1.2 GiB beside an 18 GiB band).

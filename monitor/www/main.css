@@ -1,0 +1,50 @@
+/* the main page and the Finished page (index.html, done.html) */
+:root{color-scheme:light;--surface-0:#f5f4f1;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7974;--grid:#e4e3df;--series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#8f5bd6;--series-5:#c99a00;--disk-5:#c99a00;--rest:#c9c8c2;--track:#e9e8e4;--good:#008300;--warn:#b26b00;--alarm:#b42318}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--series-4:#9d6fe0;--series-5:#d4a514;--disk-5:#c98500;--rest:#4a4a46;--track:#2a2a28;--good:#3fa33f;--warn:#d9922a;--alarm:#c4321f}}
+:root[data-theme="dark"]{color-scheme:dark;--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--series-4:#9d6fe0;--series-5:#d4a514;--disk-5:#c98500;--rest:#4a4a46;--track:#2a2a28;--good:#3fa33f;--warn:#d9922a;--alarm:#c4321f}
+body{margin:0;background:var(--surface-0);color:var(--text-primary);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14px}
+.card{background:var(--surface-1);border-radius:10px;padding:14px 16px;margin:0 0 14px}
+.alarm{background:var(--alarm);color:#fff;padding:10px 14px;border-radius:8px;margin:0 0 14px}
+.alarm b{display:block;margin-bottom:2px}.alarm ul{margin:0;padding-left:18px}.alarm li{overflow-wrap:anywhere}
+.ph{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--grid);cursor:pointer}
+.ph:first-child{border-top:0}.ph.sel .n{text-decoration:underline;text-underline-offset:3px}
+.ph .n{font-weight:600}.ph .v{color:var(--text-secondary);font-variant-numeric:tabular-nums;text-align:right}
+.ph .note{grid-column:1/3;color:var(--text-muted);font-size:13px}
+.bar{grid-column:1/3;height:6px;background:var(--track);border-radius:3px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--series-1);border-radius:3px}
+.st{font-size:12px;font-weight:600;letter-spacing:.02em;margin-left:6px}.st.done{color:var(--good)}.st.running{color:var(--series-1)}.st.failed,.st.stale{color:var(--warn)}.st.waiting,.st.paused{color:var(--text-muted)}
+.run{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto auto;gap:3px 14px;font-variant-numeric:tabular-nums;font-size:14px;margin-top:4px}
+.run .h{color:var(--text-muted);font-size:12px}.run .r{text-align:right;color:var(--text-secondary)}.run .c{color:var(--text-muted);font-size:12px;grid-column:1/6;margin-top:-3px}
+.run span{overflow-wrap:anywhere}
+@media (max-width:560px){.run{grid-template-columns:minmax(7em,1fr) auto auto auto;gap:3px 10px;font-size:13px}.run .sh{display:none}.run .c{grid-column:1/5}}
+.salerts{color:var(--alarm);font-weight:600;margin:6px 0;padding-left:18px}
+.cleared{margin:4px 0 0;padding-left:18px;color:var(--text-secondary);font-size:13px}.cleared li{overflow-wrap:anywhere;margin:2px 0}
+.cleared .when{color:var(--text-muted);font-variant-numeric:tabular-nums}
+h2{font-size:17px;margin:0 0 2px} h3{font-size:14px;margin:0 0 2px} .chart-sub{color:var(--text-secondary);font-size:13px;margin:0 0 6px}
+.meta{color:var(--text-muted);font-size:13px;margin:0 0 6px}.meta a{color:var(--series-1)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px 20px}
+.chart{min-width:0} .grid2 .wide{grid-column:1/-1}
+.empty{color:var(--text-muted);font-size:14px}
+details{margin-top:10px;color:var(--text-secondary);font-size:13px}
+code{font-size:13px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:6px 0 12px}
+.seg{display:inline-flex;border:1px solid var(--grid);border-radius:7px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;background:transparent;color:var(--text-secondary);border:0;border-left:1px solid var(--grid);padding:4px 10px;cursor:pointer}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--series-1);color:#fff}
+.hint{color:var(--text-muted);font-size:12px}
+#zoomed,.zoomed{font:inherit;font-size:13px;background:transparent;color:var(--series-1);border:1px solid var(--series-1);border-radius:7px;padding:3px 10px;cursor:pointer}
+/* uPlot: theme its legend and selection */
+.u-legend{font-size:12px;color:var(--text-secondary);text-align:left}
+.u-legend .u-series th{font-weight:500}.u-legend .u-value{font-variant-numeric:tabular-nums;color:var(--text-primary)}
+.u-legend .u-marker{border-radius:2px}
+.u-select{background:rgba(127,127,127,.18)}
+.dtab{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:3px 16px;font-variant-numeric:tabular-nums;font-size:14px;margin-top:10px}
+.dtab .h{color:var(--text-muted);font-size:12px}.dtab .r{text-align:right;color:var(--text-secondary)}.dtab .tot{border-top:1px solid var(--grid);padding-top:3px}
+.dtab .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:7px;vertical-align:-1px}
+/* the page keeps its own scroll position across redraws (keepScroll in main.js); the browser's anchoring would correct twice */
+html{overflow-anchor:none}
+.more{font-size:14px;margin:0 0 14px}.more a{text-decoration:none}.more a:hover{text-decoration:underline}
+p.more.card{padding:10px 16px}
