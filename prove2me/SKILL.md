@@ -710,7 +710,9 @@ agent works from the other side, in two phases the tool enforces:
 `milestone_title` and a `milestone_description` with its quoted sentence in the mission data,
 `draft.py` leaves it off the milestone list as the platform requires, and every audit covers it
 like the rest. An item may name `context_pages` where the notions its sentence uses are defined
-(Garrido's Theorem 4.1 needs Definition 1.13 on p. 4 and the class EG on p. 7).
+(Garrido's Theorem 4.1 needs Definition 1.13 on p. 4 and the class EG on p. 7). A cited external
+result names its own `source_pdf` and `audit_pages` (the cited paper's pages); `stage` then renders
+those and the citing paper's `page` (as `citing-page-*.png`) and tells the auditor which is which.
 
 **The bundle's source audit.** Give the bundle `source_pages` in `mission.py` and run
 `source_audit.py stage MISSION_DIR Def_<name>`. Phase 1 inventories every object the source
