@@ -505,6 +505,22 @@ def test_editing_the_post_carve_patches_file_reruns_gen(env):
     assert ('carve', 'gen') in seq and ('carve', 'plan') not in seq and 'stale' in r.stdout
 
 
+def test_a_plan_changed_by_hand_reruns_gen(env, monkeypatch):
+    # q172: `carve.py split --only E011` by hand (a bundle stopped on own timeouts, after publishing began);
+    # the resume went straight on to measure_pieces with the old out/lib: no E196, E011 unchanged
+    monkeypatch.setenv('STUB_HOOK_carve_plan', "os.makedirs('carve_work', exist_ok=True); "
+                       "open('carve_work/plan.json', 'w').write(json.dumps({'bundles': []}))")
+    r = run(env, *ARGS)
+    assert r.returncode == 0, r.stdout + r.stderr
+    plan = env.dir / 'carve_work' / 'plan.json'
+    plan.write_text(json.dumps({'bundles': [], 'split': 1}))
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert ('carve', 'gen') in seq and ('carve', 'plan') not in seq and 'stale: gen' in r.stdout, (seq, r.stdout)
+
+
 def test_state_from_before_hashes_existed_is_not_called_stale(env):
     assert run(env, *ARGS).returncode == 0
     st = json.load(open(env.dir / 'pipeline_state.json'))

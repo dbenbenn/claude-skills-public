@@ -582,6 +582,11 @@ class Pipeline:
         }.get(s, {})
         if s in GEN_READERS:
             h['gen output'] = self.gen_output_hash(s)
+        if s == 'gen' and (cfg := self.read_config()) is not None:
+            # q172: a bundle split by hand (`carve.py split --only`, the remedy for a bundle stopped on own
+            # timeouts) changed plan.json, and the resume measured the old out/lib; calibrate's own splits
+            # invalidate gen themselves, a hand split or fold has only this
+            h['plan'] = hash_paths([self.work_paths(cfg)[1]])
         if s in GRAPH_READERS and (gp := self.graph_path()):
             # oaiq-123: a `graph` re-run by a LeanInfo change is popped alone, "its consumers check its
             # output": without this, a changed graph left the old plan in place
