@@ -243,12 +243,16 @@ def prune_theorem_imports(text, verbose=True):
 
 
 def prune_by_lean(path):
-    """The pruned text by Lean's own dependencies (p2mlib.prune), or None when the file has errors
-    (its dependencies are then incomplete and the name-based pruner is the fallback)."""
+    """The pruned text by Lean's own dependencies (p2mlib.prune). A file with errors is refused: its
+    dependencies are then incomplete, and the name-based pruner this once fell back to deleted
+    load-bearing declarations (q167, Viterbo capacity)."""
     from p2mlib import leaninfo, prune as P
     info = leaninfo.run(path)
     if info.errors:
-        return None
+        # in Lean's own `file:line:col: error:` form, which rewire.blame reads
+        sys.exit('refusing: %s does not elaborate, so Lean cannot report its dependencies; fix it first:\n%s'
+                 % (path, '\n'.join('%s:%d:%d: error: %s' % (path, m.start.line, m.start.col, m.text.split('\n')[0][:200])
+                                    for m in info.errors[:8])))
     drop, drop_imports, rep = P.plan(info)
     print('declarations: %d   unused: %d   (by Lean dependencies)' % (rep['declarations'], len(rep['removed'])))
     for n in rep['removed']:
@@ -272,10 +276,6 @@ def main():
     text = open(a.file, encoding='utf-8').read()
     n0 = len(text.split('\n'))
     out = prune_by_lean(a.file)
-    if out is None:
-        print('the file does not elaborate cleanly, so Lean cannot report its dependencies: '
-              'falling back to the name-based pruner')
-        out, doomed = prune(text)
     n1 = len(out.split('\n'))
     print('%d -> %d lines (%d removed)' % (n0, n1, n0 - n1))
     if a.dry:

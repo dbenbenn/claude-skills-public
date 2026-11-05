@@ -113,7 +113,7 @@ def closer(info, i):
     return 'end' + (' ' + name if name else '')
 
 
-def scope_wrap(info, i, top_level=False):
+def scope_wrap(info, i, top_level=False, replace=None):
     """(prefix, suffix) that re-create, at the top level of any file, the scope command i sits in:
     an anonymous section holding the file's root-level context commands, then each enclosing
     namespace/section with the context commands elaborated in it (open, variable, universe,
@@ -123,7 +123,11 @@ def scope_wrap(info, i, top_level=False):
 
     `top_level`: declare at the top level instead (a `theorem solution` must not be namespaced:
     the verifier answers "Unknown identifier solution"). Each enclosing namespace is `open`ed where
-    it was entered, so the context commands after it resolve their names as they did."""
+    it was entered, so the context commands after it resolve their names as they did.
+
+    `replace` ({command index: text, or None to leave it out}) rewrites context commands: the
+    assembler leaves out those already in force at the root of its output (a hoisted `universe`,
+    q167) and the namespaces of an `open` not yet declared there (q181)."""
     pre, post, ns = ['section'], ['end'], ''
     for opener, cmds in info.commands[i].context:
         # a plain `section` adds nothing but its context commands, which come anyway; a namespace
@@ -146,7 +150,10 @@ def scope_wrap(info, i, top_level=False):
         elif o.startswith('noncomputable'):
             pre.append(o)
             post.insert(0, closer(info, opener))
-        pre += [text(info, k) for k in cmds]
+        for k in cmds:
+            t = (replace or {}).get(k, text(info, k))
+            if t:
+                pre.append(t)
     return '\n'.join(pre) + '\n', '\n'.join(post) + '\n'
 
 

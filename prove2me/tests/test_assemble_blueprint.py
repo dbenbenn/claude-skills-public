@@ -119,15 +119,19 @@ def test_parts_importing_each_other_are_refused():
     assert 'cycle' in str(e.value)
 
 
-def test_a_helper_importing_a_part_is_refused(tmp_path):
-    # the helper is inlined ahead of the Blueprint, the Part after it: no order works
+def test_a_helper_importing_the_blueprint_or_a_part_is_promoted_to_a_part(tmp_path):
+    # q188 (S9 Pisier): such a helper uses Blueprint text, and inlined ahead of the Blueprint it failed
+    # ("unknown identifier tOp"); it is assembled as a Part instead, as is a helper importing one
     ws = str(tmp_path)
     l = write(os.path.join(ws, 'Solutions', 'X', 'PartL.lean'), 'import Mathlib\n')
     t = write(os.path.join(ws, 'Solutions', 'X', 'Tools.lean'), 'import Solutions.X.PartL\n')
-    with pytest.raises(SystemExit) as e:
-        AB.check_helpers_import_no_part([('Solutions.X.PartL', l), ('Solutions.X.Tools', t)],
-                                        {'Solutions.X.PartL': 0})
-    assert 'Solutions.X.Tools' in str(e.value) and 'Solutions.X.PartL' in str(e.value)
+    d = write(os.path.join(ws, 'Solutions', 'X', 'Defs.lean'), 'import Solutions.X.Blueprint\n')
+    e = write(os.path.join(ws, 'Solutions', 'X', 'More.lean'), 'import Solutions.X.Defs\n')
+    f = write(os.path.join(ws, 'Solutions', 'X', 'Base.lean'), 'import Mathlib\n')
+    helpers = [('Solutions.X.Base', f), ('Solutions.X.PartL', l), ('Solutions.X.Tools', t),
+               ('Solutions.X.Defs', d), ('Solutions.X.More', e)]
+    assert AB.promote_helpers(helpers, {'Solutions.X.Blueprint'}, {'Solutions.X.PartL': 0}) == \
+        ['Solutions.X.Tools', 'Solutions.X.Defs', 'Solutions.X.More']
 
 
 # --- copy-header Parts (q159, Tao §4: parab, pbr, Thm 4.10 K2N; 2026-11-03) ---
@@ -161,12 +165,20 @@ def test_a_part_without_copies_is_returned_unchanged():
     ('PartBadDef', 'BP.two'),          # a copied definition that is not the Blueprint's
     ('PartBadStub', 'BP.two_eq'),      # an assumed stub stated differently
     ('PartBadAssume', 'BP.two_pos'),   # a `sorry` assumption the Blueprint does not make
-    ('PartBadProof', 'BP.two_eq'),     # a stub proved under the Blueprint's own name
+    ('PartBadSameName', 'BP.two_eq'),  # a stub proved under the Blueprint's own name, restated
 ])
 def test_a_copy_that_is_not_blueprint_text_is_refused(part, why):
     with pytest.raises(SystemExit) as e:
         AB.drop_copies(fixture(part), fixture('Blueprint'), part)
     assert part in str(e.value) and why in str(e.value)
+
+
+def test_a_stub_proved_under_the_blueprint_name_moves_to_the_parts_namespace():
+    # q195: proved under its own name with the stub's statement, it is renamed into the Part's
+    # namespace, so the stub becomes its alias as for any Part
+    text, copied, assumed = AB.drop_copies(fixture('PartSameName'), fixture('Blueprint'), 'PartSameName')
+    assert copied == ['BP.two'] and assumed == []
+    assert 'theorem PartSameName.two_eq : two = 2 := rfl' in text and 'def two' not in text
 
 
 def test_target_is_renamed_dev_and_solution_states_it_at_the_root():
@@ -253,3 +265,195 @@ def test_a_part_imported_by_another_part_is_assembled_once(tmp_path):
         compile_ok(out, ws)
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+
+# --- 2026-11-05 lessons: q165, q167, q181, q182, q187, q188, q195 ---
+
+HDR = 'import Batteries.Tactic.Alias\n\n'
+BP_API = (HDR + 'namespace API\n\ndef one : Nat := 1\n\ntheorem a_eq : one = 1 := by\n  sorry\n\n'
+          'theorem b_eq : one + one = 2 := by\n  sorry\n\ntheorem top : one + one + one = 3 := by\n'
+          '  rw [b_eq, a_eq]\n\nend API\n')
+
+
+class Case:
+    """Lean files of one assembly case under $P2M_WORKSPACE/Solutions/<name> (removed afterwards)."""
+
+    def __init__(self, name):
+        from prune_solution import _workspace
+        self.ws = _workspace()
+        self.mod = 'Solutions.' + name
+        self.dir = os.path.join(self.ws, 'Solutions', name)
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def file(self, stem, text):
+        return write(os.path.join(self.dir, stem + '.lean'), text.replace('$M', self.mod))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+
+def assembled_ok(r, out, ws, top):
+    """The assembly succeeded and OUT compiles without `sorry`; OUT's text."""
+    assert r.returncode == 0, r.stdout + r.stderr
+    text = out.read_text()
+    out.write_text(text + '\n#print axioms %s\n' % top)
+    compile_ok(out, ws)
+    return text
+
+
+@pytest.mark.lean
+def test_a_hoisted_universe_is_not_redeclared_per_chunk(tmp_path):
+    # q167 (Viterbo capacity): an inlined helper's `universe u3 u4` was hoisted to the top AND
+    # re-created in every chunk ("a universe level named u3 has already been declared", ~40 errors),
+    # and the script still exited 0
+    with Case('AsmUniverseTest') as c:
+        c.file('Tools', HDR + 'universe u\n\nsection\nabbrev Same (α : Sort u) : Sort u := α\nend\n')
+        bp = c.file('Blueprint', HDR + 'import $M.Tools\n\nnamespace AU\n\ndef one : Same Nat := (1 : Nat)\n\n'
+                    'theorem a_eq : (one : Nat) = 1 := by\n  sorry\n\ntheorem top : (one : Nat) + 0 = 1 := by\n'
+                    '  rw [Nat.add_zero, a_eq]\n\nend AU\n')
+        pa = c.file('PartA', HDR + 'import $M.Blueprint\n\nnamespace AU.PartA\n\n'
+                    'theorem a_eq : (AU.one : Nat) = 1 := rfl\n\nend AU.PartA\n')
+        out = tmp_path / 'out.lean'
+        text = assembled_ok(run_assemble(bp, out, pa), out, c.ws, 'AU.top')
+        assert text.count('universe u') == 1
+
+
+@pytest.mark.lean
+def test_print_commands_are_stripped_from_parts_and_blueprint(tmp_path):
+    # q188: a stray `#print axioms` in PartB was carried into the chunks ("Unknown constant
+    # PartB.rescale"); the Blueprint's `#print axioms API.top` names a theorem --target renames
+    with Case('AsmPrintTest') as c:
+        bp = c.file('Blueprint', BP_API + '\n#print axioms API.top\n')
+        pa = c.file('PartA', HDR + 'import $M.Blueprint\n\nnamespace API.PartA\n\n#check API.one\n\n'
+                    'theorem a_eq : API.one = 1 := rfl\n\n#print axioms a_eq\n\nend API.PartA\n\n'
+                    '#print axioms API.PartA.a_eq\n')
+        pb = c.file('PartB', HDR + 'import $M.Blueprint\n\nnamespace API.PartB\n\n#eval API.one\n\n'
+                    'theorem b_eq : API.one + API.one = 2 := rfl\n\nend API.PartB\n')
+        out = tmp_path / 'out.lean'
+        text = assembled_ok(run_assemble(bp, out, pa, pb, '--target', 'API.top'), out, c.ws, 'solution')
+        assert '#print' not in text and '#check' not in text and '#eval' not in text
+
+
+@pytest.mark.lean
+def test_a_helper_importing_the_blueprint_is_assembled_after_it(tmp_path):
+    # q188 (S9 Pisier): helper modules importing the Blueprint, not listed as Parts, were inlined
+    # ahead of the Blueprint text they use ("unknown identifier tOp")
+    with Case('AsmHelperBPTest') as c:
+        bp = c.file('Blueprint', BP_API)
+        c.file('Defs', HDR + 'import $M.Blueprint\n\nnamespace API.PartD\n\ndef two : Nat := API.one + API.one\n\n'
+               'theorem two_eq : two = 2 := rfl\n\nend API.PartD\n')
+        pa = c.file('PartA', HDR + 'import $M.Blueprint\n\nnamespace API.PartA\n\n'
+                    'theorem a_eq : API.one = 1 := rfl\n\nend API.PartA\n')
+        pb = c.file('PartB', HDR + 'import $M.Blueprint\nimport $M.Defs\n\nnamespace API.PartB\n\n'
+                    'theorem b_eq : API.one + API.one = 2 := API.PartD.two_eq\n\nend API.PartB\n')
+        out = tmp_path / 'out.lean'
+        text = assembled_ok(run_assemble(bp, out, pa, pb), out, c.ws, 'API.top')
+        assert text.index('def one') < text.index('def two') < text.index('alias b_eq')
+
+
+PART_G = (HDR + 'import $M.Blueprint\n\nnamespace API.PartG\n\n'
+          'theorem b_eq : API.one + API.one = 2 := by\n  rw [API.a_eq]\n\ndef g : Nat := 1\n\nend API.PartG\n')
+
+
+@pytest.mark.lean
+def test_a_part_opening_another_parts_namespace_comes_after_it(tmp_path):
+    # q181 (strong convergence, cited graphs): PartT's chunk header `open Finset ...PartG` was placed
+    # before PartG's chunks ("unknown namespace"), so `Finset` was not opened either
+    with Case('AsmOpenTest') as c:
+        bp = c.file('Blueprint', BP_API)
+        pg = c.file('PartG', HDR + 'import $M.Blueprint\n\nnamespace API.PartG\n\n'
+                    'theorem b_eq : API.one + API.one = 2 := rfl\n\ndef g : Nat := 1\n\nend API.PartG\n')
+        pt = c.file('PartT', HDR + 'import $M.Blueprint\nimport $M.PartG\n\nopen Nat API.PartG\n\n'
+                    'namespace API.PartT\n\ndef t : Nat := succ 0\n\n'
+                    'theorem a_eq : API.one = 1 := by\n  have : g = t := rfl\n  rfl\n\nend API.PartT\n')
+        out = tmp_path / 'out.lean'
+        text = assembled_ok(run_assemble(bp, out, pt, pg), out, c.ws, 'API.top')
+        assert text.index('theorem b_eq') < text.index('def t')
+
+
+@pytest.mark.lean
+def test_an_open_no_order_can_satisfy_is_dropped_when_unused(tmp_path):
+    # q181, the other way round: PartG's first declaration uses the stub PartT proves, so PartT's
+    # chunks must come first; they do not use PartG, so its namespace leaves their `open`
+    with Case('AsmOpenCycle2Test') as c:
+        bp = c.file('Blueprint', BP_API)
+        pg = c.file('PartG', PART_G)
+        pt = c.file('PartT', HDR + 'import $M.Blueprint\nimport $M.PartG\n\nopen Nat API.PartG\n\n'
+                    'namespace API.PartT\n\ndef t : Nat := succ 0\n\n'
+                    'theorem a_eq : API.one = 1 := rfl\n\nend API.PartT\n')
+        out = tmp_path / 'out.lean'
+        r = run_assemble(bp, out, pt, pg)
+        text = assembled_ok(r, out, c.ws, 'API.top')
+        assert 'API.PartG' in r.stderr          # the note that it left PartT's `open`
+        assert text.index('def t') < text.index('theorem b_eq')
+
+
+@pytest.mark.lean
+def test_a_scope_a_part_leaves_open_is_closed(tmp_path):
+    # q182 (strong convergence, high degree): PartQM ended `end PartQM` but left `namespace
+    # StrongConv.HighDegUp` open; concatenated, "Missing name after `end`"
+    with Case('AsmScopeTest') as c:
+        bp = c.file('Blueprint', BP_API)
+        pa = c.file('PartA', HDR + 'import $M.Blueprint\n\nnamespace API\nnamespace PartA\n\n'
+                    'theorem a_eq : API.one = 1 := rfl\n\nend PartA\n')
+        pb = c.file('PartB', HDR + 'import $M.Blueprint\n\nnamespace API.PartB\n\n'
+                    'theorem b_eq : API.one + API.one = 2 := rfl\n\nend API.PartB\n')
+        out = tmp_path / 'out.lean'
+        r = run_assemble(bp, out, pa, pb)
+        assembled_ok(r, out, c.ws, 'API.top')
+        assert 'PartA' in r.stderr and 'end API' in r.stderr
+
+
+@pytest.mark.lean
+def test_a_partial_blueprint_proof_restated_by_a_part_is_a_stub(tmp_path):
+    # q187 (high degree retry): the Blueprint's main theorem was started and ended in `sorry`; PartM
+    # restated and proved it, but only whole-body `sorry` stubs were replaced, and nothing warned
+    with Case('AsmPartialTest') as c:
+        bp = c.file('Blueprint', HDR + 'namespace API\n\ndef one : Nat := 1\n\ntheorem a_eq : one = 1 := by\n'
+                    '  sorry\n\ntheorem top : one + one = 2 := by\n  have h := a_eq\n  sorry\n\nend API\n')
+        pa = c.file('PartA', HDR + 'import $M.Blueprint\n\nnamespace API.PartA\n\n'
+                    'theorem a_eq : API.one = 1 := rfl\n\nend API.PartA\n')
+        pm = c.file('PartM', HDR + 'import $M.Blueprint\n\nnamespace API.PartM\n\n'
+                    'theorem top : API.one + API.one = 2 := by\n  rw [API.a_eq]\n\nend API.PartM\n')
+        out = tmp_path / 'out.lean'
+        r = run_assemble(bp, out, pa)          # without PartM: top keeps its `sorry`
+        assert r.returncode != 0 and 'API.top' in r.stderr and 'sorry' in r.stderr
+        r = run_assemble(bp, out, pa, '--allow-sorry')
+        assert r.returncode == 0 and 'API.top' in r.stderr
+        r = run_assemble(bp, out, pa, pm)
+        text = assembled_ok(r, out, c.ws, 'API.top')
+        assert 'alias top := API.PartM.top' in text and 'sorry' not in text
+        r = run_assemble(bp, out, pa, pm, '--target', 'API.top')
+        assembled_ok(r, out, c.ws, 'solution')
+
+
+@pytest.mark.lean
+def test_target_proved_in_a_blueprint_sub_namespace(tmp_path):
+    # q165 (Tao decay leaf): the Blueprint proved TaoBR.TaoDecay.X for the published TaoBR.X, and
+    # --target TaoBR.X refused
+    with Case('AsmTargetNsTest') as c:
+        bp = c.file('Blueprint', BP_API.replace('namespace API\n', 'namespace API.Sub\n')
+                    .replace('end API\n', 'end API.Sub\n'))
+        pa = c.file('PartA', HDR + 'import $M.Blueprint\n\nnamespace API.Sub.PartA\n\n'
+                    'theorem a_eq : API.Sub.one = 1 := rfl\n\nend API.Sub.PartA\n')
+        pb = c.file('PartB', HDR + 'import $M.Blueprint\n\nnamespace API.Sub.PartB\n\n'
+                    'theorem b_eq : API.Sub.one + API.Sub.one = 2 := rfl\n\nend API.Sub.PartB\n')
+        out = tmp_path / 'out.lean'
+        text = assembled_ok(run_assemble(bp, out, pa, pb, '--target', 'API.top'), out, c.ws, 'solution')
+        assert 'top_dev' not in text and 'exact API.Sub.top' in text
+
+
+@pytest.mark.lean
+def test_copy_header_parts_proving_under_the_blueprint_name_assemble(tmp_path):
+    # q195 (Guth-Maynard Cor 1.3): Parts proved each stub under the Blueprint's own name, with
+    # sorried copies of the sibling stubs they used; the assembler refused and the worker hand-merged
+    from prune_solution import _workspace
+    files = {n: write(str(tmp_path / 'src' / (n + '.lean')), HDR + open(os.path.join(FIX, n + '.lean')).read())
+             for n in ('Blueprint', 'PartB', 'PartSameName')}
+    out = tmp_path / 'out.lean'
+    r = run_assemble(files['Blueprint'], out, files['PartB'], files['PartSameName'], '--target', 'BP.top')
+    text = assembled_ok(r, out, _workspace(), 'solution')
+    assert 'alias two_eq := BP.PartSameName.two_eq' in text

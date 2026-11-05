@@ -1,4 +1,6 @@
 """prune_solution.prune: unreachable declarations go, roots stay."""
+import sys
+
 import pytest
 
 import prune_solution as P
@@ -40,3 +42,20 @@ def test_local_and_scoped_instances_are_declarations():
     src = ('namespace X\nnoncomputable local instance hsNorm : Norm Nat := ⟨id⟩\n'
            'scoped instance hsFinite : Inhabited Nat := ⟨0⟩\ntheorem t : True := trivial\nend X')
     assert [d[0] for d in P.parse(src.split('\n'))] == ['hsNorm', 'hsFinite', 't']
+
+
+def test_refuses_a_file_that_does_not_elaborate(monkeypatch, tmp_path, capsys):
+    # q167 (Viterbo capacity): an input with errors fell back to the name-based pruner, which deleted
+    # load-bearing declarations; it now refuses and leaves the file alone
+    from p2mlib import leaninfo
+    f = tmp_path / 'Sol.lean'
+    f.write_text(SRC)
+    broken = leaninfo.Info(str(f), 'elaborate', [], [], [leaninfo.Message(
+        'error', leaninfo.Pos(3, 0, 0), leaninfo.Pos(3, 1, 1), 'unknown identifier `foo`')])
+    monkeypatch.setattr(leaninfo, 'run', lambda *a, **k: broken)
+    monkeypatch.setattr(sys, 'argv', ['prune_solution.py', str(f)])
+    with pytest.raises(SystemExit) as e:
+        P.main()
+    assert e.value.code not in (0, None)
+    assert 'does not elaborate' in str(e.value) and 'unknown identifier `foo`' in str(e.value)
+    assert f.read_text() == SRC
