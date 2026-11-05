@@ -309,3 +309,41 @@ def test_runlock_peek_takes_no_lock_and_checks_the_command(tmp_path, monkeypatch
     assert runlock.peek(key, 'python') or runlock.peek(key, 'pytest')
     assert runlock.peek(key, 'carve_pipeline-no-such') is None
     assert runlock.held_by(key) is None              # the file is there, nobody holds it
+
+
+def test_running_gen_counts_the_files_it_has_written(carve):
+    """gen writes one file per planned bundle, statement and piece; a 3-hour regen showed no progress at all
+    (q172 MUB, 2026-11-05), so the section counts the files written since the step started."""
+    wj(carve / 'pipeline_state.json', {'steps': dict(STEPS_DONE_TO('gen'), gen={'status': 'running', 'started': '2026-11-05T19:50:23'})})
+    start = time.mktime(time.strptime('2026-11-05T19:50:23', '%Y-%m-%dT%H:%M:%S'))
+    out = carve / 'out'
+    for sub, name, t in (('lib', 'B0.lean', start + 60), ('lib', 'B1.lean', start - 3600), ('solutions', 'S1.lean', start + 5),
+                         ('solutions', 'notes.txt', start + 5)):
+        (out / sub).mkdir(parents=True, exist_ok=True)
+        (out / sub / name).write_text('x')
+        os.utime(out / sub / name, (t, t))
+    wj(carve / 'config.json', {'work': str(carve / 'work'), 'external': ['OAI.Foo.main'], 'out': str(out)})
+    sec = M.Reporter(str(carve), go=True, lib=False).compose()
+    g = phase(sec, 'Gen (files written)')
+    # planned: 2 bundles + 2 statements + 2 pieces (the external target excluded); written since the start: B0, S1
+    assert (g['done'], g['total'], g['state']) == (2, 6, 'running')
+    assert 'since 19:50' in g['note']
+
+
+def test_publish_phase_waits_while_nothing_publishes(carve, monkeypatch):
+    """A carve back in an earlier step (a regen) with no publisher running is not publishing: the phase said
+    `running` for hours while its count stood still."""
+    monkeypatch.setattr(M.Carve, 'publisher_alive', lambda self: False)
+    wj(carve / 'pipeline_state.json', {'steps': dict(STEPS_DONE_TO('gen'), gen={'status': 'running'})})
+    pub = phase(M.Reporter(str(carve), go=True, lib=False).compose(), 'Publish (live)')
+    assert pub['state'] == 'waiting' and pub['note'].startswith('paused while gen runs')
+    monkeypatch.setattr(M.Carve, 'publisher_alive', lambda self: True)
+    assert phase(M.Reporter(str(carve), go=True, lib=False).compose(), 'Publish (live)')['state'] == 'running'
+
+
+def test_a_later_step_left_running_by_a_stop_shows_as_waiting(carve):
+    """A machine stop left `measure` recorded as running while the resumed driver regenerates (gen comes first)."""
+    steps = dict(STEPS_DONE_TO('gen'), gen={'status': 'running', 'started': '2026-11-05T19:50:23'}, measure={'status': 'running'})
+    wj(carve / 'pipeline_state.json', {'steps': steps})
+    m = phase(M.Reporter(str(carve), go=True, lib=False).compose(), 'Measure bundles+statements')
+    assert m['state'] == 'waiting' and m['note'].startswith('interrupted; runs again after gen')

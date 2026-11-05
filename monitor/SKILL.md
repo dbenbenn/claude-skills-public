@@ -203,6 +203,20 @@ so the two never correct twice. Before this (2026-11-05), a card above the reade
 page jump, and phones, which fire `resize` when the address bar hides, redrew every chart while scrolling;
 resize now redraws only on a real width change.
 
+**Retries and their carves** (2026-11-05, after q172 MUB confused dbenbenn: "two seemingly unrelated names"). A
+retry batch resumes an earlier batch's carve, whose section the driver titles after the job dir's batch. So the
+page: titles every `carve-*` section "Carve of <module>" and says which running agent works on it (the agent card
+that lists that section id) and which batch started it, relabelling "worker log" as that batch's log (`carveView`
+in main.js); on an agent card shows only the carve rows whose section is live, folding the rest (backups such as
+`before_regen`, older carves of the module) into one grey "idle" line; counts items live from the section's
+Publish phase (the whole plan; run_state.json lists only what was ever queued, so q172 read "154 / 157" at 623 of
+6,338); greys a stage still recorded as running after the current one (a stop cut it off); and the items-live
+sparkline's tooltip says "unchanged since …" when the count has stood still for half an hour. In the carve monitor
+(prove2me `p2mlib/carvemonitor.py`; a running driver keeps its snapshot's version until it restarts): a running
+`gen` gets a "Gen (files written)" phase (the .lean files under out/ written since the step started, of the plan's
+items), Publish is `waiting` ("paused while <step> runs") when no publisher runs and the driver is not on a publish
+step, and a measure step recorded as running but later than the current step is `waiting` ("interrupted").
+
 **Stacked-chart legends** read `u._raw`, which `upsert` (and the disk chart) refresh along with the data:
 a reused chart's legend otherwise kept the values of the page's first load (2026-11-05: a tab open
 since the morning showed queue workers at 1.2 GiB beside an 18 GiB band).

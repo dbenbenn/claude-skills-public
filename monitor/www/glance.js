@@ -68,8 +68,8 @@ function drawNeeds(){
     else if (m.waits === 'start') rows.push({text: `<a href="#m-${esc(m.key)}">${esc(m.title)}</a>: ${esc(cur.title)} is ready to start`, tag: 'mission'});
   }
   for (const s of last.sections || []) {
-    for (const a of s.alerts || []) rows.push({text: `<a href="${hrefFor(isLive(s), 'h-' + s.id)}">${esc(s.title)}</a>${s.state === 'running' ? '' : ' (' + esc(s.state) + ')'}: <span class="atext">${esc(a)}</span>`, tag: 'alert'});
-    if (s.stale) rows.push({text: `<a href="${hrefFor(isLive(s), 'h-' + s.id)}">${esc(s.title)}</a> is stale: no update for ${Math.round(s.age_secs / 60)} min`, tag: 'stale'});
+    for (const a of s.alerts || []) rows.push({text: `<a href="${hrefFor(isLive(s), 'h-' + s.id)}">${esc(carveView(s).title)}</a>${s.state === 'running' ? '' : ' (' + esc(s.state) + ')'}: <span class="atext">${esc(a)}</span>`, tag: 'alert'});
+    if (s.stale) rows.push({text: `<a href="${hrefFor(isLive(s), 'h-' + s.id)}">${esc(carveView(s).title)}</a> is stale: no update for ${Math.round(s.age_secs / 60)} min`, tag: 'stale'});
   }
   for (const p of last.problems || []) rows.push({text: 'Unreadable section file: ' + esc(p), tag: 'section'});
   const Q = agentsData && agentsData.queue;

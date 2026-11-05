@@ -48,3 +48,5 @@
 .pl .items{display:inline-flex;align-items:center;gap:6px}
 .pl .livespark{display:inline-flex;align-items:center}
 .pl .livespark .spark{display:block;margin:0}
+
+.pl.idle .items{color:var(--text-muted);white-space:normal}

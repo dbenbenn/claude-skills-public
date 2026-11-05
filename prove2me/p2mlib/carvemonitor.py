@@ -212,12 +212,16 @@ class Carve:
         b = self.build_phase(st('build'))
         if b:
             out.append(b)
-        if cur and cur not in ('build', 'measure', 'measure_pieces'):
+        if cur == 'gen' and cur_status == 'running':
+            g = self.gen_phase((recs.get('gen') or {}).get('started'))
+            if g:
+                out.append(g)
+        elif cur and cur not in ('build', 'measure', 'measure_pieces'):
             g = self.count_phase(cur)
             if g:
                 out.append(g)
-        out += self.measure_phases(st)
-        p = self.publish_phase()
+        out += self.measure_phases(st, cur)
+        p = self.publish_phase(cur)
         if p:
             out.append(p)
         return out
@@ -244,6 +248,30 @@ class Carve:
         return {'name': '%s (modules)' % step.capitalize(), 'done': int(rows[-1][0]), 'total': int(rows[-1][1]),
                 'state': 'running', 'note': 'LeanInfo readings'}
 
+    def gen_phase(self, started):
+        """A running gen's progress: the .lean files under its out/ written since the step started, of the
+        plan's bundles, statements and pieces (one file each). gen prints nothing until it ends."""
+        plan, _, cfg = self.work_plan_times()
+        if not plan or not started:
+            return None
+        try:
+            t0 = time.mktime(time.strptime(started[:19], '%Y-%m-%dT%H:%M:%S'))
+        except (ValueError, TypeError):
+            return None
+        out = os.path.expanduser(cfg.get('out') or self.path('out'))
+        out = out if os.path.isabs(out) else self.path(out)
+        n = 0
+        for root, _, files in os.walk(out):
+            for f in files:
+                if f.endswith('.lean'):
+                    try:
+                        n += os.stat(os.path.join(root, f)).st_mtime >= t0
+                    except OSError:
+                        pass
+        total = sum(len(v) for v in planned(plan, cfg.get('external')).values())
+        return {'name': 'Gen (files written)', 'done': min(n, total), 'total': total, 'state': 'running',
+                'note': 'files under out/ written since %s' % started[11:16]}
+
     def work_plan_times(self):
         cfg = self.config()
         work = os.path.expanduser(cfg.get('work') or self.path('carve_work'))
@@ -252,7 +280,7 @@ class Carve:
         plan = plan if os.path.isabs(plan) else self.path(plan)
         return self.f.json(plan), os.path.join(work, 'times.json'), cfg
 
-    def measure_phases(self, st):
+    def measure_phases(self, st, cur=None):
         plan, times_path, cfg = self.work_plan_times()
         if not plan:
             return []
@@ -284,11 +312,16 @@ class Carve:
             note = kinds_note(got, sets, kinds)
             if failed:
                 note += '; %d failed' % failed
+            state = phase_state(status)
+            if state == 'running' and cur and cur != step and step in self.steps() and cur in self.steps() \
+                    and self.steps().index(cur) < self.steps().index(step):
+                # recorded as running by a run a stop cut off; the driver is on an earlier step and reruns it
+                state, note = 'waiting', 'interrupted; runs again after %s; %s' % (cur, note)
             out.append({'name': name, 'done': sum(len(v) for v in got.values()), 'total': total,
-                        'state': phase_state(status), 'note': note})
+                        'state': state, 'note': note})
         return out
 
-    def publish_phase(self):
+    def publish_phase(self, cur=None):
         plan = self.f.json(self.path('publish', 'plan.json'))
         if not plan:
             return None
@@ -319,8 +352,14 @@ class Carve:
             note += '; pieces held until released'
         if not rs:
             state = 'waiting'
-        else:
-            state = 'done' if done == total else 'running'
+        elif done == total:
+            state = 'done'
+        elif self.publisher_alive() or cur in ('publish', 'publish_early'):
+            state = 'running'
+        else:   # back in an earlier step (a regen) with no publisher: the count stands still
+            state = 'waiting'
+            if cur:
+                note = 'paused while %s runs; %s' % (cur, note)
         return {'name': 'Publish (live)', 'done': done, 'total': total, 'state': state, 'note': note}
 
     # -- liveness ---------------------------------------------------------------------------

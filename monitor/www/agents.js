@@ -17,7 +17,11 @@ function liveSpark(d){
   // the phase counts bundles, statements and pieces of the whole plan (the card's own count, the run
   // state's bundles and pieces so far). Scaled to its own maximum: a stall shows as a flat tail
   const [t, n] = h[h.length - 1], first = h.find(p => p[1] > 0);
-  const tip = `${n} of ${ph.total} bundles, statements and pieces live at ${fmtAt(t)}` +
+  // when the count last changed: a stalled publisher must not read as current
+  let k = h.length - 1; while (k > 0 && h[k-1][1] === n) k--;
+  const since = k > 0 ? h[k][0] : h[0][0], still = t - since > 1800;
+  const tip = `${n} of ${ph.total} bundles, statements and pieces live` +
+    (still ? `, unchanged since ${fmtAt(since)}` : ` (last change ${fmtAt(since)})`) +
     (first ? `; the first went live ${fmtAt(first[0])}` : '') + '. Click for the full chart';
   return `<a class="livespark" href="${hrefFor(isLive((last && last.sections || []).find(x => x.id === d.section) || {state: 'running'}), 'h-' + d.section)}" title="${esc(tip)}">${sparkSvg(h, 96, 20, null, 'items live over time')}</a>`;
 }
@@ -25,10 +29,17 @@ const fmtUsd = c => c == null ? '—' : '$' + (c >= 100 ? c.toFixed(0) : c.toFix
 const shortModel = m => (m || '').replace(/^claude-/, '');
 
 function stagesHtml(d){
-  const items = d.total != null ? `<span class="items">${liveSpark(d)}${d.live} / ${d.total} items live</span>` : '';
+  // the carve section's Publish phase counts the whole plan; run_state.json's rows only what was ever queued
+  const sec = d.section && last && (last.sections || []).find(s => s.id === d.section);
+  const pub = sec && (sec.phases || []).find(p => p.name === 'Publish (live)');
+  const items = pub ? `<span class="items" title="${esc(pub.note || '')}">${liveSpark(d)}${pub.done.toLocaleString()} / ${pub.total.toLocaleString()} live</span>`
+    : d.total != null ? `<span class="items">${liveSpark(d)}${d.live} / ${d.total} items live</span>` : '';
+  // a step recorded as running after the current one was cut off by a stop; it reruns in its turn
+  const ci = d.stages.findIndex(s => s.name === d.current);
+  const shown = d.stages.map((s, i) => ci >= 0 && i > ci && s.status === 'running' ? {...s, status: 'pending', stale: true} : s);
   const lab = d.earlier ? `<span class="lab earlier" title="carve of the earlier batch ${esc(d.earlier)}, which this retry resumes">${esc(d.name)}</span>` : `<span class="lab">${esc(d.name)}</span>`;
   return `<div class="pl">${lab}<div class="stages" role="list">` +
-    d.stages.map(s => `<i role="listitem" class="${s.status}${s.name === d.current ? ' cur' : ''}" title="${esc(s.name)}: ${s.status}">${esc(s.name)}</i>`).join('') +
+    shown.map(s => `<i role="listitem" class="${s.status}${s.name === d.current ? ' cur' : ''}" title="${esc(s.name)}: ${s.stale ? 'interrupted by a stop; runs again after ' + esc(d.current) : s.status}">${esc(s.name)}</i>`).join('') +
     `</div>${items}</div>`;
 }
 
@@ -36,7 +47,15 @@ function agentCard(a){
   const goals = (a.goals || []).map(g => g.url ? `<a href="${esc(g.url)}" target="_blank" rel="noopener">${esc(g.name)}</a>` : `<span>${esc(g.name)}</span>`).join('');
   const when = a.state === 'running' ? `started ${fmtAt(a.started)}` : `${a.started ? fmtAt(a.started) : ''}${a.ended ? ' → ' + fmtAt(a.ended) : ''}`;
   let ph = '';
-  if (a.phases) ph = a.phases.dirs.map(stagesHtml).join('');
+  if (a.phases) {
+    // a retry lists every carve it could resume (and backups of them); show the live ones, fold the rest into a line
+    const secs = (last && last.sections) || [];
+    const active = d => secs.some(x => x.id === d.section && ['running', 'waiting', 'paused'].includes(x.state));
+    const D = a.phases.dirs, on = a.state === 'running' && D.length > 1 && D.some(active) ? D.filter(active) : D;
+    const off = D.filter(d => !on.includes(d));
+    ph = on.map(stagesHtml).join('') + (off.length ? `<div class="pl idle"><span class="lab">idle</span><span class="items">${off.map(d =>
+      `<span title="${esc(d.earlier ? 'carve of the earlier batch ' + d.earlier : 'a carve dir of this batch')}; no driver running; last state change ${esc(fmtAt(d.mtime))}">${esc(d.name)} (since ${esc(fmtAt(d.mtime))})</span>`).join(' · ')}</span></div>` : '');
+  }
   else if ((a.goals || []).length) ph = '<div class="pl"><span class="lab">pipeline</span><span class="items">setting up</span></div>';
   const stCls = a.state === 'running' ? 'running' : a.state === 'done' ? 'done' : 'failed';
   return `<article class="ag" id="ag-${esc(a.name)}">
@@ -100,8 +119,13 @@ function drawQueue(Q){
 }
 
 async function loadAgents(){
+  const first = !agentsData;
   try { agentsData = await (await fetch('/agents.json?' + Date.now())).json(); } catch (e) { return; }
-  keepScroll(drawAgents);
+  keepScroll(() => {
+    drawAgents();
+    // the carve sections name the agent working on them (main.js carveView), known only from agents.json
+    if (first && last && typeof drawSections === 'function') drawSections(last.sections || []);
+  });
 }
 
 // ---- quota ----

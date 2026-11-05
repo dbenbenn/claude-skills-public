@@ -275,9 +275,10 @@ function drawSections(all){
   if (!secs.length){ box.innerHTML = `<section class="card"><p class="empty">${VIEW === 'main' ? 'No work in progress has a section right now.' : 'Nothing has finished in the last 24 hours.'}</p></section>`; return; }
   box.innerHTML = secs.map(s => {
     const ph = s.phases||[];
-    const meta = [s.owner?esc(s.owner):'', 'updated '+ago(s.age_secs), ...(s.links||[]).map(l=>`<a href="${esc(l.url)}">${esc(l.label)}</a>`)].filter(Boolean).join(' · ');
+    const cv = carveView(s);
+    const meta = [cv.worker, cv.owner ?? (s.owner?esc(s.owner):''), 'updated '+ago(s.age_secs), ...(s.links||[]).map(l=>`<a href="${esc(l.url)}">${esc(cv.relabel(l))}</a>`)].filter(Boolean).join(' · ');
     return `<section class="card" id="sec-${esc(s.id)}" aria-labelledby="h-${esc(s.id)}">
-      <h2 id="h-${esc(s.id)}">${esc(s.title)}<span class="st ${s.state}">${s.state.toUpperCase()}</span>${s.stale?`<span class="st stale" title="No update for ${Math.round(s.age_secs/60)} min: has its producer stopped?">STALE</span>`:''}</h2>
+      <h2 id="h-${esc(s.id)}">${esc(cv.title)}<span class="st ${s.state}">${s.state.toUpperCase()}</span>${s.stale?`<span class="st stale" title="No update for ${Math.round(s.age_secs/60)} min: has its producer stopped?">STALE</span>`:''}</h2>
       <p class="meta">${meta}</p>
       ${s.note?`<p class="chart-sub">${esc(s.note)}</p>`:''}
       ${(s.alerts||[]).length?`<ul class="salerts">${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:''}
@@ -289,6 +290,27 @@ function drawSections(all){
     card.querySelectorAll('.ph').forEach(el => el.onclick = () => { selected[s.id] = el.dataset.name; keepScroll(() => drawSections(last.sections)); });
     sectionChart(s, card);
   }
+}
+
+// A carve's section is written by its driver, named after the batch whose job dir holds the carve. A retry
+// batch resumes an earlier batch's carve, so the page titles it by its module and names the batch working on
+// it now (from agents.json: a running agent whose card lists this section).
+function carveView(s){
+  const plain = {title: s.title, worker: '', owner: null, relabel: l => l.label};
+  if (!s.id.startsWith('carve-')) return plain;
+  const m = /^(?:(\S+) carve |Carve )(\S+): (.+)$/.exec(s.title);
+  if (!m) return plain;
+  const [, starter, dir, mod] = m;
+  const A = typeof agentsData !== 'undefined' && agentsData ? agentsData.running : [];
+  const now = A.filter(a => a.phases && a.phases.dirs.some(d => d.section === s.id)).map(a => a.name);
+  const link = n => `<a href="/page/agent.html?name=${encodeURIComponent(n)}">${esc(n)}</a>`;
+  return {
+    title: `Carve of ${mod}`,
+    worker: (now.length ? `worked by ${now.map(link).join(', ')} · ` : '') + `in <code>${esc(dir)}</code>` +
+            (starter && !now.includes(starter) ? `, started by ${esc(starter)}` : ''),
+    owner: esc((s.owner || '').replace(/^queue worker \S+, /, '')),
+    relabel: l => l.label === 'worker log' && starter ? `log of ${starter}` + (now.includes(starter) ? '' : ' (started the carve)') : l.label,
+  };
 }
 
 function phaseRow(s, p){
