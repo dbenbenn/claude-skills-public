@@ -556,7 +556,12 @@ def main():
                         stubs[stub] = partial.pop(stub)
                         print('%s: proves %s, which the Blueprint left unfinished; replaced as a stub'
                               % (owners[k], stub))
-                    if stub in stubs:
+                    # q200: a Part's helper may share a stub's name with another statement (PartG's
+                    # `card_dyadic_le`, `0 < M`, beside the stub's `0 ≤ M`); only a theorem of the
+                    # stub's type proves it, and a proof already found is kept
+                    if stub in stubs and stub not in proved and (
+                            stub not in decl_of or n not in decl_of
+                            or decl_of[stub].type_hash == decl_of[n].type_hash):
                         proved[stub] = i
     alias_of = {stubs[s]: (s, t) for s, t in proved.items()}
 

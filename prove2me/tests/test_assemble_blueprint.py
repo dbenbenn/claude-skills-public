@@ -457,3 +457,20 @@ def test_copy_header_parts_proving_under_the_blueprint_name_assemble(tmp_path):
     r = run_assemble(files['Blueprint'], out, files['PartB'], files['PartSameName'], '--target', 'BP.top')
     text = assembled_ok(r, out, _workspace(), 'solution')
     assert 'alias two_eq := BP.PartSameName.two_eq' in text
+
+
+@pytest.mark.lean
+def test_a_helper_sharing_a_stubs_name_with_another_statement_is_not_its_proof(tmp_path):
+    # q200 (Guth-Maynard Prop 9.1): PartG kept a helper `card_dyadic_le` (`0 < M`, bound `3M`) beside the
+    # stub of that name (`0 ≤ M`, bound `M + 1`) that PartB proved; the stub was aliased to PartG's helper
+    # (the last Part listed won) and every use of the stub failed to elaborate
+    with Case('AsmHelperNameTest') as c:
+        bp = c.file('Blueprint', BP_API)
+        pa = c.file('PartA', HDR + 'import $M.Blueprint\n\nnamespace API.PartA\n\n'
+                    'theorem a_eq : API.one = 1 := rfl\n\nend API.PartA\n')
+        pb = c.file('PartB', HDR + 'import $M.Blueprint\n\nnamespace API.PartB\n\n'
+                    'theorem a_eq : API.one * 1 = 1 := rfl\n\n'
+                    'theorem b_eq : API.one + API.one = 2 := rfl\n\nend API.PartB\n')
+        out = tmp_path / 'out.lean'
+        text = assembled_ok(run_assemble(bp, out, pa, pb, '--target', 'API.top'), out, c.ws, 'solution')
+        assert 'alias a_eq := API.PartA.a_eq' in text
