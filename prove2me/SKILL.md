@@ -544,6 +544,14 @@ before every parameter a consumer varies afterwards. "C denotes a constant that 
 hides the order (Tao 1999, oaiq-111: Lemma 3.2's `C₀` stated after `α` could blow up as `α → 0`, so Theorem
 1.2 did not follow from it; the uniform form `∃ C₀, ∀ α, …` was published and the printed form reduced to it).
 
+**A printed formula that Lean can express is stated as printed, never "generously".** The generous
+reading (dbenbenn, "conditions only when proven needed") is for a hypothesis the print omits, not for
+replacing a formula the print gives with a safer one. A real cube root of a possibly negative quantity is
+`Real.sign s * |s| ^ (1/3 : ℝ)`, not `|s| ^ (1/3 : ℝ)`. Guth–Maynard's Proposition 4.6 first shipped
+$|\sum I_m|^{1/3}$ with a note that the print "presupposes" a sign, and dbenbenn caught it in review
+(2026-11-05): the printed statement does not presuppose anything, it is simply false if the sum is negative,
+and the Lean should say what the paper says.
+
 **Name the object the sentence is about.** When the source asserts a property of a structure it
 defines -- a graph, a tree, an action, a relation -- define that structure and state the property of
 it, rather than an isomorphism to a model object. CFP §7's "𝒯′ is connected and hence an ordered
