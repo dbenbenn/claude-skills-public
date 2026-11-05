@@ -238,6 +238,11 @@ def locked_files(d, running=False):
     if running:
         for p in (frozen_plan, _load_json(os.path.join(d, 'publish', 'plan.json'))):
             out |= plan_lib_files(p) if p else set()
+    else:
+        # pipeline.json `thaw`: files a person thaws on purpose, honoured only for files never posted (q172: the
+        # unsent importers of a bundle split by hand after publish_early kept their old imports)
+        thaw = set((_load_json(os.path.join(d, 'pipeline.json')) or {}).get('thaw') or ())
+        out -= {f for f in thaw if not posted(rs.get(f))}
     return out - {f for f, rec in rs.items() if isinstance(rec, dict) and rec.get('state') in TERMINAL}
 
 

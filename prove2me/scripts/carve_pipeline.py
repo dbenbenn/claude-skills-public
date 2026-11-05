@@ -63,6 +63,8 @@ runs them again (cached files are not re-measured), at most twice; then it stops
 offenders. A piece (a proof: resubmittable) measured under 120 s (PIECE_CAP) never counts: submit it as is and
 split only after two real verifier timeouts. Another item is excused the same way by listing it
 (`bundle:NAME`) in pipeline.json `accept_over`. Nothing is published before it. See p2mlib.carvepipeline.calibration.
+A file publish_early froze but never sent stays locked; pipeline.json `thaw` (out/lib file names) lets gen
+regenerate it, e.g. the importers of a bundle split by hand (`carve.py split --only`; then `--redo gen`).
 
 Overlap mode (pipeline.json "overlap": true; dbenbenn 2026-10-29, "a slow proof really shouldn't need to block
 submitting definition bundles"): measure, calibrate, publish_prep, prose, check_text and dryrun cover the

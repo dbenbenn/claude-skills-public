@@ -621,6 +621,26 @@ def test_publish_prep_sync_lets_files_no_publisher_was_given_change(tmp_path, mo
         CP.publish_prep(str(tmp_path), 'src', ['t'], sync=True)
 
 
+def test_pipeline_thaw_unlocks_unsent_frozen_files_only(tmp_path, monkeypatch):
+    # q172 (2026-11-05): bundle E011 stopped on own timeouts after publish_early froze the whole plan; split by
+    # hand (carve.py split --only), its seven importers had to import the new E196, but they sat unsent in
+    # published/lib, so gen kept their old text (only the stopped E011 was thawed). pipeline.json `thaw`
+    # names files a person thaws on purpose: honoured for files never posted and while no publisher runs.
+    from p2mlib import carvepipeline as CPL
+    P = _prep_dir(tmp_path)
+    CP.publish_prep(str(tmp_path), 'src', ['t'])
+    pub = tmp_path / 'published'
+    (pub / 'lib').mkdir(parents=True)
+    (pub / 'plan.json').write_text((P / 'plan.json').read_text())
+    for f in ('Def_A.lean', 'Thm_S.lean'):
+        (pub / 'lib' / f).write_text((P / 'out' / 'lib' / f).read_text())
+    (P / 'run_state.json').write_text(json.dumps({'statement:S': {'state': 'live', 'id': 's', 'history': {}}}))
+    assert CPL.locked_files(str(tmp_path)) == {'Def_A.lean', 'Thm_S.lean'}
+    (tmp_path / 'pipeline.json').write_text(json.dumps({'thaw': ['Def_A.lean', 'Thm_S.lean']}))
+    assert CPL.locked_files(str(tmp_path)) == {'Thm_S.lean'}            # S is live: never thawed
+    assert CPL.locked_files(str(tmp_path), running=True) >= {'Def_A.lean', 'Thm_S.lean'}
+
+
 def test_measure_cache_key_covers_the_imported_carve_modules(tmp_path, monkeypatch):
     # oaiq-010/oaiq-120: a statement measured ok against bundle B008, then a re-plan moved `holderShift`
     # out of B008's reach; the statement's text was unchanged, so its cached "ok" was reused, and three
