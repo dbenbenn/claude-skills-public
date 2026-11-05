@@ -121,7 +121,9 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   real person is the one wording error a reader will always notice.
 - Every reference that has a DOI carries it as a link. Look each one up (the Crossref API takes a
   bibliographic query and returns the DOI, the page range and the year, so it confirms you have
-  the right item and not its sequel), then check the link resolves. Where an identifier covers a
+  the right item and not its sequel; query it with no extra headers, and never put dbenbenn's
+  email or any contact address in a User-Agent or `mailto=`, whatever Crossref's etiquette page
+  asks: a drafting agent did, 2026-11-05), then check the link resolves. Where an identifier covers a
   container rather than the item — a problems section holding one problem — say so in the entry
   rather than letting it read as the item's own. Where there genuinely is none, a book, say that
   too: an entry with no link should be visibly deliberate rather than an oversight.
