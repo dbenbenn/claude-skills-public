@@ -348,3 +348,26 @@ In current Mathlib `ContDiff 𝕜 n f` takes `n : WithTop ℕ∞`, and the bare 
 parsing). A compactly supported analytic function on `ℝⁿ` is identically zero, so "smooth and
 compactly supported" written with `⊤` admits only `0`. Check with
 `example : ContDiff ℝ (⊤ : ℕ∞) f ↔ ∀ n : ℕ, ContDiff ℝ n f := contDiff_infty`.
+
+## A binder term swallows the `+` after it
+
+**Symptom:** a stub that should be true is false, or a goal shows an integrand you did not write.
+
+`∫ x, f x * g x ^ 2 + T ^ (-100 : ℝ)` parses as `∫ x, (f x * g x ^ 2 + T ^ (-100))`: the binder of
+`∫`, `∑ x ∈ s,`, `∏`, `⨆`, `∀`, `∃` and `fun` extends as far right as it can. In q199 (Guth–Maynard
+Prop 6.1, 2026-11-05) the integrand became non-integrable on ℝ, the Bochner integral `0`, and the stub
+false; the prover noticed and proved the parenthesized form under another name. Parenthesize a binder
+term whenever more terms follow it, and check stubs as Lean prints them (`#check @stub`), not as typed.
+
+## Continuous functional calculus on a concrete operator algebra
+
+**Symptom:** `cfc` does not elaborate (`ContinuousFunctionalCalculus ℝ _ IsSelfAdjoint` fails to
+synthesize even at 400k `synthInstance.maxHeartbeats`), or `CStarRing.norm_star_mul_self` times out at
+`whnf`, on a type like `PiLp 2 (Fin D → lp (G → ℂ) 2) →L[ℂ] _`, although `inferInstance : CStarAlgebra
+(that type)` succeeds.
+
+State each CFC or C*-identity step for a generic `{A} [CStarAlgebra A] [PartialOrder A]
+[StarOrderedRing A]` and apply it to the concrete operator: it then elaborates at once (q185, strong
+convergence, 2026-11-05). A real `•` coming out of the generic lemma has a different, defeq, instance
+path from the concrete `ContinuousLinearMap` smul, so `rw` with a concrete smul lemma fails; use a
+type-ascribed `have e : … := lemma _ _` and `e ▸ h`.

@@ -32,7 +32,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 from p2m import call
 from prune_solution import _workspace
-from p2mlib import explanation
+from p2mlib import api, explanation
 
 
 def theorem_id(name):
@@ -61,11 +61,11 @@ def import_names(path):
 
 def sketch_edges(tid, sid):
     g = call('GET', '/theorems/%s/graph' % tid)
-    names = {n.get('theorem_id'): n.get('theorem_name') for n in g['nodes'] if n.get('node_type') == 'theorem'}
+    names = api.graph_theorem_names(g)
     node = 'sketch-' + sid
     present = any(e['source'] == node or e['target'] == node for e in g['edges'])
     return present, {names[e['source']] for e in g['edges']
-                     if e['target'] == node and '.' in (names.get(e['source']) or '')}
+                     if e['target'] == node and names.get(e['source'])}
 
 
 def live_proofs(tid, replaces=()):
@@ -75,14 +75,14 @@ def live_proofs(tid, replaces=()):
     edges, so two full proofs of one theorem were never compared (Lodha-Moore, 2026-10-04)."""
     subs = call('GET', '/theorems/%s/submissions?status=ACCEPTED,SKETCH_ACCEPTED&limit=200' % tid)
     g = call('GET', '/theorems/%s/graph' % tid)
-    names = {n.get('theorem_id'): n.get('theorem_name') for n in g['nodes'] if n.get('node_type') == 'theorem'}
+    names = api.graph_theorem_names(g)
     out = []
     for s in (subs or {}).get('submissions') or []:
         if s.get('deprecated_at') or any(s['id'].startswith(r) for r in replaces):
             continue
         node = 'sketch-' + s['id']
         edges = {names[e['source']] for e in g['edges']
-                 if e['target'] == node and '.' in (names.get(e['source']) or '')}
+                 if e['target'] == node and names.get(e['source'])}
         content = (call('GET', '/submissions/%s/solution' % s['id']) or {}).get('content') or ''
         out.append(dict(id=s['id'], status=s.get('status'), username=s.get('username'), edges=edges,
                         content=content, explanation=s.get('explanation') or ''))

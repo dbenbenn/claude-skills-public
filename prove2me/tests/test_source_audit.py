@@ -86,6 +86,28 @@ def test_collect_verdict(mdir, cov, ok):
     assert (mdir / 'readbacks' / 't1.coverage.md').read_text() == cov and not os.path.exists(d)
 
 
+
+def test_collect_prints_a_strongest_reading_advisory(mdir, capsys):
+    # q168 (Viterbo Remark 1.8): "not symplectomorphic" was COVERED by the weakest notion of map, the
+    # strongest claim, which the paper's cited proof does not reach. Advisory only: the verdict stands.
+    SRC.stage(str(mdir), 't1')
+    d = os.path.join(SRC.ROOT, SRC.slug(str(mdir), 't1'))
+    open(os.path.join(d, 'claims.md'), 'w').write('- C1. x\nEND OF CLAIMS\n')
+    open(os.path.join(d, 'coverage.md'), 'w').write(
+        'VERDICT: faithful\nDIRECTNESS: direct\nSTRENGTH: strongest: C1 negated, read with maps of the open interiors\n')
+    assert SRC.collect(str(mdir), 't1')
+    out = capsys.readouterr().out
+    assert 'STRENGTH strongest: C1' in out and "source's proof" in out
+
+
+def test_collect_is_quiet_about_an_as_stated_reading(mdir, capsys):
+    SRC.stage(str(mdir), 't1')
+    d = os.path.join(SRC.ROOT, SRC.slug(str(mdir), 't1'))
+    open(os.path.join(d, 'claims.md'), 'w').write('- C1. x\nEND OF CLAIMS\n')
+    open(os.path.join(d, 'coverage.md'), 'w').write('VERDICT: faithful\nDIRECTNESS: direct\nSTRENGTH: as stated\n')
+    assert SRC.collect(str(mdir), 't1')
+    assert 'STRENGTH' not in capsys.readouterr().out
+
 def test_stage_warns_when_the_bundle_has_no_source_audit_yet(mdir, capsys):
     # CFW 2026-10-03: every statement was audited before the bundle; verify caught it only at the
     # gap review. The skill runs the bundle's audit first (statement audits skip bundle encodings).

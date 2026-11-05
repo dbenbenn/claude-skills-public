@@ -96,6 +96,17 @@ def test_live_sketch_edges_skips_deprecated_and_other_theorems():
     assert api.live_sketch_edges('T', call=lambda m, p, b=None: g) == {'live': {'N.dep'}}
 
 
+
+def test_live_sketch_edges_keeps_root_namespace_theorems_and_drops_definitions():
+    # q180: `markov_inequality_interval` (no dot) is a real edge; a definitions bundle (`StrongConv`) is not
+    g = {'nodes': [{'node_type': 'theorem', 'theorem_id': 'M', 'theorem_name': 'markov_inequality_interval',
+                    'status': 'Proved'},
+                   {'node_type': 'theorem', 'theorem_id': 'B', 'theorem_name': 'StrongConv', 'status': 'Definition'},
+                   {'node_type': 'sketch', 'submission_id': 's', 'parent_theorem_id': 'T', 'status': 'ACCEPTED',
+                    'deprecated_at': None}],
+         'edges': [{'source': 'M', 'target': 'sketch-s'}, {'source': 'B', 'target': 'sketch-s'}]}
+    assert api.live_sketch_edges('T', call=lambda m, p, b=None: g) == {'s': {'markov_inequality_interval'}}
+
 def test_no_frozen_comments(monkeypatch):
     monkeypatch.delenv('P2M_ALLOW_DOCSTRING', raising=False)
     with pytest.raises(SystemExit):

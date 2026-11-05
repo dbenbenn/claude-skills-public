@@ -960,6 +960,28 @@ RESUME says what was tried. Two Viterbo retries (2026-11-03):
   the dependant resubmitted onto it. A cited conjunction ("is a capacity" ∧ "is attained") is the
   typical case: dependants usually use one property.
 
+Six more such blockers fell on 2026-11-04/05, each to one of these checks, which every worker runs before
+recording a blocker and every retry runs before accepting one:
+- **Search prove2.me for each named prerequisite** (`q=` on its name and its standard objects): OpenAI
+  ports published operator-algebra and analysis libraries Mathlib lacks. q188 found Arveson's extension and
+  Wittstock's factorization Proved, and Pisier's linearization closed in three hours. For analytic number
+  theory, teorth/expdb ports with mechanical edits (q190: `Expdb.l2_integral_estimate`, a mean value
+  theorem with absolute constants).
+- **Is the source's abstract hypothesis concrete in the applied case?** A concrete finite-dimensional
+  operator space made Ruan's representation theorem unnecessary (q188).
+- **Does a sibling already supply the object, or a weaker bound that suffices?** q184: a published sibling's
+  extension replaced Hahn–Banach, and a sibling's moment bound replaced Choi's theorem.
+- **Do the estimates fed in have structure a crude substitute can use?** q163: equal decay at both
+  endpoints let a 450-line layer-cake interpolation replace Riesz–Thorin, and choosing the auxiliary symbol
+  removed stationary phase. Record the substitute in the Blueprint docstring.
+- **Write the finite-dimensional problem a cited existence or minimization theorem reduces to**, then ask
+  whether a duality or KKT certificate gives each inequality (q166: Viterbo Thm 2.2 by Hahn–Banach and KKT,
+  ACCEPTED in under 40 minutes of prover time).
+- **If the missing input is a result of the source itself** that the bundle can state, publish it
+  standalone (read-back first) and submit the dependant as a reduction to it in the same run (q186: Lemma
+  8.5, then Cor 8.6). "No work submitted" leaves the dependant with no decomposition, while the deep cited
+  theory belongs on that one Open leaf.
+
 The same pattern scales to whole theorems. In a **Blueprint**, the definitions are concrete, every
 lemma is `sorry`, and the main theorem is proved from those lemmas. The provers write
 `Part<X>.lean` files that restate their lemmas verbatim under `namespace <NS>.Part<X>`, and they
@@ -1002,6 +1024,19 @@ Most parts took 5 to 20 minutes.
 What made it work:
 - **Write the Blueprint so the main theorem compiles from its stubs.** Check every stub for truth
   before dispatch: a false stub wastes a prover.
+- **Check each interface before dispatch.** For every stub that feeds another, write out the measure,
+  weight and exponent on both sides and check that they match: a scoping plan's "gives" is a claim to
+  verify (q164: the linearization gave the weight |ψ|^p where the leaf needed |ψ|^q). On a research-level
+  leaf, write the whole argument with explicit constants in PLAN.md before any Lean (q165: four provers
+  closed nine stubs in 30 minutes).
+- **Read each stub as Lean prints it** (`#check @stub`): `∫ x, f x + C` integrates the `+ C` too
+  (q199; lean-pitfalls.md, "A binder term swallows the `+` after it").
+- **State the stubs so that each could be a published statement** (bundle definitions only). Then an
+  assembled solution that times out splits at its stubs. Publish the Blueprint's shared definitions as a
+  bundle and each Part's target as a standalone statement, then submit one piece per Part that imports its
+  siblings as `Theorems.Thm_*` (q167: an 8,755-line proof that timed out became 9 pieces of 11–42 s, all
+  judged within 10 minutes; `p2m-standalone/viterbo-capacity/tools/build_pieces.py`). The target's piece
+  drops the target's alias and points `solution` at the Part's name.
 - **In a mission, a step that is itself a milestone is not a Route lemma.** Import its statement
   stub (`stubs.py`) and call it by its published name, in either direction of an iff; only that
   milestone's own `chk_` proves it from the route. CFW's Blueprint (2026-10-03) stated Theorem 10,
@@ -1198,6 +1233,16 @@ So, whenever a statement's justification is a citation rather than a proof on th
 - If it is already published: the statement is frozen, so publish the corrected one, relink the
   milestones with a `reason`, and patch the old statement's prose to say what its cited argument
   does and does not give. Do not leave an unprovable statement carrying a milestone.
+
+The same gap opens from the other side when the audit chooses the *strongest reading* of a
+conclusion. Viterbo's Remark 1.8 says "not symplectomorphic to the ball". The audit marked COVERED
+a statement that forbids even a symplectomorphism between the open interiors with no boundary
+condition. For a negated existence, the weakest notion of map makes the strongest claim. Kerman's
+argument, through the theorem the paper cites, needs a Zoll boundary, so it excludes only maps smooth
+up to the boundary. The milestone was published beyond what the paper's proof reaches (q168,
+2026-11-04), and closing it needed literature the paper never cites. So when a source audit reports
+`STRENGTH: strongest` (`source_audit.py` prints it), ask whether the source's proof, with what it
+cites, reaches that reading. If it does not, take it to the gap review before publishing.
 
 ## Publish the statement before the proof
 

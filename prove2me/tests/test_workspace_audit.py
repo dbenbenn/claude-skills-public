@@ -296,3 +296,27 @@ def test_quiet_counts_no_copy_files_by_folder(main_env, monkeypatch, capsys):
     WA.main(['--quiet'])
     out = capsys.readouterr().out
     assert 'no copy under a mission repo' in out and 'JM31 1' in out
+
+
+def test_other_workers_temp_files_are_not_audited(world):
+    # q167: another worker's assemble_blueprint / prune_solution temp file is not work to back up
+    for name in ('.assemble_x1y2.lean', '.assemble_parse_ab.lean', '.pruned_123_Sol.lean'):
+        write(os.path.join(world['ws'], 'Solutions', 'F', name), 'theorem t : True := trivial\n')
+    assert not [p for p in audit(world) if '.assemble_' in p or '.pruned_' in p]
+
+
+def test_a_file_that_vanishes_mid_audit_is_skipped(world, monkeypatch):
+    # q167: a file listed as untracked and deleted before it is hashed or stat'ed must not crash the audit
+    keep = os.path.join(world['ws'], 'Solutions', 'Keep.lean')
+    gone = os.path.join(world['ws'], 'Solutions', 'Gone.lean')
+    write(keep, 'theorem keep_me : True := trivial\n')
+    write(gone, 'theorem gone_soon : True := trivial\n')
+    real = WA.untracked
+
+    def racing(ws):
+        out = real(ws)
+        os.remove(gone)
+        return out
+    monkeypatch.setattr(WA, 'untracked', racing)
+    got = audit(world)
+    assert 'Solutions/Keep.lean' in got and 'Solutions/Gone.lean' not in got

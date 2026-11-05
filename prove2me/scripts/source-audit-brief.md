@@ -63,7 +63,14 @@ statement, written by someone who never saw the source. Compare it with `claims.
   the object its sentence is about left unnamed, or the claim split up, re-encoded, or reachable
   only by an argument the statement leaves out.
 
-Reply in at most five lines: the verdict, the directness line, and one line per gap.
+- Then a strength line, also never changing the verdict: `STRENGTH: as stated`, or
+  `STRENGTH: strongest: <claim>, <the reading>` when the read-back covers a claim only through the
+  strongest reading the sentence allows. The usual case is a negated existence ("not isomorphic",
+  "admits no embedding") read with the weakest notion of map, which makes it the strongest claim.
+  Another is a conclusion read without a regularity or boundary condition that the sentence leaves
+  implicit. The drafter then checks whether the source's own proof reaches that reading.
+
+Reply in at most six lines: the verdict, the directness line, the strength line, and one line per gap.
 
 ## Rules
 

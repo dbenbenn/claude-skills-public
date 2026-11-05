@@ -138,12 +138,20 @@ def submission_source(sid, call=None):
     return r.get('content') if isinstance(r, dict) else None
 
 
+def graph_theorem_names(g):
+    """{theorem id: name} of a /graph reply's theorem nodes, without definitions bundles (also theorem
+    nodes, status 'Definition'). Filtering on status, not on a dot in the name: the dot test dropped real
+    edges to root-namespace theorems (q180, markov_inequality_interval, 2026-11-05)."""
+    return {n.get('theorem_id'): n.get('theorem_name') for n in g.get('nodes', [])
+            if n.get('node_type') == 'theorem' and n.get('status') != 'Definition'}
+
+
 def live_sketch_edges(tid, call=None):
     """{submission id: set of theorem names it imports} for the live (accepted, not deprecated)
     proofs of theorem `tid`, from its graph."""
     call = call or globals()['call']
     g = call('GET', '/theorems/%s/graph' % tid)
-    names = {n.get('theorem_id'): n.get('theorem_name') for n in g.get('nodes', []) if n.get('node_type') == 'theorem'}
+    names = graph_theorem_names(g)
     out = {}
     for n in g.get('nodes', []):
         if n.get('node_type') != 'sketch' or n.get('parent_theorem_id') != tid \
@@ -151,7 +159,7 @@ def live_sketch_edges(tid, call=None):
             continue
         node = 'sketch-' + n['submission_id']
         out[n['submission_id']] = {names[e['source']] for e in g.get('edges', [])
-                                   if e['target'] == node and '.' in (names.get(e['source']) or '')}
+                                   if e['target'] == node and names.get(e['source'])}
     return out
 
 

@@ -1219,3 +1219,19 @@ these rules over-approximate on purpose; each comes from a worker carve that fai
 `carve_measure` deletes a module's old `.olean`/`.ilean` before compiling it, so a failed file never
 leaves an earlier plan's module of the same name for later files to import (oaiq-065's "Unknown
 constant" and "Unknown identifier" after a re-plan).
+
+## Using a ported development inside another mission (worker lessons, 2026-11-04/05)
+
+Import the **published bundle plus the accepted carved solution body**, never the `Solutions/OAIQW_*`
+module chain the port was built from. That chain is linear, and its `Model.lean` redefines what the
+published bundle declares, so importing it next to the bundle fails with `environment already contains
+OAI.SymmetricPolar.omega0` (q167). The accepted carve solution (`Sol_<goal>.lean` in the carve's job
+dir) is self-contained over the published `Def_*` bundle. Minus its `theorem solution` it is a drop-in
+module: q167 used the cylinder non-squeezing carve's Galerkin and Hamiltonian engine this way. Copy it into
+the mission repo's `proofs/` at once (viterbo-mission `proofs/capacity/OAIEngine.lean`), since the job
+dir is scratch.
+
+Some published OAI bundles cannot be imported together: `Def_OAIQ075A0xx` (Stinespring) clashes with
+`Def_KadisonRingroseSupport2` (`environment already contains OAI.PopaTypeII.AbelianProjection`). Before
+building a route on two ported developments, check that one file importing both compiles; q188 replaced
+Stinespring with Kadison–Schwarz and the multiplicative domain.

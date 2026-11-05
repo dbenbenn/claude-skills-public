@@ -171,12 +171,23 @@ class Record:
 def untracked(ws):
     out = git(ws, 'status', '--porcelain=v1', '-z', '-uall').decode('utf-8', 'surrogateescape')
     return [e[3:] for e in out.split('\0') if e.startswith('?? ') and e[3:] not in TOOLING
-            and os.path.basename(e[3:]) != CARVE_OWNER]
+            and os.path.basename(e[3:]) != CARVE_OWNER and not is_temp(e[3:])]
+
+
+# Scratch files other workers' tools create and delete beside their output (assemble_blueprint,
+# prune_solution); one vanished between listing and stat and crashed the audit (q167, 2026-11-04).
+TEMP_PREFIXES = ('.assemble_', '.pruned_')
+
+
+def is_temp(path):
+    return os.path.basename(path).startswith(TEMP_PREFIXES)
 
 
 def audit(ws, idx, min_age_days=2, near=0.9, now=None):
     now = now or time.time()
-    paths = untracked(ws)
+    # another worker may delete a listed file at any moment: drop what is gone before hashing, and
+    # skip what vanishes after
+    paths = [p for p in untracked(ws) if os.path.exists(os.path.join(ws, p))]
     if not paths:
         return []
     hashes = git(ws, 'hash-object', '--stdin-paths', inp='\n'.join(paths).encode()).decode().split()
@@ -187,7 +198,10 @@ def audit(ws, idx, min_age_days=2, near=0.9, now=None):
     out = []
     for path, h in zip(paths, hashes):
         full = os.path.join(ws, path)
-        st = os.stat(full)
+        try:
+            st = os.stat(full)
+        except FileNotFoundError:
+            continue
         rec = Record(path, '', st.st_size, st.st_mtime)
         top = path.split('/', 1)[0]
         if st.st_mtime > now - min_age_days * 86400:
@@ -197,7 +211,10 @@ def audit(ws, idx, min_age_days=2, near=0.9, now=None):
         elif top in ('Theorems', 'Definitions') and path.endswith('.lean'):
             rec.kind = 'draft-stub' if path[:-5].replace('/', '.') in drafts else 'mirror'
         elif path.endswith('.lean'):
-            keys = line_keys(open(full, encoding='utf-8', errors='replace').read())
+            try:
+                keys = line_keys(open(full, encoding='utf-8', errors='replace').read())
+            except FileNotFoundError:
+                continue
             rec.coverage = len(keys & idx.lines) / len(keys) if keys else 0.0
             rec.kind = 'near-copy' if keys and rec.coverage >= near else 'unbacked'
         else:
@@ -264,7 +281,12 @@ def folder_copies(ws, repos, folders=None, include_oai=False):
     out = []
     for name in solution_folders(ws, folders, include_oai):
         for full in lean_files(os.path.join(ws, 'Solutions', name)):
-            st = os.stat(full)
+            if is_temp(full):
+                continue
+            try:
+                st = os.stat(full)
+            except FileNotFoundError:
+                continue
             out.append(Copy(os.path.relpath(full, ws), st.st_size, st.st_mtime))
     sizes = {c.size for c in out}
     found = {}
@@ -277,9 +299,14 @@ def folder_copies(ws, repos, folders=None, include_oai=False):
                 p = os.path.join(d, f)
                 if f.endswith('.lean') and os.path.getsize(p) in sizes:
                     found.setdefault(digest(p), p)
+    kept = []
     for c in out:
-        c.copy = found.get(digest(os.path.join(ws, c.path)))
-    return out
+        try:
+            c.copy = found.get(digest(os.path.join(ws, c.path)))
+        except FileNotFoundError:
+            continue
+        kept.append(c)
+    return kept
 
 
 def copies_report(copies, verbose=False):

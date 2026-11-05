@@ -178,8 +178,8 @@ def reveal(mdir, name):
               'reply in at most five lines. Do not change claims.md.')
         return
     print('Continue with PHASE 2 of brief.md: readback.md is now in your directory. Compare it with\n'
-          'claims.md, write coverage.md (with near-misses and the VERDICT line), and reply in at\n'
-          'most five lines. Do not change claims.md.')
+          'claims.md, write coverage.md (with near-misses and the VERDICT, DIRECTNESS and STRENGTH\n'
+          'lines), and reply in at most six lines. Do not change claims.md.')
 
 
 def rephase2(mdir, name):
@@ -216,7 +216,7 @@ def rephase2(mdir, name):
           'Read brief.md. PHASE 1 is already done: claims.md in this directory is the complete claims\n'
           'list, written from the source alone; do not change it. Do PHASE 2 only: readback.md%s %s now\n'
           'in your directory. Compare with claims.md, write coverage.md (with near-misses and the VERDICT\n'
-          'line) exactly as Phase 2 specifies, and reply in at most five lines. Do not read or write\n'
+          'line) exactly as Phase 2 specifies, and reply in at most six lines. Do not read or write\n'
           'anything outside this directory.' % (d, extra, 'are' if extra else 'is'))
 
 
@@ -293,6 +293,13 @@ def collect(mdir, name):
     direct = re.search(r'DIRECTNESS:\s*(.+)', open(cov, encoding='utf-8').read()) if os.path.exists(cov) else None
     if direct and not direct.group(1).strip().lower().startswith('direct'):
         print('DIRECTNESS', direct.group(1).strip(), '  <- consider restating to name the source object')
+    # advisory: a claim covered only by its strongest reading (a negated existence read with the weakest
+    # notion of map) may outrun the source's proof (q168, Viterbo Remark 1.8, 2026-11-04). Never a failure.
+    strength = re.search(r'STRENGTH:\s*(.+)', open(cov, encoding='utf-8').read()) if os.path.exists(cov) else None
+    if strength and strength.group(1).strip().lower().startswith('strongest'):
+        print('STRENGTH', strength.group(1).strip(),
+              "  <- check that the source's proof, with what it cites, reaches this reading "
+              '(SKILL.md, When the sentence outruns its citation)')
     if ok:
         teardown(slug(mdir, name), force=True)
     return ok and verdict and verdict.group(1).strip().lower().startswith(('faithful', 'literal'))
