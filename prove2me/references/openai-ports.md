@@ -447,15 +447,26 @@ and new `carve.py` inside one carve. So:
     literal-heavy data bundles at 83–88.6 s hit the server's own 300 s timeout. For a bundle a few seconds over
     that few items import, `accept_over` is the cheap exit; a split round costs a full `gen` plus a re-measure
     (q154: about 8 h). Calibrate warns when an excused bundle gates 5 or more items (q154 E001: 6 tries).
-  - **A slow piece** in `calibrate_pieces`, nothing published: as before (a uniform overrun re-plans at the ratio, a
-    lone one stops with the profiling hint). Once published, nothing is re-planned globally: each slow piece gets
-    one frozen re-plan in which only its own declarations (`keep` in the plan) cost its measured / planned ratio
-    (config `cost_factors`, `pipeline_state.json` `auto_split`), so the planner promotes lemmas inside it to new
-    statements (template prose) and nowhere else; at most two such rounds. It stops for a person, naming the
-    piece and why, when a piece is still over after its split, or its statement alone takes half its time (the
-    type is the cost: `abbrev`s cannot be added to a live statement; `theorem _root_.solution` halves the
-    serialization), or the rounds are used up. Remedies then: `accept_over` (`piece:NAME`, under 200 s), or forced
-    lemmas in `pipeline.json` `forced` plus `config_set.template_forced` and `--from config --publish`.
+  - **A slow piece** in `calibrate_pieces` (dbenbenn 2026-11-06): a uniform overrun of several pieces while nothing
+    is published still re-plans at the ratio. Otherwise each piece over the limit is measured once more, then
+    split alone: `carve.py split-piece CONFIG NODE=PARTS` (PARTS = measured s / budget, at least 2) promotes lemmas
+    the piece keeps into new statements until each part's planned cost is 1/PARTS of the piece's, regenerates only
+    that piece and the new statements and pieces (frozen stubs as published), and the run goes on from `names`:
+    no `plan`, no full `gen`, every other measurement cached. The new statements join auto_config `forced` and
+    `template_forced`. A piece the publisher stopped after own verifier timeouts (state `split`) is halved the same
+    way, up to `MAX_PIECE_SPLITS` times, only while its file is still the text that stopped. By hand:
+    `carve_pipeline.py DIR --split-piece NODE[=PARTS] --publish --detach`. It stops for a person when a piece is
+    still over after its split, or its statement alone takes half its time (the type is the cost: `abbrev`s
+    cannot be added to a live statement; `theorem _root_.solution` halves the serialization). Remedies then:
+    `accept_over` (`piece:NAME`, under 200 s), `--split-piece` with more parts, or forced lemmas. Until
+    2026-11-06 a slow piece of a published carve got a frozen global re-plan (config `cost_factors`): q153's for
+    four pieces changed the text of ~2,000 others and cost `plan` + `gen` (3 h) and a day of re-measuring.
+  - **Streaming** (with `--publish`): `measure_pieces` measures `STREAM_BATCH` (64) pieces per `carve_measure
+    --only` run and releases each batch's pieces within the limit at once (`publish/release.json` with `open`:
+    the background publisher keeps waiting for more while it is open and under 2 h old), so verifier feedback
+    arrives within the hour. The pieces bundles wait for and those of held (new) statements go first; held
+    statements are published as soon as their pieces pass. A closing full `carve_measure` (cached) reports
+    failures as before.
   - **Switching a classic carve** that has not published (oaiq-081, 2026-10-29): wait for its driver to end (`--wait`),
     add `"overlap": true` to `pipeline.json`, then `carve_pipeline.py DIR --upgrade --keep-port --publish --detach`.
     A finished `measure` stands (one that failed re-runs for bundles and statements, all cached), the plan is
@@ -710,7 +721,7 @@ back WA. The lessons:
 ## Slow or odd failures: what to try first (worker lessons, 2026-10-28)
 
 - **Calibrate's two outcomes for pieces** (classic carves, and overlap carves before anything is published; once
-  published, an overlap carve splits each slow piece by a frozen re-plan by itself, "Overlap mode" above, and stops
+  published or not, an overlap carve splits each slow piece alone by itself, "Overlap mode" above, and stops
   with this list only for what that cannot fix). When three or more pieces are over the plan by a similar factor (median
   ≥ 2.5, spread ≤ 2×), the plan's cost model was off and calibrate re-plans at that ratio by itself (oaiq-073).
   A lone slow piece, or a scatter, stops it with a profiling hint: re-planning has never shrunk one. In order:
@@ -840,7 +851,7 @@ back WA. The lessons:
   over the cap (a fold into a live piece) has its comments stripped by `gen` since 4d96885.
 - **One wild reading is the machine, not the piece** (q138: 1,595 s for a piece that compiles alone in 2.2 s,
   measured while Lean held all its swap). `calibrate_pieces` now measures an over-limit piece once more before its
-  automatic frozen re-plan (f5d1875); by hand, re-time a lone outlier with `lean -j1` and the carve's `olean/` ahead
+  automatic split (f5d1875); by hand, re-time a lone outlier with `lean -j1` and the carve's `olean/` ahead
   of LEAN_PATH (the toolchain's `lean` directly: `lake env` resets LEAN_PATH).
 - **Slow pieces made of private lemmas are not a cost-model error** (q143): oaiq-091's calibrate read five slow
   pieces, each 90-99% private lemmas, as a uniform overrun and re-planned twice (time_scale 1.2 → 5.6, items 135 →
@@ -988,7 +999,7 @@ From worker lessons oaiq-055, -057, -065, -067, -071 (2026-10-27/28).
   limit to the background publisher (started if none runs), then measures the rest.
 - **Overlap-mode carves freeze themselves** (2026-10-29): once `publish_early` ran, config `frozen` and `forced`
   already hold the published plan, bundles and statements (`pipeline_state.json` `auto_config`), and a slow piece
-  gets its frozen re-plan automatically (previous section). Only what is published or being published is
+  is split alone automatically (previous section). Only what is published or being published is
   locked against change (`carvepipeline.locked_files`, 955adf7): files of an automatic split's plan the
   publisher never sent no longer block a re-plan that reuses their names (oaiq-122: 227 such files beside 74
   published, "9 … published or being published changed"). The recipe below is what that automates; it is still

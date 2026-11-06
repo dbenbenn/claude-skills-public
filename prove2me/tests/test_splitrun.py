@@ -651,6 +651,39 @@ def test_gated_pieces_wait_for_the_release_and_the_run_ends_without_them(split):
     assert {p[1] for p in api2.posted if p[0] == 'verify'} == {'A.low_s2', 'A.mid_s2', 'A.top'}
 
 
+def test_an_open_release_keeps_the_publisher_waiting_for_more_pieces(split):
+    # carve_pipeline streams the pieces (dbenbenn 2026-11-06): each measured batch is added to an `open`
+    # release, and the publisher waits for it instead of ending once the first batch is sent
+    d, cfg = split
+    gated = dict(cfg, release=str(d / 'release.json'))
+    import hashlib
+    sha = hashlib.sha1((d / 'plan.json').read_bytes()).hexdigest()
+    (d / 'release.json').write_text(json.dumps({'plan_sha': sha, 'pieces': ['piece:A.low'], 'open': True}))
+    naps = []
+
+    def sleep(s):
+        naps.append(s)
+        if len(naps) == 3:          # the pipeline releases the rest, and closes the release
+            (d / 'release.json').write_text(json.dumps({'plan_sha': sha, 'pieces': 'all', 'open': False}))
+    api = FakeApi()
+    summary = R.Runner(gated, api, sleep=sleep).run()
+    assert {p[1] for p in api.posted if p[0] == 'verify'} == {'A.low_s2', 'A.mid_s2', 'A.top'}
+    assert summary['held'] == 0 and len(naps) >= 3
+
+
+def test_an_open_release_left_by_a_dead_driver_ends_the_publisher(split):
+    d, cfg = split
+    gated = dict(cfg, release=str(d / 'release.json'))
+    import hashlib
+    sha = hashlib.sha1((d / 'plan.json').read_bytes()).hexdigest()
+    (d / 'release.json').write_text(json.dumps({'plan_sha': sha, 'pieces': ['piece:A.low'], 'open': True}))
+    old = os.path.getmtime(d / 'release.json') - (R.RELEASE_OPEN_HOURS + 1) * 3600
+    os.utime(d / 'release.json', (old, old))
+    naps = []
+    summary = R.Runner(gated, FakeApi(), sleep=naps.append).run()
+    assert summary['held'] == 2 and len(naps) < 10
+
+
 def test_a_release_for_another_plan_releases_nothing(split):
     # a remedy re-plan rewrites publish/plan.json; a publisher started on the old plan must not send
     # the new pieces (they may import statements it does not know)

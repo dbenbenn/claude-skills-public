@@ -82,12 +82,18 @@ prose-template, check-text of the explanations, the full dry run) deal with the 
 failure after publish_early stops the driver at once and leaves the publisher running (--wait says so); a
 resumed driver waits for it before its final publish. Slow items: a statement stops, as ever; bundles over the
 limit re-plan globally only when many are (a systematic cost-model error) and nothing is published, else each is
-split alone (`carve.py split --only`, the rest of the plan kept); once published, a slow piece gets one frozen
-re-plan with its own declarations costed at its measured ratio (config `cost_factors`) and the lemmas of live
-pieces kept out of it (config `no_promote`: what the live or in-flight pieces of publish/run_state.json keep, less
-what the slow pieces keep; q160), and stops for a person
-when that cannot help, first releasing the pieces within budget (their gates run, publish/release.json lists
-them, a background publisher sends them; q129). Without --publish the pieces are measured all the same and nothing is posted.
+split alone (`carve.py split --only`, the rest of the plan kept); a slow piece (measured over the limit, after one
+re-measure) and a piece the verifier timed out on (publisher state `split`) are split alone (`carve.py
+split-piece`: lemmas the piece keeps become new statements; only its files and theirs are generated, every other
+item and measurement kept; the new statements are forced, with template prose, in auto_config; then the run goes
+on from `names`), once per piece for a local measurement and up to MAX_PIECE_SPLITS times for verifier timeouts,
+and a piece still slow stops for a person, first releasing the pieces within budget (q129). --split-piece
+NODE[=PARTS] (repeatable or comma-separated; PARTS default 2) splits pieces by hand the same way before the run
+resumes (dbenbenn 2026-11-06: q153's four slow pieces got a frozen global re-plan that changed ~2,000 other
+pieces and cost a day of measuring). With --publish, measure_pieces streams: batches of STREAM_BATCH pieces, each
+batch's fit pieces released at once (publish/release.json `open`; the background publisher waits for more while
+it is), the pieces bundles or held statements wait for first. Without --publish the pieces are measured all the
+same and nothing is posted.
 After any re-plan of a published carve: `plan` (and publish_prep, pieces_prep, for a re-plan by hand) compares
 the plan with publish/plan.json and stops when a live piece is re-shaped into new statements only live pieces
 would import (Open orphans: a live piece is never sent again without publish/comparisons/<slug>.md), and notes a
@@ -188,6 +194,8 @@ def parse(argv):
     ap.add_argument('--list', action='store_true')
     ap.add_argument('--detach', action='store_true')
     ap.add_argument('--wait', type=float, nargs='?', const=100.0, default=None)
+    ap.add_argument('--split-piece', action='append', dest='split_pieces', default=[],
+                    metavar='NODE[=PARTS]')
     a = ap.parse_args(argv)
     # a bare bundle name is its Definitions module (oaiq-042: `lake build Def_X` is no target)
     a.defs = [('Definitions.' + d if d.startswith('Def_') else d) for d in a.defs] if a.defs else a.defs
@@ -460,6 +468,12 @@ def main(argv=None):
         if a.frm:
             p.invalidate(a.frm)
         p.save()
+        if a.split_pieces:
+            want = {}
+            for x in ','.join(a.split_pieces).split(','):
+                n, _, k = x.partition('=')
+                want[n] = float(k) if k else 2
+            p.split_pieces_locally(want, 'split_piece', '--split-piece %s by hand')
         p.run(stop_after=a.stop_after, only_redo=set(a.redo), claim_folder=a.claim_folder)
     except C.StepFailed as e:
         print(e, file=sys.stderr)

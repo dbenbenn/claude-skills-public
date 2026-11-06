@@ -2381,6 +2381,107 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     return plan
 
 
+def split_piece(g, plan, node, target, cost, chunker='schedule', promote_private=(), exclude=()):
+    """Split one slow piece without re-planning: promote theorems its proof keeps into new statements
+    (each with its own piece) until every piece involved costs at most `target`, and return
+    (new plan, [new nodes]). Only `node`'s piece changes; the new nodes get a stub and a piece; every
+    other bundle, statement and piece of the plan stays as it is (a piece that keeps a promoted lemma
+    inline still proves its own copy). dbenbenn 2026-11-06: q153's four slow pieces were split by a
+    frozen global re-plan (cost_factors), which reran promotion everywhere, changed ~2,000 other pieces'
+    text and cost a day of measuring; a person would split the one piece.
+
+    A candidate is what make_plan would promote: a theorem with an ASCII public name whose statement
+    uses bundle material only, not renamed, not `exclude`d, no universe only under `max`, private only
+    as `promote_private` allows (True: all). Each step promotes the candidate whose own closure is
+    nearest half of the piece over budget, so the piece and the new one shrink together. Raises
+    CarveError when nothing can be promoted from an over-budget piece, or when the result has a
+    publish cycle (piece_cycles)."""
+    plan = json.loads(json.dumps(plan))
+    if node not in plan['pieces']:
+        raise CarveError('%s has no piece in the plan' % node)
+    bundles = plan['bundles']
+    pos = {b['name']: j for j, b in enumerate(bundles)}
+    bidx = {k: j for j, b in enumerate(bundles) for k in b['nodes']}
+    bimp = [{pos[x] for x in b.get('imports', ()) if x in pos} for b in bundles]
+    B = set(bidx)
+    ext = {g.owner.get(k, k) for k in plan.get('external_defs') or {}}
+    nodes = set(plan['nodes'])
+    renames = collision_renames(g)
+    excluded = set(exclude)
+    b_or_ext = B | ext
+
+    def ok(k):
+        nd = g.nodes.get(k)
+        if nd is None or not nd.theorem or k in nodes or k in excluded or k in renames:
+            return False
+        if nd.private and not (promote_private is True or k in set(promote_private or ())):
+            return False
+        return ascii_ok(k) and nd.sig <= b_or_ext and not max_only_universes(g, k)
+
+    def kids(c):
+        return [d for d in g.nodes[c].deps if d in g.nodes and d not in B and d not in ext]
+
+    def fresh(x):
+        s, todo = set(), [x]
+        while todo:
+            c = todo.pop()
+            if c in s:
+                continue
+            s.add(c)
+            todo += [d for d in kids(c) if d not in nodes]
+        return s
+
+    def pcost(s):
+        return sum(cost.get(x, 0.0) for x in s)
+
+    new, work = [], [node]
+    while work:
+        n = work.pop(0)
+        s = fresh(n)
+        while pcost(s) > target:
+            total = pcost(s)
+            cand = [k for k in s if k != n and ok(k)]
+            if not cand:
+                if n == node and not new:
+                    raise CarveError('%s: nothing in its piece can be a statement (no public theorem whose '
+                                     'statement uses bundle material only)' % node)
+                break
+            k = min(cand, key=lambda k: (abs(pcost(fresh(k)) - total / 2), k))
+            nodes.add(k)
+            new.append(k)
+            work.append(k)
+            s = fresh(n)
+    chunked = chunker in ('schedule', 'closure')
+
+    def need(keys):
+        ex = implicit_deps(g, keys, B) if chunked else {}
+        return {bidx[d] for x in keys for d in g.nodes[x].deps | ex.get(x, set()) | {x} if d in bidx}
+
+    def psize(s):
+        return sum(g.nodes[x].size for x in s)
+    for n in [node] + new:
+        keep = fresh(n)
+        imps = {d for x in keep for d in g.nodes[x].deps if d in nodes and d not in keep}
+        bks = need(keep) - {bidx[x] for x in keep if x in bidx}
+        in_bundles = _bundle_closure(bimp, bks)
+        avail = {k for j in in_bundles for k in bundles[j]['nodes']} | imps | ext
+        keep |= {k for k in g.extra_roots(keep, avail) if k not in nodes and k not in B and k not in ext}
+        bks = need(keep - B)
+        plan['pieces'][n] = {'keep': sorted(keep), 'imports': sorted(imps),
+                             'bundles': [bundles[i]['name'] for i in sorted(_reduce(bimp, bks))],
+                             'cost': round(pcost(keep), 2), 'size': psize(keep)}
+    for m in new:
+        sb = {bidx[d] for d in g.nodes[m].sig if d in bidx}
+        plan['stubs'][m] = {'bundles': [bundles[i]['name'] for i in sorted(_reduce(bimp, sb))]}
+    plan['nodes'] = sorted(nodes)
+    plan['over'] = sorted(set(plan.get('over') or ()) - {n for n in [node] + new
+                                                          if plan['pieces'][n]['cost'] <= target})
+    cyc = [(a, b) for a, b in piece_cycles(plan) if a in [node] + new]
+    if cyc:
+        raise CarveError('splitting %s makes publish cycles: %s' % (node, ', '.join('%s -> %s' % x for x in cyc)))
+    return plan, new
+
+
 def max_only_universes(g, k):
     """The universe parameters of theorem node k's statement that occur in it only under `max` or
     `imax` (DeclGraph `mu`; oaiq-124: `{σ : Type (max us v)}`, WA "stuck at solving universe

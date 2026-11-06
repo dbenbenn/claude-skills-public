@@ -55,6 +55,7 @@ TERMINAL = {'split', 'stop', 'give_up', 'raise_heartbeats'}
 RAISED_HEARTBEATS = 1000000
 STALE_PENDING_HOURS = 3
 LOST_CAP = 2             # resends of a lost submission before giving up for a person
+RELEASE_OPEN_HOURS = 2   # an `open` release older than this is taken as final (its driver died)
 BATCH = 10
 
 
@@ -635,12 +636,38 @@ class Runner:
     def run(self, max_hours=None):
         t0 = time.time()
         self.reconcile()
-        while self.step():
+        while True:
+            more = self.step()
             if max_hours and time.time() - t0 > max_hours * 3600:
                 break
-            if self.inflight():
-                self.sleep(self.poll_every)
+            if more:
+                if self.inflight():
+                    self.sleep(self.poll_every)
+                continue
+            if not self.release_open():
+                break
+            # carve_pipeline streams the pieces: more of them are released as they are measured
+            self.sleep(self.poll_every * 3)
         return self.summary()
+
+    def release_open(self):
+        """Is the piece release for this plan still growing (carve_pipeline's streaming measure_pieces writes
+        `open`), with pieces still held? Not when the file is older than RELEASE_OPEN_HOURS: a driver that
+        died must not keep the publisher waiting."""
+        path = self.cfg.get('release')
+        if not path:
+            return False
+        path = os.path.expanduser(path)
+        try:
+            r = json.load(open(path, encoding='utf-8'))
+            age = self.clock() - os.path.getmtime(path)
+        except (OSError, ValueError):
+            return False
+        if not isinstance(r, dict) or not r.get('open') or r.get('plan_sha') != self.plan_sha \
+                or age > RELEASE_OPEN_HOURS * 3600:
+            return False
+        rel = self.released()
+        return any(self.state.get(x, {}).get('state', 'todo') == 'todo' and self.held(x, rel) for x in self.items)
 
     def summary(self):
         states = [self.state.get(x, {}).get('state', 'todo') for x in self.items]

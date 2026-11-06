@@ -8,6 +8,7 @@ import ast
 import fcntl
 import hashlib
 import json
+import math
 import os
 import re
 import shlex
@@ -50,6 +51,8 @@ SYSTEMATIC_FRACTION = 0.25   # bundles over the limit: a systematic cost-model e
                              # 2026-10-25: QuarticPowerFree, KirchbergRordam, nearly every bundle 85-128 s
                              # against 55 s); fewer are split alone (oaiq-081: 3 of 194 bundles)
 MAX_BUNDLE_SPLITS = 3   # rounds of splitting single slow bundles before a person looks
+MAX_PIECE_SPLITS = 2    # local splits of one piece (carve.py split-piece) before a person looks
+STREAM_BATCH = 64       # pieces measured per carve_measure run while streaming them to the publisher
 STATEMENT_SHARE = 0.5   # a slow piece whose statement alone compiles in this share of its time is slow
                         # by its type (oaiq-075: 316 s of 328 in .olean serialization): no split helps
 BUNDLE_OWN_LIMIT = 80   # s local: an unpublished bundle over this is split (or excused), even under budget x 1.6.
@@ -1343,29 +1346,140 @@ class Pipeline:
         self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *self.measure_flags(), *kinds)])
 
     def step_measure_pieces(self):
-        gates = self.gate_pieces() if self.p.get('go') else []
-        if gates:
-            # q153: bundles that import a statement publish only once it is Proved, so its piece is measured
-            # and released first instead of after every other piece (bundles had stalled ~10 h)
-            self.run_cmds('measure_pieces', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
-                                                       '--kinds', 'piece', '--only', ','.join(gates))])
-            print(self.release_pieces(gates, 'measure_pieces',
-                                      'the pieces of statements bundles wait for').strip() or
-                  '== none of the %d piece(s) bundles wait for measured within budget' % len(gates), flush=True)
+        if self.p.get('go'):
+            return self.stream_pieces()
         self.run_cmds('measure_pieces', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
                                                    '--kinds', 'piece')])
-        held = self.state.pop('publish_held', None)
-        if held and self.p.get('go'):
-            # every piece measured and checked (a failure stops above, nothing posted): the held publish_early
-            # goes now, as it would have before the pieces (q160)
-            print('== measure_pieces: the pieces of the %d statement(s) publish_early held passed; publishing them '
-                  'now' % len(held.get('statements') or ()), flush=True)
-            if self.publisher_running():
-                print('== a publisher already runs on this carve; it goes on (new items wait for the final publish)',
-                      flush=True)
-            else:
-                self.publish_early_now()
         self.save()
+
+    def stream_pieces(self):
+        """With --publish: the pieces are measured in batches of STREAM_BATCH and each batch's pieces that
+        measured within the limit are released to the background publisher at once (release_measured), so
+        verifier feedback arrives within the hour instead of after every piece is measured (dbenbenn
+        2026-11-06: q153 measured ~3,000 pieces for a day before sending one). First the pieces the rest
+        waits for: those of the statements bundles import (gate_pieces, q153: bundles had stalled ~10 h)
+        and of the statements publish_early held (new since the published plan: they go once their pieces
+        pass the CoeT check, q160). A batch that fails does not stop the others; the closing full
+        carve_measure run (cached, so only the failures compile again) reports what failed, as before."""
+        held = self.state.get('publish_held')
+        live = self.live_items()
+        first = self.gate_pieces() + ['piece:' + n for n in (held or {}).get('statements') or ()
+                                      if 'piece:' + n not in live]
+        first = list(dict.fromkeys(first))
+        got = self.calibrate_inputs()
+        plan = got[1] if got else {}
+        rest = sorted('piece:' + n for n in (plan.get('pieces') or {})
+                      if 'piece:' + n not in live and 'piece:' + n not in first)
+        batches = [first[i:i + STREAM_BATCH] for i in range(0, len(first), STREAM_BATCH)] + \
+            [rest[i:i + STREAM_BATCH] for i in range(0, len(rest), STREAM_BATCH)]
+        print('== measure_pieces: %d piece(s) to measure in %d batch(es), each released as it passes'
+              % (len(first) + len(rest), len(batches)), flush=True)
+        try:
+            for k, batch in enumerate(batches):
+                if not batch:
+                    continue
+                try:
+                    self.run_cmds('measure_pieces', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
+                                                               '--kinds', 'piece', '--only', ','.join(batch))])
+                except StepFailed as e:
+                    print('== measure_pieces: batch %d/%d had failures (reported at the end): %s'
+                          % (k + 1, len(batches), str(e).splitlines()[0]), flush=True)
+                self.publish_held_if_measured()
+                print('== measure_pieces: batch %d/%d measured; %s' % (k + 1, len(batches),
+                                                                     self.release_measured(batch) or 'none released'),
+                      flush=True)
+        finally:
+            self.close_release()
+        # every piece once more, from the cache: the failures compile again and stop the step, as before
+        self.run_cmds('measure_pieces', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
+                                                   '--kinds', 'piece')])
+        self.publish_held_if_measured(final=True)
+        self.save()
+
+    def publish_held_if_measured(self, final=False):
+        """publish_early held new statements until their pieces are measured (held_statements, q160): once all
+        of them measured ok, the held publish_early goes now (it started no publisher)."""
+        held = self.state.get('publish_held')
+        if not held:
+            return
+        got = self.calibrate_inputs()
+        times = got[2] if got else {}
+        if not final and not all((times.get('piece:' + n) or {}).get('ok') for n in held.get('statements') or ()):
+            return
+        self.state.pop('publish_held', None)
+        print('== measure_pieces: the pieces of the %d statement(s) publish_early held passed; publishing them '
+              'now' % len(held.get('statements') or ()), flush=True)
+        if self.publisher_running():
+            print('== a publisher already runs on this carve; it goes on (new items wait for the final publish)',
+                  flush=True)
+        else:
+            self.publish_early_now()
+        self.save()
+
+    def release_measured(self, items):
+        """Release the pieces of `items` that measured ok within the limit to the background publisher, without
+        the full pieces' gates (pieces_prep runs them before the final publish): each solution file goes to
+        publish/out/solutions as measured, and publish/release.json, for this plan, lists them with `open`
+        (split_run keeps waiting for more while it is). A publisher is started when none runs and publish_early
+        has frozen the published part. Returns a line for the log ('' when nothing goes)."""
+        if not self.p.get('go'):
+            return ''
+        got = self.calibrate_inputs()
+        if not got:
+            return ''
+        cfg, plan, times, _, _ = got
+        limit = max(cfg.get('budget', 55) * LIMIT_FACTOR, PIECE_CAP)
+        accepted = set(self.p.get('accept_over') or ())
+        fast = sorted(x for x in items if (times.get(x) or {}).get('ok') and
+                      ((times[x].get('secs') or 0) <= limit or (x in accepted and times[x]['secs'] <= ACCEPT_CAP)))
+        P = os.path.join(self.d, 'publish')
+        pplan = os.path.join(P, 'plan.json')
+        if not fast or not os.path.exists(pplan):
+            return ''
+        sha = hashlib.sha1(open(pplan, 'rb').read()).hexdigest()
+        if sha != hashlib.sha1(open(self.work_paths(cfg)[1], 'rb').read()).hexdigest():
+            return 'not released: publish/plan.json is not the measured plan (publish_prep runs again first)'
+        from . import carve as CV
+        src, dst = os.path.join(self.gen_out(), 'solutions'), os.path.join(P, 'out', 'solutions')
+        os.makedirs(dst, exist_ok=True)
+        for x in fast:
+            f = 'Sol_%s.lean' % CV.slug(CV.statement_name(plan, x.split(':', 1)[1]))
+            if os.path.exists(os.path.join(src, f)):
+                data = open(os.path.join(src, f), 'rb').read()
+                q = os.path.join(dst, f)
+                if not os.path.exists(q) or open(q, 'rb').read() != data:
+                    tmp = q + '.tmp'
+                    open(tmp, 'wb').write(data)
+                    os.replace(tmp, q)
+        rel_path = os.path.join(P, 'release.json')
+        old = _load_json(rel_path) or {}
+        pieces = set(fast)
+        if old.get('plan_sha') == sha and isinstance(old.get('pieces'), list):
+            pieces |= set(old['pieces'])
+        if old.get('plan_sha') == sha and old.get('pieces') == 'all':
+            return ''
+        rel = {'plan_sha': sha, 'pieces': sorted(pieces), 'open': True, 'released': _now()}
+        tmp = rel_path + '.tmp'
+        json.dump(rel, open(tmp, 'w'), indent=1)
+        os.replace(tmp, rel_path)
+        if self.publisher_running():
+            how = 'the background publisher sends them'
+        elif not (self.state.get('auto_config') or {}).get('frozen') or self.held_statements():
+            how = 'no publisher yet (publish_early has not started one)'
+        else:
+            self.start_publisher()
+            how = 'a background publisher was started'
+        return 'released %d piece(s) (%d in all; %s)' % (len(fast), len(pieces), how)
+
+    def close_release(self):
+        """The streaming release is complete: `open` off, so the publisher ends once it has sent it."""
+        path = os.path.join(self.d, 'publish', 'release.json')
+        rel = _load_json(path)
+        if isinstance(rel, dict) and rel.get('open'):
+            rel['open'] = False
+            tmp = path + '.tmp'
+            json.dump(rel, open(tmp, 'w'), indent=1)
+            os.replace(tmp, path)
 
     def gate_pieces(self):
         """The pieces of the statements a bundle imports (a bundle may import a statement only once it is
@@ -1619,6 +1733,77 @@ class Pipeline:
         self.restart = True
         print('calibrate: %s' % lines[-1], file=sys.stderr, flush=True)
 
+    # -- splitting single pieces ------------------------------------------------------------------
+    def piece_split_rounds(self, n):
+        return len((self.state.get('piece_splits') or {}).get(n) or ())
+
+    def server_split_wanted(self):
+        """{node: parts} for the pieces the publisher stopped in state `split` (own verifier timeouts,
+        verdicts.decide) that have not had MAX_PIECE_SPLITS local splits yet: each is halved. Only while
+        the piece's file is still the text that stopped (the state's `sha`, as split_run.file_sha): once it
+        changed, it was split already and split_run sends it again when a publisher next starts."""
+        try:
+            st = json.load(open(os.path.join(self.d, 'publish', 'run_state.json')))
+        except (OSError, ValueError):
+            return {}
+        plan = _load_json(os.path.join(self.d, 'publish', 'plan.json')) or {}
+        from . import carve as CV
+        out = {}
+        for x, v in sorted(st.items()):
+            n = x.split(':', 1)[1]
+            if not (x.startswith('piece:') and v.get('state') == 'split') or self.piece_split_rounds(n) >= MAX_PIECE_SPLITS:
+                continue
+            if v.get('sha') and n in (plan.get('pieces') or {}):
+                slug = CV.slug(CV.statement_name(plan, n))
+                f = os.path.join(self.gen_out(), 'solutions', 'Sol_%s.lean' % slug)
+                if os.path.exists(f):
+                    h = hashlib.sha1(open(f, 'rb').read())
+                    cmp_ = os.path.join(self.d, 'publish', 'comparisons', slug + '.md')
+                    if os.path.exists(cmp_):
+                        h.update(b'\0' + open(cmp_, 'rb').read())
+                    if h.hexdigest() != v['sha']:
+                        continue
+            out[n] = 2
+        return out
+
+    def split_pieces_locally(self, want, step, why):
+        """Split each piece of `want` ({node: parts}) alone (carve.py split-piece: lemmas it keeps become new
+        statements, only its own files and theirs are regenerated), then run again from `names`; every other
+        measurement is cached, and gen is not re-run. dbenbenn 2026-11-06: q153's frozen global re-plan for
+        four slow pieces changed ~2,000 other pieces (a day of measuring); `plan` and `gen` alone took 3 h.
+        The new statements join auto_config `forced` (a later re-plan keeps them) and `template_forced`
+        (mechanical prose). A stopped piece whose file changed is sent again by split_run itself
+        (_restart_changed). Returns {node: [new nodes]}."""
+        spec = ','.join('%s=%g' % (n, k) for n, k in sorted(want.items()))
+        self.run_cmds(step, [self.tool('carve', 'split-piece', 'config.json', spec)])
+        self.check_published_unchanged(step)
+        log = os.path.join(self.d, 'logs', step + '.log')
+        line = [l for l in open(log, errors='replace').read().splitlines() if l.startswith('SPLIT_PIECES ')]
+        if not line:
+            raise StepFailed("step '%s': carve.py split-piece printed no SPLIT_PIECES line; log %s" % (step, log))
+        done = json.loads(line[-1].split(' ', 1)[1])
+        rec = self.state.setdefault('piece_splits', {})
+        for n, new in done.items():
+            rec.setdefault(n, []).append({'at': _now(), 'why': why % n if '%s' in why else why,
+                                          'parts': want.get(n), 'new': new})
+        new_all = sorted({m for v in done.values() for m in v})
+        if new_all:
+            a = self.state.setdefault('auto_config', {})
+            a['forced'] = sorted(set(a.get('forced') or ()) | set(new_all))
+            a['template_forced'] = sorted(set(a.get('template_forced') or ()) | set(new_all))
+        cfg = self.apply_auto(self.read_config() or {})
+        json.dump(cfg, open(os.path.join(self.d, 'config.json'), 'w'), indent=1)
+        g = self.state['steps'].get('gen')
+        if g and 'in' in g:
+            # split-piece generated exactly the files that changed: gen stands for the new plan
+            g['in']['plan'] = hash_paths([self.work_paths(cfg)[1]])
+        self.invalidate('names')
+        self.restart = True
+        self.save()
+        print('== %s: split alone: %s' % (step, '; '.join('%s -> %d new statement(s) %s' % (n, len(v), ', '.join(v))
+                                                          for n, v in sorted(done.items()))), flush=True)
+        return done
+
     def live_items(self):
         sp = os.path.join(self.d, 'publish', 'run_state.json')
         try:
@@ -1628,14 +1813,14 @@ class Pipeline:
         return {x for x, v in st.items() if v.get('state') == 'live'}
 
     def step_calibrate_pieces(self):
-        """Overlap mode: the pieces, measured after the bundles and statements. Nothing published:
-        as `calibrate` always did (a uniform overrun re-plans at the ratio, a lone slow piece stops
-        with the profiling hint). Once anything is published nothing is re-planned globally: each
-        slow piece is split by a frozen re-plan in which only its own declarations cost more (config
-        `cost_factors`, its measured / planned ratio; its private lemmas may be promoted too, config
-        `promote_private`; the lemmas of live pieces may not be, config `no_promote`), once; a piece still
-        slow after that, or whose
-        statement alone is slow (its type is the cost), stops for a person."""
+        """Overlap mode: the pieces, measured after the bundles and statements. A uniform overrun of several
+        pieces while nothing is published re-plans at the ratio, as `calibrate` always did. Otherwise each slow
+        piece is measured once more, then split alone (carve.py split-piece: lemmas it keeps become new
+        statements; split_pieces_locally), once; so is each piece the publisher stopped after own verifier
+        timeouts (state `split`), up to MAX_PIECE_SPLITS times. A piece still slow after its split, or whose
+        statement alone is slow (its type is the cost), stops for a person. Until 2026-11-06 a slow piece of a
+        published carve got a frozen global re-plan with its declarations costed at its ratio (config
+        `cost_factors`), which re-shaped thousands of other pieces (q153)."""
         got = self.calibrate_inputs()
         if got is None:
             return 'skipped'
@@ -1646,18 +1831,14 @@ class Pipeline:
                           accepted=self.p.get('accept_over') or ())
         lines = self.calibrate_head(cfg, res, 'pieces: ')
         log = os.path.join(self.d, 'logs', 'calibrate.log')
-        if not res['over']:
+        server = {n: k for n, k in self.server_split_wanted().items() if n in (plan.get('pieces') or {})}
+        if not res['over'] and not server:
             self.calibrate_log(lines + ['pieces fit; time_scale %g kept' % cfg.get('time_scale', 1.5)])
             return None
         ratios = sorted(secs / max(cost, 1.0) for _, secs, cost in res['over'])
         uniform = (len(ratios) >= UNIFORM_MIN and ratios[len(ratios) // 2] >= UNIFORM_RATIO
                    and ratios[-1] <= 2 * ratios[0])
-        if not self.anything_published(cfg):
-            if not uniform:
-                self.calibrate_log(lines)
-                raise StepFailed(
-                    "step 'calibrate_pieces': only pieces are over the limit, and re-planning does not shrink a "
-                    "piece:\n%s\n%s Log %s" % ('\n'.join(lines[1:]), self.PIECE_HINT, log))
+        if uniform and not server and not self.anything_published(cfg):
             return self.replan(cfg, round(min(MAX_SCALE, cfg.get('time_scale', 1.5) * ratios[len(ratios) // 2]), 1),
                                lines, 'calibrate_pieces')
         tried = self.state.setdefault('auto_split', {})
@@ -1675,9 +1856,8 @@ class Pipeline:
                 manual.append('%s: %.0f s, no declarations recorded for it in the plan' % (key, secs))
             else:
                 auto.append((n, secs, cost))
-        k = self.state.get('piece_replans', 0)
         again = [(n, secs) for n, secs, _ in auto if n not in (self.state.get('remeasured') or {})]
-        if again and k < MAX_REPLANS:
+        if again:
             # measured once more before any split (q138: 1595 s of CPU for a piece that compiles in 2 s alone,
             # measured while the machine thrashed): its entry is dropped, measure_pieces measures it again
             rm = self.state.setdefault('remeasured', {})
@@ -1692,67 +1872,31 @@ class Pipeline:
             print('calibrate_pieces: measuring %d slow piece(s) again before any split' % len(again),
                   file=sys.stderr, flush=True)
             return None
-        if auto and k < MAX_REPLANS:
-            a = self.state.setdefault('auto_config', {})
-            cf = dict(a.get('cost_factors') or {})
-            pp = set(a.get('promote_private') or ())
+        want = dict(server)
+        budget = max(float(cfg.get('budget', 55)), 1.0)
+        for n, secs, cost in auto:
+            want[n] = max(want.get(n, 2), int(math.ceil(secs / budget)))
+        if want:
             for n, secs, cost in auto:
-                r = round(max(1.0, secs / max(cost, 1.0)), 2)
-                for x in plan['pieces'][n]['keep']:
-                    cf[x] = max(cf.get(x, 1.0), r)
-                    if x.startswith('_private.'):
-                        # its private lemmas may be promoted too, as a hand `forced` entry by node name
-                        # does (oaiq-091: pieces of 60 and 394 private lemmas)
-                        pp.add(x)
-                tried[n] = {'secs': secs, 'cost': cost, 'ratio': r}
-            a['cost_factors'] = cf
-            if pp:
-                a['promote_private'] = sorted(pp)
-            # promotion only inside the slow pieces: the lemmas of live pieces stay where they are (q160: the
-            # re-plan re-shaped four accepted pieces, six new statements only they would import, Open orphans).
-            # Recomputed each round; the user's config_set no_promote stays
-            slow = [n for n, _, _ in auto]
-            live_p = live_pieces(self.d) - set(slow)
-            np_ = protected_keeps([plan, _load_json(os.path.join(self.d, 'publish', 'plan.json')),
-                                   _load_json(os.path.join(self.published_dir(), 'plan.json'))], live_p, slow)
-            prev = set(a.get('no_promote') or ())
-            user = set((self.p.get('config_set') or {}).get('no_promote') or ())
-            cfg['no_promote'] = sorted((set(cfg.get('no_promote') or ()) - prev) | user | np_)
-            if np_:
-                a['no_promote'] = sorted(np_)
-            else:
-                a.pop('no_promote', None)
-            if not cfg['no_promote']:
-                cfg.pop('no_promote')
-            lines.append('promoting only inside the slow piece(s): %d declaration(s) of %d live piece(s) kept out '
-                         'of the re-plan (config no_promote)' % (len(np_), len(live_p)))
-            self.state['piece_replans'] = k + 1
-            lines.append('splitting %d piece(s) by a frozen re-plan (%d/%d), their declarations costed at their '
-                         'measured ratio: %s' % (len(auto), k + 1, MAX_REPLANS,
-                                                 ', '.join('%s x%.1f' % (n, tried[n]['ratio']) for n, _, _ in auto)))
+                tried[n] = {'secs': secs, 'cost': cost, 'parts': want[n]}
+            lines.append('splitting %d piece(s) alone (carve.py split-piece; every other item kept): %s' % (
+                len(want), ', '.join('%s into %d%s' % (n, k, ' (verifier timeouts)' if n in server else '')
+                                     for n, k in sorted(want.items()))))
             for m in manual:
                 lines.append('  needs a person (after this round): ' + m)
             self.calibrate_log(lines)
-            self.apply_auto(cfg)
-            json.dump(cfg, open(os.path.join(self.d, 'config.json'), 'w'), indent=1)
-            self.invalidate('plan')
-            self.restart = True
             print('calibrate_pieces: %s' % lines[-1 - len(manual)], file=sys.stderr, flush=True)
+            self.split_pieces_locally(want, 'calibrate_pieces', 'calibrate_pieces: %s slow or timed out')
             return None
-        if auto:
-            manual += ['%s: %.0f s, %d automatic re-plans already' % ('piece:' + n, secs, k) for n, secs, _ in auto]
         released = self.release_within_budget(plan, times, [key for key, _, _ in res['over']])
         self.calibrate_log(lines + ['  needs a person: ' + m for m in manual] + ([released.strip()] if released else []))
         raise StepFailed(
-            "step 'calibrate_pieces': piece(s) over the %.0f s limit after the bundles and statements began "
-            "publishing:\n  %s\nThe published part is frozen (config `frozen` and `forced`, set by the pipeline), so "
-            "nothing published is re-planned; a slow piece holds back only itself (with --publish the pieces "
-            "within budget are released at once), and the full release is written in `publish`. %s A published "
-            "statement cannot be restated: where its type is the cost, "
-            "declaring OpenAI's theorem directly as `theorem _root_.solution` halves the serialization. Forced "
-            "lemmas: pipeline.json `forced` plus `config_set.template_forced` (template prose), then "
-            "`--from config --publish`. A piece under %d s may go as is and be split after two real timeouts: "
-            "pipeline.json `accept_over` [\"piece:NAME\"]. Log %s%s"
+            "step 'calibrate_pieces': piece(s) over the %.0f s limit:\n  %s\nA slow piece holds back only itself "
+            "(with --publish the pieces within budget are released at once), and the full release is written in "
+            "`publish`. %s A published statement cannot be restated: where its type is the cost, declaring "
+            "OpenAI's theorem directly as `theorem _root_.solution` halves the serialization. To split a piece by "
+            "hand: --split-piece NODE[=PARTS]. A piece under %d s may go as is and be split after two real "
+            "timeouts: pipeline.json `accept_over` [\"piece:NAME\"]. Log %s%s"
             % (res['limit'], '\n  '.join(manual), self.PIECE_HINT, ACCEPT_CAP, log, released))
 
     def release_within_budget(self, plan, times, slow):
@@ -1860,7 +2004,16 @@ class Pipeline:
             os.replace(tmp, os.path.join(self.d, 'publish', 'release.json'))
             print('== pieces released for publishing (publish/release.json)', flush=True)
             self.join_publisher('the final publish')
-        self.run_cmds('publish', [self.tool('split_run', 'publish/run.json', '--go')])
+        try:
+            self.run_cmds('publish', [self.tool('split_run', 'publish/run.json', '--go')])
+        except StepFailed:
+            # pieces the verifier timed out on (state `split`) are split alone and the run goes on; any other
+            # stop is a person's (dbenbenn 2026-11-06: split the one piece, get feedback fast)
+            want = self.server_split_wanted() if self.overlap() else {}
+            if not want:
+                raise
+            self.split_pieces_locally(want, 'publish', 'publish: %s timed out on the verifier')
+            return None
 
     # -- overlap mode: the background publisher ---------------------------------------------------
     def publish_lock_key(self):

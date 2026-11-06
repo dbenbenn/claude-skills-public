@@ -492,6 +492,46 @@ def test_a_pinned_group_frozen_bundles_already_hold_makes_no_bundle(g):
     assert C.check_plan(g, p2) == []
 
 
+def _whole_plan(g):
+    # a large budget: no promotion, so CD.main's piece keeps every lemma its proof needs
+    return C.make_plan(g, TARGETS, budget=100, piece_size=10**6, bundle_budget=0.01, bundle_size=10**6,
+                       cost=C.size_costs(g, bytes_per_second=10000), bundle_prefix='CDB', chunker='schedule')
+
+
+def test_split_piece_promotes_inside_one_piece_and_leaves_the_rest_of_the_plan_alone(g):
+    # dbenbenn 2026-11-06: q153's four slow pieces were split by a frozen global re-plan, which changed
+    # ~2,000 other pieces' text (a day of measuring); a person would split the one piece
+    P = _whole_plan(g)
+    cost = C.size_costs(g, bytes_per_second=10000)
+    Q, new = C.split_piece(g, P, 'CD.main', P['pieces']['CD.main']['cost'] / 2, cost)
+    assert new and set(Q['nodes']) == set(P['nodes']) | set(new)
+    assert Q['bundles'] == P['bundles']
+    for n in P['pieces']:
+        if n != 'CD.main':
+            assert Q['pieces'][n] == P['pieces'][n] and Q['stubs'][n] == P['stubs'][n]
+    assert set(new) <= set(Q['pieces']['CD.main']['imports'])
+    assert Q['pieces']['CD.main']['cost'] < P['pieces']['CD.main']['cost']
+    assert not set(new) & set(Q['pieces']['CD.main']['keep'])
+    assert all(set(Q['pieces'][m]['keep']) < set(P['pieces']['CD.main']['keep']) for m in new)
+    assert C.check_plan(g, Q) == [] and C.piece_cycles(Q) == []
+
+
+def test_split_piece_refuses_a_piece_with_nothing_to_promote(g):
+    P = _whole_plan(g)
+    cost = C.size_costs(g, bytes_per_second=10000)
+    small = min(P['pieces'], key=lambda n: len(P['pieces'][n]['keep']))
+    with pytest.raises(C.CarveError, match='nothing in its piece'):
+        C.split_piece(g, P, small, 0.0, cost, exclude=P['pieces'][small]['keep'])
+
+
+@pytest.mark.lean
+def test_a_split_piece_compiles(g, tmp_path):
+    P = _whole_plan(g)
+    Q, _ = C.split_piece(g, P, 'CD.main', P['pieces']['CD.main']['cost'] / 2,
+                         C.size_costs(g, bytes_per_second=10000))
+    _compile_in_publish_order(g, Q, tmp_path)
+
+
 def test_pinning_refuses_what_is_not_bundle_material(g):
     with pytest.raises(C.CarveError, match='CD.double_succ'):
         _pinned_plan(g, [['CD.double_succ']])
@@ -1153,6 +1193,28 @@ def _carve_cli(tmp_path, name, **extra):
         return r.stdout + r.stderr
     (tmp_path / 'ws').mkdir(exist_ok=True)
     return cfg, work, tmp_path / name / 'out', run
+
+
+def test_split_piece_cli_rewrites_only_the_split_piece_and_its_new_statements(tmp_path):
+    cfg, work, out, run = _carve_cli(tmp_path, 'a', budget=100, chunker='schedule', bundle_budget=0.01)
+    run('plan', str(cfg))
+    run('gen', str(cfg))
+    before = {p: p.read_bytes() for p in out.rglob('*.lean')}
+    stamp = {p: p.stat().st_mtime_ns for p in before}
+    o = run('split-piece', str(cfg), 'CD.main')
+    done = json.loads(o.split('SPLIT_PIECES ', 1)[1].splitlines()[0])
+    assert list(done) == ['CD.main'] and done['CD.main']
+    assert (work / 'plan.pre_split_piece.json').exists()
+    P = json.load(open(work / 'plan.json'))
+    assert set(done['CD.main']) <= set(P['pieces']['CD.main']['imports'])
+    changed = {p.name for p in out.rglob('*.lean') if p not in before or p.stat().st_mtime_ns != stamp[p]}
+    want = {'Sol_CD_main.lean'} | {'Thm_%s.lean' % C.slug(m) for m in done['CD.main']} | \
+        {'Sol_%s.lean' % C.slug(m) for m in done['CD.main']} | {'Thm_CD_main.lean'}
+    assert changed <= want and {'Sol_CD_main.lean'} | {'Thm_%s.lean' % C.slug(m) for m in done['CD.main']} <= changed
+    assert (out / 'lib' / 'Thm_CD_main.lean').read_bytes() == before[out / 'lib' / 'Thm_CD_main.lean'] \
+        if (out / 'lib' / 'Thm_CD_main.lean') in before else True
+    run('check', str(cfg))
+    run('split-piece', str(cfg), 'CD.nope', ok=False)
 
 
 def test_gen_applies_recorded_repairs(tmp_path):

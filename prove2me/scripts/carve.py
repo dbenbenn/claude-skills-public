@@ -14,6 +14,13 @@ usage: carve.py graph CONFIG.json                  # DeclGraph + LeanInfo of eve
                                                    # go into pipeline.json `thaw` once publish_early ran.
                                                    # The old plan: work/plan.pre_split.json (older
                                                    # copies plan.pre_split.N.json)
+       carve.py split-piece CONFIG.json NODE[=K][,NODE[=K]...] [--parts K] [--no-gen]   # split slow pieces
+                                                   # alone: promote lemmas each keeps into new
+                                                   # statements until every part costs at most 1/K of
+                                                   # it (default 2), then gen just those files; every
+                                                   # other item stays as it is. Old plan:
+                                                   # work/plan.pre_split_piece.json; prints
+                                                   # `SPLIT_PIECES {"NODE": [new nodes]}`
        carve.py fold  CONFIG.json NODE ...         # NODEs stop being statements: their pieces go into
                                                    # every importer's piece (plan in place, config `folded`)
 
@@ -399,6 +406,44 @@ def warn_leaks(g, P, limit=30):
             print('  ... %d more (p2mlib.carve.instance_leaks)' % (len(lines) - limit))
 
 
+def run_gen(cfg, g, P, kinds, names):
+    """`gen`: write the plan's files (`names`: only those bundles and nodes); exits 1 on a file over the
+    cap or a stale patch."""
+    frozen_text = published_frozen(cfg, P, names) if 'bundles' in kinds else {}
+    frozen_stubs = published_frozen_stubs(cfg, P, names) if 'stubs' in kinds else {}
+    patches = json.load(open(os.path.expanduser(cfg['patches']))) if cfg.get('patches') else ()
+    r = C.generate(g, P, cfg['out'], kinds,
+                   names, cfg.get('external', ()), cfg.get('collapse_mathlib', True),
+                   patches, repairs=recorded_repairs(cfg), frozen_text=frozen_text,
+                   frozen_stubs=frozen_stubs, monomorphic=set(cfg.get('monomorphic', ())))
+    for f in r['files']:
+        print('%9d  %s' % (r['sizes'][f], f))
+    for f, c in r['stale_repairs']:
+        print('STALE REPAIR %s | %s' % (f, c.replace('\n', ' ')[:120]))
+    for f in r['frozen_drift']:
+        print('FROZEN %s: written as published; the generated text differs from it (the plan '
+              'or a patch changed what this bundle would be; check what imports it)' % f)
+    warn_leaks(g, P)
+    report_fallbacks(g)
+    for f in r['over_cap']:
+        print('OVER 1 MiB', f)
+    # a patch no generated file contains is stale (a collision suffix `_r<hex>_<n>` that changed
+    # with the snapshot, a statement folded away): a full gen fails on it, as filter_patches does
+    # for port patches (oaiq-123); a partial gen cannot tell
+    stale = unused_patches(patches, r['patches_unused']) if names is None and len(kinds) == 3 else []
+    why = {pt['literal_old']: pt.get('why') for pt in patches}
+    # q128: a patch whose only match is a frozen file written as published reached no copy at all
+    stale += ['PATCH ON A FROZEN FILE ONLY: %r%s matches %s, which is frozen (published or being '
+              'published) and written as published, without the patch. A live item cannot change; '
+              'one that is not live (stopped before it went live) takes patches once carve_pipeline '
+              'lists it in config frozen.thawed' % (o[:160], ' -- ' + why[o] if why.get(o) else '', f)
+              for o, f in r['patches_frozen']] if names is None and len(kinds) == 3 else []
+    for line in stale:
+        print(line)
+    if r['over_cap'] or stale:
+        sys.exit(1)
+
+
 def main(argv):
     if len(argv) < 3:
         sys.exit(__doc__)
@@ -535,39 +580,40 @@ def main(argv):
         what = rest[0] if rest and rest[0] in ('bundles', 'stubs', 'pieces', 'all') else 'all'
         names = set(rest[1:] if rest and rest[0] == what else rest) or None
         kinds = ('bundles', 'stubs', 'pieces') if what == 'all' else (what,)
-        frozen_text = published_frozen(cfg, P, names) if 'bundles' in kinds else {}
-        frozen_stubs = published_frozen_stubs(cfg, P, names) if 'stubs' in kinds else {}
-        patches = json.load(open(os.path.expanduser(cfg['patches']))) if cfg.get('patches') else ()
-        r = C.generate(g, P, cfg['out'], kinds,
-                       names, cfg.get('external', ()), cfg.get('collapse_mathlib', True),
-                       patches, repairs=recorded_repairs(cfg), frozen_text=frozen_text,
-                       frozen_stubs=frozen_stubs, monomorphic=set(cfg.get('monomorphic', ())))
-        for f in r['files']:
-            print('%9d  %s' % (r['sizes'][f], f))
-        for f, c in r['stale_repairs']:
-            print('STALE REPAIR %s | %s' % (f, c.replace('\n', ' ')[:120]))
-        for f in r['frozen_drift']:
-            print('FROZEN %s: written as published; the generated text differs from it (the plan '
-                  'or a patch changed what this bundle would be; check what imports it)' % f)
-        warn_leaks(g, P)
-        report_fallbacks(g)
-        for f in r['over_cap']:
-            print('OVER 1 MiB', f)
-        # a patch no generated file contains is stale (a collision suffix `_r<hex>_<n>` that changed
-        # with the snapshot, a statement folded away): a full gen fails on it, as filter_patches does
-        # for port patches (oaiq-123); a partial gen cannot tell
-        stale = unused_patches(patches, r['patches_unused']) if names is None and what == 'all' else []
-        why = {pt['literal_old']: pt.get('why') for pt in patches}
-        # q128: a patch whose only match is a frozen file written as published reached no copy at all
-        stale += ['PATCH ON A FROZEN FILE ONLY: %r%s matches %s, which is frozen (published or being '
-                  'published) and written as published, without the patch. A live item cannot change; '
-                  'one that is not live (stopped before it went live) takes patches once carve_pipeline '
-                  'lists it in config frozen.thawed' % (o[:160], ' -- ' + why[o] if why.get(o) else '', f)
-                  for o, f in r['patches_frozen']] if names is None and what == 'all' else []
-        for line in stale:
-            print(line)
-        if r['over_cap'] or stale:
-            sys.exit(1)
+        run_gen(cfg, g, P, kinds, names)
+    elif cmd == 'split-piece':
+        if not rest or rest[0].startswith('--'):
+            sys.exit('split-piece: name the pieces (their nodes, comma-separated)')
+        g, P = load_graph(cfg), json.load(open(plan_path(cfg)))
+        parts = float(rest[rest.index('--parts') + 1]) if '--parts' in rest else 2.0
+        cost = costs(cfg, g)
+        Q, done = P, {}
+        for spec in rest[0].split(','):
+            n, _, k = spec.partition('=')
+            if n not in Q['pieces']:
+                sys.exit('split-piece: %s has no piece in the plan' % n)
+            keep = Q['pieces'][n]['keep']
+            target = sum(cost.get(x, 0.0) for x in keep) / max(float(k) if k else parts, 1.0)
+            try:
+                Q, new = C.split_piece(g, Q, n, target, cost, cfg.get('chunker', 'bands'),
+                                       cfg.get('promote_private', ()),
+                                       sorted(set(cfg.get('folded', ())) | set(cfg.get('no_promote', ()))))
+            except C.CarveError as e:
+                sys.exit('split-piece: %s' % e)
+            done[n] = new
+            for m in [n] + new:
+                print('  %-60s %7.2f planned s, %d declarations%s' % (
+                    m, Q['pieces'][m]['cost'], len(Q['pieces'][m]['keep']), ' (new statement)' if m != n else ''))
+        probs = C.check_plan(g, Q)
+        if probs:
+            sys.exit('split-piece: plan inconsistent:\n' + '\n'.join(probs[:20]))
+        backup = keep_backup(plan_path(cfg), '.pre_split_piece')
+        json.dump(P, open(backup, 'w'), indent=1, sort_keys=True)
+        json.dump(Q, open(plan_path(cfg), 'w'), indent=1, sort_keys=True)
+        print('old plan saved as %s' % backup)
+        if '--no-gen' not in rest:
+            run_gen(cfg, g, Q, ('bundles', 'stubs', 'pieces'), set(done) | {m for v in done.values() for m in v})
+        print('SPLIT_PIECES ' + json.dumps(done, sort_keys=True))
     elif cmd == 'order':
         order = C.publish_order(json.load(open(plan_path(cfg))), cfg.get('external', ()))
         json.dump(order, open(os.path.join(cfg['work'], 'order.json'), 'w'), indent=1)
