@@ -176,3 +176,27 @@ def test_stage_external_renders_cited_and_citing_pages(mdir, monkeypatch):
     src = open(os.path.join(d, 'source.md')).read()
     assert 'citing paper' in src and 'paper.pdf, p. 31' in src and 'cited.pdf' in src
     assert 'citing-page-*.png' in src and 'pp. 5-6' in src
+
+
+def test_stage_external_with_pages_keeps_the_citing_page_and_names_both_papers(mdir, monkeypatch):
+    # 2026-11-06: `--pages` (which the strong-convergence RESUME told workers to pass for an External)
+    # switched the cited-result staging off, so the citing page was missing again and the Source line
+    # read "cited.pdf, p. <citing page>" (Choi and HP B.2 stagings were fixed by hand)
+    (mdir / 'cited.pdf').write_bytes(b'%PDF fake')
+    s = (mdir / 'mission.py').read_text()
+    (mdir / 'mission.py').write_text(
+        s + "\nfor _T in THEOREMS:\n    if _T['name'] == 't1':\n"
+            "        _T.update(source_pdf='cited.pdf', audit_pages='5-6', page='31')\n")
+    calls = []
+
+    def fake_run(args, check=False, **k):
+        calls.append((os.path.basename(args[-2]), int(args[2]), os.path.basename(args[-1])))
+        open(args[-1] + '.png', 'w').write('img')
+        return types.SimpleNamespace(returncode=0)
+    monkeypatch.setattr(SRC.subprocess, 'run', fake_run)
+    SRC.stage(str(mdir), 't1', page_spec='7')
+    assert sorted(calls) == [('cited.pdf', 7, 'page-007'), ('paper.pdf', 31, 'citing-page-031')]
+    d = os.path.join(SRC.ROOT, SRC.slug(str(mdir), 't1'))
+    src = open(os.path.join(d, 'source.md')).read()
+    assert 'cited.pdf, p. 31' not in src
+    assert 'paper.pdf, p. 31' in src and 'citing-page-*.png' in src and 'pp. 7' in src
