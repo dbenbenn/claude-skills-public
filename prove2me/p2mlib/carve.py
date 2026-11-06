@@ -2061,7 +2061,10 @@ def _pin_chunks(g, pinned, B, taken, extra):
             cl.add(k)
             todo += [d for d in g.nodes[k].deps | extra.get(k, set()) if d in g.nodes]
         taken |= cl
-        out.append(sorted(cl))
+        if cl:
+            # a group frozen bundles already hold is no bundle (q153 re-plan, 2026-11-06: all 17
+            # pinned groups were published, and 17 empty bundles were refused "definition is required")
+            out.append(sorted(cl))
     return out
 
 
@@ -2185,7 +2188,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             for x in reach_t:
                 need_t |= g.nodes[x].sig if x in stmts and x != t else g.nodes[x].deps
             need_t = sorted(d for d in need_t if d in B and d not in taken)
-            grp = _pin_chunks(g, [need_t], B, taken, extra)[0] if need_t else []
+            grp = (_pin_chunks(g, [need_t], B, taken, extra) or [[]])[0] if need_t else []
             bad = sorted(k for k in grp if t in g.nodes[k].deps)
             if bad:
                 raise CarveError('%s cannot be proved before the bundles importing it: its '

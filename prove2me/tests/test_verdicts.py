@@ -41,6 +41,16 @@ CASES = [
                'Definitions.Def_OAIEG012: \u2714 [8717/8725] Built Definitions.Def_OAIEG006 (28s)\n'
                '\u2716 [8718/8725] Building Definitions.Def_OAIEG012 (44s)\nerror: Lean exited with code 137\n'
                'error: build failed', 'dependency_oom'),
+    # q153 PlanarPacking (2026-11-06): the solution's build output, cut at about 4 KB inside the replay
+    # warnings of imported statement stubs; the cause is not shown, and it is not a timeout
+    ('ERROR', 'Failed to compile solution module: Failed to compile module Submissions.Job_9eeafbcf_Sol: '
+              '\u26a0 [8709/8785] Replayed Theorems.Thm_OAI_SharpPlanar_Scoords_add_e\nwarning: '
+              'Theorems/Thm_OAI_SharpPlanar_Scoords_add_e.lean:18:6: declaration uses `sorry`\n'
+              '\u26a0 [8710/8785] Replayed Theorems.Thm_OAI_SharpPlanar_Scoords_mem_e\nwarning', 'hidden'),
+    # the same output, with the error inside what is shown, is the file's
+    ('ERROR', 'Failed to compile solution module: Failed to compile module Submissions.Job_X_Sol: '
+              '\u26a0 [1/2] Replayed Theorems.Thm_A\nwarning: Theorems/Thm_A.lean:3:6: declaration uses `sorry`\n'
+              'error: Sol.lean:12:4: unknown identifier `foo`\nerror: build failed', 'compile_error'),
     ('PUBLISHED', None, 'accepted'),
     (None, '<urlopen error [Errno -3] Temporary failure in name resolution>', 'transient'),
 ]
@@ -66,6 +76,11 @@ def test_decide_never_retries_a_wrong_or_broken_proof():
         assert V.decide(k, {}) == 'stop'
     assert V.decide('accepted', {}) == 'done'
     assert V.decide('heartbeats', {}) == 'raise_heartbeats'
+
+
+def test_decide_retries_a_hidden_cause_then_stops():
+    assert V.decide('hidden', {}) == 'retry'
+    assert V.decide('hidden', {'hidden': V.HIDDEN_CAP}) == 'stop'
 
 
 def test_decide_retries_dependency_oom_a_few_times():

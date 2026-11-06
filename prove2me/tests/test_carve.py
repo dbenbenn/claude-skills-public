@@ -477,6 +477,21 @@ def test_an_oversize_pinned_group_is_cut_into_bundles_of_the_size_limit(g):
     assert C.check_plan(g, p) == []
 
 
+def test_a_pinned_group_frozen_bundles_already_hold_makes_no_bundle(g):
+    # q153 PlanarPacking re-plan (2026-11-06): every pinned group was in a published (frozen) bundle,
+    # and each still became a bundle, empty: 17 refused "definition is required and must be a
+    # non-empty string"
+    pin = {'space': ['CD.Space.size']}
+    p = _pinned_plan(g, pin)
+    names = [b['name'] for b in p['bundles']]
+    p2 = C.make_plan(g, ['CD.main', 'CD.size_zero'], forced=['CD.size_zero'], budget=0.05, piece_size=10**6,
+                     bundle_budget=1.0, bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                     bundle_prefix='P', chunker='schedule', pinned=pin, frozen=(p, names))
+    assert all(b['nodes'] for b in p2['bundles'])
+    assert [b['name'] for b in p2['bundles']] == names
+    assert C.check_plan(g, p2) == []
+
+
 def test_pinning_refuses_what_is_not_bundle_material(g):
     with pytest.raises(C.CarveError, match='CD.double_succ'):
         _pinned_plan(g, [['CD.double_succ']])

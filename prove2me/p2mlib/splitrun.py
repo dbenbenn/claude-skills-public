@@ -375,7 +375,10 @@ class Runner:
             # splitter re-split items for days)
             why = {'split': 'NEEDS A PERSON: own compile timeout %d times; consider splitting' % (
                        st['history'].get('own_timeout', 0)),
-                   'stop': 'NEEDS A PERSON: %s' % kind, 'give_up': 'NEEDS A PERSON: transient cap reached',
+                   'stop': 'NEEDS A PERSON: %s' % (
+                       'hidden: the platform cut the log before the error (see verdicts.py); compare a '
+                       'local verifier-flags compile, then retry or split' if kind == 'hidden' else kind),
+                   'give_up': 'NEEDS A PERSON: transient cap reached',
                    'raise_heartbeats': 'NEEDS A PERSON: heartbeat timeout'}.get(dec, dec)
             self.log(item, action, '%s %s  -> %s' % (rec.get('status'), st['last'][:200], why))
         self.save()
