@@ -384,7 +384,7 @@ class Runner:
     def _result(self, item, rec, action):
         st = self.st(item)
         kind = V.classify(rec.get('status'), rec.get('error_message') or rec.get('error'))
-        dec = V.decide(kind, st['history'])
+        dec = V.decide(kind, st['history'], item.split(':', 1)[0])
         st['history'][kind] = st['history'].get(kind, 0) + 1
         st.pop('job', None)
         st.pop('sid', None)

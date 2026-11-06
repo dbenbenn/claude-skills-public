@@ -42,6 +42,8 @@ import re
 OWN_TIMEOUT_CAP = 2      # own timeouts before splitting
 HIDDEN_CAP = 2           # hidden-cause solution compile failures before stopping for a person
 DEPENDENCY_OOM_CAP = 3   # dependency_oom results before stopping for a person (q152)
+PIECE_OOM_CAP = 10       # the same for a proof: resubmittable, and q153's proofs importing 300-600 MB passed ~55%
+                         # of first tries, so three tries stopped 35 that 616 proofs' bundle (and the goal) waits on
 TRANSIENT_CAP = 30       # transient failures before giving up for this run (cold-cache p90 was 10)
 
 _TRANSIENT = re.compile(
@@ -82,8 +84,8 @@ def classify(status, error_message):
     return 'refused'
 
 
-def decide(kind, history):
-    """history: {kind: count of earlier results of this item}"""
+def decide(kind, history, item_kind=None):
+    """history: {kind: count of earlier results of this item}; item_kind 'piece' for a proof."""
     n = history.get(kind, 0)
     if kind == 'accepted':
         return 'done'
@@ -96,5 +98,5 @@ def decide(kind, history):
     if kind == 'heartbeats':
         return 'raise_heartbeats'
     if kind == 'dependency_oom':
-        return 'retry' if n < DEPENDENCY_OOM_CAP else 'stop'
+        return 'retry' if n < (PIECE_OOM_CAP if item_kind == 'piece' else DEPENDENCY_OOM_CAP) else 'stop'
     return 'stop'
