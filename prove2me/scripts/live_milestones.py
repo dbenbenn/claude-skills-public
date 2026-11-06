@@ -15,7 +15,8 @@ description as it is.
 milestones down only as far as the reading order needs (`sort_order` is not logged in the milestone
 history; title, description and link are). A file whose theorem a milestone of the mission already
 links is skipped, so a rerun only verifies. `edit` PATCHes what differs, with the reason, which
-solvers read in the milestone history.
+solvers read in the milestone history; a `theorem:` line in an `edit` file relinks the milestone to that
+theorem (a corrected or direct restatement, 2026-11-06).
 
 Written 2026-10-03, when Garrido I and Chou gained their full-strength theorems as milestones; the
 per-mission scripts it replaces (chou-mission/apply_milestone_prose.py and the like) kept their prose
@@ -156,18 +157,37 @@ def add(a):
     sys.exit(1 if bad else 0)
 
 
+def edit_body(spec, m, tid):
+    """The PATCH body for milestone `m` from the file `spec`: title and description where they differ,
+    and `theorem_id` when the file names a theorem (resolved to `tid`) other than the one linked."""
+    body = {}
+    if spec['title'] != m.get('title'):
+        body['title'] = spec['title']
+    if spec.get('description') and spec['description'] != (m.get('milestone_description') or '').strip():
+        body['milestone_description'] = spec['description']
+    if tid and tid not in linked_theorem_ids([m]):
+        body['theorem_id'] = tid
+    return body
+
+
 def edit(a):
     from p2m import call
     s = read_spec(a.file)
     m = _resolve(_milestones(a.mission), a.milestone)
-    body = {}
-    if s['title'] != m.get('title'):
-        body['title'] = s['title']
+    tid = None
+    if s.get('theorem'):
+        from submit_solution import theorem_id
+        tid = theorem_id(s['theorem'])
+        if not tid:
+            sys.exit('%s: theorem %s is not published' % (a.file, s['theorem']))
+    body = edit_body(s, m, tid)
+    if 'title' in body:
         print('title: %s\n    -> %s' % (m.get('title'), s['title']))
-    if s['description'] and s['description'] != (m.get('milestone_description') or '').strip():
-        body['milestone_description'] = s['description']
+    if 'milestone_description' in body:
         print('description changes (%d -> %d chars)' % (len(m.get('milestone_description') or ''),
                                                        len(s['description'])))
+    if 'theorem_id' in body:
+        print('relink: %s -> %s (%s)' % (','.join(sorted(linked_theorem_ids([m]))) or '-', tid, s['theorem']))
     if not body:
         print('no change: %s' % m['id'])
         return
@@ -177,8 +197,9 @@ def edit(a):
     body['reason'] = a.reason
     call('PATCH', '/milestones/%s' % m['id'], body)
     m2 = _resolve(_milestones(a.mission), m['id'])
-    ok = m2.get('title') == s['title'] and (not s['description'] or
-                                           (m2.get('milestone_description') or '').strip() == s['description'])
+    ok = (m2.get('title') == s['title'] and (not s['description'] or
+                                            (m2.get('milestone_description') or '').strip() == s['description'])
+          and (not tid or tid in linked_theorem_ids([m2])))
     print('%s  %s' % ('OK ' if ok else 'BAD', m['id']))
     sys.exit(0 if ok else 1)
 

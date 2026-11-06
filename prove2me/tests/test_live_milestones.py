@@ -74,3 +74,14 @@ def test_all_pages_reads_past_the_default_page():
         calls.append(offset)
         return data[offset:offset + limit]
     assert L.all_pages(fetch, limit=10) == data and calls == [0, 10, 20]
+
+
+def test_edit_body_relinks_when_the_file_names_another_theorem():
+    # 2026-11-06: the Choi milestone moved from the indirect statement to the direct one; `edit` could
+    # change only title and description, so a relink meant a hand-made PATCH
+    m = {'id': 'm1', 'title': 'T', 'milestone_description': 'D', 'theorem': {'id': 'old'}}
+    spec = {'title': 'T', 'description': 'D', 'theorem': 'Ns.new'}
+    assert L.edit_body(spec, m, 'new') == {'theorem_id': 'new'}
+    assert L.edit_body(spec, m, 'old') == {}
+    assert L.edit_body(dict(spec, theorem=None), m, None) == {}
+    assert L.edit_body(dict(spec, title='T2'), m, 'old') == {'title': 'T2'}
