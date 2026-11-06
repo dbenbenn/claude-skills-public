@@ -42,8 +42,9 @@ import re
 OWN_TIMEOUT_CAP = 2      # own timeouts before splitting
 HIDDEN_CAP = 2           # hidden-cause solution compile failures before stopping for a person
 DEPENDENCY_OOM_CAP = 3   # dependency_oom results before stopping for a person (q152)
-PIECE_OOM_CAP = 10       # the same for a proof: resubmittable, and q153's proofs importing 300-600 MB passed ~55%
-                         # of first tries, so three tries stopped 35 that 616 proofs' bundle (and the goal) waits on
+PIECE_OOM_CAP = 3        # the same for a proof. q153 (2026-11-06): first tries of proofs importing 300-600 MB passed
+                         # ~55%, but retries of ones that had failed passed 1 in 20: a proof over the worker's memory
+                         # fails again, so ten tries (a77afdc) mostly burned shared verifier time
 TRANSIENT_CAP = 30       # transient failures before giving up for this run (cold-cache p90 was 10)
 
 _TRANSIENT = re.compile(

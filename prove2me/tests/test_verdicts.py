@@ -97,10 +97,9 @@ def test_decide_retries_dependency_oom_a_few_times():
     assert V.decide('dependency_oom', {'dependency_oom': V.DEPENDENCY_OOM_CAP}) == 'stop'
 
 
-def test_a_proof_out_of_memory_is_retried_longer_than_a_bundle():
-    # q153 (2026-11-06): proofs importing 300-600 MB passed ~55% of first tries; three tries stopped 35 of them
-    assert V.decide('dependency_oom', {'dependency_oom': V.DEPENDENCY_OOM_CAP}) == 'stop'
-    assert V.decide('dependency_oom', {'dependency_oom': V.DEPENDENCY_OOM_CAP}, 'piece') == 'retry'
+def test_a_proof_out_of_memory_is_retried_a_few_times_only():
+    # q153 (2026-11-06): retries of failed proofs passed 1 in 20; a hidden proof failure counts as one
+    assert V.decide('dependency_oom', {'dependency_oom': V.PIECE_OOM_CAP - 1}, 'piece') == 'retry'
     assert V.decide('dependency_oom', {'dependency_oom': V.PIECE_OOM_CAP}, 'piece') == 'stop'
-    assert V.decide('hidden', {'hidden': V.HIDDEN_CAP}) == 'stop'
-    assert V.decide('hidden', {'hidden': V.HIDDEN_CAP}, 'piece') == 'retry'
+    assert V.decide('hidden', {'hidden': V.PIECE_OOM_CAP}, 'piece') == 'stop'
+    assert V.PIECE_OOM_CAP <= 4
