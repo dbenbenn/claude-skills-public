@@ -1482,8 +1482,10 @@ class Pipeline:
             os.replace(tmp, path)
 
     def gate_pieces(self):
-        """The pieces of the statements a bundle imports (a bundle may import a statement only once it is
-        Proved), not yet live: ['piece:NODE', ...]."""
+        """The pieces bundles wait for, not yet live: a bundle may import a statement only once it is Proved,
+        so every piece of that statement's proof closure (carve.publish_order's bundle dependencies) gates it.
+        ['piece:NODE', ...], the earliest bundle's first. q153 (2026-11-06): only the bundles' own statements
+        were taken, 2 pieces, while bundles E125 and E237 (and the goal's bundle behind them) waited on 694."""
         got = self.calibrate_inputs() or (None,)
         cfg = got[0] or json.load(open(os.path.join(self.d, 'config.json')))
         _, plan_path, _ = self.work_paths(cfg)
@@ -1491,8 +1493,14 @@ class Pipeline:
             return []
         plan = json.load(open(plan_path))
         live = self.live_items()
-        want = {n for b in plan.get('bundles', []) for n in b.get('statements', [])}
-        return sorted('piece:' + n for n in want if n in (plan.get('pieces') or {}) and 'piece:' + n not in live)
+        from . import carve as CV
+        order = CV.publish_order(plan, plan.get('external', ()))
+        out = []
+        for wave in order['waves']:
+            for x in wave:
+                if x.startswith('bundle:') and x not in live:
+                    out += [d for d in order['deps'][x] if d.startswith('piece:') and d not in live]
+        return list(dict.fromkeys(out))
 
     def work_paths(self, cfg):
         work = os.path.expanduser(cfg.get('work') or os.path.join(self.d, 'carve_work'))

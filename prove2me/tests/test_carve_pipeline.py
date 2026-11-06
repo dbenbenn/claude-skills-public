@@ -2308,6 +2308,19 @@ def test_slow_pieces_release_nothing_without_publish(env, monkeypatch):
     assert not any(l.startswith('systemd-run') for l in _raw(env))
 
 
+def test_the_pieces_a_bundle_waits_for_include_its_statements_proof_closure(env, monkeypatch):
+    # q153 (2026-11-06): a bundle imports a statement only once it is Proved, which needs every piece its
+    # piece imports too; taking only the bundles' own statements found 2 gate pieces of 694
+    plan = _overlap_carve(env, monkeypatch, pieces={'P0': (10, 30), 'P1': (40, 20), 'P2': (5, 5)})
+    plan['bundles'][1]['statements'] = ['P1']
+    plan['pieces']['P1']['imports'] = ['P0']
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure_pieces')
+    assert r.returncode == 0, r.stdout + r.stderr
+    first = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure' and '--only' in c['argv']][0]
+    assert sorted(first[first.index('--only') + 1].split(',')) == ['piece:P0', 'piece:P1']
+
+
 def test_pieces_that_bundles_wait_for_are_measured_and_released_first(env, monkeypatch):
     # q153 (2026-11-04): 114 of 241 bundles imported (directly or through others) 25 statements, which a
     # bundle may import only once Proved; their pieces were held until all 2,936 pieces were measured,
