@@ -68,6 +68,10 @@ class FakeApi:
     def theorem_id(self, name):
         return self.published.get(name)
 
+    def theorem_status(self, tid):
+        name = next((n for n, i in self.published.items() if i == tid), None)
+        return 'Proved' if name and name.replace('.', '_') in self.proved else 'Open'
+
     def existing(self, kind, name):
         """The live record under `name` (kind 'statement' or 'bundle'), or None. An item published
         by name without recorded text (`published`) reads as exactly ours; `foreign` holds someone
@@ -365,6 +369,53 @@ def test_a_bundle_importing_a_statement_waits_for_its_accepted_proof(split):
     r, s = run(cfg, api)
     assert s['live'] == len(r.items)
     assert api.posted.index(('verify', 'A.low_s2')) < api.posted.index(('def', 'XB001'))
+
+
+def test_proofs_have_their_own_slots(split):
+    # dbenbenn 2026-11-06: q153 sent 4 proofs at a time (one `jobs` pool for everything) with ~700 waiting
+    d, cfg = split
+    api = FakeApi(published={'A.top': 'TOP', 'XB000': 'id-XB000', 'XB001': 'id-XB001',
+                             'A.low_s2': 'id-A.low_s2', 'A.mid_s2': 'id-A.mid_s2'})
+    r = R.Runner(dict(cfg, jobs=1, piece_jobs=2), api, sleep=lambda s: None)
+    for n in ('A.low', 'A.mid'):
+        r.state['statement:' + n] = {'state': 'live', 'id': 'id-%s_s2' % n, 'history': {}}
+    r.state['bundle:ZZ'] = {'state': 'inflight', 'history': {}}      # the bundles' one slot is busy
+    r.submit(['piece:A.low', 'piece:A.mid', 'piece:A.top'])
+    assert [p for p in api.posted if p[0] == 'verify'] == [('verify', 'A.low_s2'), ('verify', 'A.mid_s2')]
+    assert R.PIECE_JOBS >= 16
+
+
+def test_a_bundle_waits_for_the_statement_proved_not_for_our_proof(split):
+    # q153 (2026-11-06): dphz had proved four statements that bundles import; our pieces stopped (settled, or
+    # refused by the live-proof guard) and the bundles waited on them until set live by hand
+    d, cfg = split
+    plan = json.loads(json.dumps(PLAN))
+    plan['bundles'][1]['statements'] = ['A.low']
+    (d / 'plan.json').write_text(json.dumps(plan))
+    (d / 'out' / 'lib' / 'Def_XB001.lean').write_text(
+        'import Mathlib\nimport Definitions.Def_XB000\nimport Theorems.Thm_A_low_s2\n\ndef XB001.k : Nat := 1\n')
+    api = FakeApi()
+    api.proofs['A.low_s2'] = [{'id': 'theirs', 'author': 'dphz', 'status': 'PENDING', 'content': 'x'}]
+    r, s = run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.low']['state'] == 'stop' and st.get('bundle:XB001', {}).get('state', 'todo') == 'todo'   # still Open
+    api.proved.add('A_low_s2')                                       # their proof was accepted
+    r, s = run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['bundle:XB001']['state'] == 'live' and st['piece:A.low']['state'] == 'stop'
+
+
+def test_a_settled_piece_whose_theorem_is_proved_is_done(split):
+    d, cfg = split
+    (d / 'comparisons').mkdir()
+    (d / 'comparisons' / 'A_low_s2.md').write_text('Same as theirs: the same Mathlib argument.\n')
+    api = FakeApi()
+    api.proofs['A.low_s2'] = [{'id': 'theirs', 'author': 'dphz', 'status': 'ACCEPTED', 'content': 'x'}]
+    api.proved.add('A_low_s2')
+    r, s = run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.low']['state'] == 'live' and st['piece:A.low']['last'].startswith('settled: Same as')
+    assert ('verify', 'A.low_s2') not in api.posted and not s['stopped']
 
 
 def test_a_statement_name_taken_by_a_different_statement_is_a_hard_stop(split):

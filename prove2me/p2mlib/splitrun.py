@@ -57,6 +57,10 @@ STALE_PENDING_HOURS = 3
 LOST_CAP = 2             # resends of a lost submission before giving up for a person
 RELEASE_OPEN_HOURS = 2   # an `open` release older than this is taken as final (its driver died)
 BATCH = 10
+PIECE_JOBS = 32          # proofs in flight at once (config `piece_jobs`), apart from `jobs` for bundles and statements:
+                         # a proof only queues on the verifier; dbenbenn 2026-11-06 ("no good reason to rate limit
+                         # proofs") after q153 sent 4 at a time with ~700 waiting
+PROVED_TTL = 600         # seconds a platform theorem status read for the bundle gate is reused
 
 
 def _ws(s):
@@ -251,11 +255,12 @@ class Runner:
             s = self.state.get(x, {}).get('state', 'todo')
             if s != 'todo' or x.split(':', 1)[0] not in self.kinds or self.held(x, rel):
                 continue
-            stopped = [d for d in self.deps[x] if self.state.get(d, {}).get('state') in TERMINAL]
+            stopped = [d for d in self.deps[x] if self.state.get(d, {}).get('state') in TERMINAL
+                       and not self.proved_on_platform(d)]
             if stopped:
                 self.blocked[x] = 'waits on stopped ' + ', '.join(stopped)
                 continue
-            if not all(self.live(d) for d in self.deps[x]):
+            if not all(self.live(d) or self.proved_on_platform(d) for d in self.deps[x]):
                 continue
             why = self.check(x)
             if why:
@@ -266,6 +271,31 @@ class Runner:
         # statements or pieces
         rank = {'bundle': 0, 'statement': 1, 'piece': 2}
         return sorted(out, key=lambda x: rank[x.split(':', 1)[0]])
+
+    def proved_on_platform(self, item):
+        """Is the statement of `item` (a piece another item waits for: a bundle importing its statement) Proved
+        on the platform although our proof did not go live: someone else's proof settled it (comparisons
+        "Same as", or the live-proof guard refused ours)? A bundle needs the statement Proved, not our proof
+        (q153, 2026-11-06: four bundles waited on pieces dphz had proved; they were set live by hand). Only
+        stopped pieces are looked up, each at most every PROVED_TTL seconds."""
+        if not item.startswith('piece:') or self.state.get(item, {}).get('state') not in TERMINAL:
+            return False
+        status = getattr(self.api, 'theorem_status', None)
+        if status is None:
+            return False
+        cache = self.__dict__.setdefault('_proved', {})
+        hit = cache.get(item)
+        if hit and self.clock() - hit[0] < PROVED_TTL:
+            return hit[1]
+        n = item.split(':', 1)[1]
+        tid = self.state.get('statement:' + n, {}).get('id') if n not in self.ext \
+            else self.api.theorem_id(self.info(item)['name'])
+        try:
+            ok = bool(tid) and status(tid) == 'Proved'
+        except Exception:
+            ok = False
+        cache[item] = (self.clock(), ok)
+        return ok
 
     def unsendable(self):
         """{item: why} for every item still to send (any wave, not only the ready ones) whose files are
@@ -492,18 +522,23 @@ class Runner:
         return sum(1 for s in self.state.values() if s.get('state') == 'inflight')
 
     def submit(self, items):
+        # bundles and statements share `jobs` slots; proofs have their own `piece_jobs` (PIECE_JOBS)
         jobs = self.cfg.get('jobs', 8)
-        room = jobs - self.inflight()
-        if self.max_items is not None:
-            room = min(room, self.max_items - self.sent)
-        if jobs >= 2 and any(not x.startswith('bundle:') for x in items):
-            # one slot stays for statements and pieces while any are ready: bundles go first, but q172 had
-            # four bundles cycling through cold-worker retries while 827 ready statements waited 5 hours
-            busy = sum(1 for x, s in self.state.items() if x.startswith('bundle:') and s.get('state') == 'inflight')
+        pjobs = self.cfg.get('piece_jobs', PIECE_JOBS)
+        busy_of = lambda pred: sum(1 for x, s in self.state.items() if s.get('state') == 'inflight' and pred(x))
+        pieces = [x for x in items if x.startswith('piece:')]
+        items = [x for x in items if not x.startswith('piece:')]
+        room = jobs - busy_of(lambda x: not x.startswith('piece:'))
+        if jobs >= 2 and any(x.startswith('statement:') for x in items):
+            # one slot stays for statements while any are ready: bundles go first, but q172 had four bundles
+            # cycling through cold-worker retries while 827 ready statements waited 5 hours
+            busy = busy_of(lambda x: x.startswith('bundle:'))
             nb = max(0, min(room, jobs - 1 - busy))
             bundles = [x for x in items if x.startswith('bundle:')]
             items = bundles[:nb] + [x for x in items if not x.startswith('bundle:')]
-        items = items[:max(room, 0)]
+        items = items[:max(room, 0)] + pieces[:max(pjobs - busy_of(lambda x: x.startswith('piece:')), 0)]
+        if self.max_items is not None:
+            items = items[:max(self.max_items - self.sent, 0)]
         self.sent += len(items)
         stmts = []
         for x in items:
@@ -580,7 +615,11 @@ class Runner:
                     ', '.join(st['lost']))]))
             if also.startswith('Same as'):
                 st.update(state='stop', last='settled: ' + also.split('\n')[0][:300], sha=self.file_sha(x))
-                self.log(x, 'settled', also.split('\n')[0][:200])
+                if self.proved_on_platform(x):
+                    # read, compared and Proved by the other proof: nothing is left for a person
+                    st['state'] = 'live'
+                self.log(x, 'settled', also.split('\n')[0][:200] + ('' if st['state'] == 'stop' else
+                                                                      ' (the theorem is Proved)'))
                 self.save()
                 return
             bad = self.disproved_imports(f['file'])
@@ -717,7 +756,7 @@ def mismatch_message(bad):
 
 class ReadOnly:
     """An API wrapper for dry runs: lookups pass through, every write raises."""
-    READS = ('theorem_id', 'existing', 'live_proofs', 'disproved')
+    READS = ('theorem_id', 'existing', 'live_proofs', 'disproved', 'theorem_status')
 
     def __init__(self, api):
         self._api = api
@@ -748,6 +787,11 @@ class LiveApi:
 
     def theorem_id(self, name):
         return self._api.theorem_id(name, call=self._call)
+
+    def theorem_status(self, tid):
+        """The platform's status of theorem `tid` ('Proved', 'Open', ...)."""
+        r = self._call('GET', '/theorems/%s' % tid)
+        return (r.get('theorem') or r).get('status') if isinstance(r, dict) else None
 
     def existing(self, kind, name):
         """The live statement or definitions bundle named exactly `name`: {id, author, preamble,
