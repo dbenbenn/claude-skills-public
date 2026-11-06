@@ -19,7 +19,10 @@
                  (137 MB import closure) failed so 22 times and were taken for timeouts. Retried
                  HIDDEN_CAP times, then a person looks.
   heartbeats     a deterministic heartbeat timeout: raise maxHeartbeats on that declaration.
-  dependency_oom FAILED "Failed to compile modules <imports>: ... Lean exited with code 137": the
+  dependency_oom "Lean exited with code 137" while building the imports ("Failed to compile modules") or the
+                 solution itself (ERROR "Failed to compile solution module: Failed to compile module <job>: ... code
+                 137"; q153 2026-11-06: a 49 s piece importing 586 MB, killed after 138 s): out of memory. Before
+                 that, FAILED "Failed to compile modules <imports>: ... Lean exited with code 137": the
                  worker was killed (out of memory) building the item's imported bundles, many heavy
                  ones in parallel. Unchanged retries failed alike (Eilenberg–Ganea 2026-10-25), but
                  on PlanarPacking (q152) siblings with the same import closure published: retried
@@ -53,7 +56,7 @@ _OWN = re.compile(r"Verification timed out|Failed to compile solution module: Mo
                   r"^Compilation timed out")
 _SOLUTION_BUILD = re.compile(r"^Failed to compile solution module: Failed to compile module ")
 _ERROR_LINE = re.compile(r"(?m)^(error: |\u2716 )")
-_DEP_OOM = re.compile(r"Failed to compile modules .*exited with code 137", re.S)
+_DEP_OOM = re.compile(r"Failed to compile modules? .*exited with code 137", re.S)
 _HEART = re.compile(r"\(deterministic\) timeout|maximum number of heartbeats")
 
 

@@ -51,6 +51,11 @@ CASES = [
     ('ERROR', 'Failed to compile solution module: Failed to compile module Submissions.Job_X_Sol: '
               '\u26a0 [1/2] Replayed Theorems.Thm_A\nwarning: Theorems/Thm_A.lean:3:6: declaration uses `sorry`\n'
               'error: Sol.lean:12:4: unknown identifier `foo`\nerror: build failed', 'compile_error'),
+    # q153 (2026-11-06): the solution's own build OOM-killed (a 586 MB import closure): retried, not a compile error
+    ('ERROR', 'Failed to compile solution module: Failed to compile module Submissions.Job_d825_Sol: \u26a0 [8709/8844] '
+              'Replayed Theorems.Thm_A\nwarning: Theorems/Thm_A.lean:15:6: declaration uses `sorry`\n'
+              '\u2716 [8844/8844] Building Submissions.Job_d825_Sol (138s)\nerror: Lean exited with code 137\n'
+              'Some required targets logged failures:\nerror: build failed', 'dependency_oom'),
     ('PUBLISHED', None, 'accepted'),
     (None, '<urlopen error [Errno -3] Temporary failure in name resolution>', 'transient'),
 ]
