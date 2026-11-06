@@ -102,3 +102,5 @@ def test_a_proof_out_of_memory_is_retried_longer_than_a_bundle():
     assert V.decide('dependency_oom', {'dependency_oom': V.DEPENDENCY_OOM_CAP}) == 'stop'
     assert V.decide('dependency_oom', {'dependency_oom': V.DEPENDENCY_OOM_CAP}, 'piece') == 'retry'
     assert V.decide('dependency_oom', {'dependency_oom': V.PIECE_OOM_CAP}, 'piece') == 'stop'
+    assert V.decide('hidden', {'hidden': V.HIDDEN_CAP}) == 'stop'
+    assert V.decide('hidden', {'hidden': V.HIDDEN_CAP}, 'piece') == 'retry'

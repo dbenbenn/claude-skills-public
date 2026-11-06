@@ -94,7 +94,8 @@ def decide(kind, history, item_kind=None):
     if kind == 'own_timeout':
         return 'retry' if n < OWN_TIMEOUT_CAP else 'split'
     if kind == 'hidden':
-        return 'retry' if n < HIDDEN_CAP else 'stop'
+        # a proof's hidden cause has been an OOM kill whenever the tail showed (q153): retried like one
+        return 'retry' if n < (PIECE_OOM_CAP if item_kind == 'piece' else HIDDEN_CAP) else 'stop'
     if kind == 'heartbeats':
         return 'raise_heartbeats'
     if kind == 'dependency_oom':
