@@ -1519,8 +1519,10 @@ def test_with_publish_bundles_and_statements_stream_to_the_publisher_as_they_are
     assert r.returncode == 0, r.stdout + r.stderr
     seq = [(c['tool'], c['argv']) for c in calls(env)]
     i = next(k for k, (t, a) in enumerate(seq) if t == 'carve_measure')
-    assert seq[i][1][:4] == ['config.json', '--keep-going', '--kinds', 'bundle,statement']
-    assert sorted(seq[i][1][5].split(',')) == ['bundle:B0', 'bundle:B1', 'statement:P0', 'statement:P1']
+    # proofs stream too, each behind its statement (dbenbenn 2026-11-07)
+    assert seq[i][1][:4] == ['config.json', '--keep-going', '--kinds', 'bundle,statement,piece']
+    assert sorted(seq[i][1][5].split(',')) == ['bundle:B0', 'bundle:B1', 'piece:P0', 'piece:P1',
+                                               'statement:P0', 'statement:P1']
     # the gates that read only the generated files run once the sample is measured, then the closing measure
     assert [(t, a[0]) for t, a in seq[i + 1:i + 5]] == [('carve_prep', 'publish-prep'), ('carve_prep', 'prose-template'),
                                                         ('carve_prep', 'check-text'), ('carve_measure', 'config.json')]
@@ -1530,6 +1532,7 @@ def test_with_publish_bundles_and_statements_stream_to_the_publisher_as_they_are
     i_close = _index(lines, lambda l: '"tool": "carve_measure"' in l and '"--only"' not in l)
     assert i_bg < i_close and 'split_run.py publish/run_stream.json --go' in lines[i_bg]
     assert 'released 4 bundle(s)/statement(s) (4 in all; a streaming publisher was started)' in r.stdout
+    assert 'released 2 piece(s) (2 in all; ' in r.stdout
     cfg = json.load(open(env.dir / 'config.json'))
     assert cfg['frozen']['bundles'] == ['B0', 'B1'] and set(cfg['template_forced']) == {'P0', 'P1'}
     st = json.load(open(env.dir / 'pipeline_state.json'))

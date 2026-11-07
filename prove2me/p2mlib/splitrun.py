@@ -215,7 +215,13 @@ class Runner:
                 return 'missing ' + p
         # the platform's soundness guard (WLTime 2026-10-23: `prelude` in a bundle, compile_error)
         from .leantext import guard_problems, guard_message
-        bad = guard_problems(open(f['file'], encoding='utf-8').read())
+        # the guard reads the whole file (0.08 s for a 650 KB bundle): once per file version, not every pass
+        # (q153: ready() spent 8 s a pass on 262 ready items)
+        key = (f['file'], os.path.getmtime(f['file']), os.path.getsize(f['file']))
+        cache = self.__dict__.setdefault('_guard', {})
+        if key not in cache:
+            cache[key] = guard_problems(open(f['file'], encoding='utf-8').read())
+        bad = cache[key]
         if bad:
             return 'the soundness guard would refuse %s: %s' % (os.path.basename(f['file']), guard_message(bad))
         text = open(f['text'], encoding='utf-8').read()

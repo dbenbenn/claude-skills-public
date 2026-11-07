@@ -32,7 +32,7 @@ OVERLAP_ONLY = ('publish_early', 'measure_pieces', 'calibrate_pieces', 'pieces_p
 DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
               'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags',
-              'overlap', 'unif_integrable', 'stream_bundles']
+              'overlap', 'unif_integrable', 'stream_bundles', 'stream_pieces']
 
 
 LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
@@ -1412,16 +1412,18 @@ class Pipeline:
         from . import carve as CV
         ext = set(plan.get('external') or ())
         live = self.live_items()
+        kinds = ('bundle', 'statement', 'piece') if self.p.get('stream_pieces', True) else ('bundle', 'statement')
         todo = [x for w in CV.publish_order(plan, ext)['waves'] for x in w
-                if x.split(':', 1)[0] in ('bundle', 'statement') and x not in live and x.split(':', 1)[1] not in ext]
+                if x.split(':', 1)[0] in kinds and x not in live and
+                not (x.startswith('statement:') and x.split(':', 1)[1] in ext)]
         batches = [todo[i:i + STREAM_BATCH] for i in range(0, len(todo), STREAM_BATCH)]
-        print('== measure: %d bundle(s) and statement(s) to measure in %d batch(es), each released as it passes'
-              % (len(todo), len(batches)), flush=True)
+        print('== measure: %d %s to measure in %d batch(es), each released as it passes'
+              % (len(todo), 'item(s)' if 'piece' in kinds else 'bundle(s) and statement(s)', len(batches)), flush=True)
         done, gates = set(), None
         for k, batch in enumerate(batches):
             try:
                 self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
-                                                    '--kinds', 'bundle,statement', '--only', ','.join(batch))])
+                                                    '--kinds', ','.join(kinds), '--only', ','.join(batch))])
             except StepFailed as e:
                 print('== measure: batch %d/%d had failures (reported at the end): %s'
                       % (k + 1, len(batches), str(e).splitlines()[0]), flush=True)
@@ -1431,6 +1433,11 @@ class Pipeline:
             gates = self.gates_result(gates)
             if gates is True and self.stream_sample_ready(plan, done | live):
                 why = self.release_items(done)
+                pieces = [x for x in batch if x.startswith('piece:')]
+                if pieces:
+                    # each proof right behind its statement (dbenbenn 2026-11-07: "rather than waiting until all
+                    # the bundles are live"); a slow or failed one stays for calibrate_pieces, as before
+                    why = '; '.join(w for w in (why, self.release_measured(pieces, gated=True)) if w)
             elif gates is False:
                 why = 'none released (a gate failed)'
             elif gates is True:
@@ -1442,7 +1449,11 @@ class Pipeline:
             gates = self.gates_result(self.stream_gates() if gates is None else gates, wait=True)
             if gates is True:
                 print('== measure: %s' % (self.release_items(done) or 'none released'), flush=True)
+                pieces = sorted(x for x in done if x.startswith('piece:'))
+                if pieces:
+                    print('== measure: %s' % (self.release_measured(pieces, gated=True) or 'no pieces released'), flush=True)
         # every bundle and statement once more, from the cache: the failures compile again and stop the step
+        # (a piece's stop measure_pieces, which finds the streamed ones measured)
         self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
                                             '--kinds', 'bundle,statement')])
         self.save()
@@ -1465,7 +1476,8 @@ class Pipeline:
                   % str(e).splitlines()[0], flush=True)
             return False
         log = os.path.join(self.d, 'logs', 'check_text.log')
-        cmd = self.tool('carve_prep', 'check-text', os.path.join(self.d, 'publish'), '--kinds', 'bundle,statement')
+        kinds = 'bundle,statement,piece' if self.p.get('stream_pieces', True) else 'bundle,statement'
+        cmd = self.tool('carve_prep', 'check-text', os.path.join(self.d, 'publish'), '--kinds', kinds)
         f = open(log, 'a')
         f.write('==== %s check_text (skill %s; beside the streaming measure)\n$ %s\n'
                 % (_now(), os.path.basename(self.snap), ' '.join(cmd)))
@@ -1702,7 +1714,7 @@ class Pipeline:
             self.publish_early_now()
         self.save()
 
-    def release_measured(self, items):
+    def release_measured(self, items, gated=False):
         """Release the pieces of `items` that measured ok within the limit to the background publisher, without
         the full pieces' gates (pieces_prep runs them before the final publish): each solution file goes to
         publish/out/solutions as measured, and publish/release.json, for this plan, lists them with `open`
@@ -1750,7 +1762,7 @@ class Pipeline:
         elif not (self.state.get('auto_config') or {}).get('frozen') or self.held_statements():
             how = 'no publisher yet (publish_early has not started one)'
         else:
-            self.start_publisher()
+            self.start_publisher(gated=gated)     # the streaming measure's: bundles stay gated
             how = 'a background publisher was started'
         return 'released %d piece(s) (%d in all; %s)' % (len(fast), len(pieces), how)
 
