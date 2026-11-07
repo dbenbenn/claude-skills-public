@@ -1553,6 +1553,20 @@ def test_check_text_runs_beside_the_measure_and_a_failure_releases_nothing(env, 
     assert 'beside the streaming measure' in (env.dir / 'logs' / 'check_text.log').read_text()
 
 
+def test_pieces_measured_while_check_text_runs_go_once_it_passes(env, monkeypatch):
+    # q153 (2026-11-07): only the batch measured when check_text passed released its pieces; those of the 25
+    # batches before waited for the end of measure
+    _overlap_carve(env, monkeypatch)
+    assert run(env, *ARGS_NEW, '--stop-after', 'config').returncode == 0
+    p = json.load(open(env.dir / 'pipeline.json'))
+    (env.dir / 'pipeline.json').write_text(json.dumps(dict(p, stream_batch=1)))
+    monkeypatch.setenv('STUB_HOOK_carve_measure_config_json', MEASURE_HOOK + "\nimport time; time.sleep(1)\n")
+    monkeypatch.setenv('STUB_HOOK_carve_prep_check_text', "import time; time.sleep(4.5)")
+    r = run(env, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    batch = [l for l in _stream_lines(r) if 'batch 6/6' in l]
+    assert batch and 'released 2 piece(s)' in batch[0], r.stdout
+
 def test_a_slow_bundle_stays_back_with_its_importers_while_the_rest_streams(env, monkeypatch):
     plan = _overlap_carve(env, monkeypatch, bundles={'B0': (55, 20), 'B1': (55, 200)})
     plan['stubs']['P1'] = {'bundles': ['B1']}

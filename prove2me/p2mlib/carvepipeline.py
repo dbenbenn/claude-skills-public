@@ -1416,7 +1416,8 @@ class Pipeline:
         todo = [x for w in CV.publish_order(plan, ext)['waves'] for x in w
                 if x.split(':', 1)[0] in kinds and x not in live and
                 not (x.startswith('statement:') and x.split(':', 1)[1] in ext)]
-        batches = [todo[i:i + STREAM_BATCH] for i in range(0, len(todo), STREAM_BATCH)]
+        n = int(self.p.get('stream_batch') or STREAM_BATCH)
+        batches = [todo[i:i + n] for i in range(0, len(todo), n)]
         print('== measure: %d %s to measure in %d batch(es), each released as it passes'
               % (len(todo), 'item(s)' if 'piece' in kinds else 'bundle(s) and statement(s)', len(batches)), flush=True)
         done, gates = set(), None
@@ -1433,7 +1434,8 @@ class Pipeline:
             gates = self.gates_result(gates)
             if gates is True and self.stream_sample_ready(plan, done | live):
                 why = self.release_items(done)
-                pieces = [x for x in batch if x.startswith('piece:')]
+                # every piece measured so far: those of batches measured while check_text ran go now too
+                pieces = sorted(x for x in done if x.startswith('piece:'))
                 if pieces:
                     # each proof right behind its statement (dbenbenn 2026-11-07: "rather than waiting until all
                     # the bundles are live"); a slow or failed one stays for calibrate_pieces, as before
