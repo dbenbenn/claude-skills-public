@@ -532,6 +532,20 @@ def test_a_split_piece_compiles(g, tmp_path):
     _compile_in_publish_order(g, Q, tmp_path)
 
 
+def test_an_oversize_pinned_group_is_cut_with_the_plans_own_chunker(g, monkeypatch):
+    # q153 (2026-11-07): the 92,000-table pinned group was cut by the scheduler even in a `closure` plan, and
+    # its mixed bundles left ~1,400 proofs importing 300+ MB; cut by need, 100 did
+    seen = []
+    real = C.chunk_bundles_closure
+    monkeypatch.setattr(C, 'chunk_bundles_closure', lambda *a, **k: seen.append(len(a[1])) or real(*a, **k))
+    pin = {'a': ['CD.Space.size', 'CD.Space.coord']}
+    p = C.make_plan(g, ['CD.main', 'CD.size_zero'], forced=['CD.size_zero'], budget=0.05, piece_size=10**6,
+                    bundle_budget=1.0, bundle_size=150, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='P', chunker='closure', pinned=pin)
+    assert seen and seen[0] == 4            # the pinned group's four declarations went through the closure chunker
+    assert C.check_plan(g, p) == []
+
+
 def test_pinning_refuses_what_is_not_bundle_material(g):
     with pytest.raises(C.CarveError, match='CD.double_succ'):
         _pinned_plan(g, [['CD.double_succ']])

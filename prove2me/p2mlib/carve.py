@@ -2202,7 +2202,12 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     cut = []
     for ch in pin_chunks:
         if len(ch) > 1 and (sum(g.nodes[k].size for k in ch) > bundle_size or sum(cost.get(k, 0.0) for k in ch) > bundle_budget):
-            cut += chunk_bundles_schedule(g, set(ch), cost, bundle_budget, bundle_size, (), extra)
+            # with the plan's own chunker: q153's 92,000-table group cut by the scheduler made bundles mixing
+            # unrelated tables, so ~1,400 proofs imported 300+ MB with chunker `closure` everywhere else
+            if chunker == 'closure':
+                cut += chunk_bundles_closure(g, set(ch), cost, bundle_budget, bundle_size, (), extra, closure_slack)
+            else:
+                cut += chunk_bundles_schedule(g, set(ch), cost, bundle_budget, bundle_size, (), extra)
         else:
             cut.append(ch)
     pin_chunks = cut
