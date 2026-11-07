@@ -1,8 +1,10 @@
 // The top of the page: the at-a-glance tiles (machine and quota in one row), the Needs-you card (everything
 // waiting for a person, gathered from status.json, agents.json and missions.json) and the Missions-in-flight
-// card (missions.json, written by the mission tracker; its buttons post to /request).
+// card (missions.json, written by the mission tracker; its buttons post to /request), and the Hand-offs card
+// (handoffs.json, written by tools/handoff; its buttons post to /request with kind 'handoff').
 // Globals used: esc, fmtAt, ago, last, agentsData, sparkSvg, queueLi, store.
 let missionsData = null;
+let handoffsData = null;
 const GLANCE_SPAN = 3 * 3600;
 
 function tileHtml({label, value, sub, href, level, spark, title}){
@@ -66,6 +68,10 @@ function drawNeeds(){
     const cur = m.steps.find(s => s.state === 'blocked' || s.state === 'failed') || m.steps.find(s => s.state !== 'done');
     if (m.waits === 'you') rows.push({text: `<a href="#m-${esc(m.key)}">${esc(m.title)}</a>: ${esc(cur.detail || cur.title)}`, tag: 'mission'});
     else if (m.waits === 'start') rows.push({text: `<a href="#m-${esc(m.key)}">${esc(m.title)}</a>: ${esc(cur.title)} is ready to start`, tag: 'mission'});
+  }
+  for (const h of (handoffsData && handoffsData.handoffs) || []) {
+    if (['stalled', 'failed', 'blocked'].includes(h.state)) rows.push({text: `<a href="#ho-${esc(h.key)}">${esc(h.title)}</a>: ${esc(h.detail)}`, tag: 'hand-off'});
+    else if (h.state === 'ready' && !h.auto) rows.push({text: `<a href="#ho-${esc(h.key)}">${esc(h.title)}</a>: the wait is over; its wrap-up is ready to start`, tag: 'hand-off'});
   }
   for (const s of last.sections || []) {
     for (const a of s.alerts || []) rows.push({text: `<a href="${hrefFor(isLive(s), 'h-' + s.id)}">${esc(carveView(s).title)}</a>${s.state === 'running' ? '' : ' (' + esc(s.state) + ')'}: <span class="atext">${esc(a)}</span>`, tag: 'alert'});
@@ -168,3 +174,80 @@ document.addEventListener('click', async e => {
 });
 
 loadMissions(); setInterval(loadMissions, 30000);
+
+// ---- Hand-offs ----
+// An agent whose remaining work is a long wait hands it to tools/handoff and exits; the service watches
+// the units (no tokens) and this card offers the wrap-up agent once they end.
+const HO_BADGE = {waiting: ['WAITING', ''], stalled: ['STALLED', 'warn'], ready: ['READY TO START', 'ready'],
+                  running: ['CLAUDE WORKING', 'running'], failed: ['WRAP-UP FAILED', 'warn'],
+                  blocked: ['WAITING FOR YOU', 'warn'], done: ['DONE', 'done']};
+const hoClicks = {};
+
+function handoffCard(h){
+  const [btxt, bcls] = HO_BADGE[h.state] || [h.state, ''];
+  const click = hoClicks[h.key];
+  const busy = click && !(h.pending && click.rid && h.pending.rid === click.rid);
+  const label = h.state === 'ready' ? 'Start wrap-up' : h.state === 'stalled' ? 'Send a Claude to look' : 'Retry wrap-up';
+  const agentLink = n => `<a href="/page/agent.html?name=${encodeURIComponent(n)}">${esc(n)}</a>`;
+  const units = Object.entries(h.units || {}).map(([u, a]) => `<code>${esc(u)}</code> ${a ? 'running' : 'ended'}`).join(' · ');
+  const res = h.pending && h.pending.result ? `<p class="mres${/^failed/.test(h.pending.result) ? ' bad' : ''}">Last ${esc(h.pending.action)} ${esc(fmtAt(h.pending.at))}: ${esc(h.pending.result)}</p>` : '';
+  const prog = h.progress_age != null ? ` · progress file changed ${esc(ago(h.progress_age))}` : '';
+  return `<article class="ms" id="ho-${esc(h.key)}">
+    <div class="mhead"><span class="mt">${esc(h.title)}</span><span class="badge ${bcls}">${esc(btxt)}</span>
+      <span class="mbtns">
+        ${h.state !== 'done' ? `<button class="btn" data-key="${esc(h.key)}" data-act="check"${busy ? ' disabled' : ''}>${busy && click.action === 'check' ? 'Checking…' : 'Check now'}</button>` : ''}
+        ${h.startable ? `<button class="btn primary" data-key="${esc(h.key)}" data-act="start"${busy ? ' disabled' : ''}>${busy && click.action === 'start' ? 'Starting…' : esc(label)}</button>` : ''}
+      </span></div>
+    <p class="hod">${esc(h.detail)}</p>
+    ${res}
+    <p class="meta">${units || 'no units'}${prog}${h.log_line ? ' · log: <code>' + esc(h.log_line) + '</code>' : ''}</p>
+    <p class="meta">${h.from ? 'handed off by ' + agentLink(h.from) : ''}${h.agent ? ' · wrap-up ' + agentLink(h.agent) : ''}
+      ${h.section ? ` · <a href="/#h-${esc(h.section)}">live progress</a>` : ''}${h.auto ? ' · starts by itself' : ''}
+      ${h.repo ? ' · records <code>' + esc(h.repo.replace(/^\/home\/[^/]+/, '~')) + '</code>' : ''}
+      · checked ${h.checked ? esc(ago(Math.round(Date.now()/1000 - h.checked))) : 'never'}</p>
+  </article>`;
+}
+
+function drawHandoffs(){
+  const el = document.getElementById('handoffs'), sub = document.getElementById('handoffs-sub');
+  if (!el) return;
+  const D = handoffsData;
+  if (!D || !D.updated) { sub.textContent = 'The hand-off service has not written anything yet (handoff.service).'; el.innerHTML = ''; return; }
+  const stale = Date.now()/1000 - D.updated > 600;
+  if (VIEW === 'done') sub.textContent = 'Hand-offs whose wrap-up is done; each leaves this list 3 days later.';
+  else sub.innerHTML = (stale ? `<b class="warntxt">The hand-off service last wrote ${esc(ago(Math.round(Date.now()/1000 - D.updated)))}: is handoff.service running?</b> ` : '') +
+    `Long waits a headless agent handed over before exiting, so no Claude is woken just to read a status line. The units are checked every ${Math.round((D.every || 60) / 60)} min (no tokens); ` +
+    'when they end, Start runs a fresh wrap-up agent (subscription), which marks the hand-off done.';
+  const L = D.handoffs.filter(h => (h.state === 'done') === (VIEW === 'done'));
+  el.innerHTML = L.length ? L.map(handoffCard).join('') : `<p class="empty">${VIEW === 'main' ? 'Nothing handed off.' : 'No hand-off finished in the last 3 days.'}</p>`;
+}
+
+async function loadHandoffs(){
+  try { handoffsData = await (await fetch('/handoffs.json?' + Date.now())).json(); } catch (e) { return; }
+  keepScroll(() => { drawHandoffs(); drawNeeds(); });
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('#handoffs button[data-act]');
+  if (!b) return;
+  const key = b.dataset.key, action = b.dataset.act;
+  if (action === 'start' && !confirm(`Start a headless Claude agent (on the subscription) to wrap up ${key}?`)) return;
+  hoClicks[key] = {action};
+  keepScroll(drawHandoffs);
+  try {
+    const r = await fetch('/request', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Monitor-Request': '1'}, body: JSON.stringify({action, key, kind: 'handoff'})});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    hoClicks[key].rid = j.queued;
+  } catch (err) { delete hoClicks[key]; alert('The request failed: ' + err.message); drawHandoffs(); return; }
+  for (let i = 0; i < 30; i++) {
+    await new Promise(res => setTimeout(res, 2000));
+    await loadHandoffs();
+    const h = (handoffsData.handoffs || []).find(x => x.key === key);
+    if (h && h.pending && h.pending.rid === hoClicks[key].rid) break;
+  }
+  delete hoClicks[key];
+  keepScroll(drawHandoffs);
+});
+
+loadHandoffs(); setInterval(loadHandoffs, 30000);

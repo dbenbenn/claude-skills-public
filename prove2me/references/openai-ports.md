@@ -316,6 +316,14 @@ and new `carve.py` inside one carve. So:
   `--wait` reports only its own run (never while the unit is active, and it says when the run had already
   ended); `--detach` refuses at once with exit 3, naming the pid and command line of a driver that holds the
   carve: stop that one or wait for it (oaiq-084; 1a4f175).
+- **Do not wait on a publisher for days** (2026-11-07): each wake of a `--wait` re-reads the agent's whole
+  context, since prompt caching does not outlive a 100-minute wait. q172 woke every 115 min for two days to
+  read "N statements live. Re-arming.", at ~$2.80 a wake (336k tokens re-cached). The driver's own
+  `carve-<hash>` section already shows the publish live. So once only waiting is left (step `publish` waiting
+  for its publisher, or hours of statements and pieces), commit the records, write a self-contained wrap-up
+  brief, hand the wait to the machine's hand-off service if it has one (the brief names it), and exit. A
+  fresh agent with a small context does the wrap-up when the units end. Keep `--wait` for build and
+  measuring, where a failure needs you soon.
 - **The carve's own section on the monitoring page** (2026-10-30): the driver publishes `carve-<hash>` (the
   unit's hash; p2mlib.carvemonitor) with the current step, steps done, modules built, items measured of planned,
   items live of the plan and its processes, refreshed every minute and at each step boundary, and marks it done

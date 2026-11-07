@@ -177,3 +177,18 @@ def test_missions_route_and_requests(server, tmp_path, monkeypatch):
     assert post(base, '/request', b'{' + b' ' * 2000 + b'}')[0] == 413
     assert post(base, '/status.json', {'action': 'check', 'key': 'gm'})[0] == 404
     assert len(list((home / 'requests').iterdir())) == 2
+
+
+def test_handoffs_route_and_requests(server, tmp_path, monkeypatch):
+    base, _ = server
+    home = tmp_path / 'home'
+    home.mkdir()
+    monkeypatch.setattr(M.State, 'home', str(home))
+    assert json.loads(get(base, '/handoffs.json')[1]) == {'handoffs': []}
+    (home / 'handoffs.json').write_text('{"handoffs": [{"key": "q172-mutually-unbiased-retry"}], "updated": 5}')
+    assert json.loads(get(base, '/handoffs.json')[1])['handoffs'][0]['key'] == 'q172-mutually-unbiased-retry'
+    # a hand-off click goes to its own directory, never the mission tracker's (which drops unknown keys)
+    s, r = post(base, '/request', {'action': 'start', 'key': 'q172-mutually-unbiased-retry', 'kind': 'handoff'})
+    assert s == 202
+    assert len(list((home / 'handoff-requests').iterdir())) == 1 and not (home / 'requests').exists()
+    assert post(base, '/request', {'action': 'start', 'key': 'gm', 'kind': 'shell'})[0] == 400

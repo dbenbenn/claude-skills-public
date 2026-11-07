@@ -151,7 +151,7 @@ The main page has two more cards (their order is in "Page layout" below):
 `/` and `/page/<name>.html` (= `www/<name>.html`), any other `www/` path with extension .js .css .html .svg .png
 .ico (plain path segments only, nothing resolving outside `www/`), `/status.json` (now with `quota.series` rows
 `[t, 5h %, 5h resetsAt, 7d %, 7d resetsAt]`), `/agents.json` (running / recent / hidden; cached 5 s) and
-`/agent/<name>/<file>[?from=N&max=M]` where file is one of transcript.jsonl, state.json, usage.json, meta.json,
+`/missions.json`, `/handoffs.json`, `POST /request` (below), `/agent/<name>/<file>[?from=N&max=M]` where file is one of transcript.jsonl, state.json, usage.json, meta.json,
 brief.md. The agent route is read-only: the name must be a plain directory name that is not a symlink, the file
 must resolve inside that directory, responses are capped at 512 KiB. For transcripts `from` is a byte offset
 (negative = from the end) and the reply holds whole lines only, with `X-Start`, `X-End`, `X-Size` headers: poll
@@ -171,9 +171,10 @@ person", so the page reads top-down by what wants attention (`www/glance.js`, `w
    section files, the OAI queue's need-a-person groups, and the inboxes (which had their own box
    above the nav before). "Nothing needs you right now" when empty.
 3. **Missions in flight** (below).
-4. **Headless agents**: queue tiles (the need-a-person tile links to Needs you), the running agents;
+4. **Hand-offs** (below): long waits a headless agent handed over before exiting.
+5. **Headless agents**: queue tiles (the need-a-person tile links to Needs you), the running agents;
    the finished ones fold into a `<details>` whose open state the browser remembers.
-5. The work-in-progress sections, then the detailed **System resources**, **Disk** and **Quota** cards.
+6. The work-in-progress sections, then the detailed **System resources**, **Disk** and **Quota** cards.
 
 **Missions in flight.** `GET /missions.json` serves `MONITOR_HOME/missions.json`, written by the mission
 tracker (`~/claude/claude-private/tools/mission-tracker`, user unit `mission-tracker.service`; its README
@@ -186,6 +187,17 @@ content type (a cross-site form can send neither without a preflight this server
 body of at most 1 KiB, and an `Origin`, when present, naming this host (`post_request`, tested in
 `test_server.py`). The page then polls `/missions.json` until the mission's `pending.rid` matches the
 id the POST returned (a phone's clock may differ from the box's).
+
+**Hand-offs** (2026-11-07). `GET /handoffs.json` serves `MONITOR_HOME/handoffs.json`, written by the hand-off
+service (`~/claude/claude-private/tools/handoff`, user unit `handoff.service`; its README has the states). An
+agent whose remaining work is only waiting (a carve's publisher with days to go) registers the units it waits on
+and exits, so no Claude is woken to read a status line (q172 paid ~$2.80 a wake re-caching 336k tokens, ~$67 in
+two days). One card per hand-off: state badge, the units and the log line it watches, links to the agents and to
+the live `carve-<hash>` section, and **Check now** / **Start wrap-up** (or Retry, or "Send a Claude to look" when
+stalled). Its buttons `POST /request` with `kind: "handoff"`, which the monitor writes to
+`MONITOR_HOME/handoff-requests/` instead of `requests/` (the mission tracker drops keys it does not know; same
+checks as above). Stalled, failed, blocked and ready-but-not-`--auto` hand-offs are listed under Needs you;
+done ones move to the Finished page.
 
 **Finished page** `/page/done.html` (2026-11-05, dbenbenn: "move completed tasks into a linked subpage"): the
 headless agents that ended in the last 24 h, the done and failed sections (they expire after a day), and the

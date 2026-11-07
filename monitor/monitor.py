@@ -702,7 +702,9 @@ def agents_body(now=None):
 
 
 REQUEST_ACTIONS = ('check', 'start')
-REQUEST_KEY = re.compile(r'^[a-z0-9][a-z0-9-]{0,30}$')
+REQUEST_KEY = re.compile(r'^[a-z0-9][a-z0-9-]{0,39}$')
+# which service a click is for -> the directory it reads (each service removes what it reads)
+REQUEST_DIRS = {'mission': 'requests', 'handoff': 'handoff-requests'}
 
 
 def missions_body():
@@ -714,10 +716,20 @@ def missions_body():
         return b'{"missions": []}'
 
 
+def handoffs_body():
+    """MONITOR_HOME/handoffs.json as written by the hand-off service (claude-private/tools/handoff),
+    or an empty list when none runs."""
+    try:
+        return open(os.path.join(State.home, 'handoffs.json'), 'rb').read()
+    except OSError:
+        return b'{"handoffs": []}'
+
+
 def post_request(headers, body):
-    """(status, reply) for POST /request: queue {action, key} for the mission tracker as a file in
-    MONITOR_HOME/requests/. The page never runs anything itself; the tracker validates the key against
-    its missions and decides. Only same-origin script requests pass: a custom header (which a
+    """(status, reply) for POST /request: queue {action, key} as a file for the service `kind` names:
+    the mission tracker (MONITOR_HOME/requests/, the default) or the hand-off service
+    (MONITOR_HOME/handoff-requests/). The page never runs anything itself; the service validates the
+    key against its own records and decides. Only same-origin script requests pass: a custom header (which a
     cross-site form cannot send without a preflight this server never answers), a JSON body, a small
     one, and an Origin, when sent, naming this host."""
     if headers.get('X-Monitor-Request') != '1' or not (headers.get('Content-Type') or '').startswith('application/json'):
@@ -731,9 +743,10 @@ def post_request(headers, body):
         r = json.loads(body)
     except ValueError:
         return 400, {'error': 'bad json'}
-    if not isinstance(r, dict) or r.get('action') not in REQUEST_ACTIONS or not REQUEST_KEY.match(str(r.get('key', ''))):
-        return 400, {'error': 'want {action: check|start, key}'}
-    d = os.path.join(State.home, 'requests')
+    if not isinstance(r, dict) or r.get('action') not in REQUEST_ACTIONS or not REQUEST_KEY.match(str(r.get('key', ''))) \
+            or r.get('kind', 'mission') not in REQUEST_DIRS:
+        return 400, {'error': 'want {action: check|start, key, kind?: mission|handoff}'}
+    d = os.path.join(State.home, REQUEST_DIRS[r.get('kind', 'mission')])
     os.makedirs(d, exist_ok=True)
     rid = '%d-%s' % (time.time_ns(), r['key'])
     save_json(os.path.join(d, rid + '.json'), {'action': r['action'], 'key': r['key'], 'at': int(time.time())})
@@ -772,6 +785,8 @@ class Handler(BaseHTTPRequestHandler):
                 body = agents_body()
             elif path == '/missions.json':
                 body = missions_body()
+            elif path == '/handoffs.json':
+                body = handoffs_body()
             elif path.startswith('/agent/'):
                 code, body, ctype, extra = agent_file(path, query)
             elif path.startswith('/inbox/'):
