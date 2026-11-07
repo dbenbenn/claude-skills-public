@@ -53,6 +53,11 @@ SYSTEMATIC_FRACTION = 0.25   # bundles over the limit: a systematic cost-model e
 MAX_BUNDLE_SPLITS = 3   # rounds of splitting single slow bundles before a person looks
 MAX_PIECE_SPLITS = 2    # local splits of one piece (carve.py split-piece) before a person looks
 STREAM_BATCH = 64       # pieces measured per carve_measure run while streaming them to the publisher
+IMPORT_LIMIT = 160e6    # .olean bytes an item may import (its measured closure_bytes). q153 (2026-11-06): all 609
+                        # accepted proofs imported <= 148 MB; above, the verifier's workers ran out of memory ("Lean
+                        # exited with code 137"; ~55% of first tries passed at 300-600 MB, retries 1 in 5), and
+                        # bundles importing 584 MB took 17 tries. The proofs used ~2% of what they imported: the
+                        # schedule chunker's top bundles mixed unrelated declarations (chunker `closure` groups by need)
 STATEMENT_SHARE = 0.5   # a slow piece whose statement alone compiles in this share of its time is slow
                         # by its type (oaiq-075: 316 s of 328 in .olean serialization): no split helps
 BUNDLE_OWN_LIMIT = 80   # s local: an unpublished bundle over this is split (or excused), even under budget x 1.6.
@@ -121,6 +126,20 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
     new_scale = round(min(MAX_SCALE, max(scale * 1.1, scale * ratio)), 1) if over else scale
     return {'over': over, 'ratio': ratio, 'new_scale': new_scale, 'limit': limit, 'bundle_limit': blimit,
             'measured': measured, 'slowest': slowest, 'statements_over': statements_over, 'excused': excused}
+
+
+def heavy_imports(plan, times, skip=(), kinds=('bundle', 'statement', 'piece')):
+    """[(item, MB)] of the plan's items (not in `skip`: published) whose measured import closure is over IMPORT_LIMIT,
+    heaviest first."""
+    items = []
+    if 'bundle' in kinds:
+        items += [('bundle:' + b['name'], b['name']) for b in plan.get('bundles') or ()]
+    if 'statement' in kinds:
+        items += [('statement:' + n, n) for n in plan.get('stubs') or {} if n not in set(plan.get('external') or ())]
+    if 'piece' in kinds:
+        items += [('piece:' + n, n) for n in plan.get('pieces') or {}]
+    out = [(key, (times.get(key) or {}).get('closure_bytes') or 0) for key, name in items if name not in skip]
+    return sorted(((k, b / 1e6) for k, b in out if b > IMPORT_LIMIT), key=lambda x: -x[1])
 
 
 def measured_chains(plan, times, skip=()):
@@ -1701,6 +1720,15 @@ class Pipeline:
                           accepted=self.p.get('accept_over') or ())
         lines = self.calibrate_head(cfg, res, 'bundles and statements: ') + self.chain_warnings(plan, times, res, fz)
         log = os.path.join(self.d, 'logs', 'calibrate.log')
+        heavy = heavy_imports(plan, times, fz, kinds=('bundle', 'statement'))
+        if heavy and not self.p.get('accept_heavy_imports'):
+            self.calibrate_log(lines + ['  imports over %.0f MB: %s %.0f MB' % (IMPORT_LIMIT / 1e6, x, mb) for x, mb in heavy])
+            raise StepFailed(
+                "step 'calibrate': %d bundle(s)/statement(s) import more than %.0f MB of .olean, where the verifier's "
+                "workers run out of memory (q153): %s. Every proof importing them pays the same. Usually a bundle mixes "
+                "unrelated declarations: re-plan with config_set `chunker`: \"closure\" (and a smaller `closure_slack`), "
+                "or split the heavy bundle; pipeline.json `accept_heavy_imports`: true publishes as is. Log %s"
+                % (len(heavy), IMPORT_LIMIT / 1e6, ', '.join('%s (%.0f MB)' % x for x in heavy[:10]), log))
         if res['statements_over']:
             self.calibrate_log(lines + ['  statement over: %s measured %.0f s' % x for x in res['statements_over']])
             raise StepFailed(self.STATEMENT_OVER_MSG % (
@@ -1838,6 +1866,12 @@ class Pipeline:
         res = calibration(part, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), live,
                           accepted=self.p.get('accept_over') or ())
         lines = self.calibrate_head(cfg, res, 'pieces: ')
+        heavy = heavy_imports(plan, times, live, kinds=('piece',))
+        if heavy:
+            lines.append('WARNING %d piece(s) import more than %.0f MB (the verifier may run out of memory; a split does '
+                         'not shrink imports, regrouping the bundles does): %s' % (
+                             len(heavy), IMPORT_LIMIT / 1e6, ', '.join('%s %.0f MB' % x for x in heavy[:5])))
+            print('calibrate_pieces: ' + lines[-1], file=sys.stderr, flush=True)
         log = os.path.join(self.d, 'logs', 'calibrate.log')
         server = {n: k for n, k in self.server_split_wanted().items() if n in (plan.get('pieces') or {})}
         if not res['over'] and not server:

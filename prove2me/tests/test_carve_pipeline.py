@@ -1559,6 +1559,22 @@ def test_a_slow_piece_is_split_alone_without_a_replan(env, monkeypatch):
     assert 'lemma_P0' in json.load(open(env.dir / 'config.json'))['forced']
 
 
+def test_a_bundle_importing_too_much_stops_before_publishing(env, monkeypatch):
+    # q153 (2026-11-06): proofs and bundles importing more than ~150 MB ran out of memory on the verifier
+    _overlap_carve(env, monkeypatch)
+    times = json.load(open(env.dir / 'carve_work' / 'times.orig.json'))
+    times['bundle:B1'] = dict(times['bundle:B1'], closure_bytes=600e6)
+    (env.dir / 'carve_work' / 'times.orig.json').write_text(json.dumps(times))
+    (env.dir / 'carve_work' / 'times.json').write_text(json.dumps(times))
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1 and "step 'calibrate'" in r.stderr and 'bundle:B1 (600 MB)' in r.stderr
+    assert 'chunker' in r.stderr and not any(l.startswith('systemd-run') for l in _raw(env))
+    p = json.load(open(env.dir / 'pipeline.json'))
+    (env.dir / 'pipeline.json').write_text(json.dumps(dict(p, accept_heavy_imports=True)))
+    r = run(env, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
 def test_split_piece_by_hand_splits_before_the_run_resumes(env, monkeypatch):
     # q153: four pieces failed on the verifier with the cause cut off (verdicts `hidden`); a person splits them
     _overlap_carve(env, monkeypatch)
