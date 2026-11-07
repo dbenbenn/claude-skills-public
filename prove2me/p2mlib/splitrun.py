@@ -470,19 +470,29 @@ class Runner:
                 out.write('\n'.join(lines))
         return True
 
+    def _fetch_all(self, fn, args):
+        """[fn(a) for a in args], RECONCILE_THREADS at once (each a few seconds of HTTP; q153: with ~45 jobs in
+        flight, polling and the lookups before posting one by one held a pass to minutes)."""
+        if len(args) < 2:
+            return [fn(a) for a in args]
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=RECONCILE_THREADS) as pool:
+            return list(pool.map(fn, args))
+
     def poll(self):
-        for x in self.items:
-            st = self.state.get(x)
-            if not st or st['state'] != 'inflight':
+        live_now = [(x, self.state[x]) for x in self.items
+                    if self.state.get(x) and self.state[x].get('state') == 'inflight']
+        recs = self._fetch_all(lambda xs: self.api.job(xs[1]['job']) if 'job' in xs[1] else self.api.verdict(xs[1]['sid']),
+                               live_now)
+        for (x, st), rec in zip(live_now, recs):
+            if st.get('state') != 'inflight':
                 continue
             if 'job' in st:
-                rec = self.api.job(st['job'])
                 if rec.get('status') in FINAL_JOB:
                     self._result(x, rec, 'publish')
                 else:
                     self._check_lost_job(x, st)
             else:
-                rec = self.api.verdict(st['sid'])
                 if rec.get('status') and rec.get('status') != 'PENDING':
                     rec.setdefault('submission_id', st['sid'])
                     self._result(x, rec, 'verdict')
@@ -573,6 +583,14 @@ class Runner:
             items = items[:max(self.max_items - self.sent, 0)]
         self.sent += len(items)
         stmts = []
+        # the name lookup each bundle and statement gets before it is posted (_submit_one), all at once
+        look = [x for x in items if not x.startswith('piece:')]
+        def lookup(x):
+            try:
+                return self.api.existing(x.split(':', 1)[0], self.info(x)['name'])
+            except Exception as e:                   # raised again in _submit_one, whose handler retries it
+                return e
+        self._prefetched = dict(zip(look, self._fetch_all(lookup, look)))
         for x in items:
             try:
                 self._submit_one(x, stmts)
@@ -603,7 +621,10 @@ class Runner:
     def _submit_one(self, x, stmts):
         f, st = self.info(x), self.st(x)
         if f['kind'] in ('bundle', 'statement'):
-            rec = self.api.existing(f['kind'], f['name'])
+            pre = getattr(self, '_prefetched', {})
+            rec = pre.pop(x) if x in pre else self.api.existing(f['kind'], f['name'])
+            if isinstance(rec, Exception):
+                raise rec
             if rec:
                 text = open(f['file'], encoding='utf-8').read()
                 if same_as_ours(f['kind'], rec, text):      # ours from an earlier run: adopt it
