@@ -1538,6 +1538,18 @@ def test_with_publish_bundles_and_statements_stream_to_the_publisher_as_they_are
     assert rel['items'] == 'all' and rel['pieces'] == 'all' and not rel['open']
 
 
+def test_check_text_runs_beside_the_measure_and_a_failure_releases_nothing(env, monkeypatch):
+    # q153: check_text took 22 min over 4,592 items before the first release; it now runs in the background
+    _overlap_carve(env, monkeypatch)
+    monkeypatch.setenv('STUB_FAIL', 'carve_prep check-text')
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1 and "step 'check_text'" in r.stderr, r.stdout + r.stderr
+    assert any('check_text failed' in l for l in _stream_lines(r)), r.stdout
+    assert not any(l.startswith('systemd-run') for l in _raw(env))
+    assert not (env.dir / 'publish' / 'release.json').exists()
+    assert 'beside the streaming measure' in (env.dir / 'logs' / 'check_text.log').read_text()
+
+
 def test_a_slow_bundle_stays_back_with_its_importers_while_the_rest_streams(env, monkeypatch):
     plan = _overlap_carve(env, monkeypatch, bundles={'B0': (55, 20), 'B1': (55, 200)})
     plan['stubs']['P1'] = {'bundles': ['B1']}

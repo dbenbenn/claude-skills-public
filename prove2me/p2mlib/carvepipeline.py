@@ -1426,15 +1426,21 @@ class Pipeline:
                 print('== measure: batch %d/%d had failures (reported at the end): %s'
                       % (k + 1, len(batches), str(e).splitlines()[0]), flush=True)
             done |= set(batch)
-            if gates is None and self.stream_sample_ready(plan, done | live):
+            if gates is None:
                 gates = self.stream_gates()
-            why = self.release_items(done) if gates else ('none released yet (the first %d bundles are measured '
-                                                          'first)' % STREAM_SAMPLE if gates is None else
-                                                          'none released (a gate failed)')
+            gates = self.gates_result(gates)
+            if gates is True and self.stream_sample_ready(plan, done | live):
+                why = self.release_items(done)
+            elif gates is False:
+                why = 'none released (a gate failed)'
+            elif gates is True:
+                why = 'none released yet (the first %d bundles are measured first)' % STREAM_SAMPLE
+            else:
+                why = 'none released yet (check_text runs)'
             print('== measure: batch %d/%d measured; %s' % (k + 1, len(batches), why or 'none released'), flush=True)
-        if gates is None and todo:
-            gates = self.stream_gates()
-            if gates:
+        if todo:
+            gates = self.gates_result(self.stream_gates() if gates is None else gates, wait=True)
+            if gates is True:
                 print('== measure: %s' % (self.release_items(done) or 'none released'), flush=True)
         # every bundle and statement once more, from the cache: the failures compile again and stop the step
         self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
@@ -1447,16 +1453,41 @@ class Pipeline:
         return sum(1 for n in names if 'bundle:' + n in done) >= min(STREAM_SAMPLE, len(names))
 
     def stream_gates(self):
-        """publish_prep, prose and check_text on the whole plan (they read the generated files, not the
-        times), so that measured items can go. False when one fails: the measure goes on releasing nothing,
-        and the step itself stops later as it would have."""
+        """publish_prep and prose on the whole plan now (they read the generated files, not the times; seconds),
+        and check_text started beside the measure (q153: 22 min over 4,592 items, which held the first release
+        back): returns its Popen, which gates_result follows. False when one fails: the measure goes on
+        releasing nothing, and the step itself stops later as it would have."""
         try:
             self.step_publish_prep()
             self.step_prose()
-            self.step_check_text()
         except StepFailed as e:
             print('== measure: not streaming to the publisher, a gate failed (its step stops later): %s'
                   % str(e).splitlines()[0], flush=True)
+            return False
+        log = os.path.join(self.d, 'logs', 'check_text.log')
+        cmd = self.tool('carve_prep', 'check-text', os.path.join(self.d, 'publish'), '--kinds', 'bundle,statement')
+        f = open(log, 'a')
+        f.write('==== %s check_text (skill %s; beside the streaming measure)\n$ %s\n'
+                % (_now(), os.path.basename(self.snap), ' '.join(cmd)))
+        f.flush()
+        proc = subprocess.Popen(cmd, cwd=self.d, env=self.env(), stdout=f, stderr=subprocess.STDOUT)
+        proc._log = (f, log)
+        return proc
+
+    def gates_result(self, gates, wait=False):
+        """True or False once the background check_text (stream_gates) has ended, else the process itself."""
+        if not isinstance(gates, subprocess.Popen):
+            return gates
+        rc = gates.wait() if wait else gates.poll()
+        if rc is None:
+            return gates
+        f, log = gates._log
+        if rc:
+            f.write('(exit %d)\n' % rc)
+        f.close()
+        if rc:
+            print('== measure: not streaming to the publisher, check_text failed (its step stops later); log %s'
+                  % log, flush=True)
             return False
         return True
 
