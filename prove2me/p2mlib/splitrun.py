@@ -59,6 +59,7 @@ RAISED_HEARTBEATS = 1000000
 STALE_PENDING_HOURS = 3
 LOST_CAP = 2             # resends of a lost submission before giving up for a person
 RELEASE_OPEN_HOURS = 2   # an `open` release older than this is taken as final (its driver died)
+RECONCILE_THREADS = 8    # platform lookups at once when a run starts (reconcile)
 BATCH = 10
 PIECE_JOBS = 32          # proofs in flight at once (config `piece_jobs`), apart from `jobs` for bundles and statements:
                          # a proof only queues on the verifier; dbenbenn 2026-11-06 ("no good reason to rate limit
@@ -340,30 +341,44 @@ class Runner:
                     and not self.held(x, rel))
             if n:
                 self.note('reconcile', 'looking up %d items not yet live on the platform before sending anything '
-                          '(a few seconds each)' % n)
+                          '(a few seconds each, %d at once)' % (n, RECONCILE_THREADS))
+        todo = []
         for x in self.items:
-            kind = x.split(':', 1)[0]
             if self.state.get(x, {}).get('state') in ('live', 'inflight') or self.held(x, rel):
                 continue
             f = self.info(x)
-            if not os.path.exists(f['file']):
+            if not os.path.exists(f['file']) or (x.startswith('piece:') and proofs is None):
                 continue
+            todo.append((x, f))
+
+        def look(xf):
+            x, f = xf
+            if x.startswith('piece:'):
+                lost = set(self.state.get(x, {}).get('lost', []))
+                return [r for r in proofs(f['name']) if r.get('id') not in lost]
+            return self.api.existing(x.split(':', 1)[0], f['name'])
+
+        # each lookup is a few seconds of HTTP: RECONCILE_THREADS at once (q153, 2026-11-07: a restart of the
+        # publisher with 1,800 released items unsent would have looked them up one by one for over an hour)
+        if len(todo) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=RECONCILE_THREADS) as pool:
+                found = list(pool.map(look, todo))
+        else:
+            found = [look(xf) for xf in todo]
+        for (x, f), rec in zip(todo, found):
+            kind = x.split(':', 1)[0]
             if kind == 'piece':
                 # our exact source already live is adopted; someone else's live proof is reported
                 # (a run's post_verify refuses the item then, for a person to compare)
-                if proofs is None:
-                    continue
                 text = _ws(open(f['file'], encoding='utf-8').read())
-                lost = set(self.state.get(x, {}).get('lost', []))
-                rows = [r for r in proofs(f['name']) if r.get('id') not in lost]
-                mine = [r for r in rows if _ws(r.get('content')) == text]
+                mine = [r for r in rec if _ws(r.get('content')) == text]
                 if mine:
                     adopted[x] = mine[0]['id']
-                elif rows:
+                elif rec:
                     self.proved_elsewhere[x] = ['%s (%s, %s)' % (r.get('id'), r.get('status'), r.get('author') or '?')
-                                                for r in rows]
+                                                for r in rec]
                 continue
-            rec = self.api.existing(kind, f['name'])
             if not rec:
                 continue
             text = open(f['file'], encoding='utf-8').read()
