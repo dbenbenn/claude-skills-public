@@ -466,7 +466,16 @@ and new `carve.py` inside one carve. So:
     the background publisher keeps waiting for more while it is open and under 2 h old), so verifier feedback
     arrives within the hour. The pieces bundles wait for and those of held (new) statements go first; held
     statements are published as soon as their pieces pass. A closing full `carve_measure` (cached) reports
-    failures as before.
+    failures as before. Since 2026-11-07 `measure` streams the bundles and statements the same way (dbenbenn:
+    "we could catch problems earlier"; q153's re-carve measured 4,592 of them for ~6 h first): batches in publish
+    order; after the first `STREAM_SAMPLE` (20) bundles, `publish_prep`, `prose` and `check_text` run once (they
+    read only the generated files), and each batch's items within calibration's limits (and the 160 MB import
+    limit unless `accept_heavy_imports`) whose own bundles and statements went first are frozen as they go
+    (`published/plan.json` holds only those, `pipeline_state.json` `streamed_stubs` the plan's statements) and
+    listed in `release.json` `items` for the streaming publisher (`publish/run_stream.json`, `gate_items`). A
+    systematic overrun while nothing is published releases nothing (calibrate re-plans); a slow or heavy item
+    stays back with its importers for calibrate to split alone; `publish_early` sets `items: "all"`.
+    `--no-stream-bundles` (pipeline.json `stream_bundles: false`) keeps the old order.
   - **Switching a classic carve** that has not published (oaiq-081, 2026-10-29): wait for its driver to end (`--wait`),
     add `"overlap": true` to `pipeline.json`, then `carve_pipeline.py DIR --upgrade --keep-port --publish --detach`.
     A finished `measure` stands (one that failed re-runs for bundles and statements, all cached), the plan is

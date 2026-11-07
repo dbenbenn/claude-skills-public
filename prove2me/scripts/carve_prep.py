@@ -36,7 +36,8 @@ usage:
   carve_prep.py publish-prep DIR SOURCE TAG[,TAG...] [--sync]
       DIR/publish/: out/ and work/{plan,order,times}.json copied, run.json,
       run_{1_bundles,2_statements,3_pieces}.json and run_early.json (run.json with the pieces gated
-      by publish/release.json, which is removed: carve_pipeline's overlap mode) for split_run.py,
+      by publish/release.json, which is removed: carve_pipeline's overlap mode), run_stream.json
+      (run_early.json with the bundles and statements gated too: carve_pipeline's streaming measure) for split_run.py,
       MANIFEST.sha1; prose/ and explanations/ created empty (written by hand). --sync, for a publish/
       a publisher may be reading: nothing is removed, each new or changed file is replaced
       atomically, and when a bundle or statement file of publish/out/lib that is published or being
@@ -470,9 +471,7 @@ def publish_prep(d, source, tags, sync=False):
                      'They are published or being published, so they are frozen: undo what changed them (a '
                      'carve patch must not touch a bundle or statement once it publishes; a re-plan keeps '
                      'them with config `frozen` and `forced`). Nothing was written.' % (len(drift), ', '.join(drift[:20])))
-        # no piece is sent while files change under it: the pipeline releases them again after its checks
-        if os.path.exists(release):
-            os.remove(release)
+        writes = []
         for sub in ('lib', 'solutions'):
             src, dst = os.path.join(d, 'out', sub), os.path.join(P, 'out', sub)
             os.makedirs(dst, exist_ok=True)
@@ -480,7 +479,16 @@ def publish_prep(d, source, tags, sync=False):
                 data = open(os.path.join(src, f), 'rb').read()
                 q = os.path.join(dst, f)
                 if not os.path.exists(q) or open(q, 'rb').read() != data:
-                    _atomic_write(q, data)
+                    writes.append((q, data))
+        old_plan = os.path.join(P, 'plan.json')
+        same_plan = os.path.exists(old_plan) and \
+            open(old_plan, 'rb').read() == open(os.path.join(d, 'work', 'plan.json'), 'rb').read()
+        # nothing is sent while files change under it: the pipeline releases it again after its checks. A
+        # sync that changes nothing keeps the release (the streaming publisher goes on: carve_pipeline)
+        if (writes or not same_plan) and os.path.exists(release):
+            os.remove(release)
+        for q, data in writes:
+            _atomic_write(q, data)
     else:
         if os.path.exists(release):
             os.remove(release)
@@ -506,6 +514,10 @@ def publish_prep(d, source, tags, sync=False):
     # wait for release.json, written for this plan once they are measured and checked
     _atomic_write(os.path.join(P, 'run_early.json'), json.dumps(dict(base, release=release), indent=1,
                                                                 ensure_ascii=False))
+    # with --publish, bundles and statements stream too: each goes once measured and calibrated, as
+    # release.json `items` lists it (dbenbenn 2026-11-07: catch problems earlier)
+    _atomic_write(os.path.join(P, 'run_stream.json'), json.dumps(dict(base, release=release, gate_items=True),
+                                                                 indent=1, ensure_ascii=False))
     files = sorted('out/lib/' + f for f in os.listdir(os.path.join(P, 'out', 'lib'))) + \
         sorted('out/solutions/' + f for f in os.listdir(os.path.join(P, 'out', 'solutions')))
     import hashlib

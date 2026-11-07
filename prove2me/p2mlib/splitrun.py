@@ -29,7 +29,10 @@ looked up, blocked nor counted unsendable, until the file `release` names says {
 plan file, "pieces": "all" | [item, ...]} for the plan this run loaded (re-read every pass, so a
 running publisher picks the release up; a release written for another plan releases nothing, since
 a re-planned piece may import a statement this run does not know). With nothing left to send but
-held pieces, the run ends.
+held pieces, the run ends. With `gate_items` in the config (carve_pipeline streaming the bundles and
+statements as they are measured, publish/run_stream.json), bundles and statements are held the same
+way until the release's `items` ("all" | [item, ...]) lists them; a missing release, or one for
+another plan, holds them all.
 
 The platform is an object with `theorem_id(name)`, `existing(kind, name)` (the live statement or
 bundle under that name: adopted only when its text is ours, whitespace aside, else the item stops
@@ -115,6 +118,7 @@ class Runner:
         self.sent = 0
         self.plan_sha = hashlib.sha1(open(cfg['plan'], 'rb').read()).hexdigest()
         self._released = None
+        self._items = 'all'      # the bundles and statements the gate lets go (released(), with `gate_items`)
         self._restart_changed()
 
     def file_sha(self, item):
@@ -160,9 +164,13 @@ class Runner:
     # ------------------------------------------------------------------ the piece gate
     def released(self):
         """The pieces the gate lets go: 'all', a set of items, or None (pieces held). Without a
-        `release` in the config every piece goes."""
+        `release` in the config every piece goes. With `gate_items`, the bundles and statements it lets
+        go are set aside in self._items the same way (held() reads them); without, all of them."""
         path = self.cfg.get('release')
+        gate = bool(self.cfg.get('gate_items'))
+        self._items = None if gate else 'all'
         if not path:
+            self._items = 'all'
             return 'all'
         try:
             r = json.load(open(os.path.expanduser(path), encoding='utf-8'))
@@ -170,12 +178,15 @@ class Runner:
             return None
         if not isinstance(r, dict) or r.get('plan_sha') != self.plan_sha:
             return None
+        if gate:
+            self._items = 'all' if r.get('items') == 'all' else set(r.get('items') or ())
         return 'all' if r.get('pieces') == 'all' else set(r.get('pieces') or ())
 
     def held(self, item, rel=None):
-        if not item.startswith('piece:'):
-            return False
         rel = self.released() if rel is None else rel
+        if not item.startswith('piece:'):
+            it = self._items
+            return not (it == 'all' or (it and item in it))
         return not (rel == 'all' or (rel and item in rel))
 
     # ------------------------------------------------------------------ items and their files
@@ -690,8 +701,8 @@ class Runner:
         return self.summary()
 
     def release_open(self):
-        """Is the piece release for this plan still growing (carve_pipeline's streaming measure_pieces writes
-        `open`), with pieces still held? Not when the file is older than RELEASE_OPEN_HOURS: a driver that
+        """Is the release for this plan still growing (carve_pipeline's streaming measure and measure_pieces
+        write `open`), with items still held? Not when the file is older than RELEASE_OPEN_HOURS: a driver that
         died must not keep the publisher waiting."""
         path = self.cfg.get('release')
         if not path:

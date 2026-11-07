@@ -3,7 +3,8 @@
 
 usage: carve_pipeline.py DIR [parameters] [--stop-after STEP] [--from STEP] [--redo STEP ...]
                          [--publish] [--upgrade | --snapshot REV] [--allow-dirty] [--list] [--detach]
-                         [--overlap | --no-overlap] [--keep-port] [--claim-folder] [--forget-publishing]
+                         [--overlap | --no-overlap] [--no-stream-bundles] [--keep-port] [--claim-folder]
+                         [--forget-publishing]
        carve_pipeline.py DIR --wait [MINUTES]
 
 DIR is the carve directory. The first run needs the parameters, which are stored in DIR/pipeline.json
@@ -93,7 +94,16 @@ resumes (dbenbenn 2026-11-06: q153's four slow pieces got a frozen global re-pla
 pieces and cost a day of measuring). With --publish, measure_pieces streams: batches of STREAM_BATCH pieces, each
 batch's fit pieces released at once (publish/release.json `open`; the background publisher waits for more while
 it is), the pieces bundles or held statements wait for first. Without --publish the pieces are measured all the
-same and nothing is posted.
+same and nothing is posted. With --publish, measure streams too (dbenbenn 2026-11-07, "we could catch problems
+earlier"): the bundles and statements are measured in batches in publish order; once STREAM_SAMPLE bundles are
+measured, publish_prep, prose and check_text run (they read only the generated files), and after each batch every
+bundle and statement measured within the limits (calibration's; the import limit unless accept_heavy_imports)
+whose own bundles and statements went before it is frozen as it goes (published/plan.json holds only those;
+config `frozen`) and released (publish/release.json `items`) to a streaming publisher, split_run.py
+publish/run_stream.json --go, which holds every bundle and statement not listed. A systematic overrun while
+nothing is published releases nothing, so calibrate can still re-plan; a slow item stays back with its importers
+for calibrate to split alone; publish_early then releases everything (`items`: "all"). Statements a later split
+adds wait for their pieces as before. --no-stream-bundles (pipeline.json "stream_bundles": false) turns it off.
 After any re-plan of a published carve: `plan` (and publish_prep, pieces_prep, for a re-plan by hand) compares
 the plan with publish/plan.json and stops when a live piece is re-shaped into new statements only live pieces
 would import (Open orphans: a live piece is never sent again without publish/comparisons/<slug>.md), and notes a
@@ -181,6 +191,7 @@ def parse(argv):
     ap.add_argument('--measure-flag', action='append', dest='measure_flags')
     ap.add_argument('--overlap', action='store_true', default=None)
     ap.add_argument('--no-overlap', action='store_false', dest='overlap')
+    ap.add_argument('--no-stream-bundles', action='store_false', dest='stream_bundles', default=None)
     ap.add_argument('--stop-after', choices=C.STEPS)
     ap.add_argument('--from', dest='frm', choices=C.STEPS)
     ap.add_argument('--redo', action='append', choices=C.STEPS, default=[])

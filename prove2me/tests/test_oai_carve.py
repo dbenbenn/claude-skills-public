@@ -581,6 +581,37 @@ def test_publish_prep_sync_updates_pieces_and_adds_items_but_never_changes_a_pub
     assert CP.published_drift(str(tmp_path / 'out' / 'lib'), str(P / 'out' / 'lib')) == ['Def_A.lean']
 
 
+def test_publish_prep_writes_the_streaming_run_and_a_sync_that_changes_nothing_keeps_the_release(tmp_path):
+    # carve_pipeline's streaming measure syncs publish/ while its publisher sends what was released: a sync
+    # that changes no file and not the plan must not take the release away (that publisher would stop)
+    P = _prep_dir(tmp_path)
+    CP.publish_prep(str(tmp_path), 'src', ['t'])
+    stream = json.load(open(P / 'run_stream.json'))
+    assert stream['gate_items'] is True and stream['release'] == str(P / 'release.json')
+    assert 'gate_items' not in json.load(open(P / 'run_early.json'))
+    (P / 'release.json').write_text('{"plan_sha": "x", "items": ["bundle:A"]}')
+    CP.publish_prep(str(tmp_path), 'src', ['t'], sync=True)
+    assert (P / 'release.json').exists()
+    (tmp_path / 'out/solutions/Sol_S.lean').write_text('p2')
+    CP.publish_prep(str(tmp_path), 'src', ['t'], sync=True)
+    assert not (P / 'release.json').exists()
+
+
+def test_the_streaming_publisher_locks_only_what_it_was_released(tmp_path):
+    import hashlib
+    from p2mlib import carvepipeline as CPL
+    P = _prep_dir(tmp_path)
+    CP.publish_prep(str(tmp_path), 'src', ['t'])
+    assert CPL.locked_files(str(tmp_path), running=True) == {'Def_A.lean', 'Thm_S.lean'}   # a plain publisher
+    (tmp_path / 'pipeline_state.json').write_text(json.dumps({'steps': {}, 'publisher': {'gated': True}}))
+    assert CPL.locked_files(str(tmp_path), running=True) == set()                       # nothing released
+    sha = hashlib.sha1((P / 'plan.json').read_bytes()).hexdigest()
+    (P / 'release.json').write_text(json.dumps({'plan_sha': sha, 'items': ['bundle:A']}))
+    assert CPL.locked_files(str(tmp_path), running=True) == {'Def_A.lean'}
+    (P / 'release.json').write_text(json.dumps({'plan_sha': sha, 'items': 'all'}))
+    assert CPL.locked_files(str(tmp_path), running=True) == {'Def_A.lean', 'Thm_S.lean'}
+
+
 def test_publish_prep_sync_lets_files_no_publisher_was_given_change(tmp_path, monkeypatch):
     # oaiq-122 (2026-10-30): publish/out/lib kept 227 statement files of an automatic split's plan the
     # publisher never sent; a later re-plan reusing 9 of their names was refused ("published or being

@@ -52,6 +52,7 @@ STUB = textwrap.dedent('''
             for f in os.listdir(os.path.join(d, 'out', 'lib')):
                 shutil.copy(os.path.join(d, 'out', 'lib', f), os.path.join(d, 'publish', 'out', 'lib', f))
         open(os.path.join(d, 'publish', 'run_early.json'), 'w').write('{}')
+        open(os.path.join(d, 'publish', 'run_stream.json'), 'w').write('{}')
     if NAME == 'carve' and sys.argv[1] == 'split-piece':
         # carve.py split-piece: each node's lemma_<node> becomes a statement of its own
         _pp = os.path.join(os.getcwd(), 'carve_work', 'plan.json')
@@ -1479,7 +1480,7 @@ def test_overlap_measures_and_checks_bundles_and_statements_before_the_pieces(en
 
 def test_with_publish_bundles_and_statements_go_in_the_background_before_the_pieces_are_measured(env, monkeypatch):
     plan = _overlap_carve(env, monkeypatch)
-    r = run(env, *ARGS_NEW, '--publish')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     lines = _raw(env)
     i_bg = _index(lines, lambda l: l.startswith('systemd-run'))
@@ -1501,6 +1502,81 @@ def test_with_publish_bundles_and_statements_go_in_the_background_before_the_pie
     assert rel['plan_sha'] == hashlib.sha1((env.dir / 'publish' / 'plan.json').read_bytes()).hexdigest()
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert st['publisher']['unit'].startswith('carve-pub-') and st['steps']['publish_early']['status'] == 'done'
+
+
+# ---------------------------------------------------------------- streaming bundles and statements (2026-11-07)
+# dbenbenn: "streaming bundles is a good idea, as we could catch problems earlier ... At worst, frozen just
+# means we have to use a different name". q153's re-carve measured 1,699 bundles and 2,893 statements for
+# ~6 h before sending one.
+
+def _stream_lines(r):
+    return [l for l in r.stdout.splitlines() if l.startswith('== measure: ')]
+
+
+def test_with_publish_bundles_and_statements_stream_to_the_publisher_as_they_are_measured(env, monkeypatch):
+    _overlap_carve(env, monkeypatch)
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = [(c['tool'], c['argv']) for c in calls(env)]
+    i = next(k for k, (t, a) in enumerate(seq) if t == 'carve_measure')
+    assert seq[i][1][:4] == ['config.json', '--keep-going', '--kinds', 'bundle,statement']
+    assert sorted(seq[i][1][5].split(',')) == ['bundle:B0', 'bundle:B1', 'statement:P0', 'statement:P1']
+    # the gates that read only the generated files run once the sample is measured, then the closing measure
+    assert [(t, a[0]) for t, a in seq[i + 1:i + 5]] == [('carve_prep', 'publish-prep'), ('carve_prep', 'prose-template'),
+                                                        ('carve_prep', 'check-text'), ('carve_measure', 'config.json')]
+    assert seq[i + 4][1] == ['config.json', '--keep-going', '--kinds', 'bundle,statement']
+    lines = _raw(env)
+    i_bg = _index(lines, lambda l: l.startswith('systemd-run'))
+    i_close = _index(lines, lambda l: '"tool": "carve_measure"' in l and '"--only"' not in l)
+    assert i_bg < i_close and 'split_run.py publish/run_stream.json --go' in lines[i_bg]
+    assert 'released 4 bundle(s)/statement(s) (4 in all; a streaming publisher was started)' in r.stdout
+    cfg = json.load(open(env.dir / 'config.json'))
+    assert cfg['frozen']['bundles'] == ['B0', 'B1'] and set(cfg['template_forced']) == {'P0', 'P1'}
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['streamed_stubs'] == ['P0', 'P1'] and st['publishing_started']
+    rel = json.load(open(env.dir / 'publish' / 'release.json'))
+    assert rel['items'] == 'all' and rel['pieces'] == 'all' and not rel['open']
+
+
+def test_a_slow_bundle_stays_back_with_its_importers_while_the_rest_streams(env, monkeypatch):
+    plan = _overlap_carve(env, monkeypatch, bundles={'B0': (55, 20), 'B1': (55, 200)})
+    plan['stubs']['P1'] = {'bundles': ['B1']}
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    rel = json.load(open(env.dir / 'publish' / 'release.json'))
+    assert rel['items'] == ['bundle:B0', 'statement:P0'] and rel['open']
+    # only what went is frozen: calibrate may split B1 alone, and its importer P1 with it
+    cfg = json.load(open(env.dir / 'config.json'))
+    assert cfg['frozen']['bundles'] == ['B0'] and set(cfg['template_forced']) == {'P0'}
+    pub = json.load(open(env.dir / 'published' / 'plan.json'))
+    assert [b['name'] for b in pub['bundles']] == ['B0'] and list(pub['stubs']) == ['P0']
+    from p2mlib import carvepipeline as CPL
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['publisher']['gated'] is True
+    assert CPL.released_lib_files(str(env.dir)) == {'Def_B0.lean', 'Thm_P0.lean'}
+
+
+def test_a_systematic_overrun_streams_nothing_so_calibrate_can_replan(env, monkeypatch):
+    _overlap_carve(env, monkeypatch, bundles={'B%d' % k: (55, 200) for k in range(4)})
+    r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert any('systematic' in l for l in _stream_lines(r)), r.stdout
+    assert not any(l.startswith('systemd-run') for l in _raw(env))
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert 'auto_config' not in st and 'publishing_started' not in st
+
+
+def test_a_bundle_importing_too_much_is_not_streamed(env, monkeypatch):
+    _overlap_carve(env, monkeypatch)
+    times = json.load(open(env.dir / 'carve_work' / 'times.orig.json'))
+    times['bundle:B1'] = dict(times['bundle:B1'], closure_bytes=600e6)
+    (env.dir / 'carve_work' / 'times.orig.json').write_text(json.dumps(times))
+    (env.dir / 'carve_work' / 'times.json').write_text(json.dumps(times))
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 1 and "step 'calibrate'" in r.stderr and 'bundle:B1 (600 MB)' in r.stderr
+    rel = json.load(open(env.dir / 'publish' / 'release.json'))
+    assert 'bundle:B1' not in rel['items'] and 'bundle:B0' in rel['items']
 
 
 def test_publish_early_freezes_only_the_plans_bundles_and_statements(env, monkeypatch):
@@ -1541,7 +1617,7 @@ def test_a_slow_piece_is_split_alone_without_a_replan(env, monkeypatch):
     # re-plan this used to get (cost_factors) changed ~2,000 other pieces of q153; the piece is split alone
     # (carve.py split-piece), gen is not re-run, and only the split piece and its new statement are measured
     _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)}, seq=[{}] * 6 + [{'piece:P0': _t(40), 'piece:lemma_P0': _t(5)}])
-    r = run(env, *ARGS_NEW, '--publish')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert [x['new'] for x in st['piece_splits']['P0']] == [['lemma_P0']] and st['auto_split']['P0']['secs'] == 192
@@ -1566,7 +1642,7 @@ def test_a_bundle_importing_too_much_stops_before_publishing(env, monkeypatch):
     times['bundle:B1'] = dict(times['bundle:B1'], closure_bytes=600e6)
     (env.dir / 'carve_work' / 'times.orig.json').write_text(json.dumps(times))
     (env.dir / 'carve_work' / 'times.json').write_text(json.dumps(times))
-    r = run(env, *ARGS_NEW, '--publish')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 1 and "step 'calibrate'" in r.stderr and 'bundle:B1 (600 MB)' in r.stderr
     assert 'chunker' in r.stderr and not any(l.startswith('systemd-run') for l in _raw(env))
     p = json.load(open(env.dir / 'pipeline.json'))
@@ -1598,7 +1674,7 @@ def test_a_slow_piece_is_measured_again_before_its_automatic_split(env, monkeypa
     # split only if it is still slow
     _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)},
                    seq=[{}, {}, {}, {'piece:P0': _t(3)}])
-    r = run(env, *ARGS_NEW, '--publish')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert st['remeasured'] == {'P0': 192} and not st.get('piece_splits')
@@ -1642,7 +1718,7 @@ def test_a_piece_the_verifier_timed_out_on_is_split_alone_once_per_stop(env, mon
 def test_a_piece_still_slow_after_its_automatic_split_stops_for_a_person(env, monkeypatch):
     _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)},
                    seq=[{}] * 6 + [{'piece:P0': _t(180), 'piece:lemma_P0': _t(5)}])
-    r = run(env, *ARGS_NEW, '--publish')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 1
     assert "step 'calibrate_pieces'" in r.stderr and 'still over after an automatic split' in r.stderr
     assert 'accept_over' in r.stderr and '--split-piece' in r.stderr
@@ -2033,7 +2109,7 @@ def test_publish_early_refuses_a_publish_dir_without_run_early(env, monkeypatch)
     # publisher would die at once and the pieces' gate would never open early
     _overlap_carve(env, monkeypatch)
     monkeypatch.setenv('STUB_HOOK_carve_prep_publish_prep', "os.remove(os.path.join(sys.argv[2], 'publish', 'run_early.json'))")
-    r = run(env, *ARGS_NEW, '--publish')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 1 and 'run_early.json' in r.stderr and '--redo publish_prep' in r.stderr, r.stdout + r.stderr
     assert not any(l.startswith('systemd-run') for l in _raw(env))
     assert 'auto_config' not in json.load(open(env.dir / 'pipeline_state.json'))
@@ -2294,7 +2370,7 @@ def test_a_slow_piece_that_stops_for_a_person_holds_back_only_itself(env, monkey
     # The pieces within budget go through the pieces' gates and are released to a background publisher;
     # the slow one waits for the person.
     _overlap_carve(env, monkeypatch, pieces={'P0': (10, 150), 'P1': (40, 30), 'P2': (40, 100)}, stimes={'P0': 80})
-    r = run(env, *ARGS_NEW, '--publish')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 1, r.stdout + r.stderr
     assert "step 'calibrate_pieces'" in r.stderr and 'the type is the cost' in r.stderr
     assert 'released' in r.stderr and 'piece:P1' in r.stderr and 'piece:P2' in r.stderr
@@ -2316,7 +2392,7 @@ def test_a_slow_piece_that_stops_for_a_person_holds_back_only_itself(env, monkey
 
 def test_slow_pieces_release_nothing_without_publish(env, monkeypatch):
     _overlap_carve(env, monkeypatch, pieces={'P0': (10, 150), 'P1': (40, 30)}, stimes={'P0': 80})
-    assert run(env, *ARGS_NEW, '--publish', '--stop-after', 'publish_early').returncode == 0
+    assert run(env, *ARGS_NEW, '--no-stream-bundles', '--publish', '--stop-after', 'publish_early').returncode == 0
     env.log.write_text('')
     r = run(env)
     assert r.returncode == 1 and "step 'calibrate_pieces'" in r.stderr, r.stdout + r.stderr
@@ -2331,7 +2407,7 @@ def test_the_pieces_a_bundle_waits_for_include_its_statements_proof_closure(env,
     plan['bundles'][1]['statements'] = ['P1']
     plan['pieces']['P1']['imports'] = ['P0']
     (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
-    r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure_pieces')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish', '--stop-after', 'measure_pieces')
     assert r.returncode == 0, r.stdout + r.stderr
     first = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure' and '--only' in c['argv']][0]
     assert sorted(first[first.index('--only') + 1].split(',')) == ['piece:P0', 'piece:P1']
@@ -2421,7 +2497,7 @@ def test_a_split_leaves_live_pieces_and_their_lemmas_alone(env, monkeypatch):
     plan = _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30), 'P2': (40, 30)},
                           seq=[{}] * 6 + [{'piece:P0': _t(40), 'piece:lemma_P0': _t(5)}])
     _run_state(env, {'piece:P1': 'live', 'piece:P2': 'stop'})
-    r = run(env, *ARGS_NEW, '--publish')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     new = json.load(open(env.dir / 'carve_work' / 'plan.json'))
     assert new['pieces']['P1'] == plan['pieces']['P1'] and new['pieces']['P2'] == plan['pieces']['P2']
@@ -2448,7 +2524,7 @@ def _reshape_live_p1(plan, also_p0=False):
 
 def test_a_replan_that_leaves_a_new_statement_only_live_pieces_import_stops_before_publishing(env, monkeypatch):
     plan = _overlap_carve(env, monkeypatch)
-    assert run(env, *ARGS_NEW, '--publish', '--stop-after', 'publish_early').returncode == 0
+    assert run(env, *ARGS_NEW, '--no-stream-bundles', '--publish', '--stop-after', 'publish_early').returncode == 0
     _run_state(env, {'piece:P1': 'live'})
     monkeypatch.setenv('STUB_HOOK_carve_plan', PLAN_HOOK)
     monkeypatch.setenv('STUB_PLAN_JSON', json.dumps(_reshape_live_p1(plan)))
@@ -2492,7 +2568,7 @@ def test_new_statements_of_a_split_wait_until_their_pieces_are_measured(env, mon
     # q160: new statements go only once their pieces passed the CoeT check; streaming measures those
     # pieces first, so they go after one batch instead of after every piece
     _overlap_carve(env, monkeypatch, pieces={'P0': (10, 192), 'P1': (40, 30)}, seq=[{}] * 6 + [{'piece:P0': _t(40), 'piece:lemma_P0': _t(5)}])
-    r = run(env, *ARGS_NEW, '--publish')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     lines = _raw(env)
     split = _index(lines, lambda l: '"split-piece"' in l)
@@ -2516,7 +2592,7 @@ def test_new_statements_of_a_split_whose_pieces_fail_are_never_posted(env, monke
             print('piece:lemma_P0 FAIL: the verifier rejects this universe-polymorphic statement: its CoeT fallback')
             sys.exit(1)
     ''') + MEASURE_HOOK)
-    r = run(env, *ARGS_NEW, '--publish')
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 1 and "step 'measure_pieces'" in r.stderr, r.stdout + r.stderr
     lines = _raw(env)
     split = _index(lines, lambda l: '"split-piece"' in l)

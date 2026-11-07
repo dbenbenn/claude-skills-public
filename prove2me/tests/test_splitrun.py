@@ -751,6 +751,29 @@ def test_a_release_for_another_plan_releases_nothing(split):
     assert [p for p in api2.posted if p[0] == 'verify'] == [('verify', 'A.low_s2')]
 
 
+def test_gated_bundles_and_statements_wait_for_the_items_release(split):
+    # carve_pipeline streams the bundles and statements as they are measured (dbenbenn 2026-11-07):
+    # with `gate_items` (publish/run_stream.json) one goes only once release.json `items` lists it
+    import hashlib
+    d, cfg = split
+    gated = dict(cfg, release=str(d / 'release.json'), gate_items=True)
+    api = FakeApi()
+    r, summary = run(gated, api)
+    assert not api.posted and summary['held'] == 7               # no release: everything held
+    sha = hashlib.sha1((d / 'plan.json').read_bytes()).hexdigest()
+    (d / 'release.json').write_text(json.dumps({'plan_sha': sha, 'items': ['bundle:XB000', 'statement:A.low']}))
+    api = FakeApi()
+    run(gated, api)
+    assert sorted(api.posted) == [('def', 'XB000'), ('thm', 'A.low_s2')]
+    (d / 'release.json').write_text(json.dumps({'plan_sha': sha, 'items': 'all', 'pieces': ['piece:A.low']}))
+    api2 = FakeApi(published=dict(api.published))
+    r, summary = run(gated, api2)
+    assert ('def', 'XB001') in api2.posted and ('thm', 'A.mid_s2') in api2.posted
+    assert [p for p in api2.posted if p[0] == 'verify'] == [('verify', 'A.low_s2')] and summary['held'] == 2
+    # without gate_items the same release gates the pieces only (run_early.json, as before)
+    assert R.Runner(dict(cfg, release=str(d / 'release.json')), None).held('bundle:XB001') is False
+
+
 def test_held_pieces_are_not_looked_up_at_reconcile(split):
     d, cfg = split
 

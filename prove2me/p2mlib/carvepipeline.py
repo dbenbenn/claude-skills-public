@@ -32,7 +32,7 @@ OVERLAP_ONLY = ('publish_early', 'measure_pieces', 'calibrate_pieces', 'pieces_p
 DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
               'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags',
-              'overlap', 'unif_integrable']
+              'overlap', 'unif_integrable', 'stream_bundles']
 
 
 LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
@@ -52,7 +52,8 @@ SYSTEMATIC_FRACTION = 0.25   # bundles over the limit: a systematic cost-model e
                              # against 55 s); fewer are split alone (oaiq-081: 3 of 194 bundles)
 MAX_BUNDLE_SPLITS = 3   # rounds of splitting single slow bundles before a person looks
 MAX_PIECE_SPLITS = 2    # local splits of one piece (carve.py split-piece) before a person looks
-STREAM_BATCH = 64       # pieces measured per carve_measure run while streaming them to the publisher
+STREAM_BATCH = 64       # items measured per carve_measure run while streaming them to the publisher
+STREAM_SAMPLE = 20      # bundles measured before the first bundle or statement is released (the systematic check)
 IMPORT_LIMIT = 160e6    # .olean bytes an item may import (its measured closure_bytes). q153 (2026-11-06): all 609
                         # accepted proofs imported <= 148 MB; above, the verifier's workers ran out of memory ("Lean
                         # exited with code 137"; ~55% of first tries passed at 300-600 MB, retries 1 in 5), and
@@ -331,14 +332,35 @@ def locked_files(d, running=False):
     rs = run_state_files(d)
     out |= {f for f, rec in rs.items() if posted(rec)}
     if running:
-        for p in (frozen_plan, _load_json(os.path.join(d, 'publish', 'plan.json'))):
-            out |= plan_lib_files(p) if p else set()
+        out |= plan_lib_files(frozen_plan) if frozen_plan else set()
+        out |= released_lib_files(d)
     else:
         # pipeline.json `thaw`: files a person thaws on purpose, honoured only for files never posted (q172: the
         # unsent importers of a bundle split by hand after publish_early kept their old imports)
         thaw = set((_load_json(os.path.join(d, 'pipeline.json')) or {}).get('thaw') or ())
         out -= {f for f in thaw if not posted(rs.get(f))}
     return out - {f for f, rec in rs.items() if isinstance(rec, dict) and rec.get('state') in TERMINAL}
+
+
+def released_lib_files(d):
+    """The out/lib files of publish/plan.json a running publisher may send: all of them, unless it is the
+    streaming publisher (pipeline_state.json `publisher.gated`, publish/run_stream.json), which sends only
+    the bundles and statements publish/release.json lists for that plan (none without one)."""
+    path = os.path.join(d, 'publish', 'plan.json')
+    plan = _load_json(path)
+    if not plan:
+        return set()
+    files = plan_lib_files(plan)
+    if not ((_load_json(os.path.join(d, 'pipeline_state.json')) or {}).get('publisher') or {}).get('gated'):
+        return files
+    rel = _load_json(os.path.join(d, 'publish', 'release.json'))
+    if not isinstance(rel, dict) or rel.get('plan_sha') != hashlib.sha1(open(path, 'rb').read()).hexdigest():
+        return set()
+    if rel.get('items') == 'all':
+        return files
+    items = set(rel.get('items') or ())
+    return plan_lib_files(dict(plan, bundles=[b for b in plan.get('bundles') or () if 'bundle:' + b['name'] in items],
+                               stubs={n: v for n, v in (plan.get('stubs') or {}).items() if 'statement:' + n in items}))
 
 
 def publisher_running_at(d, state=None):
@@ -1361,8 +1383,222 @@ class Pipeline:
         return flags
 
     def step_measure(self):
+        if self.streams_bundles():
+            return self.stream_bundles()
         kinds = ['--kinds', 'bundle,statement'] if self.overlap() else []
         self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *self.measure_flags(), *kinds)])
+
+    def streams_bundles(self):
+        """Overlap mode with --publish: bundles and statements go to the publisher as they are measured
+        (pipeline.json `stream_bundles`: false turns it off)."""
+        return bool(self.overlap() and self.p.get('go') and self.p.get('stream_bundles', True))
+
+    def stream_bundles(self):
+        """`measure` with --publish: the bundles and statements are measured in batches of STREAM_BATCH, in
+        publish order, and after each batch those that measured within the limits (calibration's, and the
+        import limit unless `accept_heavy_imports`), whose bundles and statements went before them, go to a
+        background publisher at once (release_items), frozen as they go (freeze_released). dbenbenn
+        2026-11-07: q153's re-carve measured 1,699 bundles and 2,893 statements for ~6 h before sending one;
+        "streaming bundles is a good idea, as we could catch problems earlier ... At worst, frozen just
+        means we have to use a different name". The gates that read only the generated files (publish_prep,
+        prose, check_text) run once after the first batch; dryrun keeps its step (the publisher's own
+        reconcile does its lookups first). Until STREAM_SAMPLE bundles are measured nothing goes, and while
+        nothing is published a systematic overrun (as calibrate judges it) releases nothing, so calibrate
+        can still re-plan the whole carve. Whatever is over a limit stays back for calibrate, which splits it
+        alone; its importers were held with it. A batch that fails does not stop the others; the closing full
+        carve_measure run (cached) reports what failed, as before."""
+        cfg = self.read_config() or {}
+        plan = json.load(open(self.work_paths(cfg)[1]))
+        from . import carve as CV
+        ext = set(plan.get('external') or ())
+        live = self.live_items()
+        todo = [x for w in CV.publish_order(plan, ext)['waves'] for x in w
+                if x.split(':', 1)[0] in ('bundle', 'statement') and x not in live and x.split(':', 1)[1] not in ext]
+        batches = [todo[i:i + STREAM_BATCH] for i in range(0, len(todo), STREAM_BATCH)]
+        print('== measure: %d bundle(s) and statement(s) to measure in %d batch(es), each released as it passes'
+              % (len(todo), len(batches)), flush=True)
+        done, gates = set(), None
+        for k, batch in enumerate(batches):
+            try:
+                self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
+                                                    '--kinds', 'bundle,statement', '--only', ','.join(batch))])
+            except StepFailed as e:
+                print('== measure: batch %d/%d had failures (reported at the end): %s'
+                      % (k + 1, len(batches), str(e).splitlines()[0]), flush=True)
+            done |= set(batch)
+            if gates is None and self.stream_sample_ready(plan, done | live):
+                gates = self.stream_gates()
+            why = self.release_items(done) if gates else ('none released yet (the first %d bundles are measured '
+                                                          'first)' % STREAM_SAMPLE if gates is None else
+                                                          'none released (a gate failed)')
+            print('== measure: batch %d/%d measured; %s' % (k + 1, len(batches), why or 'none released'), flush=True)
+        if gates is None and todo:
+            gates = self.stream_gates()
+            if gates:
+                print('== measure: %s' % (self.release_items(done) or 'none released'), flush=True)
+        # every bundle and statement once more, from the cache: the failures compile again and stop the step
+        self.run_cmds('measure', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
+                                            '--kinds', 'bundle,statement')])
+        self.save()
+
+    def stream_sample_ready(self, plan, done):
+        """Are STREAM_SAMPLE of the plan's bundles (or all) measured in this run, or live already?"""
+        names = [b['name'] for b in plan.get('bundles') or ()]
+        return sum(1 for n in names if 'bundle:' + n in done) >= min(STREAM_SAMPLE, len(names))
+
+    def stream_gates(self):
+        """publish_prep, prose and check_text on the whole plan (they read the generated files, not the
+        times), so that measured items can go. False when one fails: the measure goes on releasing nothing,
+        and the step itself stops later as it would have."""
+        try:
+            self.step_publish_prep()
+            self.step_prose()
+            self.step_check_text()
+        except StepFailed as e:
+            print('== measure: not streaming to the publisher, a gate failed (its step stops later): %s'
+                  % str(e).splitlines()[0], flush=True)
+            return False
+        return True
+
+    def stream_base_stubs(self, plan):
+        """The statements a streaming measure may release: those of the plan streaming began with
+        (pipeline_state.json `streamed_stubs`). A statement a later re-plan or piece split added waits for its
+        pieces' CoeT check, as publish_early's held statements do (q160). Before anything is frozen, all of
+        them; once a carve froze without streaming, none (they go with publish_early)."""
+        if 'streamed_stubs' in self.state:
+            return set(self.state['streamed_stubs'])
+        if (self.state.get('auto_config') or {}).get('frozen'):
+            return set()
+        return set(plan.get('stubs') or {})
+
+    def release_items(self, done):
+        """Release to the background publisher the bundles and statements of `done` (measured in this run)
+        that measured ok within the limits and whose own bundles and statements are released or live
+        (stream_bundles). Their files go to publish/out/lib as measured (a repair or dropped edge rewrites
+        them), they are frozen (freeze_released), and publish/release.json lists them with `open`; a
+        streaming publisher (run_stream.json) is started when none runs. Returns a line for the log."""
+        got = self.calibrate_inputs()
+        if not got:
+            return ''
+        cfg, plan, times, fz, _ = got
+        P = os.path.join(self.d, 'publish')
+        pplan = os.path.join(P, 'plan.json')
+        if not os.path.exists(pplan):
+            return ''
+        sha = hashlib.sha1(open(pplan, 'rb').read()).hexdigest()
+        if sha != hashlib.sha1(open(self.work_paths(cfg)[1], 'rb').read()).hexdigest():
+            return 'not released: publish/plan.json is not the measured plan'
+        res = calibration(dict(plan, pieces={}), times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
+                          accepted=self.p.get('accept_over') or ())
+        bad = {k for k, _, _ in res['over']} | {k for k, _ in res['statements_over']}
+        if not self.p.get('accept_heavy_imports'):
+            bad |= {k for k, _ in heavy_imports(plan, times, fz, kinds=('bundle', 'statement'))}
+        over_b = [k for k, _, _ in res['over'] if k.startswith('bundle:') and k in done]
+        measured_b = sum(1 for b in plan.get('bundles') or ()
+                         if 'bundle:' + b['name'] in done and (times.get('bundle:' + b['name']) or {}).get('ok'))
+        if not self.anything_published(cfg) and len(over_b) >= UNIFORM_MIN and \
+                len(over_b) >= SYSTEMATIC_FRACTION * measured_b:
+            return ('none released: %d of %d measured bundles over the limit, a systematic cost-model error '
+                    'calibrate re-plans' % (len(over_b), measured_b))
+        from . import carve as CV
+        ext = set(plan.get('external') or ())
+        order = CV.publish_order(plan, ext)
+        live = self.live_items()
+        rel_path = os.path.join(P, 'release.json')
+        old = _load_json(rel_path) or {}
+        prev = set(old.get('items') or ()) if old.get('plan_sha') == sha and isinstance(old.get('items'), list) else set()
+        if old.get('plan_sha') == sha and old.get('items') == 'all':
+            return ''
+        base = self.stream_base_stubs(plan)
+        ok = set(prev)
+
+        def fine(d):
+            kind, n = d.split(':', 1)
+            return kind == 'piece' or n in ext or d in ok or d in live
+
+        for x in (x for w in order['waves'] for x in w):
+            kind, n = x.split(':', 1)
+            if kind not in ('bundle', 'statement') or n in ext or x in ok or x in live or x not in done or x in bad:
+                continue
+            if kind == 'statement' and n not in base:
+                continue
+            if (times.get(x) or {}).get('ok') and all(fine(d) for d in order['deps'].get(x, ())):
+                ok.add(x)
+        new = ok - prev
+        if not new:
+            return ''
+        src, dst = os.path.join(self.gen_out(), 'lib'), os.path.join(P, 'out', 'lib')
+        os.makedirs(dst, exist_ok=True)
+        for f in sorted(plan_lib_files(self.only_items(plan, new))):
+            if os.path.exists(os.path.join(src, f)):
+                data = open(os.path.join(src, f), 'rb').read()
+                q = os.path.join(dst, f)
+                if not os.path.exists(q) or open(q, 'rb').read() != data:
+                    open(q + '.tmp', 'wb').write(data)
+                    os.replace(q + '.tmp', q)
+        self.freeze_released(plan, ok | live)
+        self.write_release(sha, items=sorted(ok), open=True)
+        if self.publisher_running():
+            how = 'the background publisher sends them'
+        else:
+            self.start_publisher(gated=True)
+            how = 'a streaming publisher was started'
+        return 'released %d bundle(s)/statement(s) (%d in all; %s)' % (len(new), len(ok), how)
+
+    @staticmethod
+    def only_items(plan, items):
+        """The plan with only the bundles and statements of `items` (external statements kept)."""
+        ext = set(plan.get('external') or ())
+        return dict(plan, bundles=[b for b in plan.get('bundles') or () if 'bundle:' + b['name'] in items],
+                    stubs={n: v for n, v in (plan.get('stubs') or {}).items() if 'statement:' + n in items or n in ext})
+
+    def freeze_released(self, plan, items):
+        """Freeze what a streaming measure released, as freeze_published does for the whole plan:
+        published/plan.json holds the plan with only those bundles and statements, published/lib their
+        files, and config `frozen` (those bundles), `forced` and `template_forced` (those statements). What is
+        not released stays free: calibrate may split it alone. The first call records the plan's statements
+        (`streamed_stubs`, stream_base_stubs)."""
+        P = os.path.join(self.d, 'publish')
+        dst = self.published_dir()
+        os.makedirs(os.path.join(dst, 'lib'), exist_ok=True)
+        was = _load_json(os.path.join(dst, 'plan.json')) or {}       # what is frozen stays frozen
+        items = set(items) | {'bundle:' + b['name'] for b in was.get('bundles') or ()} | \
+            {'statement:' + n for n in was.get('stubs') or {}}
+        part = self.only_items(plan, items)
+        tmp = os.path.join(dst, 'plan.json.tmp')
+        json.dump(part, open(tmp, 'w'), indent=1)
+        os.replace(tmp, os.path.join(dst, 'plan.json'))
+        lib = os.path.join(P, 'out', 'lib')
+        for f in sorted(plan_lib_files(part)):
+            if os.path.exists(os.path.join(lib, f)):
+                shutil.copy(os.path.join(lib, f), os.path.join(dst, 'lib', f))
+        ext = set(plan.get('external') or ())
+        stubs = {n for n in part.get('stubs') or {} if n not in ext}
+        named = set(self.p.get('forced') or ()) | set((self.p.get('config_set') or {}).get('forced') or ())
+        self.mark_publishing('the streaming measure released bundles and statements')
+        self.state.setdefault('streamed_stubs', sorted(n for n in plan.get('stubs') or {} if n not in ext))
+        a = self.state.setdefault('auto_config', {})
+        a['frozen'] = {'plan': os.path.join(dst, 'plan.json'), 'bundles': [b['name'] for b in part['bundles']],
+                       'lib': os.path.join(dst, 'lib')}
+        a['forced'] = sorted(set(a.get('forced') or ()) | stubs)
+        a['template_forced'] = sorted(set(a.get('template_forced') or ()) | (stubs - named))
+        json.dump(self.apply_auto(self.read_config() or {}), open(os.path.join(self.d, 'config.json'), 'w'), indent=1)
+        self.save()
+
+    def write_release(self, sha=None, **fields):
+        """Update publish/release.json for the plan `sha` (publish/plan.json's by default): a release for
+        another plan is replaced, else its other fields are kept."""
+        path = os.path.join(self.d, 'publish', 'release.json')
+        if sha is None:
+            sha = hashlib.sha1(open(os.path.join(self.d, 'publish', 'plan.json'), 'rb').read()).hexdigest()
+        old = _load_json(path) or {}
+        rel = dict(old) if isinstance(old, dict) and old.get('plan_sha') == sha else {'plan_sha': sha}
+        rel.update(fields)
+        rel['released'] = _now()
+        tmp = path + '.tmp'
+        json.dump(rel, open(tmp, 'w'), indent=1)
+        os.replace(tmp, path)
+        return rel
 
     def step_measure_pieces(self):
         if self.p.get('go'):
@@ -1428,7 +1664,7 @@ class Pipeline:
         self.state.pop('publish_held', None)
         print('== measure_pieces: the pieces of the %d statement(s) publish_early held passed; publishing them '
               'now' % len(held.get('statements') or ()), flush=True)
-        if self.publisher_running():
+        if self.publisher_running() and not self.gated_publisher():
             print('== a publisher already runs on this carve; it goes on (new items wait for the final publish)',
                   flush=True)
         else:
@@ -1477,10 +1713,7 @@ class Pipeline:
             pieces |= set(old['pieces'])
         if old.get('plan_sha') == sha and old.get('pieces') == 'all':
             return ''
-        rel = {'plan_sha': sha, 'pieces': sorted(pieces), 'open': True, 'released': _now()}
-        tmp = rel_path + '.tmp'
-        json.dump(rel, open(tmp, 'w'), indent=1)
-        os.replace(tmp, rel_path)
+        self.write_release(sha, pieces=sorted(pieces), open=True)
         if self.publisher_running():
             how = 'the background publisher sends them'
         elif not (self.state.get('auto_config') or {}).get('frozen') or self.held_statements():
@@ -2038,12 +2271,7 @@ class Pipeline:
         if self.overlap():
             # every piece measured, calibrated and checked (pieces_prep): release them for this plan; a
             # background publisher still running on it sends them, and the final run below resumes it
-            plan = os.path.join(self.d, 'publish', 'plan.json')
-            rel = {'plan_sha': hashlib.sha1(open(plan, 'rb').read()).hexdigest(), 'pieces': 'all',
-                   'released': _now()}
-            tmp = os.path.join(self.d, 'publish', 'release.json.tmp')
-            json.dump(rel, open(tmp, 'w'), indent=1)
-            os.replace(tmp, os.path.join(self.d, 'publish', 'release.json'))
+            self.write_release(pieces='all', items='all', open=False)
             print('== pieces released for publishing (publish/release.json)', flush=True)
             self.join_publisher('the final publish')
         try:
@@ -2086,7 +2314,7 @@ class Pipeline:
         the files, and config `frozen`, `forced` (the statements) and `template_forced` are set
         (pipeline_state.json `auto_config`), so no later step re-plans or rewrites them.
         After a re-plan of the frozen part (new statements), it waits for measure_pieces (held_statements)."""
-        if self.publisher_running():
+        if self.publisher_running() and not self.gated_publisher():
             print('== a publisher already runs on this carve; it goes on (new items wait for the final publish)',
                   flush=True)
             return None
@@ -2111,7 +2339,9 @@ class Pipeline:
             return []
         new = _load_json(os.path.join(self.d, 'publish', 'plan.json')) or {}
         old = _load_json(os.path.join(self.published_dir(), 'plan.json')) or {}
-        return sorted(set(new.get('stubs') or {}) - set(old.get('stubs') or {}) - set(new.get('external') or ()))
+        # a streaming measure freezes only what it released: the plan it began with is not new
+        return sorted(set(new.get('stubs') or {}) - set(old.get('stubs') or {}) - set(new.get('external') or ())
+                      - set(self.state.get('streamed_stubs') or ()))
 
     def publish_early_now(self):
         if not os.path.exists(os.path.join(self.d, 'publish', 'run_early.json')):
@@ -2120,7 +2350,17 @@ class Pipeline:
             raise StepFailed("step 'publish_early': no publish/run_early.json (publish_prep ran from a skill before "
                              "overlap mode); run again with `--redo publish_prep` (nothing is published yet)")
         self.freeze_published()
+        if self.publisher_running() and self.gated_publisher():
+            # the streaming measure's publisher: every bundle and statement is calibrated and checked now
+            self.write_release(items='all')
+            print('== the streaming publisher goes on with every bundle and statement (publish/release.json items: '
+                  'all)', flush=True)
+            return
         self.start_publisher()
+
+    def gated_publisher(self):
+        """Is the background publisher the streaming one (run_stream.json: bundles and statements gated)?"""
+        return bool((self.state.get('publisher') or {}).get('gated'))
 
     def freeze_published(self):
         P = os.path.join(self.d, 'publish')
@@ -2152,14 +2392,19 @@ class Pipeline:
         json.dump(self.apply_auto(cfg), open(path, 'w'), indent=1)
         self.save()
 
-    def start_publisher(self):
+    def start_publisher(self, gated=False):
         log = os.path.join(self.d, 'logs', 'publish_early.log')
         os.makedirs(os.path.dirname(log), exist_ok=True)
-        cmd = ' '.join(shlex.quote(x) for x in self.tool('split_run', 'publish/run_early.json', '--go'))
+        run = 'publish/run_stream.json' if gated else 'publish/run_early.json'
+        if gated and not os.path.exists(os.path.join(self.d, run)):
+            raise StepFailed("step 'measure': no %s (publish_prep from an older skill); run again with "
+                             "`--redo publish_prep`" % run)
+        cmd = ' '.join(shlex.quote(x) for x in self.tool('split_run', run, '--go'))
         sh = '%s >> %s 2>&1; echo "== publisher exit $?" >> %s' % (cmd, shlex.quote(log), shlex.quote(log))
         with open(log, 'a') as f:
-            f.write('== %s background publisher (bundles and statements; pieces once released), skill %s\n'
-                    % (_now(), os.path.basename(self.snap)))
+            f.write('== %s background publisher (%s), skill %s\n'
+                    % (_now(), 'streaming: bundles, statements and pieces as released' if gated else
+                       'bundles and statements; pieces once released', os.path.basename(self.snap)))
         unit, pid = None, None
         if shutil.which('systemd-run'):
             unit = publisher_unit(self.d)
@@ -2170,7 +2415,7 @@ class Pipeline:
             pid = subprocess.Popen(['/bin/sh', '-c', sh], cwd=self.d, env=self.env(), start_new_session=True,
                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL).pid
-        self.state['publisher'] = {'unit': unit, 'pid': pid, 'started': _now(), 'log': log}
+        self.state['publisher'] = {'unit': unit, 'pid': pid, 'started': _now(), 'log': log, 'gated': gated}
         self.save()
         print('== background publisher started (%s): bundles and statements now, pieces once released; '
               'progress in publish/PROGRESS.log' % (unit or 'pid %d' % pid), flush=True)
