@@ -118,6 +118,21 @@ def last_run(text):
     return text[i + 1:] if i >= 0 else text
 
 
+def runs_since(text, started):
+    """The parts of a step log whose `==== TIME STEP` header is at or after `started` (the step's start in
+    pipeline_state.json): a streaming measure runs carve_measure once per batch, each under its own header,
+    and the last one alone showed only the latest batch (q153, 2026-11-07: "bundles 38/1699" for 20 min).
+    Without `started`, the last run (last_run)."""
+    if not started or not text:
+        return last_run(text)
+    out = []
+    for part in re.split(r'(?m)^(?===== )', text):
+        m = re.match(r'==== (\S+) ', part)
+        if m and m.group(1) >= started:
+            out.append(part)
+    return ''.join(out) if out else last_run(text)
+
+
 def planned(plan, external=()):
     """{kind: set of names} a carve's plan publishes: its bundles, and its statements and pieces that are
     not external (someone else's)."""
@@ -303,7 +318,9 @@ class Carve:
                         failed += not (isinstance(r, dict) and r.get('ok'))
             elif status:
                 last = {}
-                for k, ok, n in MEASURE_LINE.findall(last_run(self.f.text(self.path('logs', step + '.log')))):
+                rec = ((self.f.json(self.path('pipeline_state.json')) or {}).get('steps') or {}).get(step) or {}
+                text = runs_since(self.f.text(self.path('logs', step + '.log')), rec.get('started'))
+                for k, ok, n in MEASURE_LINE.findall(text):
                     if k in got and n in sets[k]:
                         last[(k, n)] = ok
                 for (k, n), ok in last.items():

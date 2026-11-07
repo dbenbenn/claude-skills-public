@@ -347,3 +347,17 @@ def test_a_later_step_left_running_by_a_stop_shows_as_waiting(carve):
     wj(carve / 'pipeline_state.json', {'steps': steps})
     m = phase(M.Reporter(str(carve), go=True, lib=False).compose(), 'Measure bundles+statements')
     assert m['state'] == 'waiting' and m['note'].startswith('interrupted; runs again after gen')
+
+
+def test_a_streaming_measure_counts_every_batch_since_the_step_started(carve):
+    # q153 (2026-11-07): each batch is its own carve_measure run under its own header; counting the last
+    # one alone showed "bundles 38/1699" while the whole first pass had been measured
+    st = json.load(open(carve / 'pipeline_state.json'))
+    st['steps']['measure'] = {'status': 'running', 'started': '2026-11-07T16:52:10'}
+    wj(carve / 'pipeline_state.json', st)
+    (carve / 'logs' / 'measure.log').write_text(
+        '==== 2026-11-07T12:56:51 measure (skill a)\nbundle      3.0 s ok B1 \n'
+        '==== 2026-11-07T16:52:20 measure (skill b)\nbundle      3.0 s ok B0 \nstatement   1.0 s ok S1 \n'
+        '==== 2026-11-07T16:59:00 measure (skill b)\nstatement   1.0 s ok S2 \n')
+    m = phase(M.Reporter(str(carve), lib=False).compose(), 'Measure bundles+statements')
+    assert (m['done'], m['total']) == (3, 4) and m['note'].startswith('bundles 1/2, statements 2/2')
