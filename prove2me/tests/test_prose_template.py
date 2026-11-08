@@ -522,3 +522,26 @@ def test_has_word_p_agrees_with_the_regex(text, x):
     import re
     want = bool(re.search(r"(?<![\w])%s_p\d+(?![\w'])" % re.escape(x), text))
     assert CP.has_word_p(text, x) == want
+
+
+def test_library_lookups_persist_across_check_text_runs_until_the_packages_change(tmp_path, monkeypatch):
+    # q153 (2026-11-08): check_text re-ran ~22 min after every split round (rg over Mathlib, one search per name), and
+    # releases waited for it each time; the answers do not change while the workspace's packages do not
+    ws = tmp_path / 'ws'
+    (ws / '.lake' / 'packages' / 'mathlib' / 'Mathlib').mkdir(parents=True)
+    (ws / 'lake-manifest.json').write_text('{"rev": "a"}')
+    calls = []
+
+    class R:
+        def __init__(self, rc):
+            self.returncode = rc
+    monkeypatch.setattr(CP.subprocess, 'run', lambda args, **k: calls.append(args[-2]) or R(0 if args[-2] == 'Real.pi' else 1))
+    path = str(tmp_path / 'cache.json')
+    look = CP.library_lookup(str(ws), CP.library_roots(str(ws)), 'rg', path)
+    assert look('Real.pi') and not look('nope_xyz') and len(calls) == 2
+    look.save()
+    look = CP.library_lookup(str(ws), CP.library_roots(str(ws)), 'rg', path)
+    assert look('Real.pi') and not look('nope_xyz') and len(calls) == 2         # from the file
+    (ws / 'lake-manifest.json').write_text('{"rev": "b"}')                    # a Mathlib bump: asked again
+    look = CP.library_lookup(str(ws), CP.library_roots(str(ws)), 'rg', path)
+    assert look('Real.pi') and len(calls) == 3

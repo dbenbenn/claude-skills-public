@@ -70,6 +70,7 @@ usage:
       (without `piece`, explanations/ is not read; with only `piece`, prose/ is not). Exit 1 on a problem.
 """
 import glob
+import hashlib
 import json
 import os
 import re
@@ -577,6 +578,35 @@ def rg_exe():
     return shutil.which('rg')
 
 
+def library_lookup(ws, roots, rg, path):
+    """in_library(name) for check-text: is `name` a word in Mathlib's or Lean's sources (rg)? Answers persist in `path`
+    while the workspace's lake-manifest.json is unchanged; `.save()` writes them. q153 (2026-11-08): check_text re-ran
+    ~22 min after every split round, one rg over Mathlib per name, and releases waited for it each time."""
+    try:
+        key = hashlib.sha1(open(os.path.join(ws, 'lake-manifest.json'), 'rb').read() + repr(roots).encode()).hexdigest()
+    except OSError:
+        key = None
+    try:
+        old = json.load(open(path))
+        seen = old['seen'] if key and old.get('key') == key else {}
+    except (OSError, ValueError, KeyError):
+        seen = {}
+
+    def in_library(name):
+        if name not in seen:
+            seen[name] = bool(rg) and any(subprocess.run(['rg', '-q', '-w', '-F', name, r], executable=rg).returncode == 0
+                                          for r in roots)
+        return seen[name]
+
+    def save():
+        if key:
+            tmp = path + '.tmp'
+            json.dump({'key': key, 'seen': seen}, open(tmp, 'w'))
+            os.replace(tmp, path)
+    in_library.save = save
+    return in_library
+
+
 def library_roots(ws):
     roots = [os.path.join(ws, '.lake', 'packages', 'mathlib', 'Mathlib')]
     try:
@@ -706,18 +736,14 @@ def cmd_check_text(argv):
     local = '\n'.join(open(f, encoding='utf-8').read() for f in gen + extra)
     skip = {re.sub(r'^(Def|Thm|Sol)_', '', os.path.basename(f)[:-5]) for f in gen + extra}
     skip |= set(opts(argv, '--allow'))
-    roots, rg, seen = library_roots(ws), rg_exe(), {}
+    roots, rg = library_roots(ws), rg_exe()
+    in_library = library_lookup(ws, roots, rg, os.path.join(P, '.library_lookups.json'))
     suffix = ''
     try:        # a suffixed split (statement_suffix) publishes OpenAI's name with it appended
         suffix = json.load(open(os.path.join(P, '..', 'config.json'))).get('statement_suffix') or ''
     except (OSError, ValueError):
         pass
 
-    def in_library(name):
-        if name not in seen:
-            seen[name] = bool(rg) and any(subprocess.run(['rg', '-q', '-w', '-F', name, r], executable=rg).returncode == 0
-                                          for r in roots)
-        return seen[name]
     bad, name_cache = 0, {}
     expl = glob.glob(P + '/explanations/*.md') if kinds is None or 'piece' in kinds else []
     prose = glob.glob(P + '/prose/*.md') if kinds is None or {'bundle', 'statement'} & set(kinds) else []
@@ -742,6 +768,7 @@ def cmd_check_text(argv):
         print('COMMENT IN STUB', n)
     if not rg:
         print('warning: no rg found, Mathlib and core not searched')
+    in_library.save()
     print('%d problems' % bad)
     sys.exit(1 if bad else 0)
 
