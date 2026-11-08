@@ -412,6 +412,14 @@ and new `carve.py` inside one carve. So:
   calibrate stops at once: re-planning re-splits bundles but has never shrunk a piece. Then force the heavy
   lemmas the piece keeps into statements of their own (`forced` in pipeline.json; a private one by its graph
   node name, `_private.<module>.0.<name>`, published without the prefix) and resume `--from config`.
+  **Memory, separately from time** (q153, 2026-11-08): the verifier's workers kill a file whose Lean peaks
+  over about 7 GiB, and `import Mathlib` alone peaks at 6.5 GiB. carve_measure records each run's own peak
+  (`rss_mib`); a piece over `PIECE_RSS_LIMIT` (7,050 MiB) is never released and calibrate_pieces splits it
+  alone at once, into enough parts for the proof's share (its peak minus its statement's) to fit. A piece the
+  verifier kills for memory twice (verdicts `hidden`/`dependency_oom`) goes to state `split` the same way.
+  On q153 neither time (30-45 s pieces passed about half the time) nor the import closure (fast pieces
+  importing 90-160 MB all passed) predicted the kills; the local peak did (accepted <= 7,099 MiB, killed
+  >= 7,113 with one exception each way).
   Kernel computation (`decide +kernel`, `native_decide`) is the usual cause, since the cost model cannot
   see it: oaiq-031's piece of 20 private `decide +kernel` lemmas became 20 pieces of ~11 s, with the plan's
   bundles unchanged, so live bundles kept their text. `accept_over` in pipeline.json excuses another item

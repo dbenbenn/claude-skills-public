@@ -494,7 +494,7 @@ def test_measure_never_leaves_an_old_olean_behind_a_failed_compile(tmp_path, mon
 
     class R:
         returncode, stdout, stderr = 1, 'Def_B010.lean:1:0: error: oops', ''
-    monkeypatch.setattr(M.subprocess, 'run', lambda *a, **k: R())
+    monkeypatch.setattr(M, 'run_lean', lambda args, cwd, env: (R.returncode, R.stdout + R.stderr, 0.0, 0))
     res, _ = m.run(str(src), 'Definitions.Def_B010', {})
     assert not res['ok']
     assert not (old.parent / 'Def_B010.olean').exists() and not (old.parent / 'Def_B010.ilean').exists()
@@ -889,7 +889,7 @@ def test_measure_compiles_with_synchronous_elaboration(tmp_path, monkeypatch):
 
     class R:
         returncode, stdout, stderr = 0, '', ''
-    monkeypatch.setattr(M.subprocess, 'run', lambda args, **k: seen.append(args) or R())
+    monkeypatch.setattr(M, 'run_lean', lambda args, cwd, env: seen.append(args) or (0, '', 0.0, 0))
     m.run(str(src), 'Definitions.Def_B', {})
     m.run(str(src), None, {})
     assert all(a[:2] == ['lean', '-j1'] and '-DElab.async=false' in a and '-DautoImplicit=false' in a

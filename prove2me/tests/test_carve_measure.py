@@ -216,3 +216,64 @@ def test_only_measures_just_the_named_items(tmp_path, monkeypatch):
     assert m.run_all(kinds=['piece'], only={'piece:Q'})
     assert seen == ['piece:Q']
     assert json.load(open(os.path.join(m.cfg['work'], 'false_edges.json')))['orphaned_statements'] == []
+
+
+# ------------------------------------------------------------- peak memory and parallel pieces
+
+def test_run_lean_reports_this_process_own_peak_memory(tmp_path):
+    # q153 (2026-11-08): pieces the verifier killed for memory peaked at 7,113-7,250 MiB locally, accepted ones at
+    # <= 7,099; RUSAGE_CHILDREN's ru_maxrss is the largest child so far, so each run reads its own (os.wait4)
+    import sys as _sys
+    import carve_measure as M
+    big = [_sys.executable, '-c', 'b = bytearray(300 * 2**20); print("big")']
+    small = [_sys.executable, '-c', 'print("small")']
+    rc, out, cpu, rss = M.run_lean(big, str(tmp_path), dict(os.environ))
+    assert rc == 0 and 'big' in out and rss >= 300
+    rc, out, cpu, rss2 = M.run_lean(small, str(tmp_path), dict(os.environ))
+    assert rc == 0 and 'small' in out and rss2 < 100
+    rc, out, _, _ = M.run_lean([_sys.executable, '-c', 'import sys; sys.stderr.write("e\\n"); sys.exit(3)'],
+                               str(tmp_path), dict(os.environ))
+    assert rc == 3 and 'e' in out
+
+
+def test_a_slow_piece_measured_before_peak_memory_was_recorded_is_measured_again(tmp_path):
+    M, m = _obj(tmp_path, {'bundles': [], 'pieces': {'P': {}, 'Q': {}}, 'stubs': {}})
+    old = {'secs': M.RSS_REMEASURE_SECS + 1, 'ok': True, 'key': 'k'}
+    assert m.needs_rss('piece:P', old)
+    assert not m.needs_rss('piece:P', dict(old, secs=M.RSS_REMEASURE_SECS - 1))     # fast pieces fit anyway
+    assert not m.needs_rss('piece:P', dict(old, rss_mib=7000))
+    assert not m.needs_rss('bundle:B', old)                                          # frozen at publish
+    (tmp_path / 'publish').mkdir()
+    (tmp_path / 'publish' / 'run_state.json').write_text(json.dumps({'piece:P': {'state': 'live'},
+                                                                     'piece:Q': {'state': 'stop'}}))
+    m.__dict__.pop('_live', None)
+    assert not m.needs_rss('piece:P', old) and m.needs_rss('piece:Q', old)        # accepted: no peak needed
+
+
+def test_pieces_of_a_wave_are_measured_in_parallel_and_the_rest_in_order(tmp_path, monkeypatch):
+    import threading
+    import time
+    plan = {'bundles': [{'name': 'A', 'imports': [], 'nodes': ['x']}], 'stubs': {n: {'bundles': ['A']} for n in 'PQRS'},
+            'pieces': {n: {'bundles': ['A'], 'imports': []} for n in 'PQRS'}, 'external': []}
+    M, m = _obj(tmp_path, plan)
+    monkeypatch.setattr(M, 'copy_published', lambda *a: None)
+    m.jobs = 3
+    live, peak, order = [0], [0], []
+    gate = threading.Lock()
+
+    def measure(item, env, force, repair):
+        order.append(item)
+        with m.unlocked():                      # what run() does around Lean
+            with gate:
+                live[0] += 1
+                peak[0] = max(peak[0], live[0])
+            time.sleep(0.2)
+            with gate:
+                live[0] -= 1
+        return {'secs': 1.0, 'ok': True, 'errors': []}
+    m.measure = measure
+    m.edge_check = lambda item, env, force: {'imports': {}, 'false': [], 'restore': {}, 'file': 'f'}
+    assert m.run_all(kinds=['bundle', 'piece'])
+    assert order[0] == 'bundle:A' and sorted(order[1:]) == ['piece:%s' % n for n in 'PQRS']
+    assert peak[0] == 3
+    assert set(json.load(open(m.times_path))) == {'bundle:A'} | {'piece:%s' % n for n in 'PQRS'}

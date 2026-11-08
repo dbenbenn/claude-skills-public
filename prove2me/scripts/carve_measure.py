@@ -4,7 +4,7 @@ a time, -j1, in publish order (p2mlib.carve.publish_order), and record CPU secon
 runs with the verifier's options (p2mlib.localcheck.VERIFIER_FLAGS): autoImplicit off and synchronous
 elaboration (Elab.async=false; q128: heartbeat timeouts the verifier reported showed only so).
 
-usage: carve_measure.py CONFIG.json [--force] [--keep-going] [--dir D] [--no-repair]
+usage: carve_measure.py CONFIG.json [--force] [--keep-going] [--dir D] [--no-repair] [--jobs N]
                          [--no-edge-check] [--drop-false-edges] [--allow-false-edges]
                          [--kinds bundle,statement|piece] [--only ITEM,...]
        carve_measure.py CONFIG.json --profile bundle:NAME[,statement:NAME ...] [--dir D]
@@ -62,10 +62,17 @@ of its verifier-form file), closure_modules, and closure_missing (imports with n
 over CLOSURE_WARN_BYTES is reported with a WARNING line and in a summary at the end; it never fails
 the run (q149/oaiq-106).
 
+Each record also holds rss_mib, the run's own peak memory (os.wait4; run_lean): carve_pipeline holds a piece over
+PIECE_RSS_LIMIT back and splits it (q153 2026-11-08: the verifier's workers kill files peaking over ~7 GiB, and
+`import Mathlib` alone takes 6.5). A cached piece record without it, of RSS_REMEASURE_SECS or more, is measured
+again unless the verifier accepted the piece (publish/run_state.json). --jobs N measures the pieces of each wave N
+at a time (nothing imports a piece; the lean-cap wrapper queues the Lean runs); everything else stays in order.
+
 The JSON state files (times.json, repairs.json, edges.json, false_edges.json, profiles.json) are
 written atomically (write_json). One found cut off mid-entry (q149: a disk-full crash) keeps its
 complete entries; the original is kept as <file>.truncated, and the dropped items are measured again.
 """
+import contextlib
 import hashlib
 import importlib.util
 import json
@@ -75,6 +82,9 @@ import resource
 import shutil
 import subprocess
 import sys
+import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -83,6 +93,25 @@ from p2mlib import carve as C, edgecheck as EC, leaninfo, localcheck as L, repai
 _spec = importlib.util.spec_from_file_location('carve_cli', os.path.join(HERE, 'carve.py'))
 CLI = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(CLI)
+
+
+RSS_REMEASURE_SECS = 15   # a piece measured before peak memory was recorded (rss_mib) is measured again from this
+                          # many seconds: q153 (2026-11-08) pieces under 20 s peaked under 7,000 MiB, all of them
+
+
+def run_lean(args, cwd, env):
+    """(returncode, output, CPU seconds, peak RSS in MiB) of one process, from its own rusage (os.wait4).
+    RUSAGE_CHILDREN's ru_maxrss is the largest child of this process so far, so it cannot give one run's
+    peak. The lean-cap wrapper execs the real Lean (through `systemd-run --scope`, which execs too), so the
+    process waited for is Lean itself."""
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        p = subprocess.Popen(args, cwd=cwd, env=env, stdout=out, stderr=err)
+        _, status, ru = os.wait4(p.pid, 0)
+        p.returncode = os.waitstatus_to_exitcode(status)
+        out.seek(0)
+        err.seek(0)
+        o = out.read().decode('utf-8', 'replace') + err.read().decode('utf-8', 'replace')
+    return p.returncode, o, ru.ru_utime + ru.ru_stime, ru.ru_maxrss // 1024
 
 
 def opt(argv, name, default=None):
@@ -225,6 +254,8 @@ def reapply(text, cuts):
     return new, [c for c in stale if c in text]
 
 class Measure:
+    jobs = 1        # --jobs: pieces of one wave measured at once (nothing imports a piece); Lean's own cap queues them
+
     def __init__(self, cfg_path, d=None):
         self.cfg = CLI.load_config(cfg_path)
         self.ws = self.cfg['src']
@@ -270,14 +301,84 @@ class Measure:
             shutil.copy(path, sp)
             path = sp
             args += ['-R', self.stage, '-o', out + '.olean', '-i', out + '.ilean']
-        r0 = resource.getrusage(resource.RUSAGE_CHILDREN)
-        r = subprocess.run(args + [path], cwd=self.lean_ws, env=env, capture_output=True, text=True)
-        r1 = resource.getrusage(resource.RUSAGE_CHILDREN)
-        cpu = r1.ru_utime - r0.ru_utime + r1.ru_stime - r0.ru_stime
-        o = r.stdout + r.stderr
-        errs = [l for l in o.split('\n') if ': error' in l] or ([o[-1500:]] if r.returncode else [])
-        return {'secs': round(cpu, 1), 'ok': r.returncode == 0 and not errs, 'errors': errs[:8],
+        with self.unlocked():
+            rc, o, cpu, rss = run_lean(args + [path], self.lean_ws, env)
+        errs = [l for l in o.split('\n') if ': error' in l] or ([o[-1500:]] if rc else [])
+        return {'secs': round(cpu, 1), 'rss_mib': rss, 'ok': rc == 0 and not errs, 'errors': errs[:8],
                 'axioms': [l for l in o.split('\n') if 'depends on axioms' in l]}, o
+
+    # -- parallel pieces: one lock serializes everything but the Lean runs themselves (run() lets it go)
+    def _par(self):
+        if not hasattr(self, '_lock'):
+            self._lock, self._tls = threading.Lock(), threading.local()
+        return self._lock, self._tls
+
+    @contextlib.contextmanager
+    def unlocked(self):
+        lock, tls = self._par()
+        held = getattr(tls, 'held', False)
+        if held:
+            tls.held = False
+            lock.release()
+        try:
+            yield
+        finally:
+            if held:
+                lock.acquire()
+                tls.held = True
+
+    @contextlib.contextmanager
+    def locked(self):
+        lock, tls = self._par()
+        with lock:
+            tls.held = True
+            try:
+                yield
+            finally:
+                tls.held = False
+
+    def one(self, item, env, force, repair, edges, drop):
+        """Measure one item (and its edge check), record it in times.json; returns its record."""
+        kind, n = item.split(':', 1)
+        for attempt in range(2):
+            r = self.measure(item, env, force, repair)
+            self.times[item] = r
+            write_json(self.times_path, self.times, indent=1)
+            print('%-9s %6.1f s %s %s %s%s' % (kind, r['secs'], 'ok' if r['ok'] else 'FAIL', n,
+                                               (r['errors'][:1] or [''])[0][-200:],
+                                               ' %d MiB' % r['rss_mib'] if r.get('rss_mib') else ''), flush=True)
+            if attempt == 0 and r.get('closure_bytes', 0) > CLOSURE_WARN_BYTES:
+                print('  WARNING import closure %s over the %.1f GB soft limit: %s (%d modules); '
+                      'q149/oaiq-106 bundles over ~0.74 GB timed out publishing (report only)' % (
+                          gb(r['closure_bytes']), CLOSURE_WARN_BYTES / 1e9, item,
+                          r.get('closure_modules', 0)), flush=True)
+            if not (r['ok'] and edges):
+                break
+            e = self.edge_check(item, env, force)
+            for m, v in e['imports'].items():
+                if v != 'used':
+                    print('  edge  %-7s %s -> %s%s' % (v.upper(), n, m, (
+                        ' (import %s instead)' % ', '.join(e['restore'][m])) if m in e['restore'] else ''),
+                        flush=True)
+            if not (e['false'] and drop and attempt == 0 and self.drop_edges(item, e)):
+                break
+        return r
+
+    def needs_rss(self, item, old):
+        """Is a cached piece from before peak memory was recorded to be measured again? (A bundle or statement
+        is frozen once published; a fast piece cannot be near the verifier's memory.)"""
+        return (item.startswith('piece:') and 'rss_mib' not in old and (old.get('secs') or 0) >= RSS_REMEASURE_SECS
+                and item not in self.live_pieces())
+
+    def live_pieces(self):
+        """The pieces the verifier accepted (publish/run_state.json `live`): their peak no longer matters."""
+        if '_live' not in self.__dict__:
+            try:
+                st = json.load(open(os.path.join(self.d, 'publish', 'run_state.json')))
+                self._live = {x for x, v in st.items() if x.startswith('piece:') and v.get('state') == 'live'}
+            except (OSError, ValueError):
+                self._live = set()
+        return self._live
 
     def apply_recorded(self, src):
         name = os.path.basename(src)
@@ -371,7 +472,8 @@ class Measure:
                 open(path, 'w', encoding='utf-8').write(self.chk_text(n))
             k = self.cache_key(path)
             old = self.times.get(item)
-            if old and old.get('key') == k and old.get('ok') and not force and self.has_olean(mod):
+            if old and old.get('key') == k and old.get('ok') and not force and self.has_olean(mod) \
+                    and not self.needs_rss(item, old):
                 return old
             # a piece compiles to an .olean too (EdgeChk.*), which the edge check reads
             r, out = self.run(path, mod or self.chk_module(n), env)
@@ -559,32 +661,21 @@ class Measure:
         ok = True
         scope = self.scope(kinds, only)
         for wave in C.publish_order(self.plan, self.ext)['waves']:
-            for item in wave:
-                if item not in scope:
-                    continue
-                kind, n = item.split(':', 1)
-                for attempt in range(2):
-                    r = self.measure(item, env, force, repair)
-                    self.times[item] = r
-                    write_json(self.times_path, self.times, indent=1)
-                    print('%-9s %6.1f s %s %s %s' % (kind, r['secs'], 'ok' if r['ok'] else 'FAIL', n,
-                                                     (r['errors'][:1] or [''])[0][-200:]), flush=True)
-                    if attempt == 0 and r.get('closure_bytes', 0) > CLOSURE_WARN_BYTES:
-                        print('  WARNING import closure %s over the %.1f GB soft limit: %s (%d modules); '
-                              'q149/oaiq-106 bundles over ~0.74 GB timed out publishing (report only)' % (
-                                  gb(r['closure_bytes']), CLOSURE_WARN_BYTES / 1e9, item,
-                                  r.get('closure_modules', 0)), flush=True)
-                    if not (r['ok'] and edges):
-                        break
-                    e = self.edge_check(item, env, force)
-                    for m, v in e['imports'].items():
-                        if v != 'used':
-                            print('  edge  %-7s %s -> %s%s' % (v.upper(), n, m, (
-                                ' (import %s instead)' % ', '.join(e['restore'][m])) if m in e['restore'] else ''),
-                                flush=True)
-                    if not (e['false'] and drop and attempt == 0 and self.drop_edges(item, e)):
-                        break
-                if not r['ok']:
+            todo = [item for item in wave if item in scope]
+            serial = [i for i in todo if not i.startswith('piece:') or self.jobs <= 1]
+            par = [i for i in todo if i not in serial]
+            for item in serial:
+                if not self.one(item, env, force, repair, edges, drop)['ok']:
+                    ok = False
+                    if not keep_going:
+                        return False
+            if par:
+                def work(item):
+                    with self.locked():
+                        return self.one(item, env, force, repair, edges, drop)
+                with ThreadPoolExecutor(self.jobs) as ex:
+                    res = list(ex.map(work, par))
+                if not all(r['ok'] for r in res):
                     ok = False
                     if not keep_going:
                         return False
@@ -774,7 +865,7 @@ def print_edge_report(rep):
 
 
 def main(argv):
-    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] not in ('--dir', '--kinds', '--profile', '--only'))]
+    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] not in ('--dir', '--kinds', '--profile', '--only', '--jobs'))]
     if len(pos) != 1:
         sys.exit(__doc__)
     from p2mlib import runlock
@@ -785,6 +876,7 @@ def main(argv):
             m.profile(item, m.env())
         return
     m.allow_false = '--allow-false-edges' in argv
+    m.jobs = max(1, int(opt(argv, '--jobs') or 1))
     kinds = [k for k in (opt(argv, '--kinds') or '').split(',') if k] or None
     only = {x for x in (opt(argv, '--only') or '').split(',') if x} if '--only' in argv else None
     ok = m.run_all('--force' in argv, '--keep-going' in argv, '--no-repair' not in argv,

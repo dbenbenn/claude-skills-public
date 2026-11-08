@@ -436,8 +436,10 @@ class Runner:
             st['last'] = (rec.get('error_message') or rec.get('error') or '')[:500]
             # nothing is ever split here: a terminal state waits for a person (v1's automatic
             # splitter re-split items for days)
-            why = {'split': 'NEEDS A PERSON: own compile timeout %d times; consider splitting' % (
-                       st['history'].get('own_timeout', 0)),
+            why = {'split': ('NEEDS A PERSON: own compile timeout %d times; consider splitting' % (
+                       st['history'].get('own_timeout', 0)) if kind == 'own_timeout' else
+                       'killed for memory %d times: carve_pipeline splits it (calibrate_pieces)' % (
+                           st['history'].get('hidden', 0) + st['history'].get('dependency_oom', 0))),
                    'stop': 'NEEDS A PERSON: %s' % (
                        'hidden: the platform cut the log before the error (see verdicts.py); compare a '
                        'local verifier-flags compile, then retry or split' if kind == 'hidden' else kind),

@@ -88,7 +88,10 @@ re-measure) and a piece the verifier timed out on (publisher state `split`) are 
 split-piece`: lemmas the piece keeps become new statements; only its files and theirs are generated, every other
 item and measurement kept; the new statements are forced, with template prose, in auto_config; then the run goes
 on from `names`), once per piece for a local measurement and up to MAX_PIECE_SPLITS times for verifier timeouts,
-and a piece still slow stops for a person, first releasing the pieces within budget (q129). --split-piece
+and a piece still slow stops for a person, first releasing the pieces within budget (q129). A piece whose measured peak
+memory (carve_measure rss_mib) is over PIECE_RSS_LIMIT is held back and split alone the same way, at once (q153
+2026-11-08: the verifier's workers kill files over about 7 GiB), as is one the verifier killed for memory twice.
+Pieces are measured --jobs measure_jobs (pipeline.json, default 3) at a time. --split-piece
 NODE[=PARTS] (repeatable or comma-separated; PARTS default 2) splits pieces by hand the same way before the run
 resumes (dbenbenn 2026-11-06: q153's four slow pieces got a frozen global re-plan that changed ~2,000 other
 pieces and cost a day of measuring). With --publish, measure_pieces streams: batches of STREAM_BATCH pieces, each

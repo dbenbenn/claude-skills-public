@@ -66,17 +66,44 @@ BUNDLE_OWN_LIMIT = 80   # s local: an unpublished bundle over this is split (or 
                         # 87.7 and 88.6 s against the 88 s limit hit the server's own "Compilation timed out after
                         # 300s" 2, 3 and 1 times; E011 stopped for a person with 24 bundles behind it
 ACCEPT_BUSY = 5         # accept_over on a bundle this many items import gets a warning: E001 (88.6 s) took 6 tries
+PIECE_RSS_LIMIT = 7050  # MiB: a piece whose verifier-form file peaks over this locally (carve_measure rss_mib) is split
+                        # before it is sent. q153 (2026-11-08): 106 pieces stopped after four memory kills each
+                        # (verdicts hidden/dependency_oom); accepted pieces peaked at <= 7,099 MiB (one 7,135), the
+                        # stopped and timed-out ones at 7,113-7,250 (one 6,822), while `import Mathlib` alone peaks at
+                        # 6,551: the workers' cap is about 7 GiB. Neither time (30-45 s pieces passed about half the
+                        # time) nor the import closure (82 pieces importing >= 90 MB, under 20 s, all passed) separated them
+MAX_MEMORY_PARTS = 8    # most parts one memory split makes
+MEASURE_JOBS = 3        # pieces measured at once (carve_measure --jobs; pipeline.json measure_jobs); lean-cap queues them
 PIECE_CAP = 120         # a piece (resubmittable) is excused below this; dbenbenn 2026-10-29 (was 150): a slow
                         # submit costs only wall-clock, a needless re-plan hours; verifier data: 94-103 s passed,
                         # 118-126 s timed out 3x (oaiq-078), 125 s and 162 s passed on a retry (oaiq-047, -085),
                         # 192 s timed out 3x (oaiq-031)
 
 
+def fits_memory(rec):
+    """Does a measured item fit the verifier's memory (PIECE_RSS_LIMIT)? A record from before carve_measure
+    recorded peaks fits (carve_measure measures pieces of RSS_REMEASURE_SECS and more again)."""
+    return not rec or not rec.get('rss_mib') or rec['rss_mib'] <= PIECE_RSS_LIMIT
+
+
+def memory_parts(rss, base):
+    """Parts to split a piece peaking at `rss` MiB into, its statement alone (its imports) peaking at `base`:
+    the proof's own share (rss - base) shared out so each part's fits the room under PIECE_RSS_LIMIT. None when
+    the imports alone are over (no split helps); 2 when the statement's peak is unknown."""
+    if base is None:
+        return 2
+    room = PIECE_RSS_LIMIT - base
+    if room <= 0:
+        return None
+    return min(MAX_MEMORY_PARTS, max(2, int(math.ceil((rss - base) / room))))
+
+
 def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR, accepted=(),
                 bundle_limit=BUNDLE_OWN_LIMIT):
     """Does the cost model's `scale` (time_scale) fit this carve's measured times?
     Returns {'over': [(item, secs, cost)], 'ratio', 'new_scale', 'limit', 'bundle_limit', 'measured',
-    'slowest', 'statements_over', 'excused': [(item, secs)] (accept_over)}. A bundle is over at
+    'slowest', 'statements_over', 'excused': [(item, secs)] (accept_over), 'memory_over': [(piece, rss MiB,
+    secs)] (over PIECE_RSS_LIMIT, unpublished; apart from `over`: memory says nothing of the cost model)}. A bundle is over at
     min(limit, `bundle_limit`) (BUNDLE_OWN_LIMIT).
 
     Batch 3 (2026-10-25): the first plans of QuarticPowerFree and KirchbergRordam were made with the
@@ -91,7 +118,7 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
     timeout costs three publish attempts."""
     limit = budget * limit_factor
     blimit = min(limit, bundle_limit or limit)
-    over, measured, slowest, excused = [], 0, None, []
+    over, measured, slowest, excused, memory_over = [], 0, None, [], []
     items = [('bundle:' + b['name'], b['name'], b.get('cost') or 0) for b in plan.get('bundles', [])]
     items += [('piece:' + n, n, p.get('cost') or 0) for n, p in (plan.get('pieces') or {}).items()]
     for key, name, cost in items:
@@ -101,6 +128,9 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
         measured += 1
         if slowest is None or t['secs'] > slowest[1]:
             slowest = (key, t['secs'])
+        if key.startswith('piece:') and not fits_memory(t) and name not in frozen:
+            memory_over.append((key, t['rss_mib'], t['secs']))
+            continue
         if key.startswith('piece:') and t['secs'] <= PIECE_CAP:
             # a piece is a proof: resubmittable, so submit as is and split only after two real
             # timeouts (oaiq-035/037: a 106 s piece cost two ~1 h re-plans); bundles and statements
@@ -126,7 +156,8 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
     ratio = max((secs / max(cost, 1.0) for _, secs, cost in over), default=1.0)
     new_scale = round(min(MAX_SCALE, max(scale * 1.1, scale * ratio)), 1) if over else scale
     return {'over': over, 'ratio': ratio, 'new_scale': new_scale, 'limit': limit, 'bundle_limit': blimit,
-            'measured': measured, 'slowest': slowest, 'statements_over': statements_over, 'excused': excused}
+            'measured': measured, 'slowest': slowest, 'statements_over': statements_over, 'excused': excused,
+            'memory_over': memory_over}
 
 
 def heavy_imports(plan, times, skip=(), kinds=('bundle', 'statement', 'piece')):
@@ -1380,6 +1411,8 @@ class Pipeline:
         flags = list(self.p.get('measure_flags') or [])
         if '--keep-going' not in flags:
             flags.append('--keep-going')
+        if '--jobs' not in flags:
+            flags += ['--jobs', str(self.p.get('measure_jobs', MEASURE_JOBS))]
         return flags
 
     def step_measure(self):
@@ -1730,7 +1763,7 @@ class Pipeline:
         cfg, plan, times, _, _ = got
         limit = max(cfg.get('budget', 55) * LIMIT_FACTOR, PIECE_CAP)
         accepted = set(self.p.get('accept_over') or ())
-        fast = sorted(x for x in items if (times.get(x) or {}).get('ok') and
+        fast = sorted(x for x in items if (times.get(x) or {}).get('ok') and fits_memory(times[x]) and
                       ((times[x].get('secs') or 0) <= limit or (x in accepted and times[x]['secs'] <= ACCEPT_CAP)))
         P = os.path.join(self.d, 'publish')
         pplan = os.path.join(P, 'plan.json')
@@ -2152,13 +2185,13 @@ class Pipeline:
             print('calibrate_pieces: ' + lines[-1], file=sys.stderr, flush=True)
         log = os.path.join(self.d, 'logs', 'calibrate.log')
         server = {n: k for n, k in self.server_split_wanted().items() if n in (plan.get('pieces') or {})}
-        if not res['over'] and not server:
+        if not res['over'] and not server and not res['memory_over']:
             self.calibrate_log(lines + ['pieces fit; time_scale %g kept' % cfg.get('time_scale', 1.5)])
             return None
         ratios = sorted(secs / max(cost, 1.0) for _, secs, cost in res['over'])
         uniform = (len(ratios) >= UNIFORM_MIN and ratios[len(ratios) // 2] >= UNIFORM_RATIO
                    and ratios[-1] <= 2 * ratios[0])
-        if uniform and not server and not self.anything_published(cfg):
+        if uniform and not server and not res['memory_over'] and not self.anything_published(cfg):
             return self.replan(cfg, round(min(MAX_SCALE, cfg.get('time_scale', 1.5) * ratios[len(ratios) // 2]), 1),
                                lines, 'calibrate_pieces')
         tried = self.state.setdefault('auto_split', {})
@@ -2176,6 +2209,25 @@ class Pipeline:
                 manual.append('%s: %.0f s, no declarations recorded for it in the plan' % (key, secs))
             else:
                 auto.append((n, secs, cost))
+        # over the verifier's memory: split at once (a peak is no thrashing artefact to measure again), into enough
+        # parts for the proof's share of the peak to fit beside the imports (its statement's own peak)
+        auto_mem = []
+        for key, rss, secs in res['memory_over']:
+            n = key.split(':', 1)[1]
+            base = (times.get('statement:' + n) or {}).get('rss_mib')
+            parts = memory_parts(rss, base)
+            if n in tried:
+                manual.append('%s: %d MiB, still over the %d MiB memory limit after an automatic split (it was %s)' % (
+                    key, rss, PIECE_RSS_LIMIT, ('%d MiB' % tried[n]['rss_mib']) if tried[n].get('rss_mib')
+                    else '%.0f s' % tried[n]['secs']))
+            elif parts is None:
+                manual.append('%s: %d MiB, and its statement alone peaks at %d MiB: the imports are over the %d MiB '
+                              'memory limit, and no split helps (regroup the bundles it imports)' % (
+                                  key, rss, base, PIECE_RSS_LIMIT))
+            elif not (plan.get('pieces') or {}).get(n, {}).get('keep'):
+                manual.append('%s: %d MiB, no declarations recorded for it in the plan' % (key, rss))
+            else:
+                auto_mem.append((n, rss, secs, parts))
         again = [(n, secs) for n, secs, _ in auto if n not in (self.state.get('remeasured') or {})]
         if again:
             # measured once more before any split (q138: 1595 s of CPU for a piece that compiles in 2 s alone,
@@ -2196,11 +2248,17 @@ class Pipeline:
         budget = max(float(cfg.get('budget', 55)), 1.0)
         for n, secs, cost in auto:
             want[n] = max(want.get(n, 2), int(math.ceil(secs / budget)))
+        for n, rss, secs, parts in auto_mem:
+            want[n] = max(want.get(n, 2), parts)
         if want:
             for n, secs, cost in auto:
                 tried[n] = {'secs': secs, 'cost': cost, 'parts': want[n]}
+            for n, rss, secs, parts in auto_mem:
+                tried[n] = dict(tried.get(n) or {}, secs=secs, rss_mib=rss, parts=want[n])
+            mem = {n for n, _, _, _ in auto_mem}
             lines.append('splitting %d piece(s) alone (carve.py split-piece; every other item kept): %s' % (
-                len(want), ', '.join('%s into %d%s' % (n, k, ' (verifier timeouts)' if n in server else '')
+                len(want), ', '.join('%s into %d%s' % (n, k, ' (verifier timeouts or memory kills)' if n in server else
+                                                       ' (over the %d MiB memory limit)' % PIECE_RSS_LIMIT if n in mem else '')
                                      for n, k in sorted(want.items()))))
             for m in manual:
                 lines.append('  needs a person (after this round): ' + m)
@@ -2208,7 +2266,8 @@ class Pipeline:
             print('calibrate_pieces: %s' % lines[-1 - len(manual)], file=sys.stderr, flush=True)
             self.split_pieces_locally(want, 'calibrate_pieces', 'calibrate_pieces: %s slow or timed out')
             return None
-        released = self.release_within_budget(plan, times, [key for key, _, _ in res['over']])
+        released = self.release_within_budget(plan, times, [key for key, _, _ in res['over']] +
+                                              [key for key, _, _ in res['memory_over']])
         self.calibrate_log(lines + ['  needs a person: ' + m for m in manual] + ([released.strip()] if released else []))
         raise StepFailed(
             "step 'calibrate_pieces': piece(s) over the %.0f s limit:\n  %s\nA slow piece holds back only itself "
@@ -2242,7 +2301,7 @@ class Pipeline:
         ok = [x for x in items if (times.get(x) or {}).get('ok')]
         # calibrate_pieces has judged the slow ones (`held`); otherwise the limit decides here
         fast = sorted(x for x in ok if x not in held) if held else \
-            sorted(x for x in ok if (times[x].get('secs') or 0) <= limit)
+            sorted(x for x in ok if (times[x].get('secs') or 0) <= limit and fits_memory(times[x]))
         if not fast:
             return ''
         try:

@@ -1460,8 +1460,8 @@ def test_overlap_measures_and_checks_bundles_and_statements_before_the_pieces(en
     r = run(env, *ARGS_NEW)
     assert r.returncode == 0, r.stdout + r.stderr
     seq = [(c['tool'], c['argv']) for c in calls(env)]
-    i = seq.index(('carve_measure', ['config.json', '--keep-going', '--kinds', 'bundle,statement']))
-    j = seq.index(('carve_measure', ['config.json', '--keep-going', '--kinds', 'piece']))
+    i = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'bundle,statement']))
+    j = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'piece']))
     tail = [(t, a[0]) for t, a in seq[i:]]
     assert tail[:6] == [('carve_measure', 'config.json'), ('carve_prep', 'publish-prep'), ('carve_prep', 'prose-template'),
                         ('carve_prep', 'check-text'), ('split_run', 'publish/run_early.json'), ('carve_measure', 'config.json')]
@@ -1520,13 +1520,13 @@ def test_with_publish_bundles_and_statements_stream_to_the_publisher_as_they_are
     seq = [(c['tool'], c['argv']) for c in calls(env)]
     i = next(k for k, (t, a) in enumerate(seq) if t == 'carve_measure')
     # proofs stream too, each behind its statement (dbenbenn 2026-11-07)
-    assert seq[i][1][:4] == ['config.json', '--keep-going', '--kinds', 'bundle,statement,piece']
-    assert sorted(seq[i][1][5].split(',')) == ['bundle:B0', 'bundle:B1', 'piece:P0', 'piece:P1',
+    assert seq[i][1][:6] == ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'bundle,statement,piece']
+    assert sorted(seq[i][1][7].split(',')) == ['bundle:B0', 'bundle:B1', 'piece:P0', 'piece:P1',
                                                'statement:P0', 'statement:P1']
     # the gates that read only the generated files run once the sample is measured, then the closing measure
     assert [(t, a[0]) for t, a in seq[i + 1:i + 5]] == [('carve_prep', 'publish-prep'), ('carve_prep', 'prose-template'),
                                                         ('carve_prep', 'check-text'), ('carve_measure', 'config.json')]
-    assert seq[i + 4][1] == ['config.json', '--keep-going', '--kinds', 'bundle,statement']
+    assert seq[i + 4][1] == ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'bundle,statement']
     lines = _raw(env)
     i_bg = _index(lines, lambda l: l.startswith('systemd-run'))
     i_close = _index(lines, lambda l: '"tool": "carve_measure"' in l and '"--only"' not in l)
@@ -1965,7 +1965,7 @@ def test_a_classic_carve_switched_to_overlap_keeps_its_plan_and_measurements(env
     seq = tools_called(env)
     assert ('carve', 'plan') not in seq and ('carve', 'gen') not in seq
     measures = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure']
-    assert measures == [['config.json', '--keep-going', '--kinds', 'piece']]   # the classic measure stands
+    assert measures == [['config.json', '--keep-going', '--jobs', '3', '--kinds', 'piece']]   # the classic measure stands
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert st['steps']['calibrate_pieces']['status'] == 'done' and st.get('replans', 0) == 0
 
@@ -2295,7 +2295,7 @@ def test_a_rerun_gen_whose_pieces_changed_re_measures_and_re_syncs_them(env, mon
     measures = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure']
     # bundles and statements unchanged: only pieces, streamed in batches, then the full (cached) run
     assert all(a[a.index('--kinds') + 1] == 'piece' for a in measures)
-    assert measures[-1] == ['config.json', '--keep-going', '--kinds', 'piece']
+    assert measures[-1] == ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'piece']
     seq = tools_called(env)
     i = seq.index(('carve_measure', 'config.json'))
     assert ('carve_prep', 'publish-prep') in seq[i:] and seq[-1] == ('split_run', 'publish/run.json')
@@ -2452,8 +2452,8 @@ def test_pieces_that_bundles_wait_for_are_measured_and_released_first(env, monke
     r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure_pieces')
     assert r.returncode == 0, r.stdout + r.stderr
     seq = [(c['tool'], c['argv']) for c in calls(env)]
-    first = seq.index(('carve_measure', ['config.json', '--keep-going', '--kinds', 'piece', '--only', 'piece:P1']))
-    full = seq.index(('carve_measure', ['config.json', '--keep-going', '--kinds', 'piece']))
+    first = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'piece', '--only', 'piece:P1']))
+    full = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'piece']))
     assert first < full
     # P1 went in the first batch (released then); the streamed release grew with P0 after
     assert json.load(open(env.dir / 'publish' / 'release.json'))['pieces'] == ['piece:P0', 'piece:P1']
@@ -2631,3 +2631,61 @@ def test_new_statements_of_a_split_whose_pieces_fail_are_never_posted(env, monke
     assert 'lemma_P0' not in json.load(open(env.dir / 'published' / 'plan.json'))['stubs']
 
 
+
+
+# ---- the verifier's memory (q153, 2026-11-08) ------------------------------------------------------
+# 106 pieces stopped after four tries, all killed for memory (verdicts hidden / dependency_oom). Local peak RSS of
+# the verifier-form file separated them: accepted pieces peaked at <= 7,099 MiB (one at 7,135), failing ones at
+# 7,113-7,250 MiB (one at 6,822); import Mathlib alone takes 6,551. Time only correlated (all >= 45 s failed, 30-45 s
+# ~half), closure size not at all (82 pieces importing >= 90 MB under 20 s all passed first try).
+
+def _tm(secs, rss, ok=True):
+    return {'secs': secs, 'ok': ok, 'rss_mib': rss}
+
+
+def test_calibration_holds_a_piece_over_the_memory_limit_apart_from_the_time_scale():
+    plan = _plan({'B0': 55}, {'P': 50, 'Q': 50, 'L': 50, 'Old': 50})
+    times = {'bundle:B0': _t(20), 'piece:P': _tm(40, CP.PIECE_RSS_LIMIT + 100), 'piece:Q': _tm(40, CP.PIECE_RSS_LIMIT - 50),
+             'piece:L': _tm(40, CP.PIECE_RSS_LIMIT + 300), 'piece:Old': _t(40)}
+    r = CP.calibration(plan, times, 1.2, 55, frozen=['L'])
+    assert r['over'] == [] and r['new_scale'] == 1.2              # memory says nothing of the cost model
+    assert r['memory_over'] == [('piece:P', CP.PIECE_RSS_LIMIT + 100, 40)]   # L is live; Old has no peak recorded
+    assert CP.fits_memory(times['piece:Q']) and not CP.fits_memory(times['piece:P']) and CP.fits_memory(times['piece:Old'])
+
+
+def test_a_piece_over_memory_is_cut_into_enough_parts_for_its_proof_to_fit():
+    lim = CP.PIECE_RSS_LIMIT
+    # the statement alone (its imports) peaks at base; the proof adds the rest, shared out among the parts
+    assert CP.memory_parts(lim + 100, lim - 200) == 2           # 300 over base, 200 of room: 2 parts
+    assert CP.memory_parts(lim + 100, lim - 50) == 3           # 150 over base, 50 of room
+    assert CP.memory_parts(lim + 100, None) == 2                # no statement peak recorded: halve
+    assert CP.memory_parts(lim + 2000, lim - 10) == CP.MAX_MEMORY_PARTS
+    assert CP.memory_parts(lim + 100, lim + 5) is None          # the imports alone are over: no split helps
+
+
+def test_a_piece_over_the_verifiers_memory_is_split_alone_at_once(env, monkeypatch):
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30)},
+                   seq=[{}] * 6 + [{'piece:P0': _tm(15, 6950), 'piece:lemma_P0': _tm(5, 6900)}])
+    work = env.dir / 'carve_work'
+    for f in ('times.json', 'times.orig.json'):
+        t = json.load(open(work / f))
+        t['piece:P0'] = _tm(40, CP.PIECE_RSS_LIMIT + 120)
+        t['statement:P0'] = _tm(5, CP.PIECE_RSS_LIMIT - 80)
+        (work / f).write_text(json.dumps(t))
+    r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
+    assert split == [['split-piece', 'config.json', 'P0=3']]   # 200 MiB of proof, 80 of room
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert not st.get('remeasured')                               # a peak is not a thrashing artefact
+    assert st['auto_split']['P0']['rss_mib'] == CP.PIECE_RSS_LIMIT + 120
+    assert 'memory' in (env.dir / 'logs' / 'calibrate.log').read_text()
+
+
+def test_pieces_are_measured_with_parallel_jobs(env, monkeypatch):
+    _overlap_carve(env, monkeypatch)
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    ms = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure']
+    piece_runs = [a for a in ms if 'piece' in ' '.join(a)]
+    assert piece_runs and all(a[a.index('--jobs') + 1] == str(CP.MEASURE_JOBS) for a in piece_runs)

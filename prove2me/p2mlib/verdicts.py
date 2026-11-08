@@ -42,9 +42,10 @@ import re
 OWN_TIMEOUT_CAP = 2      # own timeouts before splitting
 HIDDEN_CAP = 2           # hidden-cause solution compile failures before stopping for a person
 DEPENDENCY_OOM_CAP = 3   # dependency_oom results before stopping for a person (q152)
-PIECE_OOM_CAP = 3        # the same for a proof. q153 (2026-11-06): first tries of proofs importing 300-600 MB passed
-                         # ~55%, but retries of ones that had failed passed 1 in 20: a proof over the worker's memory
-                         # fails again, so ten tries (a77afdc) mostly burned shared verifier time
+PIECE_OOM_CAP = 1        # earlier memory kills (hidden or dependency_oom, together) of a proof before it is split.
+                         # q153 (2026-11-06): retries of proofs that had failed passed 1 in 20, so ten tries (a77afdc)
+                         # mostly burned shared verifier time; 2026-11-08: all 106 pieces stopped after four kills
+                         # peaked over ~7.1 GiB locally (accepted ones <= 7.1), so a smaller piece fits: split
 TRANSIENT_CAP = 30       # transient failures before giving up for this run (cold-cache p90 was 10)
 
 _TRANSIENT = re.compile(
@@ -94,11 +95,14 @@ def decide(kind, history, item_kind=None):
         return 'retry' if n < TRANSIENT_CAP else 'give_up'
     if kind == 'own_timeout':
         return 'retry' if n < OWN_TIMEOUT_CAP else 'split'
+    if item_kind == 'piece' and kind in ('hidden', 'dependency_oom'):
+        # a proof's hidden cause has been an OOM kill whenever the tail showed (q153): either kind is one
+        mem = history.get('hidden', 0) + history.get('dependency_oom', 0)
+        return 'retry' if mem < PIECE_OOM_CAP else 'split'
     if kind == 'hidden':
-        # a proof's hidden cause has been an OOM kill whenever the tail showed (q153): retried like one
-        return 'retry' if n < (PIECE_OOM_CAP if item_kind == 'piece' else HIDDEN_CAP) else 'stop'
+        return 'retry' if n < HIDDEN_CAP else 'stop'
     if kind == 'heartbeats':
         return 'raise_heartbeats'
     if kind == 'dependency_oom':
-        return 'retry' if n < (PIECE_OOM_CAP if item_kind == 'piece' else DEPENDENCY_OOM_CAP) else 'stop'
+        return 'retry' if n < DEPENDENCY_OOM_CAP else 'stop'
     return 'stop'

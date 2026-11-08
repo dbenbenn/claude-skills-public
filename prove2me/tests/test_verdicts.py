@@ -100,6 +100,16 @@ def test_decide_retries_dependency_oom_a_few_times():
 def test_a_proof_out_of_memory_is_retried_a_few_times_only():
     # q153 (2026-11-06): retries of failed proofs passed 1 in 20; a hidden proof failure counts as one
     assert V.decide('dependency_oom', {'dependency_oom': V.PIECE_OOM_CAP - 1}, 'piece') == 'retry'
-    assert V.decide('dependency_oom', {'dependency_oom': V.PIECE_OOM_CAP}, 'piece') == 'stop'
-    assert V.decide('hidden', {'hidden': V.PIECE_OOM_CAP}, 'piece') == 'stop'
-    assert V.PIECE_OOM_CAP <= 4
+    assert V.decide('dependency_oom', {'dependency_oom': V.PIECE_OOM_CAP}, 'piece') == 'split'
+    assert V.decide('hidden', {'hidden': V.PIECE_OOM_CAP}, 'piece') == 'split'
+    assert V.PIECE_OOM_CAP <= 2
+
+
+def test_a_proof_killed_for_memory_twice_is_split_not_stopped():
+    # q153 (2026-11-08): the 106 pieces stopped after four memory kills each all peaked over ~7.1 GiB locally;
+    # a smaller piece fits, so after PIECE_OOM_CAP kills (of either kind) the piece goes to splitting
+    assert V.decide('hidden', {}, 'piece') == 'retry'
+    assert V.decide('hidden', {'hidden': 1}, 'piece') == 'split'
+    assert V.decide('dependency_oom', {'hidden': 1}, 'piece') == 'split'
+    assert V.decide('hidden', {'dependency_oom': 1}, 'piece') == 'split'
+    assert V.decide('hidden', {'hidden': V.HIDDEN_CAP}) == 'stop'          # a bundle or statement: a person
