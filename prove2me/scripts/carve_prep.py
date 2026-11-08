@@ -86,7 +86,7 @@ from p2mlib import oaiport as O  # noqa: E402
 COMPAT = os.path.join(os.path.dirname(HERE), 'lean', 'compat_4_34.lean')
 
 KEEP_KEYS = ('patches', 'external_theorems', 'frozen', 'pinned', 'extra_olean_modules', 'repaired',
-             'instance_names', 'measured', 'bundles_import_statements', 'literal_patches')
+             'instance_names', 'measured', 'bundles_import_statements', 'literal_patches', 'collapse_mathlib')
 
 
 def opt(argv, name, default=None):
@@ -223,7 +223,9 @@ def make_config(d, folder, root, target, defmods=(), bundle_prefix=None, forced=
            'budget': budget, 'piece_size': 700000, 'bundle_budget': budget, 'bundle_size': 650000,
            # measured -j1 piece time / estimate with these logs: 1.09-1.37 on WeakPinned's five
            # pieces and DiamondDistortion's (2026-10-19)
-           'time_scale': 1.2, 'collapse_mathlib': True, 'chunker': 'schedule', 'statement_suffix': '',
+           # OpenAI's own Mathlib imports (q153 2026-11-08: `import Mathlib` alone peaks at 6,551 MiB of the verifier's
+           # ~7 GiB); a carve configured before keeps its value (KEEP_KEYS)
+           'time_scale': 1.2, 'collapse_mathlib': False, 'chunker': 'schedule', 'statement_suffix': '',
            'build_logs': [d + '/build_adj.log'], 'jobs': 1}
     for k in KEEP_KEYS:
         if old and k in old:
@@ -772,6 +774,9 @@ def prefetch_names(lookup, keys, workers=NAME_CHECK_WORKERS, say=None, every=10.
     return got
 
 
+NAMES_CACHE_HOURS = 24   # a lookup this young is reused by the next name-check (work/names_cache.json)
+
+
 def name_check(cfg):
     """(ok, message): the carve's planned bundles and statements against what is live under their
     names, by splitrun's own reconcile (read-only, nothing written). The lookups run first, a few at
@@ -800,7 +805,30 @@ def name_check(cfg):
             f = runner.info(x)
             if os.path.exists(f['file']):
                 keys.append((f['kind'], f['name']))
-    known.update(prefetch_names(lambda k, n: live.existing(k, n), keys))
+    # q153 (2026-11-08): a piece split mid-measure re-runs this step, and 4,591 lookups took 21 min; only the new
+    # names need asking. A name someone else took since is still caught by the publisher's own reconcile
+    import time
+    cpath = os.path.join(work, 'names_cache.json') if work else None
+    try:
+        cache = json.load(open(cpath)) if cpath else {}
+    except (OSError, ValueError):
+        cache = {}
+    now = time.time()
+    for k, n in keys:
+        c = cache.get('%s:%s' % (k, n))
+        if c and now - c.get('t', 0) < NAMES_CACHE_HOURS * 3600:
+            known[(k, n)] = c.get('v')
+    ask = [x for x in keys if x not in known]
+    if len(ask) < len(keys):
+        print('names: %d of %d from the lookups of the last %d h' % (len(keys) - len(ask), len(keys), NAMES_CACHE_HOURS),
+              flush=True)
+    got = prefetch_names(lambda k, n: live.existing(k, n), ask)
+    known.update(got)
+    if cpath:
+        cache.update({'%s:%s' % kn: {'t': now, 'v': v} for kn, v in got.items()})
+        tmpf = cpath + '.tmp'
+        json.dump(cache, open(tmpf, 'w'))
+        os.replace(tmpf, cpath)
     adopted, bad = runner.reconcile(write=False)
     if bad:
         return False, ('%d planned name(s) are live on prove2.me with other text:\n%s\nFresh names: pipeline.json '

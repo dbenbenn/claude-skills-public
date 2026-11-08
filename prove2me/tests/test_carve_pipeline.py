@@ -2689,3 +2689,39 @@ def test_pieces_are_measured_with_parallel_jobs(env, monkeypatch):
     ms = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure']
     piece_runs = [a for a in ms if 'piece' in ' '.join(a)]
     assert piece_runs and all(a[a.index('--jobs') + 1] == str(CP.MEASURE_JOBS) for a in piece_runs)
+
+
+def test_pieces_over_memory_are_split_while_the_measure_still_streams(env, monkeypatch):
+    # dbenbenn 2026-11-08: "is it not possible to start splitting heavy pieces in parallel? ... earlier feedback
+    # about whether the strategy is working". A streaming batch that finds pieces over the memory limit splits
+    # them at once (the first time; later rounds at most every STREAM_SPLIT_MINUTES), and the run resumes
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30)},
+                   seq=[{}] + [{'piece:P0': _tm(15, 6950), 'piece:lemma_P0': _tm(5, 6900)}] * 8)
+    work = env.dir / 'carve_work'
+    for f in ('times.json', 'times.orig.json'):
+        t = json.load(open(work / f))
+        t['piece:P0'] = _tm(40, CP.PIECE_RSS_LIMIT + 120)
+        t['statement:P0'] = _tm(5, CP.PIECE_RSS_LIMIT - 80)
+        (work / f).write_text(json.dumps(t))
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    i = seq.index(('carve', 'split-piece'))
+    assert ('carve_prep', 'publish-prep') in seq[:i]                   # mid-measure, after a streamed batch
+    assert not any(t == ('carve', 'split-piece') for t in seq[i + 1:])  # once
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st['piece_splits']['P0'][0]['why'].startswith('measure:')
+    assert st['auto_split']['P0']['rss_mib'] == CP.PIECE_RSS_LIMIT + 120
+    assert 'splitting 1 piece(s) alone while measuring' in r.stdout
+
+
+def test_generated_files_importing_all_of_mathlib_are_flagged(env, monkeypatch):
+    # dbenbenn 2026-11-08: "If some carve mission needs to 'import Mathlib' that's a red flag that we have to be really
+    # careful about memory" (6,551 MiB of the verifier's ~7 GiB before the file's own work)
+    _overlap_carve(env, monkeypatch)
+    _gen_writes(monkeypatch, lib__Def_B0='import Mathlib\ndef b := 1\n', lib__Def_B1='import Mathlib.Data.Int.Basic\n',
+                solutions__Sol_P0='import Mathlib\n')
+    r = run(env, *ARGS_NEW, '--stop-after', 'gen')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'WARNING 2 generated file(s) import all of Mathlib' in r.stdout and 'Def_B0' in r.stdout
+    assert json.load(open(env.dir / 'pipeline_state.json'))['whole_mathlib'] == ['lib/Def_B0.lean', 'solutions/Sol_P0.lean']

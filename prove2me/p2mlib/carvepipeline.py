@@ -73,6 +73,7 @@ PIECE_RSS_LIMIT = 7050  # MiB: a piece whose verifier-form file peaks over this 
                         # 6,551: the workers' cap is about 7 GiB. Neither time (30-45 s pieces passed about half the
                         # time) nor the import closure (82 pieces importing >= 90 MB, under 20 s, all passed) separated them
 MAX_MEMORY_PARTS = 8    # most parts one memory split makes
+STREAM_SPLIT_MINUTES = 60   # memory splits while the measure streams: the first at once, then at most this often
 MEASURE_JOBS = 3        # pieces measured at once (carve_measure --jobs; pipeline.json measure_jobs); lean-cap queues them
 PIECE_CAP = 120         # a piece (resubmittable) is excused below this; dbenbenn 2026-10-29 (was 150): a slow
                         # submit costs only wall-clock, a needless re-plan hours; verifier data: 94-103 s passed,
@@ -1354,6 +1355,31 @@ class Pipeline:
         self.set_thawed()
         self.run_cmds('gen', [self.tool('carve', 'gen', 'config.json')])
         self.check_published_unchanged('gen')
+        self.flag_whole_mathlib()
+
+    def flag_whole_mathlib(self):
+        """A red flag (dbenbenn 2026-11-08): generated files that `import Mathlib` whole start at 6,551 MiB of the
+        verifier's ~7 GiB before their own work, so their proofs get split for memory (PIECE_RSS_LIMIT) and their
+        bundles and statements may not publish at all. Listed in pipeline_state.json `whole_mathlib` and warned
+        about; the narrow imports come from OpenAI's own files (config collapse_mathlib false)."""
+        cfg = self.read_config() or {}
+        out = self.gen_out()
+        hits = []
+        for sub in ('lib', 'solutions'):
+            dd = os.path.join(out, sub)
+            for f in sorted(os.listdir(dd)) if os.path.isdir(dd) else ():
+                if f.endswith('.lean'):
+                    with open(os.path.join(dd, f), errors='replace') as fh:
+                        head = fh.read(20000)
+                    if re.search(r'(?m)^import Mathlib\s*$', head):
+                        hits.append('%s/%s' % (sub, f))
+        self.state['whole_mathlib'] = hits
+        self.save()
+        if hits:
+            print('== gen: WARNING %d generated file(s) import all of Mathlib (6,551 MiB of the verifier\'s ~7 GiB before '
+                  'any work of their own; config collapse_mathlib %s): %s%s' % (
+                      len(hits), cfg.get('collapse_mathlib'), ', '.join(hits[:5]), ' ...' if len(hits) > 5 else ''),
+                  flush=True)
 
     def set_thawed(self):
         """config `frozen.thawed`: the files of published/lib that are not locked (locked_files), which gen
@@ -1480,6 +1506,11 @@ class Pipeline:
             else:
                 why = 'none released yet (check_text runs)'
             print('== measure: batch %d/%d measured; %s' % (k + 1, len(batches), why or 'none released'), flush=True)
+            if self.stream_memory_split():
+                if isinstance(gates, subprocess.Popen) and gates.poll() is None:
+                    gates.terminate()           # check_text runs again with the restarted measure
+                    gates.wait()
+                return
         if todo:
             gates = self.gates_result(self.stream_gates() if gates is None else gates, wait=True)
             if gates is True:
@@ -2159,6 +2190,63 @@ class Pipeline:
             return set()
         return {x for x, v in st.items() if v.get('state') == 'live'}
 
+    def memory_triage(self, plan, times, memory_over, tried):
+        """calibration's `memory_over` pieces -> ([(node, rss, secs, parts)] to split automatically, [why] for a
+        person): each into enough parts for the proof's share of the peak to fit beside the imports (its
+        statement's own peak, memory_parts); a person when it was split already, its imports alone are over,
+        or the plan records no declarations for it."""
+        auto_mem, manual = [], []
+        for key, rss, secs in memory_over:
+            n = key.split(':', 1)[1]
+            base = (times.get('statement:' + n) or {}).get('rss_mib')
+            parts = memory_parts(rss, base)
+            if n in tried:
+                manual.append('%s: %d MiB, still over the %d MiB memory limit after an automatic split (it was %s)' % (
+                    key, rss, PIECE_RSS_LIMIT, ('%d MiB' % tried[n]['rss_mib']) if tried[n].get('rss_mib')
+                    else '%.0f s' % tried[n]['secs']))
+            elif parts is None:
+                manual.append('%s: %d MiB, and its statement alone peaks at %d MiB: the imports are over the %d MiB '
+                              'memory limit, and no split helps (regroup the bundles it imports)' % (
+                                  key, rss, base, PIECE_RSS_LIMIT))
+            elif not (plan.get('pieces') or {}).get(n, {}).get('keep'):
+                manual.append('%s: %d MiB, no declarations recorded for it in the plan' % (key, rss))
+            else:
+                auto_mem.append((n, rss, secs, parts))
+        return auto_mem, manual
+
+    def stream_memory_split(self):
+        """While the measure streams: split the pieces measured over the verifier's memory so far, at once the first
+        time and then at most every STREAM_SPLIT_MINUTES (each round re-runs names, order and the cached part of
+        the measure). dbenbenn 2026-11-08: "is it not possible to start splitting heavy pieces in parallel? ...
+        earlier feedback about whether the strategy is working". Returns True when it split (the run restarts
+        from names)."""
+        if not self.p.get('stream_memory_splits', True):
+            return False
+        last = self.state.get('stream_split_at')
+        if last and time.time() - last < STREAM_SPLIT_MINUTES * 60:
+            return False
+        got = self.calibrate_inputs()
+        if not got:
+            return False
+        cfg, plan, times, _, _ = got
+        live = {x.split(':', 1)[1] for x in self.live_items() if x.startswith('piece:')}
+        res = calibration(dict(plan, bundles=[], stubs={}), times, cfg.get('time_scale', 1.5), cfg.get('budget', 55),
+                          live)
+        tried = self.state.setdefault('auto_split', {})
+        auto_mem, _ = self.memory_triage(plan, times, res['memory_over'], tried)
+        if not auto_mem:
+            return False
+        want = {n: parts for n, _, _, parts in auto_mem}
+        for n, rss, secs, parts in auto_mem:
+            tried[n] = dict(tried.get(n) or {}, secs=secs, rss_mib=rss, parts=parts)
+        self.state['stream_split_at'] = time.time()
+        line = 'splitting %d piece(s) alone while measuring (over the %d MiB memory limit): %s' % (
+            len(want), PIECE_RSS_LIMIT, ', '.join('%s into %d' % x for x in sorted(want.items())))
+        print('== measure: ' + line, flush=True)
+        self.calibrate_log([line])
+        self.split_pieces_locally(want, 'measure', 'measure: %s over the memory limit, split while streaming')
+        return True
+
     def step_calibrate_pieces(self):
         """Overlap mode: the pieces, measured after the bundles and statements. A uniform overrun of several
         pieces while nothing is published re-plans at the ratio, as `calibrate` always did. Otherwise each slow
@@ -2209,25 +2297,9 @@ class Pipeline:
                 manual.append('%s: %.0f s, no declarations recorded for it in the plan' % (key, secs))
             else:
                 auto.append((n, secs, cost))
-        # over the verifier's memory: split at once (a peak is no thrashing artefact to measure again), into enough
-        # parts for the proof's share of the peak to fit beside the imports (its statement's own peak)
-        auto_mem = []
-        for key, rss, secs in res['memory_over']:
-            n = key.split(':', 1)[1]
-            base = (times.get('statement:' + n) or {}).get('rss_mib')
-            parts = memory_parts(rss, base)
-            if n in tried:
-                manual.append('%s: %d MiB, still over the %d MiB memory limit after an automatic split (it was %s)' % (
-                    key, rss, PIECE_RSS_LIMIT, ('%d MiB' % tried[n]['rss_mib']) if tried[n].get('rss_mib')
-                    else '%.0f s' % tried[n]['secs']))
-            elif parts is None:
-                manual.append('%s: %d MiB, and its statement alone peaks at %d MiB: the imports are over the %d MiB '
-                              'memory limit, and no split helps (regroup the bundles it imports)' % (
-                                  key, rss, base, PIECE_RSS_LIMIT))
-            elif not (plan.get('pieces') or {}).get(n, {}).get('keep'):
-                manual.append('%s: %d MiB, no declarations recorded for it in the plan' % (key, rss))
-            else:
-                auto_mem.append((n, rss, secs, parts))
+        # over the verifier's memory: split at once (a peak is no thrashing artefact to measure again)
+        auto_mem, manual_mem = self.memory_triage(plan, times, res['memory_over'], tried)
+        manual += manual_mem
         again = [(n, secs) for n, secs, _ in auto if n not in (self.state.get('remeasured') or {})]
         if again:
             # measured once more before any split (q138: 1595 s of CPU for a piece that compiles in 2 s alone,

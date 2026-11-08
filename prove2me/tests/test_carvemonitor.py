@@ -361,3 +361,25 @@ def test_a_streaming_measure_counts_every_batch_since_the_step_started(carve):
         '==== 2026-11-07T16:59:00 measure (skill b)\nstatement   1.0 s ok S2 \n')
     m = phase(M.Reporter(str(carve), lib=False).compose(), 'Measure bundles+statements')
     assert (m['done'], m['total']) == (3, 4) and m['note'].startswith('bundles 1/2, statements 2/2')
+
+
+def test_a_streaming_measure_of_every_kind_is_one_phase_against_this_runs_items(carve):
+    # q153 (2026-11-08): restarted mid-measure, the run had 3,303 items left (pieces first); both bars showed
+    # 0 ("bundles 0/1699, statements 0/2892" and "pieces 0/2892, waiting") though batches were being measured
+    st = json.load(open(carve / 'pipeline_state.json'))
+    st['steps']['measure'] = {'status': 'running', 'started': '2026-11-08T11:12:34'}
+    st['steps'].pop('measure_pieces', None)
+    wj(carve / 'pipeline_state.json', st)
+    (carve / 'logs' / 'driver.log').write_text(
+        '== measure 2026-11-07T18:27:03\n== measure: 7318 item(s) to measure in 115 batch(es), each released as it passes\n'
+        '== measure 2026-11-08T11:12:34\n== measure: 5 item(s) to measure in 3 batch(es), each released as it passes\n'
+        '== measure: batch 1/3 measured; none released\n')
+    (carve / 'logs' / 'measure.log').write_text(
+        '==== 2026-11-07T18:30:00 measure (skill a)\nbundle      3.0 s ok B1 \n'
+        '==== 2026-11-08T11:12:40 measure (skill b)\npiece      30.0 s ok S1  7200 MiB\npiece      3.0 s ok S2  6900 MiB\n'
+        '==== 2026-11-08T11:30:00 measure (skill b)\nstatement   1.0 s ok S2 \n')
+    sec = M.Reporter(str(carve), lib=False).compose()
+    m = phase(sec, 'Measure')
+    assert (m['done'], m['total']) == (3, 5) and m['state'] == 'running'
+    assert m['note'].startswith('batch 1/3') and 'pieces 2' in m['note'] and 'statements 1' in m['note']
+    assert not [p for p in sec['phases'] if p['name'] in ('Measure bundles+statements', 'Measure pieces')]

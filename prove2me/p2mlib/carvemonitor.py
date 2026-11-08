@@ -41,6 +41,8 @@ PUB_SEP = ' | publisher: '
 MEASURE_LINE = re.compile(r'^(bundle|statement|piece)\s+[\d.]+ s (ok|FAIL) (\S+)', re.M)
 BUILD_LINE = re.compile(r'^([✔✖]) \[(\d+)/(\d+)\] (?:\w+ )?(\S+)', re.M)
 COUNT_LINE = re.compile(r'^LeanInfo (\d+)/(\d+)\s', re.M)
+STREAM_HEAD = re.compile(r'^== measure: (\d+) item\(s\) to measure in (\d+) batch', re.M)
+STREAM_BATCH_DONE = re.compile(r'^== measure: batch (\d+)/(\d+) measured', re.M)
 KIND_LABEL = {'bundle': 'bundles', 'statement': 'statements', 'piece': 'pieces'}
 
 
@@ -295,10 +297,40 @@ class Carve:
         plan = plan if os.path.isabs(plan) else self.path(plan)
         return self.f.json(plan), os.path.join(work, 'times.json'), cfg
 
+    def streaming_measure_phase(self, st):
+        """The `measure` step streaming every kind (carve_pipeline stream_bundles, `N item(s) to measure in B
+        batch(es)` in driver.log after the step's `== measure STARTED` line): one phase against this run's N items
+        (cached ones print too), with the batch reached. q153 (2026-11-08): restarted mid-measure, both per-kind
+        bars stood at 0 for half an hour while the pieces were measured. None otherwise."""
+        if st('measure') != 'running':
+            return None
+        rec = ((self.f.json(self.path('pipeline_state.json')) or {}).get('steps') or {}).get('measure') or {}
+        started = rec.get('started')
+        text = self.f.text(self.path('logs', 'driver.log')) or ''
+        i = text.rfind('== measure %s' % started) if started else -1
+        m = STREAM_HEAD.search(text, i) if i >= 0 else None
+        if not m:
+            return None
+        total, nb = int(m.group(1)), int(m.group(2))
+        b = STREAM_BATCH_DONE.findall(text, m.end())
+        seen = {}
+        for k, ok, n in MEASURE_LINE.findall(runs_since(self.f.text(self.path('logs', 'measure.log')), started)):
+            seen[(k, n)] = ok
+        counts = {k: sum(1 for kk, _ in seen if kk == k) for k in KIND_LABEL}
+        note = 'batch %d/%d; this run: %s' % (int(b[-1][0]) if b else 0, nb, ', '.join(
+            '%s %d' % (KIND_LABEL[k], counts[k]) for k in KIND_LABEL if counts[k]) or 'nothing yet')
+        failed = sum(1 for ok in seen.values() if ok == 'FAIL')
+        if failed:
+            note += '; %d failed' % failed
+        return {'name': 'Measure', 'done': min(len(seen), total), 'total': total, 'state': 'running', 'note': note}
+
     def measure_phases(self, st, cur=None):
         plan, times_path, cfg = self.work_plan_times()
         if not plan:
             return []
+        stream = self.streaming_measure_phase(st)
+        if stream:
+            return [stream]
         sets = planned(plan, cfg.get('external'))
         groups = ([('measure', 'Measure bundles+statements', ('bundle', 'statement')),
                    ('measure_pieces', 'Measure pieces', ('piece',))] if self.params().get('overlap')

@@ -870,6 +870,23 @@ def test_name_check_reconciles_from_the_prefetched_lookups(tmp_path, monkeypatch
     ok, msg = CP.name_check({'out': str(out), 'work': str(work)})
     assert ok, msg
     assert sorted(asked) == [('bundle', 'B0'), ('statement', 'A.t')]          # once each, prefetched
+    # q153 (2026-11-08): a split mid-measure re-runs `names`, and 4,591 lookups took 21 min; a lookup younger than
+    # NAMES_CACHE_HOURS is reused (the publisher's own reconcile still guards against a name taken since)
+    asked.clear()
+    (out / 'lib' / 'Thm_A_u.lean').write_text('theorem A.u : True := trivial\n')
+    plan['stubs']['A.u'] = {'bundles': ['B0']}
+    plan['pieces']['A.u'] = {'bundles': ['B0'], 'imports': []}
+    (work / 'plan.json').write_text(json.dumps(plan))
+    ok, msg = CP.name_check({'out': str(out), 'work': str(work)})
+    assert ok, msg
+    assert asked == [('statement', 'A.u')]                                     # only the new name
+    cache = json.load(open(work / 'names_cache.json'))
+    for v in cache.values():
+        v['t'] -= (CP.NAMES_CACHE_HOURS + 1) * 3600
+    (work / 'names_cache.json').write_text(json.dumps(cache))
+    asked.clear()
+    assert CP.name_check({'out': str(out), 'work': str(work)})[0]
+    assert len(asked) == 3                                                     # stale: all looked up again
 
 
 # ---- the verifier elaborates synchronously (q128, 2026-10-30) -----------------------------------
@@ -979,3 +996,16 @@ def test_prune_check_compiles_with_synchronous_elaboration(tmp_path, monkeypatch
     monkeypatch.setattr(sys, 'argv', ['prune_solution.py', str(f), '--check'])
     PS.main()
     assert seen[0][:3] == ['lake', 'env', 'lean'] and '-DElab.async=false' in seen[0]
+
+
+def test_a_new_carve_keeps_openais_own_mathlib_imports_and_an_old_one_keeps_its_choice(tmp_path):
+    # q153 (2026-11-08): `import Mathlib` alone peaks at 6,551 MiB of the verifier's ~7 GiB, while the narrow imports
+    # OpenAI's PlanarPacking files used peak at 1-3 GiB. dbenbenn: "make sure that later carves use specific Mathlib
+    # modules when possible". A carve configured before keeps `true`: its published files must not change
+    ws = tmp_path / 'ws'
+    (ws / 'Definitions').mkdir(parents=True)
+    new = CP.make_config(str(tmp_path), 'F', 'Main', 'OAI.Fam.main', [], 'FAM', [], 40, 0.0, str(ws), None)
+    assert new['collapse_mathlib'] is False
+    old = CP.make_config(str(tmp_path), 'F', 'Main', 'OAI.Fam.main', [], 'FAM', [], 40, 0.0, str(ws),
+                         {'collapse_mathlib': True})
+    assert old['collapse_mathlib'] is True
