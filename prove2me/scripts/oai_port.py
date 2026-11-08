@@ -31,7 +31,7 @@ declarations; rename OpenAI's copy of the target `<name>_oai`; core rewrites, co
 the StdSimplex shim and patches; prepend the compatibility block; append `theorem solution : type_of% @T_oai := @T_oai`;
 then (unless --no-check) compile the verifier's form (the statement imported, `theorem _check`),
 -j1, and write OUT_DIR/result.json {secs (CPU), wall, errors, axioms, unknown, bytes, dropped}.
-Rough rule: up to ~70–80 s local CPU passes the 300 s verifier; 90 s and slower timed out.
+Rule: under 100 s CPU passes the 300 s verifier (PIECE_CAP; verifier-failures.md, "Proof submissions time out").
 """
 import json
 import os
