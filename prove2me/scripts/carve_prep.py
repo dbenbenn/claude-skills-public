@@ -629,6 +629,21 @@ def _word_at(text, i):
     return 0 <= i < len(text) and _WORD.match(text[i]) is not None
 
 
+_RUN = re.compile(r"[\w'.]+")
+_NUMERAL = re.compile(r"[\d.]+$")
+
+
+def word_index(texts):
+    r"""The distinct maximal runs of [\w'.] in `texts`, one per line, pure numerals left out: has_word and has_word_p
+    answer on it as on the texts themselves (a name is made of these characters, so each match lies inside one run,
+    and its boundaries are decided there; a numeral holds no name). q153 (2026-11-08): check_text scanned 567 MB of
+    generated Lean up to four times per distinct name, over 30 min after every split round."""
+    seen = set()
+    for t in texts:
+        seen.update(r for r in _RUN.findall(t) if not _NUMERAL.match(r))
+    return '\n'.join(sorted(seen))
+
+
 def has_word(text, x):
     r"""Does `x` occur in `text` as a whole name: not after a word character, not before one or a
     prime. Same answer as `re.search(r"(?<![\w])x(?![\w'])", text)`, but `str.find` runs at memory
@@ -733,7 +748,7 @@ def cmd_check_text(argv):
     gen = glob.glob(P + '/out/lib/*.lean') + glob.glob(P + '/out/solutions/*.lean')
     ws = ws_of(argv)
     extra = opts(argv, '--search') + imported_workspace_files(ws, gen)
-    local = '\n'.join(open(f, encoding='utf-8').read() for f in gen + extra)
+    local = word_index(open(f, encoding='utf-8').read() for f in gen + extra)
     skip = {re.sub(r'^(Def|Thm|Sol)_', '', os.path.basename(f)[:-5]) for f in gen + extra}
     skip |= set(opts(argv, '--allow'))
     roots, rg = library_roots(ws), rg_exe()

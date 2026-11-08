@@ -545,3 +545,19 @@ def test_library_lookups_persist_across_check_text_runs_until_the_packages_chang
     (ws / 'lake-manifest.json').write_text('{"rev": "b"}')                    # a Mathlib bump: asked again
     look = CP.library_lookup(str(ws), CP.library_roots(str(ws)), 'rg', path)
     assert look('Real.pi') and len(calls) == 3
+
+
+def test_the_word_index_answers_every_name_lookup_as_the_whole_text_does():
+    # q153 (2026-11-08): check_text joined 567 MB of generated Lean and scanned it up to four times per distinct name
+    # in the prose (thousands of table names): over 30 min at 99% CPU after every split round. Every match lies
+    # inside one maximal run of [\w'.] and its boundaries are decided there, so the distinct runs (pure numerals,
+    # which hold no name, left out) answer alike
+    text = ("theorem X.Foo.bar_p12 : 1 = 1 := rfl\ndef h'x := 493459503278503495288752437355\n"
+            "lemma baz' (a : ℕ) := (-1630588065395479373131194940640) foo.bar.baz qux₀ mk_p3x 1.5e3\n")
+    idx = CP.word_index([text])
+    assert len(idx) < len(text)
+    for x in ('Foo', 'Foo.bar_p12', 'bar_p12', 'X.Foo', 'oo', 'baz', "baz'", 'h', 'x', 'foo.bar', 'bar.baz', 'qux₀',
+              'qux', 'mk', 'theorem', 'rfl', 'e3', 'bar'):          # names start with a letter or _ (IDENT)
+        assert CP.has_word(idx, x) == CP.has_word(text, x), x
+    for x in ('X.Foo.bar', 'bar', 'mk', 'Foo'):
+        assert CP.has_word_p(idx, x) == CP.has_word_p(text, x), x
