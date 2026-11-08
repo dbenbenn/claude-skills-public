@@ -725,6 +725,15 @@ def handoffs_body():
         return b'{"handoffs": []}'
 
 
+def publish_jobs_body():
+    """MONITOR_HOME/publish-jobs.json as written by the publish-jobs poller (claude-private/tools/publish-jobs):
+    dbenbenn's prove2.me bundle and statement publish jobs, for /page/publishing.html."""
+    try:
+        return open(os.path.join(State.home, 'publish-jobs.json'), 'rb').read()
+    except OSError:
+        return b'{"missing": true}'
+
+
 def post_request(headers, body):
     """(status, reply) for POST /request: queue {action, key} as a file for the service `kind` names:
     the mission tracker (MONITOR_HOME/requests/, the default) or the hand-off service
@@ -787,6 +796,8 @@ class Handler(BaseHTTPRequestHandler):
                 body = missions_body()
             elif path == '/handoffs.json':
                 body = handoffs_body()
+            elif path == '/publish-jobs.json':
+                body = publish_jobs_body()
             elif path.startswith('/agent/'):
                 code, body, ctype, extra = agent_file(path, query)
             elif path.startswith('/inbox/'):

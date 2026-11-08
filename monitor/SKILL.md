@@ -151,7 +151,7 @@ The main page has two more cards (their order is in "Page layout" below):
 `/` and `/page/<name>.html` (= `www/<name>.html`), any other `www/` path with extension .js .css .html .svg .png
 .ico (plain path segments only, nothing resolving outside `www/`), `/status.json` (now with `quota.series` rows
 `[t, 5h %, 5h resetsAt, 7d %, 7d resetsAt]`), `/agents.json` (running / recent / hidden; cached 5 s) and
-`/missions.json`, `/handoffs.json`, `POST /request` (below), `/agent/<name>/<file>[?from=N&max=M]` where file is one of transcript.jsonl, state.json, usage.json, meta.json,
+`/missions.json`, `/handoffs.json`, `/publish-jobs.json`, `POST /request` (below), `/agent/<name>/<file>[?from=N&max=M]` where file is one of transcript.jsonl, state.json, usage.json, meta.json,
 brief.md. The agent route is read-only: the name must be a plain directory name that is not a symlink, the file
 must resolve inside that directory, responses are capped at 512 KiB. For transcripts `from` is a byte offset
 (negative = from the end) and the reply holds whole lines only, with `X-Start`, `X-End`, `X-Size` headers: poll
@@ -206,6 +206,18 @@ missions in progress; the nav's "Finished (N)" and a line under the sections lin
 script, `www/main.js` (it was inline in index.html) with `www/main.css`, switched by `<body data-view>`; each card
 draws only when its element exists. Links between them go through `hrefFor`, and every fetch and asset path is
 absolute, since done.html lives under /page/.
+
+**Publishing page** `/page/publishing.html` (2026-11-08, dbenbenn: "a similar page [to prove2.me's
+my-submissions] that shows bundles and theorem statements"): every prove2.me publish job, bundles and
+statements, pending, failed and published. Tiles (in progress, names still failing, published and failed
+in the last 24 h, all time), two per-day bar charts for 30 days (published, stacked statements/bundles;
+failed or errored) with a table view, and a list with tabs In progress / Failed / Published, a kind
+filter, a search box, and for failures Still failing (one row per name) / Retrying / Fixed / All. Data:
+`GET /publish-jobs.json` = `MONITOR_HOME/publish-jobs.json`, written every 2 min by the user unit
+`publish-jobs.service` (`~/claude/claude-private/tools/publish-jobs`, whose README has the polling rules
+and the fixed/retrying/still-failing definitions). Page code `www/publishing.{html,js,css}`, standalone
+(it does not load main.js). Statements link to `https://prove2.me/theorems/<id>`; bundles have no page
+on prove2.me.
 
 **Scroll position.** Every redraw (status every 30 s, agents every 15 s, missions every 30 s, a phase click, a
 width change) runs inside `keepScroll`: it finds the element at the top of the viewport, the nearest ancestor with

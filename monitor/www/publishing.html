@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>monitor: publishing</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/agents.css">
+<link rel="stylesheet" href="/main.css">
+<link rel="stylesheet" href="/publishing.css"></head>
+<body data-view="publishing"><main>
+<h1>monitor: publishing</h1>
+<p class="sub" id="upd">Loading…</p>
+<div class="alarm" id="alarm" role="alert" hidden></div>
+<nav class="nav" aria-label="Views"><a href="/">← Back to the monitor</a><a href="/page/done.html">Finished</a><a href="#t-days">Per day</a><a href="#t-jobs">Jobs</a><a href="https://prove2.me/my-submissions">prove2.me: my proof submissions ↗</a></nav>
+<p class="chart-sub">What you have tried to publish on prove2.me: definitions <b>bundles</b> and theorem <b>statements</b>, from the API's publish jobs (<code>GET /api/v1/publish-jobs</code>), polled every 2 minutes by <code>claude-private/tools/publish-jobs</code>. prove2.me's own My submissions page lists proofs only. A failure counts as <i>fixed</i> once a later job of the same kind and name published, and <i>retrying</i> while a later one is still running.</p>
+<section class="pj-tiles" id="tiles" aria-label="At a glance"></section>
+<section class="card" aria-labelledby="t-days">
+<h2 id="t-days">Per day, last 30 days</h2>
+<p class="chart-sub">Jobs by the day they were submitted (CET/CEST). Hover or tap a day for its numbers.</p>
+<div class="pj-charts">
+<div><h3>Published</h3><div class="pj-legend" id="leg-pub"></div><div class="pj-bars" id="ch-pub"></div></div>
+<div><h3>Failed or errored</h3><div class="pj-bars" id="ch-bad"></div></div>
+</div>
+<details><summary>Table</summary><div id="daytab"></div></details>
+</section>
+<section class="card" aria-labelledby="t-jobs">
+<h2 id="t-jobs">Jobs</h2>
+<div class="toolbar">
+<div class="seg" role="group" aria-label="Which jobs" id="seg-tab"></div>
+<div class="seg" role="group" aria-label="Kind" id="seg-kind"></div>
+<div class="seg" role="group" aria-label="Failures" id="seg-res"></div>
+<input type="search" id="q" class="pj-q" placeholder="Filter by name, title or error" aria-label="Filter">
+</div>
+<p class="chart-sub" id="list-sub"></p>
+<div id="list"></div>
+<p><button class="zoomed" id="more" hidden>Show more</button></p>
+</section>
+</main>
+<script src="/publishing.js"></script></body></html>

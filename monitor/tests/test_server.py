@@ -152,6 +152,16 @@ def post(base, path, body, headers=None):
         return e.code, json.loads(e.read() or b'{}')
 
 
+def test_publish_jobs_route(server, tmp_path, monkeypatch):
+    base, _ = server
+    home = tmp_path / 'home'
+    home.mkdir()
+    monkeypatch.setattr(M.State, 'home', str(home))
+    assert json.loads(get(base, '/publish-jobs.json')[1]) == {'missing': True}
+    (home / 'publish-jobs.json').write_text('{"stored": 3, "failed": []}')
+    assert json.loads(get(base, '/publish-jobs.json')[1])['stored'] == 3
+
+
 def test_missions_route_and_requests(server, tmp_path, monkeypatch):
     base, _ = server
     home = tmp_path / 'home'
