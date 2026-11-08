@@ -986,9 +986,8 @@ def test_prune_check_compiles_with_synchronous_elaboration(tmp_path, monkeypatch
     import prune_solution as PS
     seen = []
 
-    class R:
-        returncode, stdout, stderr = 0, '', ''
-    monkeypatch.setattr(PS.subprocess, 'run', lambda args, **k: seen.append(args) or R())
+    from p2mlib import localcheck
+    monkeypatch.setattr(localcheck, 'run_lean', lambda args, cwd, env=None: seen.append(args) or (0, '', 1.0, 100))
     monkeypatch.setattr(PS, 'prune_by_lean', lambda f: 'theorem solution : True := trivial\n')
     monkeypatch.setenv('P2M_WORKSPACE', str(tmp_path))
     f = tmp_path / 'Sol.lean'

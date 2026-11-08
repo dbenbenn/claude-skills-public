@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Assemble one Lean file from a Blueprint (definitions + `sorry` lemmas) and Part files proving them.
 
-usage: assemble_blueprint.py BLUEPRINT.lean OUT.lean PART.lean [PART.lean ...] [--target NAME] [--allow-sorry]
+usage: assemble_blueprint.py BLUEPRINT.lean OUT.lean PART.lean [PART.lean ...] [--target NAME]
+           [--published STUB=Theorems.MODULE[:NAME] ...] [--allow-sorry]
 
 The parallel-prover pattern (F-amenability child, Lodha–Moore Lemma 5.6, 2026-10-02): a Blueprint
 states every lemma with `sorry` and proves the main theorem from them; each prover writes
@@ -67,9 +68,18 @@ stubs): OUT is then a solution file. The Blueprint's NAME is renamed NAME_dev (a
 not declare the target's name: references/verifier-failures.md) and a root-level `theorem solution`
 with NAME's statement, `exact NAME_dev <explicit arguments>`, closes the file. Without it OUT is a
 development for build_solution.py, which finds the target's proof as `NAME_dev` the same way.
-When the Blueprint proves it in a sub-namespace instead (`TaoBR.TaoDecay.X` for `TaoBR.X`, q165: one
-Blueprint theorem with NAME's last component), that theorem keeps its name and `solution` calls it.
-Either way run `prune_solution.py OUT --check` before submitting.
+When the Blueprint proves it under another name instead, one Blueprint theorem whose last component is
+NAME's or NAME's plus `_dev` (`TaoBR.TaoDecay.X` for `TaoBR.X`, q165; `X_dev`, q208), that theorem keeps
+its name and `solution` calls it. Either way run `prune_solution.py OUT --check` before submitting.
+
+--published STUB=Theorems.MODULE[:NAME] (repeatable): the stub is proved by the published theorem instead
+of a Part, `exact NAME <its explicit arguments>`, and MODULE is imported (NAME defaults to the module's
+theorem). This cuts a slow Blueprint proof into pieces at stubs published as statements (q196, q200,
+q209 each did it by hand): assemble each piece with --target and the stubs it does not prove published.
+The published form may be the stub's with definitions unfolded (`exact` unfolds them), but a published
+statement whose bundle redeclares the Blueprint's definitions clashes; then publish the Blueprint's
+definitions as that bundle first. A Part's proof of a published stub stays in OUT unused, and
+prune_solution.py drops it.
 """
 import argparse
 import heapq
@@ -289,6 +299,24 @@ def parse_part(path, scratch):
     return info
 
 
+def published_name(module, ws):
+    """The full name of the theorem a published Theorems module states: its first `theorem`, under the
+    module's `namespace` when it opens one and the name is not already qualified by it."""
+    path = module_path(module, ws)
+    try:
+        text = strip(open(path, encoding='utf-8').read())
+    except OSError:
+        sys.exit('refusing: --published: no file %s for %s (fetch_theorems.py --names first)' % (path, module))
+    m = re.search(r'^\s*(?:theorem|lemma)\s+([^\s:({\[]+)', text, re.M)
+    if not m:
+        sys.exit('refusing: --published: %s states no theorem; give its name as MODULE:NAME' % module)
+    name = m.group(1)
+    ns = re.search(r'^namespace\s+(\S+)', text[:m.start()], re.M)
+    if ns and not name.startswith(ns.group(1) + '.'):
+        name = ns.group(1) + '.' + name
+    return name
+
+
 def renamed(info, i, suffix='_dev'):
     """Command i's text with its declared name renamed `<name><suffix>`."""
     c = info.commands[i]
@@ -434,6 +462,9 @@ def main():
     ap.add_argument('out')
     ap.add_argument('parts', nargs='+')
     ap.add_argument('--target', help='the published theorem: rename it NAME_dev and append `theorem solution`')
+    ap.add_argument('--published', action='append', default=[], metavar='STUB=MODULE[:NAME]',
+                    help='prove Blueprint stub STUB by the published theorem of Theorems module MODULE (its '
+                         'theorem NAME, read from the module when omitted) and import MODULE')
     ap.add_argument('--allow-sorry', action='store_true',
                     help='exit 0 although declarations of OUT still use `sorry` (stubs no Part proves)')
     args = ap.parse_args()
@@ -484,6 +515,15 @@ def main():
         pre = merged[header_end(merged):].rstrip('\n') + '\n'
         print('inlined %s' % ', '.join(m for m, _ in helpers))
     hdr = header_imports([read(p) for _, p in helpers] + texts, bp_mods)
+    published = {}                                 # stub as given -> (module, theorem name)
+    for spec in args.published:
+        stub, _, mod = spec.partition('=')
+        mod, _, name = mod.partition(':')
+        if not stub or not mod.startswith('Theorems.'):
+            sys.exit('refusing: --published %s: write STUB=Theorems.MODULE[:NAME]' % spec)
+        published[stub] = (mod, name or published_name(mod, ws))
+        if mod not in hdr:
+            hdr.append(mod)
     imports_text = ''.join('import %s\n' % m for m in hdr)
     header = imports_text + pre
     closers = [[] for _ in texts]
@@ -563,6 +603,18 @@ def main():
                             stub not in decl_of or n not in decl_of
                             or decl_of[stub].type_hash == decl_of[n].type_hash):
                         proved[stub] = i
+    pub_of = {}                                    # stub command -> published theorem name
+    for given, (mod, name) in published.items():
+        hits = [n for n in set(stubs) | set(partial) if n == given or n.rsplit('.', 1)[-1] == given]
+        if len(hits) != 1:
+            sys.exit('refusing: --published %s: %s' % (given, 'not a Blueprint stub (a theorem proved by `sorry`)'
+                     if not hits else 'several stubs match: %s; give the full name' % ', '.join(sorted(hits))))
+        n = hits[0]
+        if n in partial:
+            stubs[n] = partial.pop(n)
+        proved.pop(n, None)                        # a Part's proof of it is no longer used (prune drops it)
+        pub_of[stubs[n]] = name
+        print('%s: proved by the published %s (%s)' % (n, name, mod))
     alias_of = {stubs[s]: (s, t) for s, t in proved.items()}
 
     cmd_of = {d.name: d.command for d in info.decls}
@@ -584,7 +636,7 @@ def main():
             # a different name, so it keeps it and `solution` calls it
             last = args.target.rsplit('.', 1)[-1]
             cands = [i for i in named if cmds[i].decl_kind == 'theorem'
-                     and any(n.rsplit('.', 1)[-1] == last for n in cmds[i].names)]
+                     and any(n.rsplit('.', 1)[-1] in (last, last + '_dev') for n in cmds[i].names)]
             if len(cands) > 1:
                 sys.exit('refusing: --target %s: the Blueprint has several theorems named %s: %s' % (
                     args.target, last, ', '.join(cmds[i].names[0] for i in cands)))
@@ -640,6 +692,11 @@ def main():
                  % '; '.join(stuck[:12]))
 
     def text_of(i):
+        if i in pub_of:
+            c = cmds[i]
+            sig = info.slice(c.ids[0][1].byte, c.value_start.byte).rstrip()
+            return '%s := by\n  exact %s%s' % (info.slice(c.start.byte, c.value_start.byte).rstrip(), pub_of[i],
+                                                ''.join(' ' + x for x in explicit_binders(sig)))
         if i in alias_of:
             s, t = alias_of[i]
             c = cmds[i]
@@ -696,7 +753,7 @@ def main():
         body.append('\n' + solution_text(info, tgt, args.target if suffix else cmds[tgt].names[0], suffix,
                                          replace=at_root))
     open(out, 'w', encoding='utf-8').write(header + ''.join(body))
-    missing = sorted(set(stubs) - set(proved))
+    missing = sorted(n for n in set(stubs) - set(proved) if stubs[n] not in pub_of)
     if missing:
         print('stubs kept (no Part proves them): %s' % ', '.join(missing))
     print('wrote %s (%d stubs replaced)' % (out, len(proved)))

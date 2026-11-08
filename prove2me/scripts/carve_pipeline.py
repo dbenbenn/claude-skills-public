@@ -62,7 +62,7 @@ its `prefixes` do not match the sources and the root module.
 bundle over 80 s, BUNDLE_OWN_LIMIT: q172's data bundles of 83-88.6 s timed out on the server's own 300 s) raises
 config `time_scale` to scale x (its measured seconds / its planned cost), forgets plan..measure and
 runs them again (cached files are not re-measured), at most twice; then it stops and lists the
-offenders. A piece (a proof: resubmittable) measured under 120 s (PIECE_CAP) never counts: submit it as is and
+offenders. A piece (a proof: resubmittable) measured under 100 s (PIECE_CAP) never counts: submit it as is and
 split only after two real verifier timeouts. Another item is excused the same way by listing it
 (`bundle:NAME`) in pipeline.json `accept_over` (warned when many items import it). It also sums the measured
 times over each unpublished bundle's import chain and warns, never stops, over 150 s (a cold verifier worker builds

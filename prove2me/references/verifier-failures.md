@@ -52,11 +52,12 @@ size first from the record: a 102KB solution had been accepted, so a 70KB one is
 
 **A WA "does not match the target type" that no local check reproduces: look for a raw `Classical.choose (Classical.choose_spec …)` in a hypothesis.** Erdős 3 v2 (2026-10-18): two statements got WA ("failed to synthesize CoeT … timeout at `typeclass` (20000)") for every proof, although locally the solution's type and the target's were `Expr`-equal, every published file was byte-identical and every emulation of the check passed. Private probes (`"private": true` statements keeping the hypotheses, conclusion `True`, proof `trivial`) bisected it in four rounds of about 15 minutes each: the trigger was two hypotheses whose binder types repeated `Classical.choose (Classical.choose_spec (exists_… m dim))`. Restating them after the colon, with the term named once by `let A := …` (the form the accepted statements used), passed at once. The proofs needed only an `intro` and positional arguments. So: never put a raw choose-of-an-existence-theorem into a binder type; name it with a `let` after the colon. To bisect a verifier-only WA, use private trivial probes rather than guesses. The verifier elaborates the check separately from the solution file, so options set in the solution never reach its message, and the soundness guard refuses metaprogramming.
 
-**Proof submissions time out the same way.** A solution's verify can return `ERROR` with "Verification
-timed out after 300s". Measure the solution file single-threaded (`lake env lean -j1 FILE`; the default
-parallel wall time hides the cost): Artin's (10.10) solution took 81 s single-threaded (17 s wall) and
-timed out twice, while 18 s and 40 s ones passed. Over about 60 s single-threaded, split it into
-published cuts before the second retry.
+**Proof submissions time out the same way** ("Verification timed out after 300s"). Measure CPU seconds
+under synchronous elaboration, as `prune_solution.py --check` does; parallel wall time hides the cost
+(q196: 52 s wall, 126 s CPU). Since late October 77–103 s passed first time and 108–142 s timed out at
+least twice (oaiq-078, q159, q196, q209); the 66 s and 81 s timeouts of 2026-10-09/10 predate them. So over 100 s, split into published cuts before the first
+submission (dbenbenn 2026-11-08, also carvepipeline `PIECE_CAP`); under it, submit as is. Memory is a
+separate limit (about 7 GiB peak, `PIECE_RSS_LIMIT`), and `--check` reports both.
 
 **Retry or split according to how easy the split is** (dbenbenn, 2026-10-08). When the carver can cut an item cleanly into parts that are each much faster, split early, after an own-compile timeout or a slow local check, because a split costs little. Dependency timeouts ("Module compilation timed out") do not depend on the item's own size, so they never justify a split: a 14 s Erdős 3 bundle got four in a row while its 42 s sibling passed first try. When one heavy declaration dominates, or the best cut barely changes the time, keep retrying much longer instead. Never loop re-splitting for a marginal gain: a 76 s bundle that the scheduler kept "splitting" to stay under a 75 s cutoff went through unsplit on a retry.
 

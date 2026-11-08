@@ -30,6 +30,8 @@ compiled locally.
 import hashlib
 import os
 import re
+import subprocess
+import tempfile
 
 IMPORT = re.compile(r'^import (\S+)\s*$', re.M)
 
@@ -81,3 +83,18 @@ def server_check_text(solution, preamble, formal_statement, target):
     imps = list(dict.fromkeys(IMPORT.findall(solution) + IMPORT.findall(preamble or '') + ['Lean']))
     rest = IMPORT.sub('', body).lstrip('\n')
     return ''.join('import %s\n' % i for i in imps) + '\n' + rest
+
+
+def run_lean(args, cwd, env=None):
+    """(returncode, output, CPU seconds, peak RSS in MiB) of one process, from its own rusage (os.wait4).
+    RUSAGE_CHILDREN's ru_maxrss is the largest child of this process so far, so it cannot give one run's
+    peak. The lean-cap wrapper execs the real Lean (through `systemd-run --scope`, which execs too), so the
+    process waited for is Lean itself."""
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        p = subprocess.Popen(args, cwd=cwd, env=env, stdout=out, stderr=err)
+        _, status, ru = os.wait4(p.pid, 0)
+        p.returncode = os.waitstatus_to_exitcode(status)
+        out.seek(0)
+        err.seek(0)
+        o = out.read().decode('utf-8', 'replace') + err.read().decode('utf-8', 'replace')
+    return p.returncode, o, ru.ru_utime + ru.ru_stime, ru.ru_maxrss // 1024

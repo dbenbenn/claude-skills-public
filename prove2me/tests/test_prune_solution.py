@@ -59,3 +59,31 @@ def test_refuses_a_file_that_does_not_elaborate(monkeypatch, tmp_path, capsys):
     assert e.value.code not in (0, None)
     assert 'does not elaborate' in str(e.value) and 'unknown identifier `foo`' in str(e.value)
     assert f.read_text() == SRC
+
+
+def _check_run(monkeypatch, tmp_path, cpu, rss):
+    """main --check on a clean file whose compile took `cpu` s and peaked at `rss` MiB."""
+    from p2mlib import localcheck
+    f = tmp_path / 'Sol.lean'
+    f.write_text(SRC)
+    monkeypatch.setattr(P, 'prune_by_lean', lambda path: SRC)
+    monkeypatch.setattr(localcheck, 'run_lean', lambda args, cwd, env=None: (0, '', cpu, rss))
+    monkeypatch.setenv('P2M_WORKSPACE', str(tmp_path))
+    monkeypatch.setattr(sys, 'argv', ['prune_solution.py', str(f), '--check'])
+    P.main()
+
+
+def test_check_reports_cpu_and_peak_memory_and_warns_over_the_verifier_limits(monkeypatch, tmp_path, capsys):
+    # q196, q209 (2026-11-05/06): whole-file solutions of 126 s and 119 s single-threaded (52 s wall) timed out
+    # twice each at the verifier's 300 s; q153 (2026-11-08): files peaking over ~7 GiB are killed for memory.
+    # --check measures both, so the split happens before the first submission (dbenbenn 2026-11-08)
+    from p2mlib import carvepipeline as CP
+    _check_run(monkeypatch, tmp_path, 40.0, 6800)
+    out = capsys.readouterr().out
+    assert 'compiles clean' in out and '40 s CPU' in out and '6800 MiB' in out and 'SPLIT' not in out
+    _check_run(monkeypatch, tmp_path, CP.PIECE_CAP + 19.0, 6800)
+    out = capsys.readouterr().out
+    assert 'SPLIT' in out and 'time' in out
+    _check_run(monkeypatch, tmp_path, 40.0, CP.PIECE_RSS_LIMIT + 50)
+    out = capsys.readouterr().out
+    assert 'SPLIT' in out and 'memory' in out

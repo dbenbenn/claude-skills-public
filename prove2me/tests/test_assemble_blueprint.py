@@ -474,3 +474,60 @@ def test_a_helper_sharing_a_stubs_name_with_another_statement_is_not_its_proof(t
         out = tmp_path / 'out.lean'
         text = assembled_ok(run_assemble(bp, out, pa, pb, '--target', 'API.top'), out, c.ws, 'solution')
         assert 'alias a_eq := API.PartA.a_eq' in text
+
+
+# --- a Blueprint stub replaced by a published statement (q196, q200, q209), a `_dev` target (q208) ---
+
+def _assemble(tmp_path, bp_text, part_text, *extra):
+    from prune_solution import _workspace
+    ws = _workspace()
+    d = os.path.join(ws, 'Solutions', 'AsmPubTest')
+    try:
+        bp = write(os.path.join(d, 'Blueprint.lean'), bp_text)
+        part = write(os.path.join(d, 'PartA.lean'), part_text)
+        out = tmp_path / 'out.lean'
+        r = subprocess.run([sys.executable, os.path.join(SCRIPTS, 'assemble_blueprint.py'), bp, str(out), part,
+                            *extra], capture_output=True, text=True)
+        return r, (out.read_text() if out.exists() else '')
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+PUB_BP = '''import Mathlib
+
+namespace APT
+
+noncomputable def inv (n : ℕ) : ℝ := 1 / (n : ℝ)
+
+theorem two_eq : (2 : ℕ) = 1 + 1 := by
+  sorry
+
+theorem key {a m : ℕ} (h0 : 0 < m) (hma : m < a) : inv (min m (a - m)) ≤ inv m + inv (a - m) := by
+  sorry
+
+theorem top_dev {a m : ℕ} (h0 : 0 < m) (hma : m < a) : inv (min m (a - m)) ≤ inv m + inv (a - m) ∧ 2 = 1 + 1 :=
+  ⟨key h0 hma, two_eq⟩
+
+end APT
+'''
+
+PUB_PART = 'import Solutions.AsmPubTest.Blueprint\n\nnamespace APT.PartA\n\ntheorem two_eq : (2 : ℕ) = 1 + 1 := rfl\n\nend APT.PartA\n'
+
+
+@pytest.mark.lean
+def test_published_replaces_a_stub_by_the_published_theorem_and_a_dev_target_is_found(tmp_path):
+    # q196/q209: a slow Blueprint proof was cut at stubs published as statements, and every piece wired them
+    # in by a job-local script (whose lazy regex once deleted a Part's `end`); the published form may be the
+    # stub's with its definitions unfolded. q208: --target NAME refused a Blueprint proving it as NAME_dev
+    r, text = _assemble(tmp_path, PUB_BP, PUB_PART, '--target', 'APT.top',
+                        '--published', 'APT.key=Theorems.Thm_BlockCycleRotation_one_div_min_le')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'import Theorems.Thm_BlockCycleRotation_one_div_min_le\n' in text
+    assert 'exact BlockCycleRotation.one_div_min_le h0 hma' in text and 'sorry' not in text
+    assert 'exact APT.top_dev h0 hma' in text
+
+
+@pytest.mark.lean
+def test_published_refuses_a_name_that_is_no_stub(tmp_path):
+    r, _ = _assemble(tmp_path, PUB_BP, PUB_PART, '--published', 'APT.inv=Theorems.Thm_BlockCycleRotation_one_div_min_le')
+    assert r.returncode != 0 and 'not a Blueprint stub' in r.stdout + r.stderr

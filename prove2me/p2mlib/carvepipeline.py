@@ -77,10 +77,10 @@ MAX_MEMORY_ROUNDS = 2   # automatic memory splits of one piece before a person l
                         # halved pieces measured, 9 stayed just over (7,053-7,095 MiB): the proof's share does not halve exactly
 STREAM_SPLIT_MINUTES = 60   # memory splits while the measure streams: the first at once, then at most this often
 MEASURE_JOBS = 3        # pieces measured at once (carve_measure --jobs; pipeline.json measure_jobs); lean-cap queues them
-PIECE_CAP = 120         # a piece (resubmittable) is excused below this; dbenbenn 2026-10-29 (was 150): a slow
-                        # submit costs only wall-clock, a needless re-plan hours; verifier data: 94-103 s passed,
-                        # 118-126 s timed out 3x (oaiq-078), 125 s and 162 s passed on a retry (oaiq-047, -085),
-                        # 192 s timed out 3x (oaiq-031)
+PIECE_CAP = 100         # a piece (resubmittable) is excused below this; dbenbenn 2026-11-08 (150, then 120 from
+                        # 2026-10-29): verifier data: 94-103 s passed, 118-126 s timed out 3x (oaiq-078), whole-file
+                        # 119 s and 126 s 2x (q209, q196), 192 s 3x (oaiq-031); 125 s and 162 s passed on a retry
+                        # (oaiq-047, -085). Independent of PIECE_RSS_LIMIT: a piece over either is split
 
 
 def fits_memory(rec):

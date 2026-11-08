@@ -583,6 +583,9 @@ quietly superseded: the platform takes disproofs. `POST /verify` with `proof_typ
 but **not** `Theorems.Thm_*`, so lemmas it needs must be concatenated into the file. Accepted, it
 flips the theorem to `Disproved`, which is what a reader who lands on it deserves to see;
 deprecation says only that someone lost interest. `scripts/submit_verify.py --disprove` sends it.
+When dependants need the disproved item, publish in the same run the corrected form the source's own
+proof gives (a weakened formula rather than a hypothesis of unknown truth), read-back first; the typo
+rule pre-decides it, so no HOLD, and the live milestone's relink goes to FIXES-PENDING (q203).
 **Fix the universe.** The verifier elaborates `solution @target`, so if the statement quantifies
 over `Type*` and `solution` does too, nothing pins the universe and the verdict is `WA` with
 "contains universe level metavariables". State the negation over `Type` and give the
@@ -946,43 +949,35 @@ it, so the steps provably fit together. Then give each prover its own file and i
 verbatim as `chk_<name>`, with helpers in a per-step namespace. Four opus provers closed C9's steps
 in under eight minutes each, and the assembly compiled on the first try.
 
-**"Blocked: needs <named theorem>" is not a verdict until the used consequence has been looked at.**
-Before recording such a blocker, or leaving a reduction resting on a deep cited leaf, write down
-what the proof actually uses from that theorem, then spend one pass looking for an elementary or
-separately citable proof of just that consequence. The blocker stands only if that pass fails, and
-RESUME says what was tried. Two Viterbo retries (2026-11-03):
-- q161: `maxSystolicRatio_mono_and_exists_eq` was recorded "needs Williamson's normal form and
-  John's ellipsoid, each a library project". What it used was one symplectic plane with small
-  projection area; a max-volume simplex frame, its skew Gram matrix and symplectic transvections
-  gave that, and a 9-Part Blueprint closed in about 35 minutes of prover time.
-- q162: the 2-product formula was reduced to a capacity statement implying Gromov non-squeezing,
-  but used only translation, scaling and monotonicity of c_EHZ on convex domains. Monotonicity
-  follows from Clarke's dual action principle (length form), which was published standalone
-  (54be58ac, named theorems stand alone), proved in about two hours with no Sobolev spaces, and
-  the dependant resubmitted onto it. A cited conjunction ("is a capacity" ∧ "is attained") is the
-  typical case: dependants usually use one property.
-
-Six more such blockers fell on 2026-11-04/05, each to one of these checks, which every worker runs before
-recording a blocker and every retry runs before accepting one:
-- **Search prove2.me for each named prerequisite** (`q=` on its name and its standard objects): OpenAI
-  ports published operator-algebra and analysis libraries Mathlib lacks. q188 found Arveson's extension and
-  Wittstock's factorization Proved, and Pisier's linearization closed in three hours. For analytic number
-  theory, teorth/expdb ports with mechanical edits (q190: `Expdb.l2_integral_estimate`, a mean value
-  theorem with absolute constants).
-- **Is the source's abstract hypothesis concrete in the applied case?** A concrete finite-dimensional
-  operator space made Ruan's representation theorem unnecessary (q188).
-- **Does a sibling already supply the object, or a weaker bound that suffices?** q184: a published sibling's
-  extension replaced Hahn–Banach, and a sibling's moment bound replaced Choi's theorem.
-- **Do the estimates fed in have structure a crude substitute can use?** q163: equal decay at both
-  endpoints let a 450-line layer-cake interpolation replace Riesz–Thorin, and choosing the auxiliary symbol
-  removed stationary phase. Record the substitute in the Blueprint docstring.
+**"Blocked: needs <named theorem>" is not a verdict until these checks have run.** A worker runs them
+before recording a blocker or leaving a reduction on a deep cited leaf; a retry runs them again, against
+what sibling batches have proved since (q209), before accepting one. RESUME says what was tried. From
+2026-11-03 to 11-06, fourteen such blockers fell, each to one of these checks:
+- **What does the proof use from it?** Find each use. A qualitative consequence (bounded, attained, an
+  integer inequality), or one property of a cited conjunction, often has a short direct proof. q161: one
+  symplectic plane instead of Williamson and John. q162: monotonicity of c_EHZ alone, by Clarke's dual
+  principle, published standalone (54be58ac). q212: a 130-line count giving e ≥ v instead of
+  Hanany–Puder's limit theorem.
+- **Search prove2.me for the prerequisite and for its textbook ingredients**, by their standard names and
+  by any namespace whose hits look related. q188: Arveson and Wittstock were already Proved. q210: the
+  approximate functional equation was there as Riemann–Siegel (`RSInt`, `RSSeam`). q208: a local zero
+  count and the divisor bound were under `Zeta23.RvM` and `CircleMethod`. q190: teorth/expdb ports for
+  analytic number theory.
+- **Does a sibling supply the object, or a weaker bound that suffices?** q184: siblings replaced
+  Hahn–Banach and Choi. q209: a cited reflection lemma was the B-process another batch had just proved.
+- **Is the abstract hypothesis concrete in the applied case?** q188: a finite-dimensional operator space
+  needs no Ruan. For a symmetric object (a regular tree, a free group's Cayley graph, a phase with a
+  scaling symmetry), write its exact recursion or rescaling first. q218: an eigenfunction gave Puder's
+  cogrowth bound. q207: rescaling made every stationary-phase integral one constant.
+- **Do the estimates fed in have structure a crude substitute can use?** q163: layer-cake interpolation
+  instead of Riesz–Thorin. q208: a truncated Taylor series in log(n/N) instead of a smooth-cutoff Fourier
+  step. Record the substitute in the Blueprint docstring.
 - **Write the finite-dimensional problem a cited existence or minimization theorem reduces to**, then ask
-  whether a duality or KKT certificate gives each inequality (q166: Viterbo Thm 2.2 by Hahn–Banach and KKT,
-  ACCEPTED in under 40 minutes of prover time).
+  whether a duality or KKT certificate gives each inequality (q166).
 - **If the missing input is a result of the source itself** that the bundle can state, publish it
-  standalone (read-back first) and submit the dependant as a reduction to it in the same run (q186: Lemma
-  8.5, then Cor 8.6). "No work submitted" leaves the dependant with no decomposition, while the deep cited
-  theory belongs on that one Open leaf.
+  standalone (read-back first) and submit the dependant as a reduction to it in the same run (q186). "No
+  work submitted" leaves the dependant with no decomposition, while the deep cited theory belongs on that
+  one Open leaf.
 
 The same pattern scales to whole theorems. In a **Blueprint**, the definitions are concrete, every
 lemma is `sorry`, and the main theorem is proved from those lemmas. The provers write
@@ -1006,9 +1001,10 @@ BLUEPRINT OUT PARTS… [--target NAME]` merges the result into one file:
   are checked verbatim against the Blueprint and dropped; a changed copy is refused, and a stub
   proved under the Blueprint's own name with the same statement is moved into `Part<X>` (q195).
   Briefs say: copy Blueprint text but never change it, and prove targets in `Part<X>`;
-- `--target <published name>`, when the Blueprint proves the published theorem under that name,
-  renames it `_dev` (a unique theorem with that last component in a sub-namespace is called as
-  it is, q165) and appends `theorem solution`; then `prune_solution.py --check`;
+- `--target <published name>` renames the Blueprint's theorem of that name `_dev` (one whose last
+  component is the name, or the name plus `_dev`, is called as it is: q165, q208) and appends
+  `theorem solution`; `--published STUB=Theorems.MODULE` proves a stub by a published statement,
+  imported, instead of a Part; then `prune_solution.py --check`;
 - the output is then elaborated: an error, or a leftover `sorry` (each named) without
   `--allow-sorry`, exits nonzero, and `prune_solution.py` refuses input that does not elaborate
   (it used to fall back to name-based pruning and delete load-bearing declarations, q167).
@@ -1029,7 +1025,8 @@ Blueprint gives after the stub. Two jobs show the pattern working:
 - the Lodha–Moore Lemma 5.6 counterexample: four of its five parts in under ten minutes each.
 
 Each prover builds its own `.olean` of the Blueprint (`lake build <module>` builds only that
-module).
+module) and finishes with `lake build` of its Part: `lake env lean` accepts auto-bound implicits that
+the verifier and an importing Part reject (q202).
 
 The pattern scales to research-level external milestones. On 2026-10-03, overnight, it closed:
 - Monod 2023 Theorem 5.1: six parts, about 3,450 lines;
@@ -1049,12 +1046,12 @@ What made it work:
   closed nine stubs in 30 minutes).
 - **Read each stub as Lean prints it** (`#check @stub`): `∫ x, f x + C` integrates the `+ C` too
   (q199; lean-pitfalls.md, "A binder term swallows the `+` after it").
-- **State the stubs so that each could be a published statement** (bundle definitions only). Then an
-  assembled solution that times out splits at its stubs. Publish the Blueprint's shared definitions as a
-  bundle and each Part's target as a standalone statement, then submit one piece per Part that imports its
-  siblings as `Theorems.Thm_*` (q167: an 8,755-line proof that timed out became 9 pieces of 11–42 s, all
-  judged within 10 minutes; `p2m-standalone/viterbo-capacity/tools/build_pieces.py`). The target's piece
-  drops the target's alias and points `solution` at the Part's name.
+- **State the stubs so that each could be a published statement** (bundle definitions only). Then a
+  solution that `prune_solution.py --check` marks SPLIT (over 100 s CPU or the verifier's memory) splits at
+  its stubs before its first submission: publish the shared definitions as a bundle and the stubs that
+  partition the time as statements, and assemble each piece with `--target` and `--published` for the
+  others (q167: 9 pieces of 11–42 s; q200: 8 of 8–31 s; all accepted first time). If the Parts' times
+  already sum past 100 s, plan the cut before assembling.
 - **In a mission, a step that is itself a milestone is not a Route lemma.** Import its statement
   stub (`stubs.py`) and call it by its published name, in either direction of an iff; only that
   milestone's own `chk_` proves it from the route. CFW's Blueprint (2026-10-03) stated Theorem 10,
@@ -1284,7 +1281,7 @@ Failures that no local build reproduces. The detail and the case behind each is 
 | `WA` "does not match the target type", `CoeT` typeclass timeout | A raw `Classical.choose (Classical.choose_spec …)` in a binder type. Name it with `let` after the colon. |
 | `WA` "failed to synthesize CoeT (∀ {H : Type ?u.4} …) x (∀ {H : Type ?u.3} …)", printed types identical | A universe-polymorphic statement with a heavy type: the verifier's plain type comparison fails and its `CoeT` fallback runs out of `typeclass` budget (opus-kadison, oaiq-039). Never resubmit unchanged: the local check (`localcheck`, since 19c7a63) runs that fallback; state it monomorphically if every importer is, or `carve.py fold` it into its importers' pieces. |
 | "unknown universe level", or `SORRY` on a declaration above the real fault | The verifier runs with `autoImplicit` off and `lake env lean` does not. Hoist every `universe` line to the top of an assembled file. |
-| "FAILED: Compilation timed out after 300s", "Verification timed out after 300s" | The item itself is slow. Retry unchanged first; after about two real timeouts split it into pieces of about 60 s or less at `-j1` locally. |
+| "FAILED: Compilation timed out after 300s", "Verification timed out after 300s" | The item itself is slow. Over 100 s CPU locally (`prune_solution.py --check`), split before submitting; under it, retry unchanged and split after about two real timeouts. |
 | `WA` "stuck at solving universe constraint `max ?a ?v =?= max ?b ?v`" | A universe that occurs only under `max` in a statement with heavy binders (oaiq-124). The local check reports it since 2442579; fold the statement, or restate it with every universe bare. |
 | `SORRY` on a carved piece whose local `#print axioms` is clean | The server could not elaborate it (an unknown identifier, say). Compile the *submitted* source against the published bundles before resubmitting (oaiq-120). |
 | "Module compilation timed out" | A cold worker building imported bundles. Retry unchanged, never split, unless an imported *statement* module takes over about 90 s locally (`lean -o`): then every importer fails, and the statement needs restating (its large sides as `abbrev`s in a bundle). |

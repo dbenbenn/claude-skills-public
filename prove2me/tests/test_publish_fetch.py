@@ -66,6 +66,34 @@ def test_names_also_fetches_the_bundles_its_statements_import(tmp_path, monkeypa
     assert (tmp_path / 'Definitions' / 'Def_Inner.lean').read_text().endswith('def N.j := 1\n')
 
 
+def test_names_also_fetches_the_theorems_a_bundle_imports(tmp_path, monkeypatch):
+    # q210 (2026-11-06): RSSeam.rs_Z_C0_seam's bundles import published theorems (Theorems.Thm_*), about 70
+    # modules in all; --names followed only `import Definitions.*`, so it took one run per import layer.
+    # A module's platform name is found by searching its stem (`q=RSSeam_rs_Z_C0_seam` finds exactly it)
+    def call(m, p, b=None):
+        if p.startswith('/theorems?theorem_name=N.t&'):
+            return {'theorems': [{'theorem_name': 'N.t', 'id': 'T'}]}
+        if p.startswith('/theorems?theorem_name=Outer&'):
+            return {'theorems': [{'theorem_name': 'Outer', 'id': 'O'}]}
+        if p.startswith('/theorems?q=M_used_lemma&'):
+            return {'theorems': [{'theorem_name': 'M.used_lemma_two', 'id': 'X'},
+                                 {'theorem_name': 'M.used_lemma', 'id': 'U'}]}
+        if p == '/theorems/T':
+            return {'theorem_name': 'N.t', 'status': 'Open', 'preamble': 'import Mathlib\nimport Definitions.Def_Outer',
+                    'formal_statement': 'theorem N.t : N.k = 1 := by\n  sorry'}
+        if p == '/theorems/O':
+            return {'theorem_name': 'Outer', 'status': 'Definition',
+                    'definition': 'import Mathlib\nimport Theorems.Thm_M_used_lemma\n\ndef N.k := 1'}
+        if p == '/theorems/U':
+            return {'theorem_name': 'M.used_lemma', 'status': 'Proved', 'preamble': 'import Mathlib',
+                    'formal_statement': 'theorem M.used_lemma : True := by\n  sorry'}
+        raise AssertionError(p)
+    monkeypatch.setattr(F, 'call', call)
+    monkeypatch.setattr(F.sys, 'argv', ['fetch_theorems.py', '--names', 'N.t', '--out', str(tmp_path)])
+    F.main()
+    assert (tmp_path / 'Theorems' / 'Thm_M_used_lemma.lean').read_text().startswith('import Mathlib\n\ntheorem M.used_lemma')
+
+
 def test_imported_bundle_found_by_definitions_search(tmp_path, monkeypatch):
     # 2026-10-18: `--names MilnorDynamics.locally_bounded_holomorphic_subseq_locally_uniform`
     # reported "imported bundle not found on the platform: Def_MilnorDynamics_NormalFamilies":

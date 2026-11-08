@@ -49,6 +49,15 @@ def lookup_bundle(name):
     return hit[0].get('definition_id') if hit else None
 
 
+def lookup_module(module):
+    """The id of the published theorem whose statement module is `module` (Theorems.Thm_<stem>). The stem
+    loses the name's dots, so it is searched (`q=<stem>`) and the hit whose module matches is taken."""
+    stem = module[len('Theorems.Thm_'):]
+    r = call('GET', '/theorems?q=%s&limit=20' % stem)
+    hit = [t for t in (r.get('theorems') or []) if statement_module(t.get('theorem_name') or '')[0] == module]
+    return (hit[0].get('id') or hit[0].get('theorem_id')) if hit else None
+
+
 def platform_name(n):
     """The platform's name for N: a bundle's module form `Definitions.Def_X` (or `Def_X`) is `X`
     (oaiq-065: `--names Definitions.Def_X` answered "not published")."""
@@ -94,7 +103,7 @@ def main():
             ids += [t.get('id') or t.get('theorem_id') for t in paged('/theorems?mission_id=%s' % m['id'], 'theorems')]
     written, same, mods, retired = [], 0, [], []
     dr = drafts(ws) if root == ws else {}
-    # every bundle a written file imports is fetched too, transitively: `--names` once wrote a
+    # every bundle and published theorem a written file imports is fetched too, transitively: `--names` once wrote a
     # statement without the Def_ bundle its preamble imports, and the build failed (2026-10-18)
     queue, seen = list(ids), set(ids)
     while queue:
@@ -134,6 +143,13 @@ def main():
                     seen.add(bid); queue.append(bid)
                 elif not bid:
                     print('   imported bundle not found on the platform: Def_%s' % b)
+            # and every published theorem a bundle (or statement) imports (q210: ~70 modules under RSSeam)
+            for m in re.findall(r'^import (Theorems\.Thm_\S+)', text, re.M):
+                tid2 = lookup_module(m)
+                if tid2 and tid2 not in seen:
+                    seen.add(tid2); queue.append(tid2)
+                elif not tid2:
+                    print('   imported theorem not found on the platform: %s' % m)
     if retired:
         update_drafts(remove=retired, ws=ws)
         print('%d draft stub(s) now published' % len(retired))

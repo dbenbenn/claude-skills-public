@@ -24,8 +24,10 @@ them is treated as a root, and the result MUST be compiled before it is submitte
 usage:
     prune_solution.py FILE [-o OUT] [--check] [--dry]
 
-    --check  elaborate the pruned file with `lake env lean -DautoImplicit=false` (run from
-             $P2M_WORKSPACE) BEFORE writing it; the destination is replaced only if it compiles.
+    --check  elaborate the pruned file with `lake env lean -DautoImplicit=false -DElab.async=false` (run
+             from $P2M_WORKSPACE) BEFORE writing it; the destination is replaced only if it compiles.
+             Prints its CPU seconds and peak memory, and SPLIT when either is over the verifier's
+             (carvepipeline PIECE_CAP, PIECE_RSS_LIMIT).
              The verifier has autoImplicit off, and `lake env lean` ignores the lakefile's
              leanOptions, so without the flag an out-of-scope `universe u` passes here
     --dry    report what would go, write nothing
@@ -33,7 +35,6 @@ usage:
 import argparse
 import os
 import re
-import subprocess
 import sys
 from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # p2mlib
@@ -296,22 +297,31 @@ def main():
     open(cand, 'w', encoding='utf-8').write(out)
     try:
         # the verifier's elaboration, synchronous (q128)
-        from p2mlib.localcheck import VERIFIER_FLAGS
-        p = subprocess.run(['lake', 'env', 'lean', *VERIFIER_FLAGS,
-                            os.path.relpath(cand, ws)], cwd=ws, capture_output=True, text=True)
+        from p2mlib import localcheck
+        from p2mlib.carvepipeline import PIECE_CAP, PIECE_RSS_LIMIT
+        rc, output, cpu, rss = localcheck.run_lean(['lake', 'env', 'lean', *localcheck.VERIFIER_FLAGS,
+                                                    os.path.relpath(cand, ws)], ws)
         # the verifier rejects a sorry as firmly as an error, so a sorry warning fails too; and
         # match `: error` as a prefix, since coded errors print as `: error(lean.unknownIdentifier):`
-        errs = [l for l in (p.stdout + p.stderr).split('\n')
+        errs = [l for l in output.split('\n')
                 if re.search(r': error\b', l) or re.search(r"declaration uses .sorry.", l)]
-        if errs or p.returncode != 0:
+        if errs or rc != 0:
             print('COMPILE FAILED (exit %d) — an error or a sorry; if the unpruned file was clean, '
-                  'the prune removed something load-bearing. %s left unchanged:' % (p.returncode, dest))
-            for l in (errs or (p.stdout + p.stderr).strip().split('\n')[-5:])[:10]:
+                  'the prune removed something load-bearing. %s left unchanged:' % (rc, dest))
+            for l in (errs or output.strip().split('\n')[-5:])[:10]:
                 print('   ', l[:200])
             sys.exit(1)
         os.replace(cand, dest)
         cand = None
-        print('wrote %s\ncompiles clean' % dest)
+        # CPU seconds under synchronous elaboration are what the verifier's 300 s budget sees (parallel wall
+        # time hides it: q196, 52 s wall for 126 s); over either limit, split before the first submission
+        print('wrote %s\ncompiles clean: %.0f s CPU, peak %d MiB' % (dest, cpu, rss))
+        if cpu > PIECE_CAP:
+            print('SPLIT before submitting: over the verifier\'s time (%.0f s CPU > %d s; q196, q209: 119-126 s '
+                  'timed out twice). verifier-failures.md, "Proof submissions time out".' % (cpu, PIECE_CAP))
+        if rss > PIECE_RSS_LIMIT:
+            print('SPLIT before submitting: over the verifier\'s memory (peak %d MiB > %d MiB; q153).'
+                  % (rss, PIECE_RSS_LIMIT))
     finally:
         if cand and os.path.exists(cand):
             os.remove(cand)

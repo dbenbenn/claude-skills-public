@@ -99,19 +99,7 @@ RSS_REMEASURE_SECS = 15   # a piece measured before peak memory was recorded (rs
                           # many seconds: q153 (2026-11-08) pieces under 20 s peaked under 7,000 MiB, all of them
 
 
-def run_lean(args, cwd, env):
-    """(returncode, output, CPU seconds, peak RSS in MiB) of one process, from its own rusage (os.wait4).
-    RUSAGE_CHILDREN's ru_maxrss is the largest child of this process so far, so it cannot give one run's
-    peak. The lean-cap wrapper execs the real Lean (through `systemd-run --scope`, which execs too), so the
-    process waited for is Lean itself."""
-    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
-        p = subprocess.Popen(args, cwd=cwd, env=env, stdout=out, stderr=err)
-        _, status, ru = os.wait4(p.pid, 0)
-        p.returncode = os.waitstatus_to_exitcode(status)
-        out.seek(0)
-        err.seek(0)
-        o = out.read().decode('utf-8', 'replace') + err.read().decode('utf-8', 'replace')
-    return p.returncode, o, ru.ru_utime + ru.ru_stime, ru.ru_maxrss // 1024
+from p2mlib.localcheck import run_lean  # noqa: E402  (tests patch carve_measure.run_lean)
 
 
 def opt(argv, name, default=None):
