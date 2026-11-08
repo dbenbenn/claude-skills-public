@@ -93,7 +93,7 @@ function row(j){
   const res = j.res ? `<span class="chip ${j.res}" title="${j.tries} jobs for this name">${RES_LABEL[j.res]}${j.tries > 1 ? ` · ${j.tries} tries` : ''}</span>` : '';
   const when = j.status === 'PENDING' || j.status === 'COMPILING'
     ? `submitted ${fmtAt(j.created)} · ${dur(Math.round(Date.now()/1000 - j.created))}`
-    : `${fmtAt(j.updated)} · took ${dur((j.updated || j.created) - j.created)}`;
+    : `${{PUBLISHED: 'published', FAILED: 'failed', ERROR: 'errored'}[j.status] || j.status} ${fmtAt(j.updated)} · took ${dur((j.updated || j.created) - j.created)}`;
   const title = j.title && !j.title.startsWith(j.name + ':') ? j.title : (j.title || '').slice(j.name.length + 1).trim();
   return `<div class="pj-row"><div class="nm"><span class="chip ${j.status}">${j.status}</span><span class="chip kind">${KIND[j.kind] || j.kind}</span>${res}${link(j)}${j.vis === 'private' ? ' <span class="chip kind">private</span>' : ''}</div>
     <div class="when">${when}</div>${title ? `<div class="ti">${esc(title)}</div>` : ''}${j.error ? `<div class="err">${esc(j.error)}</div>` : ''}</div>`;
