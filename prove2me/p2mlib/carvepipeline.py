@@ -73,6 +73,8 @@ PIECE_RSS_LIMIT = 7050  # MiB: a piece whose verifier-form file peaks over this 
                         # 6,551: the workers' cap is about 7 GiB. Neither time (30-45 s pieces passed about half the
                         # time) nor the import closure (82 pieces importing >= 90 MB, under 20 s, all passed) separated them
 MAX_MEMORY_PARTS = 8    # most parts one memory split makes
+MAX_MEMORY_ROUNDS = 2   # automatic memory splits of one piece before a person looks. q153 (2026-11-08): of the first 32
+                        # halved pieces measured, 9 stayed just over (7,053-7,095 MiB): the proof's share does not halve exactly
 STREAM_SPLIT_MINUTES = 60   # memory splits while the measure streams: the first at once, then at most this often
 MEASURE_JOBS = 3        # pieces measured at once (carve_measure --jobs; pipeline.json measure_jobs); lean-cap queues them
 PIECE_CAP = 120         # a piece (resubmittable) is excused below this; dbenbenn 2026-10-29 (was 150): a slow
@@ -2200,9 +2202,10 @@ class Pipeline:
             n = key.split(':', 1)[1]
             base = (times.get('statement:' + n) or {}).get('rss_mib')
             parts = memory_parts(rss, base)
-            if n in tried:
-                manual.append('%s: %d MiB, still over the %d MiB memory limit after an automatic split (it was %s)' % (
-                    key, rss, PIECE_RSS_LIMIT, ('%d MiB' % tried[n]['rss_mib']) if tried[n].get('rss_mib')
+            rounds = (tried.get(n) or {}).get('memory_rounds', 1 if n in tried else 0)
+            if n in tried and (rounds >= MAX_MEMORY_ROUNDS or not tried[n].get('rss_mib')):
+                manual.append('%s: %d MiB, still over the %d MiB memory limit after %d automatic split(s) (it was %s)' % (
+                    key, rss, PIECE_RSS_LIMIT, max(rounds, 1), ('%d MiB' % tried[n]['rss_mib']) if tried[n].get('rss_mib')
                     else '%.0f s' % tried[n]['secs']))
             elif parts is None:
                 manual.append('%s: %d MiB, and its statement alone peaks at %d MiB: the imports are over the %d MiB '
@@ -2238,7 +2241,8 @@ class Pipeline:
             return False
         want = {n: parts for n, _, _, parts in auto_mem}
         for n, rss, secs, parts in auto_mem:
-            tried[n] = dict(tried.get(n) or {}, secs=secs, rss_mib=rss, parts=parts)
+            tried[n] = dict(tried.get(n) or {}, secs=secs, rss_mib=rss, parts=parts,
+                            memory_rounds=(tried.get(n) or {}).get('memory_rounds', 1 if n in tried else 0) + 1)
         self.state['stream_split_at'] = time.time()
         line = 'splitting %d piece(s) alone while measuring (over the %d MiB memory limit): %s' % (
             len(want), PIECE_RSS_LIMIT, ', '.join('%s into %d' % x for x in sorted(want.items())))
@@ -2326,7 +2330,8 @@ class Pipeline:
             for n, secs, cost in auto:
                 tried[n] = {'secs': secs, 'cost': cost, 'parts': want[n]}
             for n, rss, secs, parts in auto_mem:
-                tried[n] = dict(tried.get(n) or {}, secs=secs, rss_mib=rss, parts=want[n])
+                tried[n] = dict(tried.get(n) or {}, secs=secs, rss_mib=rss, parts=want[n],
+                                memory_rounds=(tried.get(n) or {}).get('memory_rounds', 1 if n in tried else 0) + 1)
             mem = {n for n, _, _, _ in auto_mem}
             lines.append('splitting %d piece(s) alone (carve.py split-piece; every other item kept): %s' % (
                 len(want), ', '.join('%s into %d%s' % (n, k, ' (verifier timeouts or memory kills)' if n in server else

@@ -2725,3 +2725,18 @@ def test_generated_files_importing_all_of_mathlib_are_flagged(env, monkeypatch):
     assert r.returncode == 0, r.stdout + r.stderr
     assert 'WARNING 2 generated file(s) import all of Mathlib' in r.stdout and 'Def_B0' in r.stdout
     assert json.load(open(env.dir / 'pipeline_state.json'))['whole_mathlib'] == ['lib/Def_B0.lean', 'solutions/Sol_P0.lean']
+
+
+def test_a_piece_still_over_memory_after_its_split_gets_one_more_round_then_a_person():
+    # q153 (2026-11-08, first streaming round): 70 pieces halved; 23 of the first 32 measured fit, 9 stayed just over
+    # (7,053-7,095 MiB against 7,150-7,250 before): the proof's share does not halve exactly
+    p = object.__new__(CP.Pipeline)
+    plan = {'pieces': {'P': {'keep': ['P', 'l']}}}
+    times = {'statement:P': _tm(3, CP.PIECE_RSS_LIMIT - 450)}
+    over = [('piece:P', CP.PIECE_RSS_LIMIT + 40, 30)]
+    tried = {'P': {'secs': 60, 'rss_mib': CP.PIECE_RSS_LIMIT + 150, 'parts': 2}}
+    auto, manual = p.memory_triage(plan, times, over, tried)
+    assert [a[0] for a in auto] == ['P'] and not manual
+    tried['P']['memory_rounds'] = CP.MAX_MEMORY_ROUNDS
+    auto, manual = p.memory_triage(plan, times, over, tried)
+    assert not auto and 'still over the' in manual[0]
