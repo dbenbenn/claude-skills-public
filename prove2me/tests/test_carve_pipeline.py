@@ -2742,3 +2742,45 @@ def test_a_piece_still_over_memory_after_its_split_gets_one_more_round_then_a_pe
     tried['P']['memory_rounds'] = CP.MAX_MEMORY_ROUNDS
     auto, manual = p.memory_triage(plan, times, over, tried)
     assert not auto and 'still over the' in manual[0]
+
+
+def test_a_piece_in_flight_is_never_split_for_memory(env, monkeypatch):
+    # q153 (2026-11-08): the publisher was stopped with 32 pieces in flight; the streaming splitter took only `live`
+    # pieces as off limits and split 25 of them, 6 of which the verifier had in fact accepted: their new statements
+    # were then imported by live pieces only (the q160 orphan gate), and nothing was released for 3 h
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30)})
+    work = env.dir / 'carve_work'
+    for f in ('times.json', 'times.orig.json'):
+        t = json.load(open(work / f))
+        t['piece:P0'] = _tm(40, CP.PIECE_RSS_LIMIT + 120)
+        (work / f).write_text(json.dumps(t))
+    _run_state(env, {'piece:P0': 'inflight'})
+    r = run(env, *ARGS_NEW, '--publish')
+    split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
+    assert split == [], r.stdout + r.stderr
+
+
+def test_a_streaming_release_of_pieces_starts_a_gated_publisher_even_with_statements_held(tmp_path):
+    # q153 (2026-11-08): with the publisher stopped by hand, three batches released 174-206 pieces and each said
+    # "no publisher yet (publish_early has not started one)": held statements kept it from starting. A gated
+    # publisher sends only what release.json lists, so the held statements stay held either way
+    p = object.__new__(CP.Pipeline)
+    p.d, p.p, p.state = str(tmp_path), {'go': True}, {'auto_config': {'frozen': {'x': 1}}, 'steps': {}}
+    (tmp_path / 'publish').mkdir()
+    (tmp_path / 'publish' / 'plan.json').write_text('{}')
+    (tmp_path / 'work').mkdir()
+    (tmp_path / 'work' / 'plan.json').write_text('{}')
+    plan = {'pieces': {'P': {}}, 'stubs': {'P': {}}}
+    p.calibrate_inputs = lambda: ({'budget': 55}, plan, {'piece:P': _tm(5, 6900)}, None, None)
+    p.work_paths = lambda cfg: (None, str(tmp_path / 'work' / 'plan.json'))
+    p.gen_out = lambda: str(tmp_path / 'out')
+    p.publisher_running = lambda: False
+    p.held_statements = lambda: ['S']
+    started = []
+    p.start_publisher = lambda gated=False: started.append(gated)
+    p.write_release = lambda sha, **kw: None
+    out = p.release_measured(['piece:P'], gated=True)
+    assert started == [True] and 'started' in out
+    started.clear()
+    out = p.release_measured(['piece:P'], gated=False)            # an ungated publisher would send the held ones
+    assert started == [] and 'no publisher yet' in out

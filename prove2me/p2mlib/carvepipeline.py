@@ -1827,10 +1827,12 @@ class Pipeline:
         self.write_release(sha, pieces=sorted(pieces), open=True)
         if self.publisher_running():
             how = 'the background publisher sends them'
-        elif not (self.state.get('auto_config') or {}).get('frozen') or self.held_statements():
+        elif not (self.state.get('auto_config') or {}).get('frozen') or (not gated and self.held_statements()):
             how = 'no publisher yet (publish_early has not started one)'
         else:
-            self.start_publisher(gated=gated)     # the streaming measure's: bundles stay gated
+            # the streaming measure's (gated): it sends only what release.json lists, so held statements stay held.
+            # q153 2026-11-08: with the publisher stopped by hand, batches releasing 174-206 pieces each started none
+            self.start_publisher(gated=gated)
             how = 'a background publisher was started'
         return 'released %d piece(s) (%d in all; %s)' % (len(fast), len(pieces), how)
 
@@ -2232,7 +2234,9 @@ class Pipeline:
         if not got:
             return False
         cfg, plan, times, _, _ = got
-        live = {x.split(':', 1)[1] for x in self.live_items() if x.startswith('piece:')}
+        # live and in flight alike (live_pieces, as check_live_pieces): q153 2026-11-08, 6 of 25 in-flight pieces
+        # split here had been accepted, and their new statements were orphans
+        live = live_pieces(self.d)
         res = calibration(dict(plan, bundles=[], stubs={}), times, cfg.get('time_scale', 1.5), cfg.get('budget', 55),
                           live)
         tried = self.state.setdefault('auto_split', {})
@@ -2264,7 +2268,7 @@ class Pipeline:
         if got is None:
             return 'skipped'
         cfg, plan, times, _, _ = got
-        live = {x.split(':', 1)[1] for x in self.live_items() if x.startswith('piece:')}
+        live = live_pieces(self.d)              # in flight too: a verdict may still make it live
         part = dict(plan, bundles=[], stubs={})
         res = calibration(part, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), live,
                           accepted=self.p.get('accept_over') or ())
