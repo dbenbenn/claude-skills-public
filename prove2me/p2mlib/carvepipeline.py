@@ -32,7 +32,7 @@ OVERLAP_ONLY = ('publish_early', 'measure_pieces', 'calibrate_pieces', 'pieces_p
 DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
               'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags',
-              'overlap', 'unif_integrable', 'stream_bundles', 'stream_pieces']
+              'overlap', 'unif_integrable', 'stream_bundles', 'stream_pieces', 'accept_orphans']
 
 
 LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
@@ -1337,13 +1337,22 @@ class Pipeline:
         resent = {n for n in live if n in (new.get('pieces') or {}) and
                   os.path.exists(os.path.join(cmp_dir, CV.slug(CV.statement_name(new, n)) + '.md'))}
         reshaped, orphans = live_piece_changes(ref, new, live, resent)
+        # pipeline.json `accept_orphans` (a person's call): those that have a piece of their own go live proved, just
+        # unused (q153 2026-11-08: six lemmas of three accepted pieces a memory split had re-shaped)
+        ok = {s for s in self.p.get('accept_orphans') or () if s in orphans and s in (new.get('pieces') or {})}
+        for s in sorted(ok):
+            print('== %s: NOTE accepted orphan statement %s (pipeline.json accept_orphans): imported by %s only; it goes '
+                  'live with its own piece' % (step, s, ', '.join('piece:' + n for n in orphans[s]) or 'nothing'),
+                  flush=True)
+        orphans = {s: v for s, v in orphans.items() if s not in ok}
         if orphans:
             raise StepFailed(
                 "step '%s': the new plan re-shapes live piece(s), and %d new statement(s) would be imported by live "
                 "pieces only, so they would go live as Open orphans (q160):\n  %s\nlive piece(s) changed:\n  %s\n"
                 "Keep their lemmas out of the plan: pipeline.json `config_set.no_promote` (the declarations the live "
                 "pieces keep; the automatic split of a slow piece sets this itself), then resume; or, to send a live "
-                "piece again in its new form, write publish/comparisons/<slug>.md for it first."
+                "piece again in its new form, write publish/comparisons/<slug>.md for it first; or, to let them go live proved but "
+                "unused (each has its own piece), list them in pipeline.json `accept_orphans`."
                 % (step, len(orphans), '\n  '.join('%s (imported by %s)' % (s, ', '.join('piece:' + n for n in imp) or
                                                                            'other new statements only')
                                                    for s, imp in orphans.items()),

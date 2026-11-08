@@ -2784,3 +2784,23 @@ def test_a_streaming_release_of_pieces_starts_a_gated_publisher_even_with_statem
     started.clear()
     out = p.release_measured(['piece:P'], gated=False)            # an ungated publisher would send the held ones
     assert started == [] and 'no publisher yet' in out
+
+
+def test_orphan_statements_a_person_accepted_go_on_when_each_has_its_own_piece(env, monkeypatch):
+    # q153 (2026-11-08): 3 accepted pieces re-shaped by a split left 6 new statements only they import; each has its
+    # own piece, so it would go live proved, just unused. dbenbenn: "6 unused lemmas is no problem, and we can
+    # deprecate them later". pipeline.json `accept_orphans` lets exactly those through
+    plan = _overlap_carve(env, monkeypatch)
+    assert run(env, *ARGS_NEW, '--no-stream-bundles', '--publish', '--stop-after', 'publish_early').returncode == 0
+    _run_state(env, {'piece:P1': 'live'})
+    monkeypatch.setenv('STUB_HOOK_carve_plan', PLAN_HOOK)
+    monkeypatch.setenv('STUB_PLAN_JSON', json.dumps(_reshape_live_p1(plan)))
+    p = json.load(open(env.dir / 'pipeline.json'))
+    (env.dir / 'pipeline.json').write_text(json.dumps(dict(p, accept_orphans=['N1'])))
+    r = run(env, '--redo', 'plan', '--stop-after', 'plan')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'accepted orphan' in r.stdout and 'N1' in r.stdout
+    # an orphan nobody listed still stops the run
+    (env.dir / 'pipeline.json').write_text(json.dumps(dict(p, accept_orphans=['Other'])))
+    r = run(env, '--redo', 'plan', '--stop-after', 'plan')
+    assert r.returncode == 1 and 'Open orphans' in r.stderr and 'N1' in r.stderr
