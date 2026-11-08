@@ -1640,7 +1640,11 @@ class Pipeline:
             kind, n = x.split(':', 1)
             if kind not in ('bundle', 'statement') or n in ext or x in ok or x in live or x not in done or x in bad:
                 continue
-            if kind == 'statement' and n not in base:
+            # a statement a split added goes once its own piece measured ok in this run: that is the CoeT check
+            # publish_early's hold waits for (q160). q153 2026-11-08: held to the measure's end, 1,251 released
+            # pieces importing such statements could not be verified
+            if kind == 'statement' and n not in base and not (
+                    'piece:' + n in done and (times.get('piece:' + n) or {}).get('ok')):
                 continue
             if (times.get(x) or {}).get('ok') and all(fine(d) for d in order['deps'].get(x, ())):
                 ok.add(x)

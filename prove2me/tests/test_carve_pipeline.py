@@ -2804,3 +2804,26 @@ def test_orphan_statements_a_person_accepted_go_on_when_each_has_its_own_piece(e
     (env.dir / 'pipeline.json').write_text(json.dumps(dict(p, accept_orphans=['Other'])))
     r = run(env, '--redo', 'plan', '--stop-after', 'plan')
     assert r.returncode == 1 and 'Open orphans' in r.stderr and 'N1' in r.stderr
+
+
+def test_a_new_statement_of_a_streaming_split_is_released_once_its_own_piece_is_measured(env, monkeypatch):
+    # q153 (2026-11-08): statements made by mid-measure splits were held to the end of the measure (stream_base_stubs),
+    # so 1,251 released pieces that import them could not be verified. A statement's own piece measured ok is the CoeT
+    # check publish_early's hold waits for (q160); with it, the statement goes with the stream
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30)},
+                   seq=[{}] + [{'piece:P0': _tm(15, 6950), 'piece:lemma_P0': _tm(5, 6900),
+                                 'statement:lemma_P0': _tm(3, 6600)}] * 8)
+    work = env.dir / 'carve_work'
+    for f in ('times.json', 'times.orig.json'):
+        t = json.load(open(work / f))
+        t['piece:P0'] = _tm(40, CP.PIECE_RSS_LIMIT + 120)
+        t['statement:P0'] = _tm(5, CP.PIECE_RSS_LIMIT - 80)
+        (work / f).write_text(json.dumps(t))
+    # as on q153, the stream recorded the statements it began with before the split
+    assert run(env, *ARGS_NEW, '--stop-after', 'order').returncode == 0
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    st['streamed_stubs'] = ['P0', 'P1']
+    (env.dir / 'pipeline_state.json').write_text(json.dumps(st))
+    r = run(env, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'statement:lemma_P0' in json.load(open(env.dir / 'publish' / 'release.json')).get('items', [])
