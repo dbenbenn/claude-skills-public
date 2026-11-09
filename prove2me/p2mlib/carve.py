@@ -3163,6 +3163,21 @@ def leak_summary(leaks):
     return out
 
 
+def bundle_needs(deps, live=()):
+    """Every item a bundle not yet live needs, transitively, the bundles among them: what to measure and send first
+    (dbenbenn 2026-11-09: "any proof that's blocking a bundle should get prioritized ... a bundle problem can have a
+    large impact"). `deps` is publish_order's {item: [items it waits for]}; live items and what only they need drop out."""
+    live = set(live)
+    need, todo = set(), [x for x in deps if x.startswith('bundle:') and x not in live]
+    while todo:
+        x = todo.pop()
+        if x in need or x in live:
+            continue
+        need.add(x)
+        todo += deps.get(x, ())
+    return need
+
+
 def publish_order(plan, external=()):
     """The import DAG as waves: every item of a wave can publish concurrently once the earlier
     waves are published. Items: `bundle:NAME` (after the bundles it imports and the pieces of the

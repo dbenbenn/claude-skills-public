@@ -1490,9 +1490,14 @@ class Pipeline:
         ext = set(plan.get('external') or ())
         live = self.live_items()
         kinds = ('bundle', 'statement', 'piece') if self.p.get('stream_pieces', True) else ('bundle', 'statement')
-        todo = [x for w in CV.publish_order(plan, ext)['waves'] for x in w
+        order = CV.publish_order(plan, ext)
+        todo = [x for w in order['waves'] for x in w
                 if x.split(':', 1)[0] in kinds and x not in live and
                 not (x.startswith('statement:') and x.split(':', 1)[1] in ext)]
+        # what an unpublished bundle needs first, in publish order (its dependencies are in it too); the
+        # streaming measure had lost measure_pieces' gate_pieces priority (dbenbenn 2026-11-09)
+        need = CV.bundle_needs(order['deps'], live)
+        todo = [x for x in todo if x in need] + [x for x in todo if x not in need]
         n = int(self.p.get('stream_batch') or STREAM_BATCH)
         batches = [todo[i:i + n] for i in range(0, len(todo), n)]
         print('== measure: %d %s to measure in %d batch(es), each released as it passes'

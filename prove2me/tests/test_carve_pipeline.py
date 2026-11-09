@@ -2939,3 +2939,20 @@ def test_a_carve_may_set_its_own_memory_limit():
     assert p.rss_limit() == 8600
     p.p = {}
     assert p.rss_limit() == CP.PIECE_RSS_LIMIT
+
+
+def test_the_streaming_measure_takes_what_unpublished_bundles_need_first(env, monkeypatch):
+    # dbenbenn 2026-11-09: "any proof that's blocking a bundle should get prioritized over other proofs ... a bundle
+    # problem can have a large impact". Since pieces stream with the measure (2026-11-07), the measure took them in
+    # plain publish order and gate_pieces' priority (measure_pieces) no longer applied
+    plan = _overlap_carve(env, monkeypatch, pieces={'P2': (5, 5), 'P0': (10, 30), 'P1': (40, 20)})
+    plan['bundles'][1]['statements'] = ['P1']
+    plan['pieces']['P1']['imports'] = ['P0']
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    first = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure' and '--only' in c['argv']][0]
+    order = first[first.index('--only') + 1].split(',')
+    chain = {'piece:P0', 'statement:P0', 'piece:P1', 'statement:P1', 'bundle:B1'}
+    assert max(order.index(x) for x in chain) < min(order.index(x) for x in ('statement:P2', 'piece:P2'))
+    assert order.index('statement:P0') < order.index('piece:P0') < order.index('piece:P1') < order.index('bundle:B1')

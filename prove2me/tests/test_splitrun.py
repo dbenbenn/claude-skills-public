@@ -1073,3 +1073,29 @@ def test_a_bundle_refused_for_an_unproved_import_waits_instead_of_stopping():
     m = 'Imported platform theorems must be Proved at submission time, but the following are not: X (status=Open).'
     assert V.classify('FAILED', m) == 'unproved_imports'
     assert V.decide('unproved_imports', {'unproved_imports': 3}, 'bundle') == 'retry'
+
+
+def test_ready_sends_what_an_unpublished_bundle_needs_before_other_items_of_its_kind(split):
+    # dbenbenn 2026-11-09: proofs blocking a bundle go first. XB001 imports A.mid (whose proof imports A.low);
+    # A.aaa blocks nothing and would otherwise come first
+    d, cfg = split
+    plan = json.loads(json.dumps(PLAN))
+    plan['bundles'][1]['statements'] = ['A.mid']
+    plan['stubs'] = {'A.aaa': {'bundles': ['XB000']}, 'A.low': {'bundles': ['XB000']}, 'A.mid': {'bundles': ['XB000']}}
+    plan['pieces']['A.mid']['bundles'] = ['XB000']
+    plan['pieces']['A.aaa'] = {'bundles': ['XB000'], 'imports': []}
+    (d / 'plan.json').write_text(json.dumps(plan))
+    for n in ('A.aaa',):
+        (d / 'out' / 'lib' / ('Thm_%s_s2.lean' % n.replace('.', '_'))).write_text(
+            (d / 'out' / 'lib' / 'Thm_A_low_s2.lean').read_text().replace('A.low', n))
+        (d / 'out' / 'solutions' / ('Sol_%s_s2.lean' % n.replace('.', '_'))).write_text(
+            (d / 'out' / 'solutions' / 'Sol_A_low_s2.lean').read_text().replace('A.low', n))
+        (d / 'explanations' / ('%s_s2.md' % n.replace('.', '_'))).write_text(EXPL)
+        (d / 'prose' / ('%s_s2.md' % n.replace('.', '_'))).write_text('---\ntitle: Lemma A.aaa\n---\n\nIt holds.\n')
+    r = R.Runner(cfg, FakeApi(), sleep=lambda s: None)
+    for x in r.items:
+        if x.startswith('statement:') or x == 'bundle:XB000':
+            r.state[x] = {'state': 'live', 'id': 'id-' + x, 'history': {}}
+    ready = [x for x in r.ready() if x.startswith('piece:')]
+    assert set(ready[:2]) == {'piece:A.low', 'piece:A.mid'}, (ready, r.blocked)
+    assert 'piece:A.aaa' in ready[2:], (ready, r.blocked)

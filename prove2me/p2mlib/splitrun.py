@@ -295,7 +295,9 @@ class Runner:
         # bundles first: their chain is the critical path, so they never wait for a slot behind
         # statements or pieces
         rank = {'bundle': 0, 'statement': 1, 'piece': 2}
-        return sorted(out, key=lambda x: rank[x.split(':', 1)[0]])
+        # within a kind, what an unpublished bundle needs first (dbenbenn 2026-11-09)
+        need = C.bundle_needs(self.deps, {x for x, v in self.state.items() if v.get('state') == 'live'})
+        return sorted(out, key=lambda x: (rank[x.split(':', 1)[0]], x not in need))
 
     def statement_proved(self, item):
         """Is the statement of piece `item` Proved on the platform (each looked up at most every PROVED_TTL
