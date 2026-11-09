@@ -33,7 +33,7 @@ DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
               'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags',
               'overlap', 'unif_integrable', 'stream_bundles', 'stream_pieces', 'accept_orphans',
-              'try_over_memory']
+              'try_over_memory', 'piece_rss_limit']
 
 
 LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
@@ -90,10 +90,10 @@ PIECE_CAP = 100         # a piece (resubmittable) is excused below this; dbenben
                         # (oaiq-047, -085). Independent of PIECE_RSS_LIMIT: a piece over either is split
 
 
-def fits_memory(rec):
+def fits_memory(rec, limit=PIECE_RSS_LIMIT):
     """Does a measured item fit the verifier's memory (PIECE_RSS_LIMIT)? A record from before carve_measure
     recorded peaks fits (carve_measure measures pieces of RSS_REMEASURE_SECS and more again)."""
-    return not rec or not rec.get('rss_mib') or rec['rss_mib'] <= PIECE_RSS_LIMIT
+    return not rec or not rec.get('rss_mib') or rec['rss_mib'] <= limit
 
 
 def memory_parts(rss, base):
@@ -108,7 +108,7 @@ def memory_parts(rss, base):
     return min(MAX_MEMORY_PARTS, max(2, int(math.ceil((rss - base) / room))))
 
 
-def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR, accepted=(),
+def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR, accepted=(), rss_limit=PIECE_RSS_LIMIT,
                 bundle_limit=BUNDLE_OWN_LIMIT):
     """Does the cost model's `scale` (time_scale) fit this carve's measured times?
     Returns {'over': [(item, secs, cost)], 'ratio', 'new_scale', 'limit', 'bundle_limit', 'measured',
@@ -138,7 +138,7 @@ def calibration(plan, times, scale, budget, frozen=(), limit_factor=LIMIT_FACTOR
         measured += 1
         if slowest is None or t['secs'] > slowest[1]:
             slowest = (key, t['secs'])
-        if key.startswith('piece:') and not fits_memory(t) and name not in frozen:
+        if key.startswith('piece:') and not fits_memory(t, rss_limit) and name not in frozen:
             memory_over.append((key, t['rss_mib'], t['secs']))
             continue
         if key.startswith('piece:') and t['secs'] <= PIECE_CAP:
@@ -1616,7 +1616,7 @@ class Pipeline:
         if sha != hashlib.sha1(open(self.work_paths(cfg)[1], 'rb').read()).hexdigest():
             return 'not released: publish/plan.json is not the measured plan'
         res = calibration(dict(plan, pieces={}), times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
-                          accepted=self.p.get('accept_over') or ())
+                          accepted=self.p.get('accept_over') or (), rss_limit=self.rss_limit())
         bad = {k for k, _, _ in res['over']} | {k for k, _ in res['statements_over']}
         if not self.p.get('accept_heavy_imports'):
             bad |= {k for k, _ in heavy_imports(plan, times, fz, kinds=('bundle', 'statement'))}
@@ -1817,7 +1817,7 @@ class Pipeline:
         limit = max(cfg.get('budget', 55) * LIMIT_FACTOR, PIECE_CAP)
         accepted = set(self.p.get('accept_over') or ())
         trying = {'piece:' + n for n in self.trying_pieces()}
-        fast = sorted(x for x in items if (times.get(x) or {}).get('ok') and (fits_memory(times[x]) or x in trying) and
+        fast = sorted(x for x in items if (times.get(x) or {}).get('ok') and (fits_memory(times[x], self.rss_limit()) or x in trying) and
                       ((times[x].get('secs') or 0) <= limit or (x in accepted and times[x]['secs'] <= ACCEPT_CAP)))
         P = os.path.join(self.d, 'publish')
         pplan = os.path.join(P, 'plan.json')
@@ -2012,7 +2012,7 @@ class Pipeline:
         if self.overlap():
             return self.calibrate_frozen_part(cfg, plan, times, fz, times_path)
         res = calibration(plan, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
-                          accepted=self.p.get('accept_over') or ())
+                          accepted=self.p.get('accept_over') or (), rss_limit=self.rss_limit())
         lines = self.calibrate_head(cfg, res) + self.chain_warnings(plan, times, res, fz)
         log = os.path.join(self.d, 'logs', 'calibrate.log')
         if res['statements_over']:
@@ -2084,7 +2084,7 @@ class Pipeline:
         whole carve)."""
         part = dict(plan, pieces={})
         res = calibration(part, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
-                          accepted=self.p.get('accept_over') or ())
+                          accepted=self.p.get('accept_over') or (), rss_limit=self.rss_limit())
         lines = self.calibrate_head(cfg, res, 'bundles and statements: ') + self.chain_warnings(plan, times, res, fz)
         log = os.path.join(self.d, 'logs', 'calibrate.log')
         heavy = heavy_imports(plan, times, fz, kinds=('bundle', 'statement'))
@@ -2226,6 +2226,11 @@ class Pipeline:
             return set()
         return {x for x, v in st.items() if v.get('state') == 'live'}
 
+    def rss_limit(self):
+        """The piece memory limit for this carve: pipeline.json `piece_rss_limit`, else PIECE_RSS_LIMIT (q153
+        2026-11-09: 39 pieces at 7,151-8,579 MiB all accepted, so the carve set 8,600)."""
+        return int(self.p.get('piece_rss_limit') or PIECE_RSS_LIMIT)
+
     def trying_pieces(self):
         """Pieces sent whatever their measured peak: pipeline.json `try_over_memory` (a person's trial) and those
         split-piece found unsplittable (q153 2026-11-09). A memory kill of one leaves it for a person."""
@@ -2275,7 +2280,7 @@ class Pipeline:
         # split here had been accepted, and their new statements were orphans
         live = live_pieces(self.d)
         res = calibration(dict(plan, bundles=[], stubs={}), times, cfg.get('time_scale', 1.5), cfg.get('budget', 55),
-                          live)
+                          live, rss_limit=self.rss_limit())
         tried = self.state.setdefault('auto_split', {})
         # pipeline.json `try_over_memory`: sent whatever their peak; a memory kill splits them (server_split_wanted)
         trying = self.trying_pieces()
@@ -2296,7 +2301,7 @@ class Pipeline:
                             memory_rounds=(tried.get(n) or {}).get('memory_rounds', 1 if n in tried else 0) + 1)
         self.state['stream_split_at'] = time.time()
         line = 'splitting %d piece(s) alone while measuring (%d over the %d MiB memory limit, %d the verifier rejected): %s' % (
-            len(want), len(auto_mem), PIECE_RSS_LIMIT, len(server), ', '.join('%s into %d' % x for x in sorted(want.items())))
+            len(want), len(auto_mem), self.rss_limit(), len(server), ', '.join('%s into %d' % x for x in sorted(want.items())))
         print('== measure: ' + line, flush=True)
         self.calibrate_log([line])
         self.split_pieces_locally(want, 'measure', 'measure: %s over the memory limit, split while streaming')
@@ -2318,7 +2323,7 @@ class Pipeline:
         live = live_pieces(self.d)              # in flight too: a verdict may still make it live
         part = dict(plan, bundles=[], stubs={})
         res = calibration(part, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), live,
-                          accepted=self.p.get('accept_over') or ())
+                          accepted=self.p.get('accept_over') or (), rss_limit=self.rss_limit())
         # pipeline.json `try_over_memory`: sent whatever their peak; a memory kill splits them (server_split_wanted)
         trying = self.trying_pieces()
         res['memory_over'] = [m for m in res['memory_over'] if m[0].split(':', 1)[1] not in trying]
@@ -2432,7 +2437,7 @@ class Pipeline:
         ok = [x for x in items if (times.get(x) or {}).get('ok')]
         # calibrate_pieces has judged the slow ones (`held`); otherwise the limit decides here
         fast = sorted(x for x in ok if x not in held) if held else \
-            sorted(x for x in ok if (times[x].get('secs') or 0) <= limit and fits_memory(times[x]))
+            sorted(x for x in ok if (times[x].get('secs') or 0) <= limit and fits_memory(times[x], self.rss_limit()))
         if not fast:
             return ''
         try:

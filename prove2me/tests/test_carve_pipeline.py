@@ -2925,3 +2925,17 @@ def test_an_unsplittable_piece_over_memory_is_sent_once_and_the_round_goes_on(en
     assert 'piece:P0' in json.load(open(env.dir / 'publish' / 'release.json'))['pieces']
     splits = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
     assert sum('P0' in a[2] for a in splits) == 1                      # asked once, never again
+
+
+def test_a_carve_may_set_its_own_memory_limit():
+    # q153 (2026-11-09): 39 pieces measured at 7,151-8,579 MiB were all accepted, none rejected since 08:00; the
+    # 7,150 limit split pieces the verifier takes. pipeline.json `piece_rss_limit` overrides PIECE_RSS_LIMIT
+    assert CP.fits_memory(_tm(10, 8400), limit=8600) and not CP.fits_memory(_tm(10, 8601), limit=8600)
+    r = CP.calibration(_plan({'B0': 55}, {'P': 10}), {'bundle:B0': _t(5), 'piece:P': _tm(10, 8400)}, 1.2, 55,
+                       rss_limit=8600)
+    assert r['memory_over'] == []
+    p = object.__new__(CP.Pipeline)
+    p.p = {'piece_rss_limit': 8600}
+    assert p.rss_limit() == 8600
+    p.p = {}
+    assert p.rss_limit() == CP.PIECE_RSS_LIMIT
