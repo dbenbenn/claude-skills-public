@@ -57,9 +57,14 @@ STUB = textwrap.dedent('''
         # carve.py split-piece: each node's lemma_<node> becomes a statement of its own
         _pp = os.path.join(os.getcwd(), 'carve_work', 'plan.json')
         _plan = json.load(open(_pp))
-        _done = {}
+        _done, _un = {}, {}
         for _spec in sys.argv[3].split(','):
             _n = _spec.split('=')[0]
+            if _n in json.loads(os.environ.get('STUB_UNSPLITTABLE', '[]')):
+                if '--skip-unsplittable' not in sys.argv:
+                    sys.exit('split-piece: ' + _n + ': nothing in its piece can be a statement')
+                _un[_n] = 'nothing in its piece can be a statement'
+                continue
             _m = 'lemma_' + _n
             _plan['pieces'][_n] = dict(_plan['pieces'][_n], keep=[_n], imports=[_m])
             _plan['pieces'][_m] = {'cost': 1, 'keep': [_m], 'bundles': ['B0'], 'imports': []}
@@ -69,6 +74,7 @@ STUB = textwrap.dedent('''
             os.makedirs(os.path.join(os.getcwd(), 'out', 'solutions'), exist_ok=True)
             open(os.path.join(os.getcwd(), 'out', 'solutions', 'Sol_' + _n + '.lean'), 'w').write('split ' + _n)
         json.dump(_plan, open(_pp, 'w'))
+        print('UNSPLITTABLE_PIECES ' + json.dumps(_un))
         print('SPLIT_PIECES ' + json.dumps(_done))
     # a test scripts a tool's behaviour: STUB_HOOK_<tool>_<first argument, . and - as _>
     exec(os.environ.get('STUB_HOOK_' + NAME + '_' + (sys.argv[1] if len(sys.argv) > 1 else '').replace('.', '_').replace('-', '_'), ''))
@@ -1657,7 +1663,7 @@ def test_a_slow_piece_is_split_alone_without_a_replan(env, monkeypatch):
     seq = tools_called(env)
     assert seq.count(('carve', 'plan')) == 1 and seq.count(('carve', 'gen')) == 1 and seq.count(('carve', 'split-piece')) == 1
     split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
-    assert split == [['split-piece', 'config.json', 'P0=4']]           # 192 s against a 55 s budget
+    assert split == [['split-piece', 'config.json', 'P0=4', '--skip-unsplittable']]           # 192 s against a 55 s budget
     i = seq.index(('carve', 'split-piece'))
     assert seq[i + 1:i + 3] == [('carve_prep', 'name-check'), ('carve', 'order')]   # from names on, gen kept
     assert 'split-piece' in (env.dir / 'logs' / 'calibrate.log').read_text()
@@ -1690,7 +1696,7 @@ def test_split_piece_by_hand_splits_before_the_run_resumes(env, monkeypatch):
     r = run(env, '--split-piece', 'P0=3', '--split-piece', 'P1', '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
-    assert split == [['split-piece', 'config.json', 'P0=3,P1=2']]
+    assert split == [['split-piece', 'config.json', 'P0=3,P1=2', '--skip-unsplittable']]
     seq = tools_called(env)
     assert ('carve', 'plan') not in seq and ('carve', 'gen') not in seq
     assert seq[seq.index(('carve', 'split-piece')) + 1] == ('carve_prep', 'name-check')
@@ -1742,7 +1748,7 @@ def test_a_piece_the_verifier_timed_out_on_is_split_alone_once_per_stop(env, mon
     r = run(env, '--redo', 'calibrate_pieces', '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
-    assert split == [['split-piece', 'config.json', 'P2=2']]
+    assert split == [['split-piece', 'config.json', 'P2=2', '--skip-unsplittable']]
     assert json.load(open(env.dir / 'pipeline_state.json'))['piece_splits']['P2'][0]['new'] == ['lemma_P2']
 
 
@@ -2677,7 +2683,7 @@ def test_a_piece_over_the_verifiers_memory_is_split_alone_at_once(env, monkeypat
     r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
-    assert split == [['split-piece', 'config.json', 'P0=3']]   # 200 MiB of proof, 80 of room
+    assert split == [['split-piece', 'config.json', 'P0=3', '--skip-unsplittable']]   # 200 MiB of proof, 80 of room
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert not st.get('remeasured')                               # a peak is not a thrashing artefact
     assert st['auto_split']['P0']['rss_mib'] == CP.PIECE_RSS_TARGET + 120
@@ -2859,7 +2865,7 @@ def test_a_piece_the_verifier_killed_for_memory_is_split_in_the_next_streaming_r
     r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure')
     assert r.returncode == 0, r.stdout + r.stderr
     split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
-    assert split == [['split-piece', 'config.json', 'P0=2']]
+    assert split == [['split-piece', 'config.json', 'P0=2', '--skip-unsplittable']]
 
 
 def test_pieces_a_person_lists_to_try_over_memory_are_released_and_not_split_until_answered(env, monkeypatch):
@@ -2895,3 +2901,27 @@ def test_calibrate_pieces_lets_a_trial_piece_through_without_stopping(env, monke
     r = run(env, '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     assert not [c for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
+
+
+def test_an_unsplittable_piece_over_memory_is_sent_once_and_the_round_goes_on(env, monkeypatch):
+    # q153 (2026-11-09): density0_r0_10_eq, one declaration peaking at 8,049 MiB (its statement alone 6,939), was asked
+    # into 8 parts; split-piece refused ("nothing in its piece can be a statement") and the driver stopped. Such a piece
+    # is recorded unsplittable, sent once as it is (a person looks if the verifier rejects it), and the others split
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30), 'P2': (40, 30)},
+                   seq=[{}] + [{'piece:P1': _tm(10, 6900), 'piece:lemma_P1': _tm(5, 6800),
+                                'statement:lemma_P1': _tm(3, 6600)}] * 8)
+    monkeypatch.setenv('STUB_UNSPLITTABLE', json.dumps(['P0']))
+    work = env.dir / 'carve_work'
+    for f in ('times.json', 'times.orig.json'):
+        t = json.load(open(work / f))
+        t['piece:P0'] = _tm(17, 8049)
+        t['piece:P1'] = _tm(40, CP.PIECE_RSS_TARGET + 120)
+        t['statement:P1'] = _tm(3, CP.PIECE_RSS_TARGET - 80)
+        (work / f).write_text(json.dumps(t))
+    r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert 'P0' in st['unsplittable'] and 'P1' in st['piece_splits']
+    assert 'piece:P0' in json.load(open(env.dir / 'publish' / 'release.json'))['pieces']
+    splits = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
+    assert sum('P0' in a[2] for a in splits) == 1                      # asked once, never again

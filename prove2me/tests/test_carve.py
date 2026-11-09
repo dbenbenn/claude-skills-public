@@ -1231,6 +1231,28 @@ def test_split_piece_cli_rewrites_only_the_split_piece_and_its_new_statements(tm
     run('split-piece', str(cfg), 'CD.nope', ok=False)
 
 
+def test_split_many_skips_a_piece_with_nothing_to_promote_when_asked(g, monkeypatch):
+    # q153 (2026-11-09): one unsplittable piece (a single declaration) stopped a round of 176 memory splits
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('carve_cli_t', os.path.join(os.path.dirname(HERE), 'scripts', 'carve.py'))
+    CLI = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(CLI)
+    P = _whole_plan(g)
+    cost = C.size_costs(g, bytes_per_second=10000)
+    real = CLI.C.split_piece
+
+    def fake(g_, Q, n, *a, **k):
+        if n == 'CD.top_pick':
+            raise C.CarveError('CD.top_pick: nothing in its piece can be a statement (...)')
+        return real(g_, Q, n, *a, **k)
+    monkeypatch.setattr(CLI.C, 'split_piece', fake)
+    with pytest.raises(C.CarveError, match='nothing in its piece'):
+        CLI.split_many(g, P, 'CD.main,CD.top_pick', cost, {'chunker': 'schedule'})
+    Q, done, un = CLI.split_many(g, P, 'CD.main,CD.top_pick', cost, {'chunker': 'schedule'}, skip_unsplittable=True)
+    assert list(done) == ['CD.main'] and done['CD.main'] and list(un) == ['CD.top_pick']
+    assert Q['pieces']['CD.top_pick'] == P['pieces']['CD.top_pick']
+
+
 def test_gen_applies_recorded_repairs(tmp_path):
     # carve_measure cuts a failing context command and records the cut in work/repairs.json;
     # Boone-Higman (2026-10-24): a later `carve.py gen` rewrote the bundle without the cut, so the

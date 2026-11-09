@@ -444,6 +444,34 @@ def run_gen(cfg, g, P, kinds, names):
         sys.exit(1)
 
 
+def split_many(g, P, specs, cost, cfg, parts=2.0, skip_unsplittable=False):
+    """split-piece over `specs` ('NODE[=PARTS],...'): (new plan, {node: new statements}, {node: why} unsplittable).
+    With skip_unsplittable a piece with nothing to promote is noted and the others split (carve_pipeline; q153
+    2026-11-09: one single-declaration piece stopped a round of 176); otherwise its CarveError propagates."""
+    Q, done, unsplittable = P, {}, {}
+    for spec in specs.split(','):
+        n, _, k = spec.partition('=')
+        if n not in Q['pieces']:
+            raise C.CarveError('%s has no piece in the plan' % n)
+        keep = Q['pieces'][n]['keep']
+        target = sum(cost.get(x, 0.0) for x in keep) / max(float(k) if k else parts, 1.0)
+        try:
+            Q, new = C.split_piece(g, Q, n, target, cost, cfg.get('chunker', 'bands'),
+                                   cfg.get('promote_private', ()),
+                                   sorted(set(cfg.get('folded', ())) | set(cfg.get('no_promote', ()))))
+        except C.CarveError as e:
+            if not skip_unsplittable or 'nothing in its piece' not in str(e):
+                raise
+            unsplittable[n] = str(e)
+            print('  %-60s unsplittable: %s' % (n, e))
+            continue
+        done[n] = new
+        for m in [n] + new:
+            print('  %-60s %7.2f planned s, %d declarations%s' % (
+                m, Q['pieces'][m]['cost'], len(Q['pieces'][m]['keep']), ' (new statement)' if m != n else ''))
+    return Q, done, unsplittable
+
+
 def main(argv):
     if len(argv) < 3:
         sys.exit(__doc__)
@@ -587,23 +615,15 @@ def main(argv):
         g, P = load_graph(cfg), json.load(open(plan_path(cfg)))
         parts = float(rest[rest.index('--parts') + 1]) if '--parts' in rest else 2.0
         cost = costs(cfg, g)
-        Q, done = P, {}
-        for spec in rest[0].split(','):
-            n, _, k = spec.partition('=')
-            if n not in Q['pieces']:
-                sys.exit('split-piece: %s has no piece in the plan' % n)
-            keep = Q['pieces'][n]['keep']
-            target = sum(cost.get(x, 0.0) for x in keep) / max(float(k) if k else parts, 1.0)
-            try:
-                Q, new = C.split_piece(g, Q, n, target, cost, cfg.get('chunker', 'bands'),
-                                       cfg.get('promote_private', ()),
-                                       sorted(set(cfg.get('folded', ())) | set(cfg.get('no_promote', ()))))
-            except C.CarveError as e:
-                sys.exit('split-piece: %s' % e)
-            done[n] = new
-            for m in [n] + new:
-                print('  %-60s %7.2f planned s, %d declarations%s' % (
-                    m, Q['pieces'][m]['cost'], len(Q['pieces'][m]['keep']), ' (new statement)' if m != n else ''))
+        try:
+            Q, done, unsplittable = split_many(g, P, rest[0], cost, cfg, parts, '--skip-unsplittable' in rest)
+        except C.CarveError as e:
+            sys.exit('split-piece: %s' % e)
+        if '--skip-unsplittable' in rest:
+            print('UNSPLITTABLE_PIECES ' + json.dumps(unsplittable, sort_keys=True))
+        if not done:
+            print('SPLIT_PIECES {}')
+            return
         probs = C.check_plan(g, Q)
         if probs:
             sys.exit('split-piece: plan inconsistent:\n' + '\n'.join(probs[:20]))

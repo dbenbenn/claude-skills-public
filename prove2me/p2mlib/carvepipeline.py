@@ -1816,7 +1816,7 @@ class Pipeline:
         cfg, plan, times, _, _ = got
         limit = max(cfg.get('budget', 55) * LIMIT_FACTOR, PIECE_CAP)
         accepted = set(self.p.get('accept_over') or ())
-        trying = {'piece:' + n for n in self.p.get('try_over_memory') or ()}
+        trying = {'piece:' + n for n in self.trying_pieces()}
         fast = sorted(x for x in items if (times.get(x) or {}).get('ok') and (fits_memory(times[x]) or x in trying) and
                       ((times[x].get('secs') or 0) <= limit or (x in accepted and times[x]['secs'] <= ACCEPT_CAP)))
         P = os.path.join(self.d, 'publish')
@@ -2154,7 +2154,8 @@ class Pipeline:
         out = {}
         for x, v in sorted(st.items()):
             n = x.split(':', 1)[1]
-            if not (x.startswith('piece:') and v.get('state') == 'split') or self.piece_split_rounds(n) >= MAX_PIECE_SPLITS:
+            if not (x.startswith('piece:') and v.get('state') == 'split') or self.piece_split_rounds(n) >= MAX_PIECE_SPLITS \
+                    or n in (self.state.get('unsplittable') or {}):
                 continue
             if v.get('sha') and n in (plan.get('pieces') or {}):
                 slug = CV.slug(CV.statement_name(plan, n))
@@ -2178,13 +2179,23 @@ class Pipeline:
         (mechanical prose). A stopped piece whose file changed is sent again by split_run itself
         (_restart_changed). Returns {node: [new nodes]}."""
         spec = ','.join('%s=%g' % (n, k) for n, k in sorted(want.items()))
-        self.run_cmds(step, [self.tool('carve', 'split-piece', 'config.json', spec)])
+        self.run_cmds(step, [self.tool('carve', 'split-piece', 'config.json', spec, '--skip-unsplittable')])
         self.check_published_unchanged(step)
         log = os.path.join(self.d, 'logs', step + '.log')
         line = [l for l in open(log, errors='replace').read().splitlines() if l.startswith('SPLIT_PIECES ')]
         if not line:
             raise StepFailed("step '%s': carve.py split-piece printed no SPLIT_PIECES line; log %s" % (step, log))
         done = json.loads(line[-1].split(' ', 1)[1])
+        un = [l for l in open(log, errors='replace').read().splitlines() if l.startswith('UNSPLITTABLE_PIECES ')]
+        if un:
+            # nothing in them can be a statement: they go once as they are (trying_pieces), a person looks if rejected
+            got = json.loads(un[-1].split(' ', 1)[1])
+            self.state.setdefault('unsplittable', {}).update(got)
+            if got:
+                print('== %s: unsplittable, sent once as they are: %s' % (step, ', '.join(sorted(got))), flush=True)
+        if not done:
+            self.save()
+            return done
         rec = self.state.setdefault('piece_splits', {})
         for n, new in done.items():
             rec.setdefault(n, []).append({'at': _now(), 'why': why % n if '%s' in why else why,
@@ -2214,6 +2225,11 @@ class Pipeline:
         except (OSError, ValueError):
             return set()
         return {x for x, v in st.items() if v.get('state') == 'live'}
+
+    def trying_pieces(self):
+        """Pieces sent whatever their measured peak: pipeline.json `try_over_memory` (a person's trial) and those
+        split-piece found unsplittable (q153 2026-11-09). A memory kill of one leaves it for a person."""
+        return set(self.p.get('try_over_memory') or ()) | set(self.state.get('unsplittable') or {})
 
     def memory_triage(self, plan, times, memory_over, tried):
         """calibration's `memory_over` pieces -> ([(node, rss, secs, parts)] to split automatically, [why] for a
@@ -2262,7 +2278,7 @@ class Pipeline:
                           live)
         tried = self.state.setdefault('auto_split', {})
         # pipeline.json `try_over_memory`: sent whatever their peak; a memory kill splits them (server_split_wanted)
-        trying = set(self.p.get('try_over_memory') or ())
+        trying = self.trying_pieces()
         res['memory_over'] = [m for m in res['memory_over'] if m[0].split(':', 1)[1] not in trying]
         auto_mem, _ = self.memory_triage(plan, times, res['memory_over'], tried)
         # and those the verifier rejected (state `split`: a memory kill, or own timeouts), sized from their peak
@@ -2304,7 +2320,7 @@ class Pipeline:
         res = calibration(part, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), live,
                           accepted=self.p.get('accept_over') or ())
         # pipeline.json `try_over_memory`: sent whatever their peak; a memory kill splits them (server_split_wanted)
-        trying = set(self.p.get('try_over_memory') or ())
+        trying = self.trying_pieces()
         res['memory_over'] = [m for m in res['memory_over'] if m[0].split(':', 1)[1] not in trying]
         lines = self.calibrate_head(cfg, res, 'pieces: ')
         heavy = heavy_imports(plan, times, live, kinds=('piece',))
