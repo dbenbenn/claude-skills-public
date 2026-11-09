@@ -2702,8 +2702,8 @@ def test_pieces_over_memory_are_split_while_the_measure_still_streams(env, monke
     work = env.dir / 'carve_work'
     for f in ('times.json', 'times.orig.json'):
         t = json.load(open(work / f))
-        t['piece:P0'] = _tm(40, CP.PIECE_RSS_LIMIT + 120)
-        t['statement:P0'] = _tm(5, CP.PIECE_RSS_LIMIT - 80)
+        t['piece:P0'] = _tm(40, CP.PIECE_RSS_TARGET + 120)
+        t['statement:P0'] = _tm(5, CP.PIECE_RSS_TARGET - 80)
         (work / f).write_text(json.dumps(t))
     r = run(env, *ARGS_NEW, '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
@@ -2713,7 +2713,7 @@ def test_pieces_over_memory_are_split_while_the_measure_still_streams(env, monke
     assert not any(t == ('carve', 'split-piece') for t in seq[i + 1:])  # once
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert st['piece_splits']['P0'][0]['why'].startswith('measure:')
-    assert st['auto_split']['P0']['rss_mib'] == CP.PIECE_RSS_LIMIT + 120
+    assert st['auto_split']['P0']['rss_mib'] == CP.PIECE_RSS_TARGET + 120
     assert 'splitting 1 piece(s) alone while measuring' in r.stdout
 
 
@@ -2816,8 +2816,8 @@ def test_a_new_statement_of_a_streaming_split_is_released_once_its_own_piece_is_
     work = env.dir / 'carve_work'
     for f in ('times.json', 'times.orig.json'):
         t = json.load(open(work / f))
-        t['piece:P0'] = _tm(40, CP.PIECE_RSS_LIMIT + 120)
-        t['statement:P0'] = _tm(5, CP.PIECE_RSS_LIMIT - 80)
+        t['piece:P0'] = _tm(40, CP.PIECE_RSS_TARGET + 120)
+        t['statement:P0'] = _tm(5, CP.PIECE_RSS_TARGET - 80)
         (work / f).write_text(json.dumps(t))
     # as on q153, the stream recorded the statements it began with before the split
     assert run(env, *ARGS_NEW, '--stop-after', 'order').returncode == 0
@@ -2832,15 +2832,16 @@ def test_a_new_statement_of_a_streaming_split_is_released_once_its_own_piece_is_
 def test_a_borderline_piece_is_tried_once_and_splits_aim_below_it():
     # dbenbenn 2026-11-09: "if a piece is borderline (memory <7100MiB say) try submitting it once before splitting".
     # q153: 97 of 210 held pieces peaked at 7,051-7,100 MiB, where accepted pieces were seen (up to 7,099)
-    assert CP.PIECE_RSS_LIMIT == 7100 and CP.PIECE_RSS_TARGET < CP.PIECE_RSS_LIMIT
-    assert CP.fits_memory(_tm(16, 7083)) and not CP.fits_memory(_tm(16, 7101))
-    r = CP.calibration(_plan({'B0': 55}, {'P': 10, 'Q': 10}), {'bundle:B0': _t(5), 'piece:P': _tm(16, 7083),
-                                                              'piece:Q': _tm(16, 7130)}, 1.2, 55)
+    # 2026-11-09: 87 of 89 sent at 7,051-7,100 accepted first try, none lost; dbenbenn: nudge it up
+    assert CP.PIECE_RSS_LIMIT == 7150 and CP.PIECE_RSS_TARGET < CP.PIECE_RSS_LIMIT
+    assert CP.fits_memory(_tm(16, 7133)) and not CP.fits_memory(_tm(16, 7151))
+    r = CP.calibration(_plan({'B0': 55}, {'P': 10, 'Q': 10}), {'bundle:B0': _t(5), 'piece:P': _tm(16, 7133),
+                                                              'piece:Q': _tm(16, 7180)}, 1.2, 55)
     assert [x[0] for x in r['memory_over']] == ['piece:Q']
     # parts are sized to land under the target, not just under the limit
     base = CP.PIECE_RSS_TARGET - 100
     assert CP.memory_parts(CP.PIECE_RSS_TARGET + 100, base) == 2
-    assert CP.memory_parts(CP.PIECE_RSS_LIMIT + 1, base) == 2
+    assert CP.memory_parts(CP.PIECE_RSS_TARGET + 250, base) == 4      # 350 of proof, 100 of room
 
 
 def test_a_piece_the_verifier_killed_for_memory_is_split_in_the_next_streaming_round(env, monkeypatch):

@@ -66,10 +66,11 @@ BUNDLE_OWN_LIMIT = 80   # s local: an unpublished bundle over this is split (or 
                         # 87.7 and 88.6 s against the 88 s limit hit the server's own "Compilation timed out after
                         # 300s" 2, 3 and 1 times; E011 stopped for a person with 24 bundles behind it
 ACCEPT_BUSY = 5         # accept_over on a bundle this many items import gets a warning: E001 (88.6 s) took 6 tries
-PIECE_RSS_LIMIT = 7100  # MiB: a piece whose verifier-form file peaks over this locally (carve_measure rss_mib) is split
+PIECE_RSS_LIMIT = 7150  # MiB: a piece whose verifier-form file peaks over this locally (carve_measure rss_mib) is split
                         # before it is sent; one at or under it is tried once (dbenbenn 2026-11-09: "if a piece is
                         # borderline (memory <7100MiB say) try submitting it once before splitting"; was 7050), and a
-                        # memory kill splits it (verdicts PIECE_OOM_CAP 0).
+                        # memory kill splits it (verdicts PIECE_OOM_CAP 0). 7150 since 2026-11-09 (dbenbenn: "nudge up"):
+                        # q153's pieces sent at 7,051-7,100 MiB were 87 accepted first try, 2 after a failure, none lost.
                         # before it is sent. q153 (2026-11-08): 106 pieces stopped after four memory kills each
                         # (verdicts hidden/dependency_oom); accepted pieces peaked at <= 7,099 MiB (one 7,135), the
                         # stopped and timed-out ones at 7,113-7,250 (one 6,822), while `import Mathlib` alone peaks at
