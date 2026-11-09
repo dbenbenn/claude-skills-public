@@ -66,12 +66,16 @@ BUNDLE_OWN_LIMIT = 80   # s local: an unpublished bundle over this is split (or 
                         # 87.7 and 88.6 s against the 88 s limit hit the server's own "Compilation timed out after
                         # 300s" 2, 3 and 1 times; E011 stopped for a person with 24 bundles behind it
 ACCEPT_BUSY = 5         # accept_over on a bundle this many items import gets a warning: E001 (88.6 s) took 6 tries
-PIECE_RSS_LIMIT = 7050  # MiB: a piece whose verifier-form file peaks over this locally (carve_measure rss_mib) is split
+PIECE_RSS_LIMIT = 7100  # MiB: a piece whose verifier-form file peaks over this locally (carve_measure rss_mib) is split
+                        # before it is sent; one at or under it is tried once (dbenbenn 2026-11-09: "if a piece is
+                        # borderline (memory <7100MiB say) try submitting it once before splitting"; was 7050), and a
+                        # memory kill splits it (verdicts PIECE_OOM_CAP 0).
                         # before it is sent. q153 (2026-11-08): 106 pieces stopped after four memory kills each
                         # (verdicts hidden/dependency_oom); accepted pieces peaked at <= 7,099 MiB (one 7,135), the
                         # stopped and timed-out ones at 7,113-7,250 (one 6,822), while `import Mathlib` alone peaks at
                         # 6,551: the workers' cap is about 7 GiB. Neither time (30-45 s pieces passed about half the
                         # time) nor the import closure (82 pieces importing >= 90 MB, under 20 s, all passed) separated them
+PIECE_RSS_TARGET = 7050 # MiB: what a memory split sizes its parts to stay under (a margin below PIECE_RSS_LIMIT)
 MAX_MEMORY_PARTS = 8    # most parts one memory split makes
 MAX_MEMORY_ROUNDS = 2   # automatic memory splits of one piece before a person looks. q153 (2026-11-08): of the first 32
                         # halved pieces measured, 9 stayed just over (7,053-7,095 MiB): the proof's share does not halve exactly
@@ -91,11 +95,11 @@ def fits_memory(rec):
 
 def memory_parts(rss, base):
     """Parts to split a piece peaking at `rss` MiB into, its statement alone (its imports) peaking at `base`:
-    the proof's own share (rss - base) shared out so each part's fits the room under PIECE_RSS_LIMIT. None when
+    the proof's own share (rss - base) shared out so each part's fits the room under PIECE_RSS_TARGET. None when
     the imports alone are over (no split helps); 2 when the statement's peak is unknown."""
     if base is None:
         return 2
-    room = PIECE_RSS_LIMIT - base
+    room = PIECE_RSS_TARGET - base
     if room <= 0:
         return None
     return min(MAX_MEMORY_PARTS, max(2, int(math.ceil((rss - base) / room))))
@@ -2254,15 +2258,22 @@ class Pipeline:
                           live)
         tried = self.state.setdefault('auto_split', {})
         auto_mem, _ = self.memory_triage(plan, times, res['memory_over'], tried)
-        if not auto_mem:
+        # and those the verifier rejected (state `split`: a memory kill, or own timeouts), sized from their peak
+        server = {}
+        for n in self.server_split_wanted():
+            if n in (plan.get('pieces') or {}) and n not in {a[0] for a in auto_mem}:
+                rec = times.get('piece:' + n) or {}
+                base = (times.get('statement:' + n) or {}).get('rss_mib')
+                server[n] = memory_parts(rec['rss_mib'], base) or 2 if rec.get('rss_mib') else 2
+        if not auto_mem and not server:
             return False
-        want = {n: parts for n, _, _, parts in auto_mem}
+        want = dict(server, **{n: parts for n, _, _, parts in auto_mem})
         for n, rss, secs, parts in auto_mem:
             tried[n] = dict(tried.get(n) or {}, secs=secs, rss_mib=rss, parts=parts,
                             memory_rounds=(tried.get(n) or {}).get('memory_rounds', 1 if n in tried else 0) + 1)
         self.state['stream_split_at'] = time.time()
-        line = 'splitting %d piece(s) alone while measuring (over the %d MiB memory limit): %s' % (
-            len(want), PIECE_RSS_LIMIT, ', '.join('%s into %d' % x for x in sorted(want.items())))
+        line = 'splitting %d piece(s) alone while measuring (%d over the %d MiB memory limit, %d the verifier rejected): %s' % (
+            len(want), len(auto_mem), PIECE_RSS_LIMIT, len(server), ', '.join('%s into %d' % x for x in sorted(want.items())))
         print('== measure: ' + line, flush=True)
         self.calibrate_log([line])
         self.split_pieces_locally(want, 'measure', 'measure: %s over the memory limit, split while streaming')

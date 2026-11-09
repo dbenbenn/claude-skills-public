@@ -42,7 +42,8 @@ import re
 OWN_TIMEOUT_CAP = 2      # own timeouts before splitting
 HIDDEN_CAP = 2           # hidden-cause solution compile failures before stopping for a person
 DEPENDENCY_OOM_CAP = 3   # dependency_oom results before stopping for a person (q152)
-PIECE_OOM_CAP = 1        # earlier memory kills (hidden or dependency_oom, together) of a proof before it is split.
+PIECE_OOM_CAP = 0        # earlier memory kills (hidden or dependency_oom, together) of a proof before it is split.
+                         # dbenbenn 2026-11-09: a borderline piece (measured <= 7,100 MiB) is tried once, then split.
                          # q153 (2026-11-06): retries of proofs that had failed passed 1 in 20, so ten tries (a77afdc)
                          # mostly burned shared verifier time; 2026-11-08: all 106 pieces stopped after four kills
                          # peaked over ~7.1 GiB locally (accepted ones <= 7.1), so a smaller piece fits: split

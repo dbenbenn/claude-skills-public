@@ -2656,7 +2656,7 @@ def test_calibration_holds_a_piece_over_the_memory_limit_apart_from_the_time_sca
 
 
 def test_a_piece_over_memory_is_cut_into_enough_parts_for_its_proof_to_fit():
-    lim = CP.PIECE_RSS_LIMIT
+    lim = CP.PIECE_RSS_TARGET                                   # parts aim below the target
     # the statement alone (its imports) peaks at base; the proof adds the rest, shared out among the parts
     assert CP.memory_parts(lim + 100, lim - 200) == 2           # 300 over base, 200 of room: 2 parts
     assert CP.memory_parts(lim + 100, lim - 50) == 3           # 150 over base, 50 of room
@@ -2671,8 +2671,8 @@ def test_a_piece_over_the_verifiers_memory_is_split_alone_at_once(env, monkeypat
     work = env.dir / 'carve_work'
     for f in ('times.json', 'times.orig.json'):
         t = json.load(open(work / f))
-        t['piece:P0'] = _tm(40, CP.PIECE_RSS_LIMIT + 120)
-        t['statement:P0'] = _tm(5, CP.PIECE_RSS_LIMIT - 80)
+        t['piece:P0'] = _tm(40, CP.PIECE_RSS_TARGET + 120)
+        t['statement:P0'] = _tm(5, CP.PIECE_RSS_TARGET - 80)
         (work / f).write_text(json.dumps(t))
     r = run(env, *ARGS_NEW, '--no-stream-bundles', '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
@@ -2680,7 +2680,7 @@ def test_a_piece_over_the_verifiers_memory_is_split_alone_at_once(env, monkeypat
     assert split == [['split-piece', 'config.json', 'P0=3']]   # 200 MiB of proof, 80 of room
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert not st.get('remeasured')                               # a peak is not a thrashing artefact
-    assert st['auto_split']['P0']['rss_mib'] == CP.PIECE_RSS_LIMIT + 120
+    assert st['auto_split']['P0']['rss_mib'] == CP.PIECE_RSS_TARGET + 120
     assert 'memory' in (env.dir / 'logs' / 'calibrate.log').read_text()
 
 
@@ -2827,3 +2827,35 @@ def test_a_new_statement_of_a_streaming_split_is_released_once_its_own_piece_is_
     r = run(env, '--publish', '--stop-after', 'measure')
     assert r.returncode == 0, r.stdout + r.stderr
     assert 'statement:lemma_P0' in json.load(open(env.dir / 'publish' / 'release.json')).get('items', [])
+
+
+def test_a_borderline_piece_is_tried_once_and_splits_aim_below_it():
+    # dbenbenn 2026-11-09: "if a piece is borderline (memory <7100MiB say) try submitting it once before splitting".
+    # q153: 97 of 210 held pieces peaked at 7,051-7,100 MiB, where accepted pieces were seen (up to 7,099)
+    assert CP.PIECE_RSS_LIMIT == 7100 and CP.PIECE_RSS_TARGET < CP.PIECE_RSS_LIMIT
+    assert CP.fits_memory(_tm(16, 7083)) and not CP.fits_memory(_tm(16, 7101))
+    r = CP.calibration(_plan({'B0': 55}, {'P': 10, 'Q': 10}), {'bundle:B0': _t(5), 'piece:P': _tm(16, 7083),
+                                                              'piece:Q': _tm(16, 7130)}, 1.2, 55)
+    assert [x[0] for x in r['memory_over']] == ['piece:Q']
+    # parts are sized to land under the target, not just under the limit
+    base = CP.PIECE_RSS_TARGET - 100
+    assert CP.memory_parts(CP.PIECE_RSS_TARGET + 100, base) == 2
+    assert CP.memory_parts(CP.PIECE_RSS_LIMIT + 1, base) == 2
+
+
+def test_a_piece_the_verifier_killed_for_memory_is_split_in_the_next_streaming_round(env, monkeypatch):
+    # verdicts.decide puts it in state `split` at its first memory kill; the streaming rounds split it, rather than
+    # leaving it to calibrate_pieces at the end of the measure
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 20), 'P1': (40, 30)},
+                   seq=[{}] + [{'piece:P0': _tm(10, 6900), 'piece:lemma_P0': _tm(5, 6800),
+                                'statement:lemma_P0': _tm(3, 6600)}] * 8)
+    work = env.dir / 'carve_work'
+    for f in ('times.json', 'times.orig.json'):
+        t = json.load(open(work / f))
+        t['piece:P0'] = _tm(20, 7080)
+        (work / f).write_text(json.dumps(t))
+    _run_state(env, {'piece:P0': 'split'})
+    r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
+    assert split == [['split-piece', 'config.json', 'P0=2']]
