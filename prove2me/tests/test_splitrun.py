@@ -1099,3 +1099,58 @@ def test_ready_sends_what_an_unpublished_bundle_needs_before_other_items_of_its_
     ready = [x for x in r.ready() if x.startswith('piece:')]
     assert set(ready[:2]) == {'piece:A.low', 'piece:A.mid'}, (ready, r.blocked)
     assert 'piece:A.aaa' in ready[2:], (ready, r.blocked)
+
+
+# ---- stale sketches (q153, 2026-11-09; prove2me_feedback#21) ------------------------------------------------
+# b9_5_contains was verified 0.28 s after its only import: it got SKETCH_ACCEPTED (the import was Open when it was
+# checked) and never resolved to Proved once the import was, holding a bundle and ~1,200 items above it for a day.
+
+def _clocked(cfg, api):
+    t = [1_000_000.0]
+    r = R.Runner(cfg, api, sleep=lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0])
+    return r, t
+
+
+def test_a_sketch_accepted_with_its_import_at_the_same_moment_is_rechecked_and_resent(split):
+    d, cfg = split
+    api = FakeApi(script={'verify:A.mid_s2': [('SKETCH_ACCEPTED', None)]})
+    r, t = _clocked(cfg, api)
+    r.run()
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.mid']['state'] == 'live' and 'A_mid_s2' in api.proved          # resent, now ACCEPTED
+    assert [p for p in api.posted if p == ('verify', 'A.mid_s2')] == [('verify', 'A.mid_s2')] * 2
+    assert 're-check' in api.also['A.mid_s2']
+    assert 'recheck' in (d / 'PROGRESS.log').read_text()
+
+
+def test_a_sketch_whose_import_is_really_open_is_not_resent(split):
+    d, cfg = split
+    api = FakeApi(script={'verify:A.mid_s2': [('SKETCH_ACCEPTED', None)], 'verify:A.low_s2': [('SKETCH_ACCEPTED', None)]})
+    r, t = _clocked(cfg, api)
+    r.run()
+    assert [p for p in api.posted if p == ('verify', 'A.mid_s2')] == [('verify', 'A.mid_s2')]
+
+
+def test_a_bundle_waiting_long_for_proved_imports_finds_a_stale_sketch_below_it(split):
+    d, cfg = split
+    plan = json.loads(json.dumps(PLAN))
+    plan['bundles'][1]['statements'] = ['A.mid']
+    plan['stubs']['A.mid']['bundles'] = ['XB000']
+    plan['pieces']['A.mid']['bundles'] = ['XB000']
+    (d / 'plan.json').write_text(json.dumps(plan))
+    (d / 'out' / 'lib' / 'Def_XB001.lean').write_text(
+        'import Mathlib\nimport Definitions.Def_XB000\nimport Theorems.Thm_A_mid_s2\n\ndef XB001.k : Nat := 1\n')
+    api = FakeApi()
+    r, t = _clocked(cfg, api)
+    for x in r.items:
+        if x != 'bundle:XB001' and x != 'piece:A.top':
+            r.state[x] = {'state': 'live', 'id': 'id-' + x.split(':', 1)[1].replace('A.', 'A.') + '_s2', 'history': {}}
+    api.published.update({'A.low_s2': 'id-A.low_s2', 'A.mid_s2': 'id-A.mid_s2', 'XB000': 'id-XB000'})
+    r.state['statement:A.low']['id'], r.state['statement:A.mid']['id'] = 'id-A.low_s2', 'id-A.mid_s2'
+    r.state['piece:A.mid'].update(sketch=True, verdict_at=t[0] - 86400)    # long ago: no race window
+    api.proved.add('A_low_s2')                                             # its import is Proved, it is not
+    r.step()
+    assert r.state['bundle:XB001'].get('state', 'todo') == 'todo'
+    t[0] += R.STALE_BUNDLE_WAIT + 1
+    r.step()
+    assert r.state['piece:A.mid']['state'] in ('todo', 'inflight') and r.state['piece:A.mid'].get('recheck')

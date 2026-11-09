@@ -64,6 +64,12 @@ BATCH = 10
 PIECE_JOBS = 32          # proofs in flight at once (config `piece_jobs`), apart from `jobs` for bundles and statements:
                          # a proof only queues on the verifier; dbenbenn 2026-11-06 ("no good reason to rate limit
                          # proofs") after q153 sent 4 at a time with ~700 waiting
+RACE_WINDOW = 600        # s: a SKETCH_ACCEPTED proof and an ACCEPTED proof of one of its imports this close together
+RECHECK_DELAY = 900      # s: then, this much later, is the sketch's theorem Proved? (prove2me_feedback#21)
+STALE_BUNDLE_WAIT = 7200  # s a bundle waits for Proved imports before the Open chain under it is walked for stale sketches
+STALE_RECHECK = ('Same proof, re-checked: its first copy was judged SKETCH_ACCEPTED while an import was still Open, '
+                 'and the theorem did not resolve to Proved once its imports were (prove2me_feedback#21); this copy '
+                 'should be ACCEPTED outright.')
 PROVED_TTL = 600         # seconds a platform theorem status read for the bundle gate is reused
 
 
@@ -271,7 +277,8 @@ class Runner:
         rel = self._released = self.released()
         for x in self.items:
             s = self.state.get(x, {}).get('state', 'todo')
-            if s != 'todo' or x.split(':', 1)[0] not in self.kinds or self.held(x, rel):
+            if s != 'todo' or x.split(':', 1)[0] not in self.kinds or \
+                    (self.held(x, rel) and not self.state.get(x, {}).get('recheck')):
                 continue
             stopped = [d for d in self.deps[x] if self.state.get(d, {}).get('state') in TERMINAL
                        and not self.proved_on_platform(d)]
@@ -286,6 +293,7 @@ class Runner:
                         and not self.statement_proved(d)]
             if unproved:
                 self.blocked[x] = 'waits until Proved: ' + ', '.join(unproved)
+                self.st(x).setdefault('waiting_proved_since', self.clock())
                 continue
             why = self.check(x)
             if why:
@@ -298,6 +306,91 @@ class Runner:
         # within a kind, what an unpublished bundle needs first (dbenbenn 2026-11-09)
         need = C.bundle_needs(self.deps, {x for x, v in self.state.items() if v.get('state') == 'live'})
         return sorted(out, key=lambda x: (rank[x.split(':', 1)[0]], x not in need))
+
+    # -- stale sketches (prove2me_feedback#21) ---------------------------------------------------------------
+    def _parents(self):
+        if not hasattr(self, '_parents_of'):
+            self._parents_of = {}
+            for x, ds in self.deps.items():
+                if x.startswith('piece:'):
+                    for dd in ds:
+                        if dd.startswith('statement:') and dd != 'statement:' + x[6:]:
+                            self._parents_of.setdefault(dd, []).append(x)
+        return self._parents_of
+
+    def _imports(self, piece):
+        return ['piece:' + dd[10:] for dd in self.deps.get(piece, ()) if dd.startswith('statement:')
+                and dd != 'statement:' + piece[6:]]
+
+    def note_race(self, item, st):
+        """A sketch verdict and an ACCEPTED verdict of one of its imports within RACE_WINDOW: check the sketch's
+        theorem RECHECK_DELAY later (the platform may have missed resolving it; prove2me_feedback#21)."""
+        now = st['verdict_at']
+
+        def near(o):
+            return o.get('verdict_at') is not None and abs(o['verdict_at'] - now) <= RACE_WINDOW
+        if st['sketch']:
+            if any(near(self.state.get(c, {})) and not self.state.get(c, {}).get('sketch') for c in self._imports(item)):
+                st.setdefault('recheck_due', now + RECHECK_DELAY)
+        else:
+            for p in self._parents().get('statement:' + item[6:], ()):
+                ps = self.state.get(p, {})
+                if ps.get('state') == 'live' and ps.get('sketch') and near(ps):
+                    ps.setdefault('recheck_due', now + RECHECK_DELAY)
+
+    def recheck_if_stale(self, piece):
+        """Our live sketch of `piece` whose theorem is Open while every import of ours is Proved: send the same proof
+        again (STALE_RECHECK as the reason). True when it was queued."""
+        st = self.state.get(piece, {})
+        if st.get('state') != 'live':
+            return False
+        self.__dict__.setdefault('_stmt_proved', {}).pop(piece, None)       # a fresh read
+        if self.statement_proved(piece) or not all(self.statement_proved(c) for c in self._imports(piece)):
+            return False
+        st.update(state='todo', recheck=STALE_RECHECK)
+        st.pop('recheck_due', None)
+        self.log(piece, 'recheck', 'Open although every import is Proved: sending the same proof again')
+        self.save()
+        return True
+
+    def walk_stale(self, piece, seen):
+        """Down the Open chain under `piece` (our live proofs whose theorems are Open) to stale sketches."""
+        if piece in seen or len(seen) > 2000:
+            return
+        seen.add(piece)
+        if self.state.get(piece, {}).get('state') != 'live' or self.statement_proved(piece):
+            return
+        opn = [c for c in self._imports(piece) if not self.statement_proved(c)]
+        if not opn:
+            self.recheck_if_stale(piece)
+        for c in opn:
+            self.walk_stale(c, seen)
+
+    def stale_checks(self):
+        """Due race rechecks, and an hourly walk under each bundle that has waited STALE_BUNDLE_WAIT for Proved
+        imports. True while a recheck is still to come (the run waits for it)."""
+        now, pending = self.clock(), False
+        for x in self.items:
+            st = self.state.get(x)
+            if not st or 'recheck_due' not in st:
+                continue
+            if st['recheck_due'] > now:
+                pending = True
+                continue
+            st.pop('recheck_due')
+            self.recheck_if_stale(x)
+        for x in self.items:
+            st = self.state.get(x) or {}
+            if not x.startswith('bundle:') or st.get('state', 'todo') != 'todo' or 'waiting_proved_since' not in st:
+                continue
+            if now - st['waiting_proved_since'] < STALE_BUNDLE_WAIT or now - st.get('stale_walk_at', 0) < 3600:
+                continue
+            st['stale_walk_at'] = now
+            seen = set()
+            for dd in self.deps.get(x, ()):
+                if dd.startswith('piece:') and not self.statement_proved(dd):
+                    self.walk_stale(dd, seen)
+        return pending
 
     def statement_proved(self, item):
         """Is the statement of piece `item` Proved on the platform (each looked up at most every PROVED_TTL
@@ -453,6 +546,10 @@ class Runner:
             st['state'] = 'live'
             st['id'] = rec.get('theorem_id') or rec.get('definition_id') or rec.get('submission_id') or st.get('id')
             self.log(item, action, '%s %s' % (rec.get('status'), st['id']))
+            if item.startswith('piece:'):
+                st['verdict_at'], st['sketch'] = self.clock(), rec.get('status') == 'SKETCH_ACCEPTED'
+                st.pop('recheck', None)
+                self.note_race(item, st)
         elif dec == 'raise_heartbeats' and self._raise_heartbeats(item):
             # the person's fix every time (oaiq-055: four Lech bundles), done once; a second heartbeat
             # timeout waits for a person as before
@@ -694,6 +791,8 @@ class Runner:
             # comparisons/<slug>.md, "Different from <id>: ..." (sent as the reason) or "Same as <id>: ..."
             # (settled, not sent); submit_all.py's convention (oaiq-068)
             also = open(f['comparison'], encoding='utf-8').read().strip() if os.path.exists(f['comparison']) else ''
+            if st.get('recheck') and not also.startswith('Same as'):
+                also = '\n'.join(filter(None, [also, st['recheck']]))
             if st.get('lost') and not also.startswith('Same as'):
                 also = '\n'.join(filter(None, [also, 'resending: our own submission(s) %s never got a verdict' % (
                     ', '.join(st['lost']))]))
@@ -753,8 +852,9 @@ class Runner:
     def step(self):
         """Poll what is in flight, then send what is ready. True while there is anything to wait for."""
         self.poll()
+        self._recheck_pending = self.stale_checks()
         sent = self.submit(self.ready())
-        return bool(self.inflight() or sent)
+        return bool(self.inflight() or sent or self._recheck_pending)
 
     def run(self, max_hours=None):
         t0 = time.time()
@@ -764,7 +864,7 @@ class Runner:
             if max_hours and time.time() - t0 > max_hours * 3600:
                 break
             if more:
-                if self.inflight():
+                if self.inflight() or getattr(self, '_recheck_pending', False):
                     self.sleep(self.poll_every)
                 continue
             if not self.release_open():
