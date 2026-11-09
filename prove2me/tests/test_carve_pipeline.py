@@ -1462,8 +1462,8 @@ def test_overlap_measures_and_checks_bundles_and_statements_before_the_pieces(en
     r = run(env, *ARGS_NEW)
     assert r.returncode == 0, r.stdout + r.stderr
     seq = [(c['tool'], c['argv']) for c in calls(env)]
-    i = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'bundle,statement']))
-    j = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'piece']))
+    i = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', str(CP.MEASURE_JOBS), '--kinds', 'bundle,statement']))
+    j = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', str(CP.MEASURE_JOBS), '--kinds', 'piece']))
     tail = [(t, a[0]) for t, a in seq[i:]]
     assert tail[:6] == [('carve_measure', 'config.json'), ('carve_prep', 'publish-prep'), ('carve_prep', 'prose-template'),
                         ('carve_prep', 'check-text'), ('split_run', 'publish/run_early.json'), ('carve_measure', 'config.json')]
@@ -1522,13 +1522,13 @@ def test_with_publish_bundles_and_statements_stream_to_the_publisher_as_they_are
     seq = [(c['tool'], c['argv']) for c in calls(env)]
     i = next(k for k, (t, a) in enumerate(seq) if t == 'carve_measure')
     # proofs stream too, each behind its statement (dbenbenn 2026-11-07)
-    assert seq[i][1][:6] == ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'bundle,statement,piece']
+    assert seq[i][1][:6] == ['config.json', '--keep-going', '--jobs', str(CP.MEASURE_JOBS), '--kinds', 'bundle,statement,piece']
     assert sorted(seq[i][1][7].split(',')) == ['bundle:B0', 'bundle:B1', 'piece:P0', 'piece:P1',
                                                'statement:P0', 'statement:P1']
     # the gates that read only the generated files run once the sample is measured, then the closing measure
     assert [(t, a[0]) for t, a in seq[i + 1:i + 5]] == [('carve_prep', 'publish-prep'), ('carve_prep', 'prose-template'),
                                                         ('carve_prep', 'check-text'), ('carve_measure', 'config.json')]
-    assert seq[i + 4][1] == ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'bundle,statement']
+    assert seq[i + 4][1] == ['config.json', '--keep-going', '--jobs', str(CP.MEASURE_JOBS), '--kinds', 'bundle,statement']
     lines = _raw(env)
     i_bg = _index(lines, lambda l: l.startswith('systemd-run'))
     i_close = _index(lines, lambda l: '"tool": "carve_measure"' in l and '"--only"' not in l)
@@ -1967,7 +1967,7 @@ def test_a_classic_carve_switched_to_overlap_keeps_its_plan_and_measurements(env
     seq = tools_called(env)
     assert ('carve', 'plan') not in seq and ('carve', 'gen') not in seq
     measures = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure']
-    assert measures == [['config.json', '--keep-going', '--jobs', '3', '--kinds', 'piece']]   # the classic measure stands
+    assert measures == [['config.json', '--keep-going', '--jobs', str(CP.MEASURE_JOBS), '--kinds', 'piece']]   # the classic measure stands
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert st['steps']['calibrate_pieces']['status'] == 'done' and st.get('replans', 0) == 0
 
@@ -2297,7 +2297,7 @@ def test_a_rerun_gen_whose_pieces_changed_re_measures_and_re_syncs_them(env, mon
     measures = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_measure']
     # bundles and statements unchanged: only pieces, streamed in batches, then the full (cached) run
     assert all(a[a.index('--kinds') + 1] == 'piece' for a in measures)
-    assert measures[-1] == ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'piece']
+    assert measures[-1] == ['config.json', '--keep-going', '--jobs', str(CP.MEASURE_JOBS), '--kinds', 'piece']
     seq = tools_called(env)
     i = seq.index(('carve_measure', 'config.json'))
     assert ('carve_prep', 'publish-prep') in seq[i:] and seq[-1] == ('split_run', 'publish/run.json')
@@ -2454,8 +2454,8 @@ def test_pieces_that_bundles_wait_for_are_measured_and_released_first(env, monke
     r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure_pieces')
     assert r.returncode == 0, r.stdout + r.stderr
     seq = [(c['tool'], c['argv']) for c in calls(env)]
-    first = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'piece', '--only', 'piece:P1']))
-    full = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', '3', '--kinds', 'piece']))
+    first = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', str(CP.MEASURE_JOBS), '--kinds', 'piece', '--only', 'piece:P1']))
+    full = seq.index(('carve_measure', ['config.json', '--keep-going', '--jobs', str(CP.MEASURE_JOBS), '--kinds', 'piece']))
     assert first < full
     # P1 went in the first batch (released then); the streamed release grew with P0 after
     assert json.load(open(env.dir / 'publish' / 'release.json'))['pieces'] == ['piece:P0', 'piece:P1']
