@@ -5,6 +5,7 @@ import os
 import pytest
 
 from p2mlib import splitrun as R
+from p2mlib import verdicts as V
 
 # a two-bundle chain, two statements, two pieces; `top` is external (someone else's statement)
 PLAN = {
@@ -1045,3 +1046,30 @@ def test_reconcile_says_how_many_items_it_looks_up_before_sending(split):
     assert 'reconcile  looking up 7 items' in lines[0] and 'submit' in lines[1]
     run(cfg, FakeApi())                                           # everything live: nothing to look up, no line
     assert sum('reconcile' in l for l in (d / 'PROGRESS.log').read_text().splitlines()) == 1
+
+
+def test_a_bundle_waits_while_our_sketch_accepted_proof_leaves_its_import_open(split):
+    # q153 (2026-11-09): bundle OAIQ098G362 imports two statements whose pieces were SKETCH_ACCEPTED (live) while the
+    # statements stayed Open (their proofs import Open statements); it was sent, refused "Imported platform theorems
+    # must be Proved at submission time", and stopped for a person with nine bundles behind it
+    d, cfg = split
+    plan = json.loads(json.dumps(PLAN))
+    plan['bundles'][1]['statements'] = ['A.low']
+    (d / 'plan.json').write_text(json.dumps(plan))
+    (d / 'out' / 'lib' / 'Def_XB001.lean').write_text(
+        'import Mathlib\nimport Definitions.Def_XB000\nimport Theorems.Thm_A_low_s2\n\ndef XB001.k : Nat := 1\n')
+    api = FakeApi(script={'verify:A.low_s2': [('SKETCH_ACCEPTED', None)] * 5})
+    r, s = run(cfg, api)
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['piece:A.low']['state'] == 'live'                                 # our proof, a sketch
+    assert st.get('bundle:XB001', {}).get('state', 'todo') == 'todo'            # waits, not sent, not stopped
+    assert ('def', 'XB001') not in api.posted
+    api.proved.add('A_low_s2')                                                  # the statement is Proved now
+    r, s = run(cfg, api)
+    assert json.loads((d / 'run_state.json').read_text())['bundle:XB001']['state'] == 'live'
+
+
+def test_a_bundle_refused_for_an_unproved_import_waits_instead_of_stopping():
+    m = 'Imported platform theorems must be Proved at submission time, but the following are not: X (status=Open).'
+    assert V.classify('FAILED', m) == 'unproved_imports'
+    assert V.decide('unproved_imports', {'unproved_imports': 3}, 'bundle') == 'retry'

@@ -280,6 +280,13 @@ class Runner:
                 continue
             if not all(self.live(d) or self.proved_on_platform(d) for d in self.deps[x]):
                 continue
+            # a bundle imports statements: the platform wants them Proved, and our live proof may be only a sketch
+            # whose own imports are Open (q153 2026-11-09: OAIQ098G362 refused, nine bundles behind it)
+            unproved = [d for d in self.deps[x] if x.startswith('bundle:') and d.startswith('piece:')
+                        and not self.statement_proved(d)]
+            if unproved:
+                self.blocked[x] = 'waits until Proved: ' + ', '.join(unproved)
+                continue
             why = self.check(x)
             if why:
                 self.blocked[x] = why
@@ -289,6 +296,26 @@ class Runner:
         # statements or pieces
         rank = {'bundle': 0, 'statement': 1, 'piece': 2}
         return sorted(out, key=lambda x: rank[x.split(':', 1)[0]])
+
+    def statement_proved(self, item):
+        """Is the statement of piece `item` Proved on the platform (each looked up at most every PROVED_TTL
+        seconds, and only once it is Proved for good)?"""
+        status = getattr(self.api, 'theorem_status', None)
+        if status is None:
+            return True                    # an API without statuses: our live proof is all we can know
+        cache = self.__dict__.setdefault('_stmt_proved', {})
+        hit = cache.get(item)
+        if hit and (hit[1] or self.clock() - hit[0] < PROVED_TTL):
+            return hit[1]
+        n = item.split(':', 1)[1]
+        tid = self.state.get('statement:' + n, {}).get('id') if n not in self.ext \
+            else self.api.theorem_id(self.info(item)['name'])
+        try:
+            ok = bool(tid) and status(tid) == 'Proved'
+        except Exception:
+            ok = False
+        cache[item] = (self.clock(), ok)
+        return ok
 
     def proved_on_platform(self, item):
         """Is the statement of `item` (a piece another item waits for: a bundle importing its statement) Proved

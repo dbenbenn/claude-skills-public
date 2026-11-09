@@ -19,6 +19,8 @@
                  (137 MB import closure) failed so 22 times and were taken for timeouts. Retried
                  HIDDEN_CAP times, then a person looks.
   heartbeats     a deterministic heartbeat timeout: raise maxHeartbeats on that declaration.
+  unproved_imports  "Imported platform theorems must be Proved at submission time": a bundle imports a statement
+                 that is live but not Proved (our proof only sketch-accepted). Waits; sent again once Proved.
   dependency_oom "Lean exited with code 137" while building the imports ("Failed to compile modules") or the
                  solution itself (ERROR "Failed to compile solution module: Failed to compile module <job>: ... code
                  137"; q153 2026-11-06: a 49 s piece importing 586 MB, killed after 138 s): out of memory. Before
@@ -47,6 +49,7 @@ PIECE_OOM_CAP = 0        # earlier memory kills (hidden or dependency_oom, toget
                          # q153 (2026-11-06): retries of proofs that had failed passed 1 in 20, so ten tries (a77afdc)
                          # mostly burned shared verifier time; 2026-11-08: all 106 pieces stopped after four kills
                          # peaked over ~7.1 GiB locally (accepted ones <= 7.1), so a smaller piece fits: split
+UNPROVED_CAP = 20        # refusals for an imported statement not yet Proved before a person looks
 TRANSIENT_CAP = 30       # transient failures before giving up for this run (cold-cache p90 was 10)
 
 _TRANSIENT = re.compile(
@@ -62,6 +65,7 @@ _OWN = re.compile(r"Verification timed out|Failed to compile solution module: Mo
 _SOLUTION_BUILD = re.compile(r"^Failed to compile solution module: Failed to compile module ")
 _ERROR_LINE = re.compile(r"(?m)^(error: |\u2716 )")
 _DEP_OOM = re.compile(r"Failed to compile modules? .*exited with code 137", re.S)
+_UNPROVED = re.compile(r"Imported platform theorems must be Proved")
 _HEART = re.compile(r"\(deterministic\) timeout|maximum number of heartbeats")
 
 
@@ -73,6 +77,8 @@ def classify(status, error_message):
         return 'wrong'
     if _HEART.search(m):
         return 'heartbeats'
+    if _UNPROVED.search(m):
+        return 'unproved_imports'
     # a database drop or import-parser timeout inside a FAILED is still the platform's fault
     if _TRANSIENT.search(m):
         return 'transient'
@@ -104,6 +110,10 @@ def decide(kind, history, item_kind=None):
         return 'retry' if n < HIDDEN_CAP else 'stop'
     if kind == 'heartbeats':
         return 'raise_heartbeats'
+    if kind == 'unproved_imports':
+        # a bundle sent while a statement it imports was live but not yet Proved (q153 2026-11-09, OAIQ098G362):
+        # it waits in todo; splitrun.ready sends it again only once the platform says Proved
+        return 'retry' if n < UNPROVED_CAP else 'stop'
     if kind == 'dependency_oom':
         return 'retry' if n < DEPENDENCY_OOM_CAP else 'stop'
     return 'stop'
