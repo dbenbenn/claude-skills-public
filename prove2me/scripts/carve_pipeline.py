@@ -265,6 +265,15 @@ def wait_result(log_text):
     return int(found[-1]) if found else None
 
 
+def write_detached(d, run_id, argv):
+    """logs/detached.json: this --detach run's id and arguments, which carve_resume.py repeats (less the one-shot
+    options) when a reboot or power cut stopped the run (q153, 2026-11-09: three power cuts in an afternoon)."""
+    path = os.path.join(d, 'logs', 'detached.json')
+    with open(path + '.tmp', 'w') as f:
+        json.dump({'run_id': run_id, 'argv': list(argv), 'at': time.strftime('%Y-%m-%d %H:%M:%S')}, f, indent=1)
+    os.replace(path + '.tmp', path)
+
+
 def detach(a, argv):
     log = os.path.join(a.dir, 'logs', 'driver.log')
     os.makedirs(os.path.dirname(log), exist_ok=True)
@@ -286,6 +295,7 @@ def detach(a, argv):
         return 3
     with open(log, 'a') as f:
         f.write('== detached %s run %s\n' % (time.strftime('%Y-%m-%d %H:%M:%S'), run_id))
+    write_detached(a.dir, run_id, [x for x in rest if x != '--detach'])
     if shutil.which('systemd-run'):
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode:

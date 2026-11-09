@@ -1419,6 +1419,7 @@ script prints its usage when run with no arguments.
 | `carve_measure.py` | Compile every generated bundle, statement stub and piece of a carve (carve.py gen), one Lean at a time, -j1, in publish order (p2mlib.carve.publish_order), and record CPU seconds and errors. |
 | `carve_pipeline.py` | The one driver for the module-route carve of a ported openai/math result; runs from a skill snapshot. |
 | `carve_prep.py` | The small steps around carving a ported openai/math result (oai_port_modules.py, oai_build_modules.py, then carve.py graph/plan/gen, carve_measure.py, carve.py split). |
+| `carve_resume.py` | Resume the carves a reboot or power cut interrupted: run at boot by the user unit carve-resume.service. |
 | `caveat_audit.py` | Audit the prose that explains a source-audit gap: does the natural-language statement's note account for each gap accurately, and does it claim anything the Lean or a citation does not back? |
 | `check_complete.py` | Is a mission's development complete? |
 | `check_description.py` | Run the prove2me skill's description checklist mechanically. |
