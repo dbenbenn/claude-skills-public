@@ -2860,3 +2860,38 @@ def test_a_piece_the_verifier_killed_for_memory_is_split_in_the_next_streaming_r
     assert r.returncode == 0, r.stdout + r.stderr
     split = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
     assert split == [['split-piece', 'config.json', 'P0=2']]
+
+
+def test_pieces_a_person_lists_to_try_over_memory_are_released_and_not_split_until_answered(env, monkeypatch):
+    # dbenbenn 2026-11-09: "If you have available some largish unsplit proof, let's try submitting it to see if it
+    # goes through". pipeline.json `try_over_memory` releases those pieces whatever their peak; a split waits for
+    # the verifier's answer (a memory kill puts them in state `split`)
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30)})
+    work = env.dir / 'carve_work'
+    for f in ('times.json', 'times.orig.json'):
+        t = json.load(open(work / f))
+        t['piece:P0'] = _tm(88, 7370)
+        t['statement:P0'] = _tm(5, 6900)
+        (work / f).write_text(json.dumps(t))
+    assert run(env, *ARGS_NEW, '--stop-after', 'order').returncode == 0
+    p = json.load(open(env.dir / 'pipeline.json'))
+    (env.dir / 'pipeline.json').write_text(json.dumps(dict(p, try_over_memory=['P0'])))
+    r = run(env, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'piece:P0' in json.load(open(env.dir / 'publish' / 'release.json'))['pieces']
+    assert not [c for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
+
+
+def test_calibrate_pieces_lets_a_trial_piece_through_without_stopping(env, monkeypatch):
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30)})
+    work = env.dir / 'carve_work'
+    for f in ('times.json', 'times.orig.json'):
+        t = json.load(open(work / f))
+        t['piece:P0'] = _tm(88, 7370)
+        (work / f).write_text(json.dumps(t))
+    assert run(env, *ARGS_NEW, '--no-stream-bundles', '--stop-after', 'order').returncode == 0
+    p = json.load(open(env.dir / 'pipeline.json'))
+    (env.dir / 'pipeline.json').write_text(json.dumps(dict(p, try_over_memory=['P0'])))
+    r = run(env, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not [c for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']

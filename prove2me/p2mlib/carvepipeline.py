@@ -32,7 +32,8 @@ OVERLAP_ONLY = ('publish_early', 'measure_pieces', 'calibrate_pieces', 'pieces_p
 DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
               'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags',
-              'overlap', 'unif_integrable', 'stream_bundles', 'stream_pieces', 'accept_orphans']
+              'overlap', 'unif_integrable', 'stream_bundles', 'stream_pieces', 'accept_orphans',
+              'try_over_memory']
 
 
 LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
@@ -1815,7 +1816,8 @@ class Pipeline:
         cfg, plan, times, _, _ = got
         limit = max(cfg.get('budget', 55) * LIMIT_FACTOR, PIECE_CAP)
         accepted = set(self.p.get('accept_over') or ())
-        fast = sorted(x for x in items if (times.get(x) or {}).get('ok') and fits_memory(times[x]) and
+        trying = {'piece:' + n for n in self.p.get('try_over_memory') or ()}
+        fast = sorted(x for x in items if (times.get(x) or {}).get('ok') and (fits_memory(times[x]) or x in trying) and
                       ((times[x].get('secs') or 0) <= limit or (x in accepted and times[x]['secs'] <= ACCEPT_CAP)))
         P = os.path.join(self.d, 'publish')
         pplan = os.path.join(P, 'plan.json')
@@ -2259,6 +2261,9 @@ class Pipeline:
         res = calibration(dict(plan, bundles=[], stubs={}), times, cfg.get('time_scale', 1.5), cfg.get('budget', 55),
                           live)
         tried = self.state.setdefault('auto_split', {})
+        # pipeline.json `try_over_memory`: sent whatever their peak; a memory kill splits them (server_split_wanted)
+        trying = set(self.p.get('try_over_memory') or ())
+        res['memory_over'] = [m for m in res['memory_over'] if m[0].split(':', 1)[1] not in trying]
         auto_mem, _ = self.memory_triage(plan, times, res['memory_over'], tried)
         # and those the verifier rejected (state `split`: a memory kill, or own timeouts), sized from their peak
         server = {}
@@ -2298,6 +2303,9 @@ class Pipeline:
         part = dict(plan, bundles=[], stubs={})
         res = calibration(part, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), live,
                           accepted=self.p.get('accept_over') or ())
+        # pipeline.json `try_over_memory`: sent whatever their peak; a memory kill splits them (server_split_wanted)
+        trying = set(self.p.get('try_over_memory') or ())
+        res['memory_over'] = [m for m in res['memory_over'] if m[0].split(':', 1)[1] not in trying]
         lines = self.calibrate_head(cfg, res, 'pieces: ')
         heavy = heavy_imports(plan, times, live, kinds=('piece',))
         if heavy:
