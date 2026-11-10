@@ -1498,10 +1498,14 @@ def _join_convert_tail_brackets(text):
         if m:
             depth = sum((c in '([{') - (c in ')]}') for c in m.group(1))
             j = i
-            while depth > 0 and j + 1 < len(lines) and j - i < 4 and lines[j + 1].strip():
+            opened = False      # a bracket stayed open at the end of some continuation line
+            while ((depth > 0 or lines[j].rstrip().endswith('<;>')) and j + 1 < len(lines) and j - i < 4
+                   and lines[j + 1].strip()):
                 j += 1
                 depth += sum((c in '([{') - (c in ')]}') for c in lines[j])
-            if j > i and depth == 0:
+                opened = opened or depth > 0
+            if j > i and depth == 0 and (opened or m.group(1).count('(') + m.group(1).count('[')
+                                         > m.group(1).count(')') + m.group(1).count(']')):
                 line = line.rstrip() + ' ' + ' '.join(l.strip() for l in lines[i + 1:j + 1])
                 out.append(line)
                 i = j + 1

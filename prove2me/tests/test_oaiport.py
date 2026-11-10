@@ -3288,3 +3288,15 @@ def test_convert_chain_continued_over_several_lines_stays_one_tactic():
     out = O.core_rewrites(src)
     assert out == ("  convert h using 1 <;> first | (with_reducible_and_instances rfl) | "
                    "((try rfl) <;> funext j <;> simp only [a,b] <;> dsimp [s] <;> simp_all)\n")
+
+
+def test_convert_chain_with_bracket_opening_on_a_continuation_line_is_joined():
+    # q241 (MatrixSigning FramedMapRoutine, DenseInputMachine): the first line ends in `<;>` with no bracket
+    # open; the `simp only [a,\n b]` bracket opens and closes on the next lines
+    src = ("  convert h using 1 <;> (try rfl) <;> funext j <;>\n"
+           "    simp only [a,b,c,\n"
+           "      d,e] <;>\n"
+           "    split_ifs <;> simp_all\n")
+    out = O.core_rewrites(src)
+    assert out == ("  convert h using 1 <;> first | (with_reducible_and_instances rfl) | "
+                   "((try rfl) <;> funext j <;> simp only [a,b,c, d,e] <;> split_ifs <;> simp_all)\n")
