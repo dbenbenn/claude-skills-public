@@ -2432,6 +2432,7 @@ COMPAT_NARROW_IMPORTS = (
     'Mathlib.Analysis.Complex.Circle',
     'Mathlib.MeasureTheory.Constructions.BorelSpace.Complex',
     'Mathlib.Topology.Algebra.LinearMapCompletion',
+    'Mathlib.MeasureTheory.Function.JacobianOneDim',
 )
 
 

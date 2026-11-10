@@ -3221,3 +3221,9 @@ def test_compat_has_congr_sdiff_and_contdiff_bump_from_circle_domains():
     for n in ('AbsolutelyContinuousOnInterval.congr', 'Set.subset_image_sdiff',
               'exists_contDiff_support_eq_eq_one_iff'):
         assert 'theorem _root_.%s ' % n in src, n
+
+
+def test_compat_narrow_imports_include_one_dim_change_of_variables():
+    # Compat's integral_comp_log_Ioi_zero uses integral_image_eq_integral_abs_deriv_smul, which only
+    # Mathlib.MeasureTheory.Function.JacobianOneDim provides; a narrow Compat failed to build (q222)
+    assert 'Mathlib.MeasureTheory.Function.JacobianOneDim' in O.COMPAT_NARROW_IMPORTS
