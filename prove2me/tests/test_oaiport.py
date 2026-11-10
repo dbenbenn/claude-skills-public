@@ -3267,3 +3267,12 @@ def test_hidden_instance_names_follow_mathlib_drift():
     assert "attribute [-instance] TopologicalSpace.IsCompletelyMetrizableSpace.MetrizableSpace" in out
     assert out.count("IsLeftUniformAddGroup.toIsTopologicalAddGroup") == 1
     assert out.startswith("attribute [-instance] IsLeftUniformAddGroup")
+
+
+def test_convert_tail_trailing_comma_stays_outside_the_wrapper():
+    # q238 KMedianRecovery LengthHeight: `⟨by convert h using 1; simp; omega,\n by …⟩` put the separating comma
+    # inside the wrapper parentheses ("unexpected token ','; expected ')'")
+    src = "  exact ⟨by convert hb using 1; simp [f]; omega,\n    by convert hc using 1; simp [f]; omega⟩\n"
+    out = O.core_rewrites(src)
+    assert "omega,)" not in out
+    assert "(simp [f]; omega),\n" in out

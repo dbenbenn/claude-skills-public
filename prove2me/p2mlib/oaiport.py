@@ -1709,18 +1709,23 @@ def core_rewrites(text, compat_ns='OAI', known=None):
             return m.group(0)
         # a `(by convert … ; tac)]` inside brackets: the tail closes an outer bracket, so the tactic's end is
         # not the line's (Erdos970 MellinCalculus, q142)
+        # (also `⟨ … ⟩`: a tail ending `omega⟩` closes an anonymous constructor, q238 LengthHeight)
         depth = 0
         for ch in tac:
-            depth += (ch in '([{') - (ch in ')]}')
+            depth += (ch in '([{⟨') - (ch in ')]}⟩')
             if depth < 0:
                 return m.group(0)
+        # a trailing `,` separates the elements of an enclosing `⟨ …, … ⟩`: it stays outside the wrapper
+        comma = ''
+        if tac.endswith(','):
+            tac, comma = tac[:-1].rstrip(), ','
         # a sequence ending in `; rfl`: our stronger simp lemmas can close the goal first, and the bare
         # `rfl` then fails with "No goals to be solved" (RandomMean, oaiq-117)
         tac = re.sub(r";[ \t]*rfl[ \t]*$", '; try rfl', tac)
         # one line: inside the parentheses a continuation line left of the opening column ends a term
         # application early (`apply Finset.sum_congr rfl` read `rfl` as "expected ')'"; SKRatio, q130)
         tac = re.sub(r"<;>[ \t]*\n[ \t]*", '<;> ', tac)
-        return '%s <;> first | (with_reducible_and_instances rfl) | (%s)' % (m.group('head'), tac)
+        return '%s <;> first | (with_reducible_and_instances rfl) | (%s)%s' % (m.group('head'), tac, comma)
     # a tactic after `using n;` whose bracket closes on a later line (a long `simp only [a,\n b]; abel`):
     # join those lines first, so the rule below sees the whole tactic (FilteredNilpotentPerturbation, q145)
     text = _join_convert_tail_brackets(text)
