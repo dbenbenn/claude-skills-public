@@ -744,6 +744,7 @@ def _arg_end(text, k):
 # d13f23b states without it (eLpNorm_sum_le, eLpNorm_le_eLpNorm_of_exponent_le, tendsto_integral_of_L1';
 # oaiq-038, oaiq-048). Same order as AEM_TAC: fun_prop, the context, Lp elements, then measurability.
 AESM_TAC = ("first | fun_prop | assumption | solve_by_elim | exact Lp.aestronglyMeasurable _ "
+            "| exact MemLp.aestronglyMeasurable (by assumption) "
             "| (apply Measurable.aestronglyMeasurable; solve_by_elim) "
             "| (apply Continuous.aestronglyMeasurable; solve_by_elim) "
             "| (apply Measurable.aestronglyMeasurable; measurability) | measurability")

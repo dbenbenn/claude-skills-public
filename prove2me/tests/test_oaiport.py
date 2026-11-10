@@ -1870,6 +1870,12 @@ def test_added_measurability_arguments_go_in_by_name():
     assert O.core_rewrites(out) == out
 
 
+def test_added_measurability_tactic_uses_a_memlp_hypothesis():
+    # q234: `hd : MemLp (fun x => f x - g x) 2 μ` is in context, and none of fun_prop / solve_by_elim finds
+    # `AEStronglyMeasurable (fun x => f x - g x) μ` from it
+    assert "exact MemLp.aestronglyMeasurable (by assumption)" in O.AESM_TAC
+
+
 def test_added_measurability_argument_not_inserted_where_already_given():
     # the vector-measure `tendsto_integral_of_L1' f hfi …` already took `hfi` in d13f23b; a name inside a longer
     # name, `@`-explicit uses and an already named argument are left alone
