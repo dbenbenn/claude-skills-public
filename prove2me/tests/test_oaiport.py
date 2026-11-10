@@ -3276,3 +3276,15 @@ def test_convert_tail_trailing_comma_stays_outside_the_wrapper():
     out = O.core_rewrites(src)
     assert "omega,)" not in out
     assert "(simp [f]; omega),\n" in out
+
+
+def test_convert_chain_continued_over_several_lines_stays_one_tactic():
+    # q241 (MatrixSigning ConditionalRoutine, RowDotCounter): `<;>` at the end of three consecutive lines
+    # left the wrapped chain cut after the first continuation line (`…<;>)`, "unexpected token ')'")
+    src = ("  convert h using 1 <;> (try rfl) <;> funext j <;>\n"
+           "    simp only [a,b] <;>\n"
+           "    dsimp [s] <;>\n"
+           "    simp_all\n")
+    out = O.core_rewrites(src)
+    assert out == ("  convert h using 1 <;> first | (with_reducible_and_instances rfl) | "
+                   "((try rfl) <;> funext j <;> simp only [a,b] <;> dsimp [s] <;> simp_all)\n")

@@ -1732,7 +1732,7 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # the term may span lines, and a chain ending in `<;>` continues on the next line (oaiq-092)
     text = re.sub(r"(?m)^(?P<head>(?:[ \t]*(?:· )?|[^\n]*?\bby[ \t]+)convert (?:(?!convert\b)[^;\n])*?"
                   r"(?:\n(?:(?!convert\b)[^;\n])*?){0,3}? using \d+)[ \t]*(?:;|<;>)[ \t]*"
-                  r"(?P<tac>[^\n]*<;>[ \t]*\n[ \t]*[^\n]+|[^\n]+)$",
+                  r"(?P<tac>(?:[^\n]*<;>[ \t]*\n[ \t]*)+[^\n]+|[^\n]+)$",
                   _convert_tac, text)
     # oaiq-054..072 drift (signatures checked against both Mathlibs, 2026-10-28):
     # d13f23b's `Submodule.isTopologicalAddGroup` is our `Submodule.topologicalAddGroup` (Conductivity oaiq-059)
