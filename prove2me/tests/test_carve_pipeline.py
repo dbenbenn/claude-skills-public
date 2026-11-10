@@ -2956,3 +2956,32 @@ def test_the_streaming_measure_takes_what_unpublished_bundles_need_first(env, mo
     chain = {'piece:P0', 'statement:P0', 'piece:P1', 'statement:P1', 'bundle:B1'}
     assert max(order.index(x) for x in chain) < min(order.index(x) for x in ('statement:P2', 'piece:P2'))
     assert order.index('statement:P0') < order.index('piece:P0') < order.index('piece:P1') < order.index('bundle:B1')
+
+
+def test_a_split_cut_off_midway_is_undone_when_the_driver_starts(env, monkeypatch):
+    # q153 (2026-11-09 21:06): a restart killed carve.py split-piece after it wrote the new plan and before the driver
+    # recorded it; the next run stopped at gen ("its input plan changed ... publishing has started") for 11 h. A power
+    # cut (carve_resume) would do the same. The driver notes the split before it starts and puts the plan back
+    _overlap_carve(env, monkeypatch)
+    assert run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure').returncode == 0
+    work = env.dir / 'carve_work'
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    st['split_in_progress'] = {'plan_hash': CP.hash_paths([str(work / 'plan.json')]), 'spec': 'P0=2', 'at': 'x'}
+    (env.dir / 'pipeline_state.json').write_text(json.dumps(st))
+    (work / 'plan.pre_split_piece.json').write_bytes((work / 'plan.json').read_bytes())
+    p = json.load(open(work / 'plan.json'))
+    p['pieces']['P0']['keep'] = ['P0']
+    (work / 'plan.json').write_text(json.dumps(p))                    # what the cut-off split had written
+    env.log.write_text('')
+    r = run(env, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'split cut off' in r.stdout
+    assert json.load(open(work / 'plan.json'))['pieces']['P0']['keep'] != ['P0']
+    assert 'split_in_progress' not in json.load(open(env.dir / 'pipeline_state.json'))
+    gens = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'gen']
+    assert ['gen', 'config.json', 'pieces', 'P0'] in gens
+
+
+def test_a_split_records_itself_while_it_runs():
+    p = object.__new__(CP.Pipeline)
+    assert hasattr(p, 'recover_interrupted_split')

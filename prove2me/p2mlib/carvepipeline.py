@@ -2184,7 +2184,13 @@ class Pipeline:
         (mechanical prose). A stopped piece whose file changed is sent again by split_run itself
         (_restart_changed). Returns {node: [new nodes]}."""
         spec = ','.join('%s=%g' % (n, k) for n, k in sorted(want.items()))
+        # noted first: a driver cut off while split-piece runs (a restart, a power cut) puts the plan back on its next
+        # start (recover_interrupted_split; q153 2026-11-09 stopped at gen for 11 h)
+        cfg0 = self.read_config() or {}
+        self.state['split_in_progress'] = {'plan_hash': hash_paths([self.work_paths(cfg0)[1]]), 'spec': spec, 'at': _now()}
+        self.save()
         self.run_cmds(step, [self.tool('carve', 'split-piece', 'config.json', spec, '--skip-unsplittable')])
+        self.state.pop('split_in_progress', None)
         self.check_published_unchanged(step)
         log = os.path.join(self.d, 'logs', step + '.log')
         line = [l for l in open(log, errors='replace').read().splitlines() if l.startswith('SPLIT_PIECES ')]
@@ -2684,8 +2690,35 @@ class Pipeline:
             self.tool('split_run', 'publish/run.json')])
 
     # -- driver -----------------------------------------------------------------------------
+    def recover_interrupted_split(self):
+        """A split-piece cut off midway (pipeline_state.json `split_in_progress` left behind): if the plan changed since,
+        put back the plan it saved (work/plan.pre_split_piece.json, when its hash is the one noted) and regenerate the
+        split pieces' files from it; the split runs again where it was decided. Stops for a person when no saved plan
+        matches."""
+        rec = self.state.get('split_in_progress')
+        if not rec:
+            return
+        cfg = self.read_config() or {}
+        plan_path = self.work_paths(cfg)[1]
+        if hash_paths([plan_path]) != rec['plan_hash']:
+            backup = os.path.join(os.path.dirname(plan_path), 'plan.pre_split_piece.json')
+            if not (os.path.exists(backup) and hash_paths([backup]) == rec['plan_hash']):
+                raise StepFailed('a split (split-piece %s, %s) was cut off after it changed %s, and no saved plan '
+                                 'matches the one before it: compare with the work/plan.pre_split_piece*.json files '
+                                 'and put the right one back by hand' % (rec['spec'], rec['at'], plan_path))
+            shutil.copy(plan_path, plan_path + '.cut_off_split')
+            shutil.copy(backup, plan_path)
+            names = [x.split('=')[0] for x in rec['spec'].split(',')]
+            self.run_cmds('split_recovery', [self.tool('carve', 'gen', 'config.json', 'pieces', *names)])
+            print('== a split cut off midway (split-piece %s at %s): the plan before it is back (the cut-off one is '
+                  'kept as %s.cut_off_split) and those pieces regenerated; it runs again'
+                  % (rec['spec'][:200], rec['at'], os.path.basename(plan_path)), flush=True)
+        self.state.pop('split_in_progress', None)
+        self.save()
+
     def run(self, stop_after=None, only_redo=(), claim_folder=False):
         self.check_ownership(claim_folder)
+        self.recover_interrupted_split()
         self.publishing_started()                 # record evidence seen now as a state fact
         self.save()
         self.sync_config_set()
