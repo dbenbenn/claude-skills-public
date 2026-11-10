@@ -1574,6 +1574,12 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     text = re.sub(r"(?<![\w.'])NonUnitalStarRingHom\.ofClass(?![\w'])", pre + 'nonUnitalStarRingHomOfClass', text)
     # d13f23b's `OrderHom.ofClass f` is `OrderHomClass.toOrderHom f` here (ArtinGroups Salvetti cover, q225)
     text = re.sub(r"(?<![\w.'])OrderHom\.ofClass(?![\w'])", 'OrderHomClass.toOrderHom', text)
+    # d13f23b's hidden-instance names that ours renamed or dropped (CoarseAssembly, q229): hiding the
+    # Left variant again stands in for the gone `IsUniformAddGroup.isTopologicalAddGroup`
+    text = re.sub(r"(?<![\w.'])TopologicalSpace\.IsCompletelyMetrizableSpace\.instMetrizableSpace(?![\w'])",
+                  'IsCompletelyMetrizableSpace.MetrizableSpace', text)
+    text = re.sub(r"(?<![\w.'])IsUniformAddGroup\.isTopologicalAddGroup(?![\w'])",
+                  'IsLeftUniformAddGroup.toIsTopologicalAddGroup', text)
     # d13f23b's `Set.orderIsoOfEq s t h` is `OrderIso.setCongr s t h` here (ArtinGroups Salvetti cover, q225)
     text = re.sub(r"(?<![\w.'])Set\.orderIsoOfEq(?![\w'])", 'OrderIso.setCongr', text)
     # d13f23b's `Isometry.antilipschitzWith` is `Isometry.antilipschitz` here (HyperbolicGroups, oaiq-034)

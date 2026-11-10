@@ -3245,3 +3245,18 @@ def test_set_order_iso_of_eq_is_order_iso_set_congr():
     out = O.core_rewrites("(Set.orderIsoOfEq _ _ (congrArg Set.Iic h))\n")
     assert "(OrderIso.setCongr _ _ (congrArg Set.Iic h))" in out
     assert "orderIsoOfEq" not in out
+
+
+# d13f23b's `attribute [-instance]` lines name `TopologicalSpace.IsCompletelyMetrizableSpace.instMetrizableSpace`
+# (ours: `IsCompletelyMetrizableSpace.MetrizableSpace`) and `IsUniformAddGroup.isTopologicalAddGroup`
+# (gone; the Left/Right variants remain) (CoarseAssembly, q229).
+
+def test_hidden_instance_names_follow_mathlib_drift():
+    src = ("attribute [-instance] IsUniformAddGroup.isTopologicalAddGroup\n"
+           "  IsLeftUniformAddGroup.toIsTopologicalAddGroup\n"
+           "attribute [-instance] TopologicalSpace.IsCompletelyMetrizableSpace.instMetrizableSpace\n")
+    out = O.core_rewrites(src)
+    assert "IsUniformAddGroup.isTopologicalAddGroup" not in out
+    assert "instMetrizableSpace" not in out
+    assert "attribute [-instance] IsCompletelyMetrizableSpace.MetrizableSpace" in out
+    assert "IsLeftUniformAddGroup.toIsTopologicalAddGroup" in out
