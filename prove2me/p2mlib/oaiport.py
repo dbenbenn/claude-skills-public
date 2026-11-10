@@ -2326,6 +2326,8 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
     files, missing = {}, set()
     for oai, (short, t) in sources.items():
         mx = (MATRIX_DEFAULT_INSTANCE if not cstar and names_matrix(t) else '') + comm_cstar_line(t, compat_ns) + circle_line(t, compat_ns)
+        if compat_ns and oai.split('.')[0] != 'OAI':
+            mx = 'open %s\n' % compat_ns + mx      # a foreign package's module is outside `namespace OAI` (q244)
         def rep(m):
             n = m.group(1)
             if n in names:

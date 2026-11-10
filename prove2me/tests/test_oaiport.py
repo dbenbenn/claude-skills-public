@@ -3300,3 +3300,13 @@ def test_convert_chain_with_bracket_opening_on_a_continuation_line_is_joined():
     out = O.core_rewrites(src)
     assert out == ("  convert h using 1 <;> first | (with_reducible_and_instances rfl) | "
                    "((try rfl) <;> funext j <;> simp only [a,b,c, d,e] <;> split_ifs <;> simp_all)\n")
+
+
+def test_foreign_modules_open_the_compat_namespace():
+    # q244 (ClassFieldTheory): a foreign-package module is not inside `namespace OAI`, so the compat
+    # lemmas (`ite_eq_left`, ...) were unknown there; it gets `open OAI` after the imports
+    srcs = {'OAI.A': ('A', 'import Mathlib\n\ntheorem a : True := trivial\n'),
+            'Foreign.B': ('B', 'import Mathlib\n\ntheorem b : True := trivial\n')}
+    files = O.module_texts(srcs, 'Solutions.X')
+    assert '\nopen OAI\n' in files['B.lean'] and 'open OAI' not in files['A.lean']
+    assert 'open OAI' not in O.module_texts(srcs, 'Solutions.X', compat_ns=None)['B.lean']
