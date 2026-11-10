@@ -706,10 +706,17 @@ mixed old and new `carve.py` inside one carve).
   17a5cac): q172's data bundles at 83–88.6 s hit the server's own 300 s timeout.
 - **Memory, separately from time** (q153). The verifier's workers kill a file whose Lean peaks over
   about 7 GiB; `import Mathlib` alone peaks at 6.5 GiB. carve_measure records each run's peak
-  (`rss_mib`). A piece over `PIECE_RSS_LIMIT` (7,050 MiB) is never released, and calibrate_pieces splits
-  it alone at once, into enough parts for the proof's share (its peak minus its statement's) to fit. A
-  piece the verifier kills for memory twice (verdicts `hidden`/`dependency_oom`) goes to state `split` the
-  same way. Neither time nor import closure predicted the kills; the local peak did.
+  (`rss_mib`). A piece over `PIECE_RSS_LIMIT` (7,150 MiB; pipeline.json `piece_rss_limit`) is split alone,
+  into enough parts for the proof's share (its peak minus its statement's) to fit, with two exceptions
+  that are sent once as they are: a piece listed in `try_over_memory` or found unsplittable, and a fast
+  piece a little over (at most `TRY_UNSPLIT_RSS` 8,600 MiB and `TRY_UNSPLIT_SECS` 20 s) that imports at
+  most `TRY_UNSPLIT_IMPORTS` (120) statements; q153 had all 331 pieces over 7,150 MiB accepted, each
+  importing at most 119. A memory kill (verdicts `hidden`/`dependency_oom`) puts a piece in state `split`.
+- **Many imports are their own memory cost** (q154 `GramData.Block3.gram`, 2026-11-10): the verifier
+  replays every imported module, which the local peak under-counts. `gram` imported 709 entry statements
+  and was killed four times at ~7,450 MiB, and each split only made it import more. A piece like that
+  needs its imports grouped under a layer of intermediate statements (rows of a matrix, say), not a split;
+  calibrate_pieces says so when it stops for a person.
 - **Kernel computation is invisible to the cost model** (`decide +kernel`, `native_decide`) and is the
   usual cause of a slow item: see **Kernel time** under "Slow or odd failures".
 - **`accept_over`** in pipeline.json excuses an item (`bundle:NAME`, `piece:NAME`) under a 200 s cap. For

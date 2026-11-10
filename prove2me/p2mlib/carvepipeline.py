@@ -33,7 +33,7 @@ DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
               'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags',
               'overlap', 'unif_integrable', 'stream_bundles', 'stream_pieces', 'accept_orphans',
-              'try_over_memory', 'piece_rss_limit']
+              'try_over_memory', 'piece_rss_limit', 'try_unsplit_rss']
 
 
 LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
@@ -77,6 +77,17 @@ PIECE_RSS_LIMIT = 7150  # MiB: a piece whose verifier-form file peaks over this 
                         # stopped and timed-out ones at 7,113-7,250 (one 6,822), while `import Mathlib` alone peaks at
                         # 6,551: the workers' cap is about 7 GiB. Neither time (30-45 s pieces passed about half the
                         # time) nor the import closure (82 pieces importing >= 90 MB, under 20 s, all passed) separated them
+TRY_UNSPLIT_RSS = 8600  # MiB: a piece over the memory limit but at most this, and at most TRY_UNSPLIT_SECS locally, is sent
+TRY_UNSPLIT_SECS = 20   # once as it is before any split (a memory kill then splits it, server_split_wanted). q153
+                        # (2026-11-09): 39 pieces at 7,151-8,579 MiB were all accepted, and every one of ~240 memory kills
+                        # that evening was of a piece taking 29-94 s; q154 (2026-11-10): GramData.Block3.gram, 7.3 s at
+                        # 7,444 MiB, stayed over through three splits (each made it import the parts it gave away) and
+                        # stopped the driver for a person. pipeline.json `try_unsplit_rss` (0: off) overrides
+TRY_UNSPLIT_IMPORTS = 120   # ... and only a piece importing at most this many statements: the verifier replays each
+                        # imported module, which the local peak under-counts. q153: all 331 pieces measured over 7,150 MiB
+                        # (to 8,634) were accepted, importing <= 119 (those over 8,000 mostly none); q154's gram, importing
+                        # 709 entry statements, was memory-killed 4 times at ~7,450 MiB on 2026-11-07 (and every split
+                        # made it import more). Such a piece wants its imports grouped (a layer of row statements), not a split
 PIECE_RSS_TARGET = 7050 # MiB: what a memory split sizes its parts to stay under (a margin below PIECE_RSS_LIMIT)
 MAX_MEMORY_PARTS = 8    # most parts one memory split makes
 MAX_MEMORY_ROUNDS = 2   # automatic memory splits of one piece before a person looks. q153 (2026-11-08): of the first 32
@@ -1821,7 +1832,7 @@ class Pipeline:
         cfg, plan, times, _, _ = got
         limit = max(cfg.get('budget', 55) * LIMIT_FACTOR, PIECE_CAP)
         accepted = set(self.p.get('accept_over') or ())
-        trying = {'piece:' + n for n in self.trying_pieces()}
+        trying = {'piece:' + n for n in self.trying_pieces(times, plan)}
         fast = sorted(x for x in items if (times.get(x) or {}).get('ok') and (fits_memory(times[x], self.rss_limit()) or x in trying) and
                       ((times[x].get('secs') or 0) <= limit or (x in accepted and times[x]['secs'] <= ACCEPT_CAP)))
         P = os.path.join(self.d, 'publish')
@@ -2242,10 +2253,26 @@ class Pipeline:
         2026-11-09: 39 pieces at 7,151-8,579 MiB all accepted, so the carve set 8,600)."""
         return int(self.p.get('piece_rss_limit') or PIECE_RSS_LIMIT)
 
-    def trying_pieces(self):
-        """Pieces sent whatever their measured peak: pipeline.json `try_over_memory` (a person's trial) and those
-        split-piece found unsplittable (q153 2026-11-09). A memory kill of one leaves it for a person."""
-        return set(self.p.get('try_over_memory') or ()) | set(self.state.get('unsplittable') or {})
+    def trying_pieces(self, times=None, plan=None):
+        """Pieces sent whatever their measured peak: pipeline.json `try_over_memory` (a person's trial), those
+        split-piece found unsplittable (q153 2026-11-09; a memory kill of one leaves it for a person), and, given
+        `times` and `plan`, every fast piece a little over the limit with few imports (fast_over_memory; a memory
+        kill splits it)."""
+        out = set(self.p.get('try_over_memory') or ()) | set(self.state.get('unsplittable') or {})
+        return out | self.fast_over_memory(times, plan) if times and plan else out
+
+    def fast_over_memory(self, times, plan):
+        """Pieces measured over the memory limit but at most TRY_UNSPLIT_RSS (pipeline.json `try_unsplit_rss`),
+        at most TRY_UNSPLIT_SECS, importing at most TRY_UNSPLIT_IMPORTS statements: sent once before any split."""
+        cap = self.p.get('try_unsplit_rss', TRY_UNSPLIT_RSS)
+        if not cap:
+            return set()
+        limit, pieces = self.rss_limit(), plan.get('pieces') or {}
+        return {n for n in pieces
+                for v in [times.get('piece:' + n)]
+                if v and v.get('ok', True) and v.get('rss_mib') and limit < v['rss_mib'] <= cap
+                and (v.get('secs') or 0) <= TRY_UNSPLIT_SECS
+                and len(pieces[n].get('imports') or ()) <= TRY_UNSPLIT_IMPORTS}
 
     def memory_triage(self, plan, times, memory_over, tried):
         """calibration's `memory_over` pieces -> ([(node, rss, secs, parts)] to split automatically, [why] for a
@@ -2259,9 +2286,13 @@ class Pipeline:
             parts = memory_parts(rss, base)
             rounds = (tried.get(n) or {}).get('memory_rounds', 1 if n in tried else 0)
             if n in tried and (rounds >= MAX_MEMORY_ROUNDS or not tried[n].get('rss_mib')):
-                manual.append('%s: %d MiB, still over the %d MiB memory limit after %d automatic split(s) (it was %s)' % (
+                imports = len(((plan.get('pieces') or {}).get(n) or {}).get('imports') or ())
+                manual.append('%s: %d MiB, still over the %d MiB memory limit after %d automatic split(s) (it was %s)%s' % (
                     key, rss, PIECE_RSS_LIMIT, max(rounds, 1), ('%d MiB' % tried[n]['rss_mib']) if tried[n].get('rss_mib')
-                    else '%.0f s' % tried[n]['secs']))
+                    else '%.0f s' % tried[n]['secs'],
+                    ('; it imports %d statements, which the verifier replays one by one: group them under a layer '
+                     'of intermediate statements (a split only adds imports)' % imports)
+                    if imports > TRY_UNSPLIT_IMPORTS else ''))
             elif parts is None:
                 manual.append('%s: %d MiB, and its statement alone peaks at %d MiB: the imports are over the %d MiB '
                               'memory limit, and no split helps (regroup the bundles it imports)' % (
@@ -2294,7 +2325,7 @@ class Pipeline:
                           live, rss_limit=self.rss_limit())
         tried = self.state.setdefault('auto_split', {})
         # pipeline.json `try_over_memory`: sent whatever their peak; a memory kill splits them (server_split_wanted)
-        trying = self.trying_pieces()
+        trying = self.trying_pieces(times, plan)
         res['memory_over'] = [m for m in res['memory_over'] if m[0].split(':', 1)[1] not in trying]
         auto_mem, _ = self.memory_triage(plan, times, res['memory_over'], tried)
         # and those the verifier rejected (state `split`: a memory kill, or own timeouts), sized from their peak
@@ -2336,7 +2367,7 @@ class Pipeline:
         res = calibration(part, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), live,
                           accepted=self.p.get('accept_over') or (), rss_limit=self.rss_limit())
         # pipeline.json `try_over_memory`: sent whatever their peak; a memory kill splits them (server_split_wanted)
-        trying = self.trying_pieces()
+        trying = self.trying_pieces(times, plan)
         res['memory_over'] = [m for m in res['memory_over'] if m[0].split(':', 1)[1] not in trying]
         lines = self.calibrate_head(cfg, res, 'pieces: ')
         heavy = heavy_imports(plan, times, live, kinds=('piece',))
@@ -2448,7 +2479,8 @@ class Pipeline:
         ok = [x for x in items if (times.get(x) or {}).get('ok')]
         # calibrate_pieces has judged the slow ones (`held`); otherwise the limit decides here
         fast = sorted(x for x in ok if x not in held) if held else \
-            sorted(x for x in ok if (times[x].get('secs') or 0) <= limit and fits_memory(times[x], self.rss_limit()))
+            sorted(x for x in ok if (times[x].get('secs') or 0) <= limit and (
+                fits_memory(times[x], self.rss_limit()) or x.split(':', 1)[1] in self.trying_pieces(times, plan)))
         if not fast:
             return ''
         try:

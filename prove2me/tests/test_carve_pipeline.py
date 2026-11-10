@@ -2914,7 +2914,7 @@ def test_an_unsplittable_piece_over_memory_is_sent_once_and_the_round_goes_on(en
     work = env.dir / 'carve_work'
     for f in ('times.json', 'times.orig.json'):
         t = json.load(open(work / f))
-        t['piece:P0'] = _tm(17, 8049)
+        t['piece:P0'] = _tm(25, 8049)       # (it took 17 s; over TRY_UNSPLIT_SECS here so the split is asked)
         t['piece:P1'] = _tm(40, CP.PIECE_RSS_TARGET + 120)
         t['statement:P1'] = _tm(3, CP.PIECE_RSS_TARGET - 80)
         (work / f).write_text(json.dumps(t))
@@ -2985,3 +2985,42 @@ def test_a_split_cut_off_midway_is_undone_when_the_driver_starts(env, monkeypatc
 def test_a_split_records_itself_while_it_runs():
     p = object.__new__(CP.Pipeline)
     assert hasattr(p, 'recover_interrupted_split')
+
+
+def test_a_fast_piece_a_little_over_memory_with_few_imports_is_tried_unsplit_first():
+    # q153: all 331 pieces measured over 7,150 MiB (to 8,634) were accepted, importing <= 119 statements; its memory
+    # kills were of slow pieces. q154 (2026-11-10): GramData.Block3.gram, 7 s at ~7,450 MiB but importing 709 entry
+    # statements, was memory-killed 4 times, and three splits only made it import more
+    p = object.__new__(CP.Pipeline)
+    p.p, p.state = {}, {}
+    times = {'piece:G': _tm(7.3, 7444), 'piece:S': _tm(40, 7300), 'piece:H': _tm(5, CP.TRY_UNSPLIT_RSS + 1),
+             'piece:F': _tm(5, 6900), 'piece:Gram': _tm(7.3, 7444), 'statement:G': _tm(3, 7444)}
+    plan = {'pieces': {'G': {'imports': ['a'] * 15}, 'S': {}, 'H': {}, 'F': {},
+                       'Gram': {'imports': ['e%d' % i for i in range(709)]}}}
+    assert p.trying_pieces(times, plan) == {'G'}
+    assert p.trying_pieces() == set() and p.trying_pieces(times) == set()
+    p.p = {'try_unsplit_rss': 0}
+    assert p.trying_pieces(times, plan) == set()
+    p.p = {'piece_rss_limit': 7500}
+    assert p.trying_pieces(times, plan) == set()
+
+
+def test_a_piece_still_over_memory_with_many_imports_tells_the_person_to_group_them():
+    p = object.__new__(CP.Pipeline)
+    plan = {'pieces': {'Gram': {'keep': ['Gram'], 'imports': ['e%d' % i for i in range(709)]}}}
+    tried = {'Gram': {'secs': 11.6, 'rss_mib': 7451, 'parts': 2, 'memory_rounds': CP.MAX_MEMORY_ROUNDS}}
+    auto, manual = p.memory_triage(plan, {}, [('piece:Gram', 7444, 7.3)], tried)
+    assert not auto and 'imports 709 statements' in manual[0] and 'intermediate statements' in manual[0]
+
+
+def test_calibrate_pieces_sends_a_fast_piece_over_memory_instead_of_splitting_it(env, monkeypatch):
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30)})
+    work = env.dir / 'carve_work'
+    for f in ('times.json', 'times.orig.json'):
+        t = json.load(open(work / f))
+        t['piece:P0'] = _tm(7, 7444)
+        (work / f).write_text(json.dumps(t))
+    r = run(env, *ARGS_NEW, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'piece:P0' in json.load(open(env.dir / 'publish' / 'release.json'))['pieces']
+    assert not [c for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
