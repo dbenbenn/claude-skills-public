@@ -469,9 +469,27 @@ def health_flags(path, now, alive=pid_running, home=os.path.expanduser('~'), win
 
 # ---- the sections ----------------------------------------------------------------------------
 
-def load_sections(d, now):
+WORKER_LINK = re.compile(r'/page/agent\.html\?name=([\w.-]+)$')
+
+
+def worker_on_it(sec, worker_alive):
+    """The agent repairing a failed section: its `worker log` link names a headless agent that is still
+    running. dbenbenn 2026-11-10: q222/q225 carves showed red "stopped at build" alerts while their queue
+    workers were fixing exactly those modules (a worker's normal port repair, not trouble)."""
+    if sec.get('state') != 'failed' or worker_alive is None:
+        return None
+    for l in sec.get('links') or []:
+        m = WORKER_LINK.search(l.get('url') or '')
+        if m and worker_alive(m.group(1)):
+            return m.group(1)
+    return None
+
+
+def load_sections(d, now, worker_alive=None):
     """(sections, problems): every valid section file, newest state, marked stale when a running or
-    waiting one missed three heartbeats; done/failed ones past expires_secs are left off."""
+    waiting one missed three heartbeats; done/failed ones past expires_secs are left off. A failed one whose
+    worker agent is still running (worker_on_it; worker_alive(name) -> bool) shows as waiting on that worker,
+    its alerts moved into the note: the alert comes back if the worker ends without restarting the carve."""
     secs, problems = [], []
     for f in sorted(os.listdir(d)) if os.path.isdir(d) else []:
         if not f.endswith('.json'):
@@ -492,6 +510,10 @@ def load_sections(d, now):
             continue
         sec = dict(sec, id=sid, age_secs=int(age),
                    stale=sec['state'] in ('running', 'waiting') and age > 3 * sec.get('heartbeat_secs', 300))
+        w = worker_on_it(sec, worker_alive)
+        if w:
+            sec.update(state='waiting', stale=False, alerts=[], handled_by=w,
+                       note='worker %s is repairing it; %s' % (w, sec.get('note') or 'stopped'))
         secs.append(sec)
     rank = lambda s: (0 if s.get('alerts') or s['state'] == 'failed' else 1 if s['state'] != 'done' else 2, s['title'].lower())
     return sorted(secs, key=rank), problems
@@ -586,7 +608,12 @@ def step(home, now=None):
     os.makedirs(st, exist_ok=True)
     res = load_json(os.path.join(st, 'resources.json'), {})
     hist = load_json(os.path.join(st, 'history.json'), {})
-    secs, problems = load_sections(sd, now)
+    args = AG.process_args()
+
+    def worker_alive(name):
+        st = load_json(os.path.join(AG.AGENTS_DIR, name, 'state.json'), {})
+        return isinstance(st, dict) and AG.checked_state(AG.AGENTS_DIR, name, st, args).get('state') == 'running'
+    secs, problems = load_sections(sd, now, worker_alive)
     groups = [(s['id'], [p['match'] for p in s.get('processes', [])]) for s in secs if s.get('processes')]
     procs = proc_table(groups)
     mi = read_meminfo()

@@ -267,3 +267,19 @@ def test_cgroup_usage_reads_lean_slice_and_queue_units(tmp_path):
         (base / d / 'cpu.stat').write_text('usage_usec %d\nuser_usec 0\n' % us)
     u = M.cgroup_usage(str(base))
     assert sum(u['lean'].values()) == 7 and sum(u['queue'].values()) == 6
+
+
+def test_a_failed_carve_whose_worker_is_still_running_waits_on_it_without_an_alert(tmp_path):
+    # 2026-11-10: q222/q225 "stopped at build" alerts while their queue workers were repairing those modules
+    h = str(tmp_path)
+    link = [{'label': 'worker log', 'url': '/page/agent.html?name=q225-artin-groups'}]
+    S.publish('carve-a', title='A', state='failed', note='stopped at build: 3 modules failed', alerts=['stopped'],
+              links=link, home=h, now=100)
+    S.publish('carve-b', title='B', state='failed', note='stopped', alerts=['stopped'], home=h, now=100)
+    secs, _ = M.load_sections(os.path.join(h, 'sections'), now=110, worker_alive=lambda n: n == 'q225-artin-groups')
+    by = {s['id']: s for s in secs}
+    assert by['carve-a']['state'] == 'waiting' and by['carve-a']['alerts'] == [] and not by['carve-a']['stale']
+    assert by['carve-a']['note'].startswith('worker q225-artin-groups is repairing it; stopped at build')
+    assert by['carve-b']['state'] == 'failed' and by['carve-b']['alerts'] == ['stopped']
+    secs, _ = M.load_sections(os.path.join(h, 'sections'), now=110, worker_alive=lambda n: False)
+    assert {s['id']: s for s in secs}['carve-a']['alerts'] == ['stopped']
