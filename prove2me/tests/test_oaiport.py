@@ -3237,3 +3237,11 @@ def test_order_hom_of_class_is_order_hom_class_to_order_hom():
     assert "OrderHomClass.toOrderHom (insertOldIso A v hv)" in out
     assert "ofClass" not in out
     assert O.core_rewrites("MyOrderHom.ofClass f", None) == "MyOrderHom.ofClass f"
+
+
+# d13f23b's `Set.orderIsoOfEq s t h` is `OrderIso.setCongr s t h` in our Mathlib (q225).
+
+def test_set_order_iso_of_eq_is_order_iso_set_congr():
+    out = O.core_rewrites("(Set.orderIsoOfEq _ _ (congrArg Set.Iic h))\n")
+    assert "(OrderIso.setCongr _ _ (congrArg Set.Iic h))" in out
+    assert "orderIsoOfEq" not in out
