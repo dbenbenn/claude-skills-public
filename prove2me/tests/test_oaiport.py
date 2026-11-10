@@ -3227,3 +3227,13 @@ def test_compat_narrow_imports_include_one_dim_change_of_variables():
     # Compat's integral_comp_log_Ioi_zero uses integral_image_eq_integral_abs_deriv_smul, which only
     # Mathlib.MeasureTheory.Function.JacobianOneDim provides; a narrow Compat failed to build (q222)
     assert 'Mathlib.MeasureTheory.Function.JacobianOneDim' in O.COMPAT_NARROW_IMPORTS
+
+
+# d13f23b's `OrderHom.ofClass f` is `OrderHomClass.toOrderHom f` in our Mathlib
+# (ArtinGroups Salvetti cover, q225).
+
+def test_order_hom_of_class_is_order_hom_class_to_order_hom():
+    out = O.core_rewrites("(weightMap (OrderHom.ofClass (insertOldIso A v hv)) a)\n")
+    assert "OrderHomClass.toOrderHom (insertOldIso A v hv)" in out
+    assert "ofClass" not in out
+    assert O.core_rewrites("MyOrderHom.ofClass f", None) == "MyOrderHom.ofClass f"
