@@ -731,5 +731,11 @@ theorem _root_.exists_contDiff_support_eq_eq_one_iff {E : Type*} [NormedAddCommG
       (∀ x, x ∈ t ↔ f x = 1) := by
   simpa [contMDiff_iff_contDiff] using
     exists_contMDiff_support_eq_eq_one_iff (modelWithCornersSelf ℝ E) (n := n) hs ht h
+/-- d13f23b's `ContinuousLinearMap.IsInvertible.eventually_nhds`: invertible operators form an open set
+(SurfaceImmersion primitives, q249). -/
+theorem _root_.ContinuousLinearMap.IsInvertible.eventually_nhds {𝕜 E F : Type*} [NontriviallyNormedField 𝕜]
+    [NormedAddCommGroup E] [NormedSpace 𝕜 E] [CompleteSpace E] [NormedAddCommGroup F] [NormedSpace 𝕜 F]
+    {f : E →L[𝕜] F} (hf : f.IsInvertible) : ∀ᶠ g in nhds f, g.IsInvertible := by
+  obtain ⟨e, rfl⟩ := hf
+  exact Filter.mem_of_superset (ContinuousLinearEquiv.nhds e) (by rintro _ ⟨e', rfl⟩; exact ⟨e', rfl⟩)
 end OAICompat434
-

@@ -3310,3 +3310,12 @@ def test_foreign_modules_open_the_compat_namespace():
     files = O.module_texts(srcs, 'Solutions.X')
     assert '\nopen OAI\n' in files['B.lean'] and 'open OAI' not in files['A.lean']
     assert 'open OAI' not in O.module_texts(srcs, 'Solutions.X', compat_ns=None)['B.lean']
+
+
+def test_compat_has_is_invertible_eventually_nhds():
+    # d13f23b's `ContinuousLinearMap.IsInvertible.eventually_nhds` (openness of the invertible
+    # operators; SurfaceImmersion primitives, q249): ours has only `ContinuousLinearEquiv.nhds`
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem _root_.ContinuousLinearMap.IsInvertible.eventually_nhds ' in src
