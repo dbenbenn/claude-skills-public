@@ -3356,3 +3356,30 @@ def test_compat_has_norm_map_star_mul_le_and_isunital_tocstaralgebra():
                             'compat_4_34.lean')).read()
     assert 'theorem _root_.PositiveLinearMap.norm_map_star_mul_le ' in src
     assert 'noncomputable def IsUnital.toCStarAlgebra' in src
+
+
+# q251 (InvariantIsing): d13f23b has `MeasurableSpace (Matrix m n α)` (Mathlib/Analysis/Matrix/MeasurableSpace.lean); ours has
+# none, so `Measure (Orthogonal N)` does not elaborate. The compat block supplies it under an explicit name (the platform's
+# Def_InvariantIsing bundle declares an anonymous copy; a same-named one would clash). The compat `Int.squarefree_iff_prime_sq_not_dvd`
+# needs `Nat.squarefree_iff_prime_squarefree`, so the narrow Compat must import `Mathlib.Data.Nat.Squarefree`.
+
+def test_compat_has_matrix_measurable_space_instance():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'instance _root_.Matrix.compatMeasurableSpace' in src
+
+
+def test_narrow_compat_imports_cover_the_squarefree_shim():
+    assert 'Mathlib.Data.Nat.Squarefree' in O.COMPAT_NARROW_IMPORTS
+
+
+def test_compat_has_rnderiv_compprod_right_charfun_and_haslaw_lemmas():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for needle in ('theorem _root_.ProbabilityTheory.rnDeriv_measure_compProd_right',
+                   'theorem _root_.ProbabilityTheory.charFun_map_eq_charFun_map_inner_one',
+                   'theorem _root_.ProbabilityTheory.HasLaw.memLp ', 'theorem _root_.ProbabilityTheory.HasLaw.memLp_comp ',
+                   'theorem _root_.ProbabilityTheory.HasLaw.integrable_comp '):
+        assert needle in src, needle

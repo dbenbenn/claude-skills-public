@@ -2423,6 +2423,7 @@ def patch_drop_note(old, pre, post):
 
 # the Mathlib files the compat block's declarations need, for `module_files(compat_imports=…)`
 COMPAT_NARROW_IMPORTS = (
+    'Mathlib.Data.Nat.Squarefree',
     'Mathlib.Combinatorics.Young.YoungDiagram',
     'Mathlib.Analysis.Normed.Algebra.Spectrum',
     'Mathlib.Algebra.MvPolynomial.Basic',

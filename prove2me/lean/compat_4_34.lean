@@ -814,4 +814,55 @@ theorem _root_.logDeriv_fun_comp {𝕜 𝕜' : Type*} [NontriviallyNormedField �
     [NormedAlgebra 𝕜 𝕜'] {f : 𝕜' → 𝕜'} {g : 𝕜 → 𝕜'} {x : 𝕜} (hf : DifferentiableAt 𝕜' f (g x))
     (hg : DifferentiableAt 𝕜 g x) : logDeriv (fun x => f (g x)) x = logDeriv f (g x) * deriv g x :=
   logDeriv_comp hf hg
+/-- Mathlib d13f23b's `MeasurableSpace (Matrix m n α)` (Mathlib/Analysis/Matrix/MeasurableSpace.lean): the product structure
+(InvariantIsing, q251). Explicitly named: the platform's `Def_InvariantIsing` declares an anonymous copy of the same
+instance. -/
+instance _root_.Matrix.compatMeasurableSpace {m n α : Type*} [MeasurableSpace α] :
+    MeasurableSpace (Matrix m n α) :=
+  inferInstanceAs <| MeasurableSpace (m → n → α)
+open MeasureTheory ProbabilityTheory in
+/-- Mathlib d13f23b's `ProbabilityTheory.rnDeriv_measure_compProd_right`: `∂(μ ⊗ₘ κ)/∂(μ ⊗ₘ η)` is the kernel's
+Radon-Nikodym derivative (InvariantIsing KernelRelativeEntropy, q251). -/
+theorem _root_.ProbabilityTheory.rnDeriv_measure_compProd_right {α β : Type*} {mα : MeasurableSpace α}
+    {mβ : MeasurableSpace β} [MeasurableSpace.CountableOrCountablyGenerated α β]
+    (μ : MeasureTheory.Measure α) [MeasureTheory.IsFiniteMeasure μ]
+    (κ η : ProbabilityTheory.Kernel α β) [ProbabilityTheory.IsFiniteKernel κ]
+    [ProbabilityTheory.IsFiniteKernel η] :
+    (μ ⊗ₘ κ).rnDeriv (μ ⊗ₘ η) =ᵐ[μ ⊗ₘ η] fun p => κ.rnDeriv η p.1 p.2 := by
+  have h : κ = η.withDensity (κ.rnDeriv η) + κ.singularPart η :=
+    (Kernel.rnDeriv_add_singularPart κ η).symm
+  have hf : Measurable (Function.uncurry (κ.rnDeriv η)) := Kernel.measurable_rnDeriv κ η
+  have hsum : μ ⊗ₘ κ = μ ⊗ₘ κ.singularPart η + (μ ⊗ₘ η).withDensity (fun p => κ.rnDeriv η p.1 p.2) := by
+    conv_lhs => rw [h]
+    rw [Measure.compProd_add_right, Measure.compProd_withDensity hf, add_comm]
+  refine Measure.eq_rnDeriv₀ hf.aemeasurable ?_ hsum |>.symm
+  exact Measure.MutuallySingular.compProd_of_right μ μ (.of_forall <| Kernel.mutuallySingular_singularPart _ _)
+/-- d13f23b's `ProbabilityTheory.charFun_map_eq_charFun_map_inner_one` (InvariantIsing CavityPrecisionTiltLaw, q251). -/
+theorem _root_.ProbabilityTheory.charFun_map_eq_charFun_map_inner_one {Ω E : Type*} {mΩ : MeasurableSpace Ω}
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [MeasurableSpace E] [BorelSpace E]
+    {μ : MeasureTheory.Measure Ω} {Y : Ω → E} (hY : AEMeasurable Y μ) (t : E) :
+    MeasureTheory.charFun (μ.map Y) t = MeasureTheory.charFun (μ.map fun ω => inner ℝ (Y ω) t) 1 := by
+  have h2 : AEMeasurable (fun ω => inner ℝ (Y ω) t) μ := by fun_prop
+  rw [MeasureTheory.charFun_apply, MeasureTheory.charFun_apply_real,
+    MeasureTheory.integral_map hY (by fun_prop), MeasureTheory.integral_map h2 (by fun_prop)]
+  simp
+/-- d13f23b's `HasLaw.memLp_comp` (InvariantIsing CavityGaussianRows, q251). -/
+theorem _root_.ProbabilityTheory.HasLaw.memLp_comp {Ω 𝓧 E : Type*} {mΩ : MeasurableSpace Ω} {m𝓧 : MeasurableSpace 𝓧}
+    [NormedAddCommGroup E] {P : MeasureTheory.Measure Ω} {μ : MeasureTheory.Measure 𝓧} {X : Ω → 𝓧} {f : 𝓧 → E}
+    {p : ENNReal} (hX : ProbabilityTheory.HasLaw X μ P) (hf : MeasureTheory.MemLp f p μ) :
+    MeasureTheory.MemLp (f ∘ X) p P := by
+  have h : MeasureTheory.MemLp f p (P.map X) := hX.map_eq ▸ hf
+  exact (MeasureTheory.memLp_map_measure_iff h.aestronglyMeasurable hX.aemeasurable).1 h
+/-- d13f23b's `HasLaw.memLp`: a variable whose law has `id` in `L^p` is in `L^p`. -/
+theorem _root_.ProbabilityTheory.HasLaw.memLp {Ω E : Type*} {mΩ : MeasurableSpace Ω} {mE : MeasurableSpace E}
+    [NormedAddCommGroup E] {P : MeasureTheory.Measure Ω} {μ : MeasureTheory.Measure E} {X : Ω → E}
+    {p : ENNReal} (hX : ProbabilityTheory.HasLaw X μ P) (hμ : MeasureTheory.MemLp id p μ) :
+    MeasureTheory.MemLp X p P := hX.memLp_comp hμ
+/-- d13f23b's `HasLaw.integrable_comp` (InvariantIsing CavityGaussianRows, q251). -/
+theorem _root_.ProbabilityTheory.HasLaw.integrable_comp {Ω 𝓧 E : Type*} {mΩ : MeasurableSpace Ω}
+    {m𝓧 : MeasurableSpace 𝓧} [NormedAddCommGroup E] {P : MeasureTheory.Measure Ω}
+    {μ : MeasureTheory.Measure 𝓧} {X : Ω → 𝓧} {f : 𝓧 → E} (hX : ProbabilityTheory.HasLaw X μ P)
+    (hf : MeasureTheory.Integrable f μ) : MeasureTheory.Integrable (f ∘ X) P := by
+  have h : MeasureTheory.Integrable f (P.map X) := hX.map_eq ▸ hf
+  exact (MeasureTheory.integrable_map_measure h.aestronglyMeasurable hX.aemeasurable).1 h
 end OAICompat434
