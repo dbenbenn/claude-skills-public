@@ -1332,6 +1332,37 @@ def _memlp_mul_swap(text):
     return ''.join(out) + text[i:]
 
 
+def _classical_not_imp(text, known=None):
+    """Bare `not_imp` → `Classical.not_imp` in a text that opens `Classical` (q233). Our Mathlib keeps a deprecated
+    root alias `not_imp := Classical.not_imp` that d13f23b dropped, so under `open Classical` (or `open Classical
+    in`) the bare name is ambiguous here; `Classical.not_imp` is what d13f23b resolved it to, with the same
+    statement. Left alone where the port declares a `not_imp` of its own."""
+    if not re.search(r"(?m)^[ \t]*open[ \t]+(?!scoped\b)[^\n]*(?<![\w.'])Classical(?![\w.'])", text):
+        return text
+    known = declared_lemmas([text]) if known is None else known
+    if any(k.rsplit('.', 1)[-1] == 'not_imp' for k in known):
+        return text
+    return re.sub(r"(?<![\w.'])not_imp(?![\w'!?])", 'Classical.not_imp', text)
+
+
+def _elpnorm_smul_measure_of_ne_top(text):
+    """d13f23b's `eLpNorm_smul_measure_of_ne_zero_of_ne_top hp0 hptop c` (f implicit) is private here; ours is
+    `eLpNorm_smul_measure_of_ne_top hptop f c` (no `p ≠ 0`; f explicit, so `(f := _)` keeps a given `c` in place)
+    (q231). A call with fewer than two positional arguments is left."""
+    out, i = [], 0
+    for m in re.finditer(r"(?<![\w.'@])((?:MeasureTheory\.)?)eLpNorm_smul_measure_of_ne_zero_of_ne_top(?![\w'])", text):
+        args = _call_args(text, m.end())
+        pos = [a for a in args if not a[0]]
+        if len(pos) < 2:
+            continue
+        named_f = any(a[0] and re.match(r"\(\s*f\s*:=", text[a[1]:]) for a in args)
+        _, _, e, w = pos[0]
+        out.append(text[i:m.start()] + m.group(1) + 'eLpNorm_smul_measure_of_ne_top'
+                   + (' (f := _)' if len(pos) >= 3 and not named_f else '') + text[m.end():w])
+        i = e
+    return ''.join(out) + text[i:]
+
+
 def _header_conclusion(head):
     """The conclusion of a `theorem`/`lemma`/`have` header (its text up to `:= by`): what follows the first `:`
     outside brackets (binders are bracketed, so a `∀ x : T,` in the conclusion stays in it); '' when there is
@@ -1813,6 +1844,17 @@ def core_rewrites(text, compat_ns='OAI', known=None):
                   r"\1", text)
     # d13f23b's `Sigma.ι_comp_desc` is our `Sigma.ι_desc` (Kaplansky quasitrace, 2026-10-26)
     text = re.sub(r"(?<![\w'])Sigma\.ι_comp_desc(_assoc)?(?![\w'])", r"Sigma.ι_desc\1", text)
+    # ... and its dual `Pi.lift_comp_π` is our `Pi.lift_π` (q223 Seshadri); d13f23b's own `Pi.lift_π` (`Pi.lift (Pi.π
+    # f) = 𝟙 _`) has no counterpart here
+    text = re.sub(r"(?<![\w'])Pi\.lift_comp_π(_assoc|_apply)?(?![\w'])", r"Pi.lift_π\1", text)
+    # d13f23b's `List.prod_le_pow_length` / `pow_length_le_prod` (additive `length_nsmul_le_sum`) are our `_card`
+    # names (q233 totient); also `l.prod_le_pow_length …`
+    for _old, _new in (('prod_le_pow_length', 'prod_le_pow_card'), ('pow_length_le_prod', 'pow_card_le_prod'),
+                       ('length_nsmul_le_sum', 'card_nsmul_le_sum')):
+        text = re.sub(r"(?:(?<![\w'])List|(?<=[\w')\]]))\.%s(?![\w'])" % _old,
+                      lambda m, n=_new, o=_old: m.group(0)[:-len(o)] + n, text)
+    text = _classical_not_imp(text, known)
+    text = _elpnorm_smul_measure_of_ne_top(text)
     # d13f23b renames (UnitDistances, StandardMap 2026-10-25)
     text = re.sub(r"(?<![\w.'])birkhoffSum_succ_apply'(?![\w'])", "birkhoffSum_succ'", text)
     text = re.sub(r"(?<![\w.'])birkhoffSum_add_right_apply(?![\w'])", "birkhoffSum_add", text)

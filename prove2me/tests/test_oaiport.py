@@ -1344,6 +1344,64 @@ def test_sigma_iota_comp_desc_renamed():
         "exact Sigma.ι_desc _ _; simp [Sigma.ι_desc_assoc]"
 
 
+def test_pi_lift_comp_pi_renamed():
+    # q223 (Seshadri): d13f23b's `Pi.lift_comp_π` (with `_assoc`, `_apply`) is our `Pi.lift_π`; d13f23b's own
+    # `Pi.lift_π` (`Pi.lift (Pi.π f) = 𝟙 _`) has no counterpart here and is left alone
+    src = "rw [Pi.lift_comp_π]; simp [Pi.lift_comp_π_assoc, CategoryTheory.Limits.Pi.lift_comp_π_apply]\nexact Pi.lift_π\n"
+    out = O.core_rewrites(src)
+    assert out == "rw [Pi.lift_π]; simp [Pi.lift_π_assoc, CategoryTheory.Limits.Pi.lift_π_apply]\nexact Pi.lift_π\n"
+    assert O.core_rewrites(out) == out
+
+
+def test_list_prod_pow_length_lemmas_renamed():
+    # q233 (totient): d13f23b's `List.prod_le_pow_length` / `List.pow_length_le_prod` (additive `length_nsmul_le_sum`)
+    # are our `…_card` forms (d13f23b keeps `_card` as deprecated aliases), also in dot form on a list
+    src = ("    _ ≤ _ := List.prod_le_pow_length _ _ (fun p hp => h hp)\n"
+           "    exact (l.prod_le_pow_length _ hmem).trans h\n"
+           "      _ ≤ n.primeFactorsList.prod := List.pow_length_le_prod _ 2\n"
+           "  simpa using List.length_nsmul_le_sum l 1 h\n"
+           "  exact my_prod_le_pow_length x\n")
+    out = O.core_rewrites(src)
+    assert out == ("    _ ≤ _ := List.prod_le_pow_card _ _ (fun p hp => h hp)\n"
+                   "    exact (l.prod_le_pow_card _ hmem).trans h\n"
+                   "      _ ≤ n.primeFactorsList.prod := List.pow_card_le_prod _ 2\n"
+                   "  simpa using List.card_nsmul_le_sum l 1 h\n"
+                   "  exact my_prod_le_pow_length x\n")
+    assert O.core_rewrites(out) == out
+
+
+def test_bare_not_imp_under_open_classical_becomes_classical_not_imp():
+    # q233: our Mathlib still has the deprecated root alias `not_imp := Classical.not_imp`, d13f23b no longer does, so
+    # under `open Classical` a bare `not_imp` is ambiguous here. `Classical.not_imp` is what d13f23b resolved it to.
+    src = ("open Classical in\ntheorem t : True := by\n"
+           "  simpa only [SquarefreeAbove,not_forall,not_imp,not_not,exists_prop] using hfail\n"
+           "  rw [← not_imp, Decidable.not_imp_symm, not_imp_not]\n")
+    out = O.core_rewrites(src)
+    assert "simpa only [SquarefreeAbove,not_forall,Classical.not_imp,not_not,exists_prop] using hfail\n" in out
+    assert "  rw [← Classical.not_imp, Decidable.not_imp_symm, not_imp_not]\n" in out
+    assert O.core_rewrites(out) == out
+    # no `open Classical` (only `open scoped`): no ambiguity, nothing to do
+    plain = "open scoped Classical\ntheorem t : True := by\n  simp only [not_imp]\n"
+    assert O.core_rewrites(plain) == plain
+    # a port that declares its own `not_imp` keeps its meaning
+    own = "open Classical\ntheorem Foo.not_imp : True := trivial\nexample := not_imp\n"
+    assert O.core_rewrites(own, known={'Foo.not_imp'}) == own
+
+
+def test_elpnorm_smul_measure_of_ne_zero_of_ne_top_becomes_the_public_lemma():
+    # q231 (Riesz): d13f23b's `eLpNorm_smul_measure_of_ne_zero_of_ne_top hp0 hptop c` (f implicit) is private here;
+    # ours is `eLpNorm_smul_measure_of_ne_top hptop f c` (no `p ≠ 0`, f explicit)
+    src = ("  rw [blowupMeasure, eLpNorm_smul_measure_of_ne_zero_of_ne_top\n"
+           "      (by norm_num : (2 : ℝ≥0∞) ≠ 0) (by norm_num : (2 : ℝ≥0∞) ≠ ⊤),\n"
+           "  exact MeasureTheory.eLpNorm_smul_measure_of_ne_zero_of_ne_top hp0 hpt c\n"
+           "  exact eLpNorm_smul_measure_of_ne_zero_of_ne_top hp0 hpt (f := g) c\n")
+    out = O.core_rewrites(src)
+    assert out == ("  rw [blowupMeasure, eLpNorm_smul_measure_of_ne_top (by norm_num : (2 : ℝ≥0∞) ≠ ⊤),\n"
+                   "  exact MeasureTheory.eLpNorm_smul_measure_of_ne_top (f := _) hpt c\n"
+                   "  exact eLpNorm_smul_measure_of_ne_top hpt (f := g) c\n")
+    assert O.core_rewrites(out) == out
+
+
 # d13f23b's `eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top hp0 hptop hf` has a third, measurability argument;
 # ours has two (Elasticity Regularity, 2026-10-26)
 
