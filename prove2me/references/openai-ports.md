@@ -51,7 +51,10 @@ and how to repair it.
   takes `--def` for each published bundle the goal imports and `--forced` for each theorem the paper
   names (each becomes its own published statement, reusable by others); then `carve.py graph`,
   `carve_prep.py ext-defs`, `carve.py plan/gen/order`, `carve_measure.py`, `carve.py split`. The
-  module port inlines tactic macros across modules, as `oai_port.py` does. `oai_build_modules.py`
+  module port inlines tactic macros across modules, as `oai_port.py` does, `syntax` + `macro_rules`
+  tactics included: a recursive one becomes `repeat' (first | …)` in source order, without backtracking
+  (9cb038c; q222 still needed a reorder by patch), and a call it cannot flatten is left with a warning
+  (expand those uses by hand). `oai_build_modules.py`
   rebuilds a module when anything it imports changed: no `--force` after a fix.
 - **A bundle that needs a statement imports it.** With `bundles_import_statements` (the default), a
   bundle imports a forced theorem that definitions need. That import is allowed only once the theorem
@@ -215,9 +218,9 @@ toolchain.
 - **Getting the sources.** Put them beside `OAI/` in `src/lean` (the commit pinned in
   `lean/lake-manifest.json`) and resume; the port takes them as OpenAI's. With a local checkout at the
   pinned commit, `oai_fetch.py DEST ROOT --foreign <checkout>` (repeatable) copies the package's import
-  closure and names any module the checkout lacks (oaiq-093: a stray import to patch away). Strip
-  LeanArchitect annotations with `~/claude/p2m-standalone/openai-ports/oaiq-083/prep_upstream.py`, and
-  turn `/--` doc comments inside tactic blocks into `/-`. Packages written in the module system
+  closure, strips LeanArchitect annotations (a8b47ea), and names any module the checkout lacks
+  (oaiq-093: a stray import to patch away). Turn `/--` doc comments inside tactic blocks into `/-` by
+  hand. Packages written in the module system
   (`module`, `public import`, `public section`, `@[expose]`, `public def`) need no strip script: the
   port's `demodule` makes them plain (0edecdf, fb51151). The `Erdos970` forks are in
   `prove2me_workspace/Solutions/OAIChowla`.
@@ -267,8 +270,9 @@ drops it with a `why:` naming the rule: delete it from the patches file.
 - **The `eLpNorm` family** (0cd4396; `Lp` norm sites 0888a41, af5cc81, 7a21c26): removed measurability
   arguments are dropped by position, added ones are inserted by name and proved by `AESM_TAC`, and
   renames such as `eLpNorm_indicator_const₀`, `eventuallyEq_univ` and `mgf_gaussianReal heq`.
-- **Renames and compat lemmas** (f6bb691, d0c5d2c, f76350b, ae6d21c), among them `MemLp.mul` by argument
-  name, `Ordinal.lt_wf.induction` (now `WellFoundedLT.induction`, case `ind`), `simp [ite_true]` gaining
+- **Renames and compat lemmas** (f6bb691, d0c5d2c, f76350b, ae6d21c, 2c13ec2, cf1ff0e), among them
+  `MemLp.mul` and `MemLp.smul` by argument name (also through an untyped `have`), `Pi.lift_comp_π`,
+  the `List` `length` → `card` lemmas, `not_imp` under `open Classical`, `Ordinal.lt_wf.induction` (now `WellFoundedLT.induction`, case `ind`), `simp [ite_true]` gaining
   `if_true`, and `Finset.antidiagonal` outside Hahn-series files.
 - **`convert h using 1` + `· rfl` / `· ext x …` on `HasDerivAt` / `HasFDerivAt`** becomes
   `h.congr_deriv (Eq.symm ?_)` (8fdf735): hand patches adding a `symm` count 0.
@@ -367,8 +371,7 @@ drops it with a `why:` naming the rule: delete it from the patches file.
   - `Finset.sum_le_sum_of_injOn` is gone (`sum_image` + `sum_le_sum_of_subset_of_nonneg`).
   - `decide (G.Reachable …)` under `omit [Fintype V] in` needs `@decide _ (Classical.propDecidable _)`
     (oaiq-089).
-  - `liminf_le_liminf (hu := …) (hv := …)` has the two names swapped; `MemLp.smul` takes the function
-    first; `toReal_eLpNorm` and `summable_norm_of_tsum_eLpNorm_ne_top` gained a measurability argument.
+  - `liminf_le_liminf (hu := …) (hv := …)` has the two names swapped; `toReal_eLpNorm` and `summable_norm_of_tsum_eLpNorm_ne_top` gained a measurability argument.
   - `List.Pairwise.rel_getElem_of_lt h …` is `List.pairwise_iff_getElem.1 h _ _ hi hj hij`;
     `Nodup.eq_of_getElem_eq` is `(Nodup.getElem_inj_iff …).1`.
   - `exists_contDiff_support_eq_eq_one_iff` is `exists_contMDiff_support_eq_eq_one_iff (I :=
