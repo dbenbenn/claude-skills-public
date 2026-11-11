@@ -1130,31 +1130,39 @@ class Graph:
 
     def _cross_module_notation_deps(self):
         """A global (not local, not scoped) notation of a module m imported by m2 is a dependency of
-        the commands of m2 whose syntax contains its kind (by Lean's record). Without it the carved
-        bundle of m2's declarations leaves the notation behind with its module, which is drawn from
-        for nothing else (q249: a module holding only `notation "𝒞" => ContDiff ℝ`, `notation:70 u " ⬝ "
-        φ:65 => …`, used by every later module of the Sphere Eversion library: "unknown identifier" at
-        the first use)."""
-        glob = []                       # (module, node key, declared kinds)
+        the declarations of m2 that use its tokens: the carved bundle of m2's declarations otherwise
+        leaves the notation behind with its module, which nothing else draws from (q249: Sphere
+        Eversion's `Notations` module, `notation "𝒞" => ContDiff ℝ` and `notation:70 u " ⬝ " φ:65 =>
+        …`, used by every later module: "unknown identifier" at the first use). Lean's record of
+        syntax kinds names only a file's own notations, so the use is read from the text, as for a
+        local notation without a record. The dependency is on the first declaration of the notation's
+        module, whose bundle then carries the module's global notations (keep_global)."""
+        glob = []                       # (module, node key, tokens)
         for m, info in self.infos.items():
+            keys = self.by_module.get(m) or []
+            first = next((k for k in keys if k not in self.scoped and k in self.nodes), None)
+            if first is None:
+                continue
             for c in info.commands:
-                if c.short_kind in NOTATION and (m, c.index) not in self._scoped_cmds and c.declares_kinds:
-                    key = self.cmd_node.get((m, c.index))
-                    if key:
-                        glob.append((m, key, set(c.declares_kinds)))
+                if c.short_kind not in NOTATION or (m, c.index) in self._scoped_cmds:
+                    continue
+                txt = leanedit.text(info, c.index)
+                if _is_local(txt):
+                    continue
+                toks = _notation_tokens(txt)
+                if toks:
+                    glob.append((m, first, toks))
         if not glob:
             return
-        for m, info in self.infos.items():
-            for c in info.commands:
-                if not c.kinds_used:
-                    continue
-                key = self.cmd_node.get((m, c.index))
-                if not key:
-                    continue
-                used = set(c.kinds_used)
-                for gm, gkey, kinds in glob:
-                    if gm != m and gkey != key and kinds & used and self.sees(m, gm):
-                        self.nodes[key].ndeps.add(gkey)
+        for k, nd in self.nodes.items():
+            if k in self.scoped or k in self.exports or nd.module not in self.infos:
+                continue
+            info = self.infos[nd.module]
+            text = strip(info.slice(*info.command_span(nd.cmd)))
+            for gm, first, toks in glob:
+                if gm != nd.module and first != k and self.sees(nd.module, gm) and \
+                        any(_uses_token(text, tk) for tk in toks):
+                    nd.ndeps.add(first)
 
     def _build_export_deps(self):
         """An export node depends on the project declarations it exports, and a node whose source

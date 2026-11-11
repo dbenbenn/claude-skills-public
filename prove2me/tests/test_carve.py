@@ -3727,23 +3727,31 @@ def test_command_line_split_only_keeps_a_consistent_plan(tmp_path):
     assert not (tmp_path / 'pipeline.json').exists()
 
 
-def test_a_global_notation_of_an_imported_module_is_a_dependency_of_its_users():
+def test_a_global_notation_of_an_imported_module_is_a_dependency_of_its_users(monkeypatch):
     # q249: Sphere Eversion's `Notations` module holds only global notations; the declarations of
-    # later modules that use `⬝` or `𝒞` left it behind and the bundle failed at the first use
+    # later modules that use `⬝` or `𝒞` left it behind and the bundle failed at the first use.
+    # Lean's kinds_used knows only a file's own notations, so the use is read from the text.
     from types import SimpleNamespace as NS
-    cmd = lambda i, k, declares=None, used=None: NS(index=i, short_kind=k, declares_kinds=declares, kinds_used=used)
-    notation = cmd(0, 'notation', declares=['term_⬝_'])
-    local_nt = cmd(1, 'notation', declares=['term_loc_'])
-    user = cmd(0, 'def', used=['term_⬝_', 'term_loc_'])
-    other = cmd(1, 'def', used=['term_other_'])
-    own = cmd(2, 'def', used=['term_⬝_'])
-    infos = {'N': NS(commands=[notation, local_nt]), 'U': NS(commands=[user, other]),
-             'X': NS(commands=[own])}
-    nodes = {k: NS(ndeps=set()) for k in ('nt', 'lo', 'u', 'o', 'x')}
-    fake = NS(infos=infos, _scoped_cmds={('N', 1)},
-              cmd_node={('N', 0): 'nt', ('N', 1): 'lo', ('U', 0): 'u', ('U', 1): 'o', ('X', 2): 'x'},
-              nodes=nodes, sees=lambda m, d: (m, d) in {('U', 'N')})
+    texts = {('N', 0): 'notation "𝒞" => ContDiff ℝ', ('N', 1): 'local notation "LOC" => 1',
+             ('N', 2): 'theorem anchor : True := trivial'}
+    cmd = lambda i, k: NS(index=i, short_kind=k)
+    class Info:
+        def __init__(self, mod, commands, bodies):
+            self.mod, self.commands, self.bodies = mod, commands, bodies
+        def command_span(self, i):
+            return (i, i)
+        def slice(self, a, b):
+            return self.bodies[a]
+    infos = {'N': Info('N', [cmd(0, 'notation'), cmd(1, 'notation'), cmd(2, 'theorem')], {2: texts[('N', 2)]}),
+             'U': Info('U', [cmd(0, 'def'), cmd(1, 'def')], {0: 'def f := 𝒞 ∞ g + LOC', 1: 'def h := 1'}),
+             'X': Info('X', [cmd(0, 'def')], {0: 'def k := 𝒞 ∞ g'})}
+    monkeypatch.setattr(C.leanedit, 'text', lambda info, i: texts[(info.mod, i)])
+    nodes = {k: NS(ndeps=set(), module=m, cmd=i) for k, m, i in
+             (('anchor', 'N', 2), ('f', 'U', 0), ('h', 'U', 1), ('k', 'X', 0))}
+    fake = NS(infos=infos, _scoped_cmds=set(), scoped={}, exports={}, nodes=nodes,
+              by_module={'N': ['anchor'], 'U': ['f', 'h'], 'X': ['k']},
+              sees=lambda m, d: (m, d) in {('U', 'N')})
     C.Graph._cross_module_notation_deps(fake)
-    assert nodes['u'].ndeps == {'nt'}          # the local notation never crosses a module
-    assert nodes['o'].ndeps == set()           # a declaration not using it
-    assert nodes['x'].ndeps == set()           # a module that does not import it
+    assert nodes['f'].ndeps == {'anchor'}      # uses 𝒞; the local notation LOC never crosses a module
+    assert nodes['h'].ndeps == set()           # does not use it
+    assert nodes['k'].ndeps == set()           # a module that does not import it
