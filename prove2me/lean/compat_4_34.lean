@@ -738,4 +738,46 @@ theorem _root_.ContinuousLinearMap.IsInvertible.eventually_nhds {𝕜 E F : Type
     {f : E →L[𝕜] F} (hf : f.IsInvertible) : ∀ᶠ g in nhds f, g.IsInvertible := by
   obtain ⟨e, rfl⟩ := hf
   exact Filter.mem_of_superset (ContinuousLinearEquiv.nhds e) (by rintro _ ⟨e', rfl⟩; exact ⟨e', rfl⟩)
+/-- Mathlib d13f23b's `Int.sq_emod_four`: an integer square is `0` or `1` mod 4, according to parity. -/
+theorem _root_.Int.sq_emod_four (x : ℤ) : x ^ 2 % 4 = x % 2 := by
+  have h : x % 4 = 0 ∨ x % 4 = 1 ∨ x % 4 = 2 ∨ x % 4 = 3 := by omega
+  rcases h with h | h | h | h <;>
+    simp [pow_two, Int.mul_emod, h] <;> omega
+
+/-- Mathlib d13f23b's `Int.squarefree_iff_prime_sq_not_dvd`. -/
+theorem _root_.Int.squarefree_iff_prime_sq_not_dvd {n : ℤ} :
+    Squarefree n ↔ ∀ p : ℕ, p.Prime → ¬ ((p : ℤ) ^ 2 ∣ n) := by
+  rw [← Int.squarefree_natAbs, Nat.squarefree_iff_prime_squarefree]
+  refine forall_congr' fun p => imp_congr_right fun hp => not_congr ?_
+  rw [pow_two, ← Nat.cast_mul, Int.natCast_dvd]
+
+/-- Mathlib d13f23b's `Int.IsFundamentalDiscr`: a fundamental discriminant is a squarefree `D ≡ 1 [4]`, or `4 * d`
+with `d` squarefree and `d ≡ 2, 3 [4]`. -/
+def _root_.Int.IsFundamentalDiscr (D : ℤ) : Prop :=
+  (D % 4 = 1 ∧ Squarefree D) ∨ ∃ d : ℤ, D = 4 * d ∧ Squarefree d ∧ (d % 4 = 2 ∨ d % 4 = 3)
+
+theorem _root_.Int.isFundamentalDiscr_iff_squarefree {D : ℤ} :
+    Int.IsFundamentalDiscr D ↔
+      (D % 4 = 1 ∧ Squarefree D) ∨ ∃ d : ℤ, D = 4 * d ∧ Squarefree d ∧ (d % 4 = 2 ∨ d % 4 = 3) :=
+  Iff.rfl
+
+theorem _root_.Int.isFundamentalDiscr_four_mul {d : ℤ} :
+    Int.IsFundamentalDiscr (4 * d) ↔ Squarefree d ∧ (d % 4 = 2 ∨ d % 4 = 3) := by
+  constructor
+  · rintro (⟨h, _⟩ | ⟨e, he, hs, h⟩)
+    · omega
+    · have : e = d := by omega
+      subst this; exact ⟨hs, h⟩
+  · rintro ⟨hs, h⟩
+    exact Or.inr ⟨d, rfl, hs, h⟩
+
+theorem _root_.Int.IsFundamentalDiscr.emod_four_eq_zero_or_one {D : ℤ} (h : Int.IsFundamentalDiscr D) :
+    D % 4 = 0 ∨ D % 4 = 1 := by
+  rcases h with ⟨h, _⟩ | ⟨e, he, _, _⟩ <;> omega
+
+/-- d13f23b's `logDeriv_fun_comp`, the `fun x => f (g x)` form of `logDeriv_comp` (q247 Jacobsthal). -/
+theorem _root_.logDeriv_fun_comp {𝕜 𝕜' : Type*} [NontriviallyNormedField 𝕜] [NontriviallyNormedField 𝕜']
+    [NormedAlgebra 𝕜 𝕜'] {f : 𝕜' → 𝕜'} {g : 𝕜 → 𝕜'} {x : 𝕜} (hf : DifferentiableAt 𝕜' f (g x))
+    (hg : DifferentiableAt 𝕜 g x) : logDeriv (fun x => f (g x)) x = logDeriv f (g x) * deriv g x :=
+  logDeriv_comp hf hg
 end OAICompat434

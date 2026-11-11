@@ -3329,3 +3329,18 @@ def test_mfderiv_abuse_is_mfderiv():
     assert "hd.mfderiv\n" in out and "(by simp)).mfderiv\n" in out
     assert "mfderiv_abuse" not in out
     assert O.core_rewrites("my_mfderiv_abuse x", None) == "my_mfderiv_abuse x"
+
+
+# d13f23b has `Int.IsFundamentalDiscr` (+ `isFundamentalDiscr_iff_squarefree`, `_four_mul`, `.emod_four_eq_zero_or_one`),
+# `Int.sq_emod_four`, `Int.squarefree_iff_prime_sq_not_dvd` and `logDeriv_fun_comp`; ours has none (q247 Jacobsthal Siegel).
+
+def test_compat_has_int_fundamental_discr_and_friends():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for needle in ('def _root_.Int.IsFundamentalDiscr', 'theorem _root_.Int.isFundamentalDiscr_iff_squarefree',
+                   'theorem _root_.Int.isFundamentalDiscr_four_mul',
+                   'theorem _root_.Int.IsFundamentalDiscr.emod_four_eq_zero_or_one',
+                   'theorem _root_.Int.sq_emod_four', 'theorem _root_.Int.squarefree_iff_prime_sq_not_dvd',
+                   'theorem _root_.logDeriv_fun_comp'):
+        assert needle in src, needle
