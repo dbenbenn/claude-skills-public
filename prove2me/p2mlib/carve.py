@@ -1141,8 +1141,6 @@ class Graph:
         for m, info in self.infos.items():
             keys = self.by_module.get(m) or []
             first = next((k for k in keys if k not in self.scoped and k in self.nodes), None)
-            if first is None:
-                continue
             for c in info.commands:
                 if c.short_kind not in NOTATION or (m, c.index) in self._scoped_cmds:
                     continue
@@ -1150,12 +1148,23 @@ class Graph:
                 if _is_local(txt):
                     continue
                 toks = _notation_tokens(txt)
-                if toks:
-                    glob.append((m, first, toks))
+                if not toks:
+                    continue
+                if first is None:
+                    # a module of notations alone has no declaration to depend on: its first global
+                    # notation becomes a node of its own, which draws the module (and so every global
+                    # notation in it) into a bundle
+                    first = '«gnotation»:%s:%d' % (m, c.index)
+                    a, b = info.command_span(c.index)
+                    self.nodes[first] = Node(first, m, c.index, [], 'notation', False, False, False, [],
+                                             b - a, False)
+                    self.cmd_node[(m, c.index)] = first
+                    self.by_module[m].append(first)
+                glob.append((m, first, toks))
         if not glob:
             return
-        for k, nd in self.nodes.items():
-            if k in self.scoped or k in self.exports or nd.module not in self.infos:
+        for k, nd in list(self.nodes.items()):
+            if k in self.scoped or k in self.exports or k.startswith('«gnotation»') or nd.module not in self.infos:
                 continue
             info = self.infos[nd.module]
             text = strip(info.slice(*info.command_span(nd.cmd)))

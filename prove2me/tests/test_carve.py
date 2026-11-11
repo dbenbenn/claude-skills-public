@@ -3748,10 +3748,34 @@ def test_a_global_notation_of_an_imported_module_is_a_dependency_of_its_users(mo
     monkeypatch.setattr(C.leanedit, 'text', lambda info, i: texts[(info.mod, i)])
     nodes = {k: NS(ndeps=set(), module=m, cmd=i) for k, m, i in
              (('anchor', 'N', 2), ('f', 'U', 0), ('h', 'U', 1), ('k', 'X', 0))}
-    fake = NS(infos=infos, _scoped_cmds=set(), scoped={}, exports={}, nodes=nodes,
+    fake = NS(infos=infos, _scoped_cmds=set(), scoped={}, exports={}, nodes=nodes, cmd_node={},
               by_module={'N': ['anchor'], 'U': ['f', 'h'], 'X': ['k']},
               sees=lambda m, d: (m, d) in {('U', 'N')})
     C.Graph._cross_module_notation_deps(fake)
     assert nodes['f'].ndeps == {'anchor'}      # uses 𝒞; the local notation LOC never crosses a module
     assert nodes['h'].ndeps == set()           # does not use it
     assert nodes['k'].ndeps == set()           # a module that does not import it
+
+
+def test_a_module_of_notations_alone_gets_a_node_its_users_depend_on(monkeypatch):
+    # q249: Sphere Eversion's `Notations` has no declaration at all
+    from types import SimpleNamespace as NS
+    cmd = lambda i, k: NS(index=i, short_kind=k)
+    class Info:
+        def __init__(self, commands, bodies):
+            self.commands, self.bodies = commands, bodies
+        def command_span(self, i):
+            return (i, i + 1)
+        def slice(self, a, b):
+            return self.bodies[a]
+    infos = {'N': Info([cmd(0, 'notation'), cmd(1, 'notation3')], {}),
+             'U': Info([cmd(0, 'def')], {0: 'def f := hull s'})}
+    texts = {0: 'notation "hull" => convexHull ℝ', 1: 'notation3 "∀ᶠ " (...) " near " s => s'}
+    monkeypatch.setattr(C.leanedit, 'text', lambda info, i: texts[i] if info is infos['N'] else '')
+    nodes = {'f': NS(ndeps=set(), module='U', cmd=0)}
+    fake = NS(infos=infos, _scoped_cmds=set(), scoped={}, exports={}, nodes=nodes, cmd_node={},
+              by_module={'U': ['f']}, sees=lambda m, d: (m, d) == ('U', 'N'))
+    fake.by_module = __import__('collections').defaultdict(list, fake.by_module)
+    C.Graph._cross_module_notation_deps(fake)
+    assert nodes['f'].ndeps == {'«gnotation»:N:0'}
+    assert nodes['«gnotation»:N:0'].module == 'N' and fake.cmd_node[('N', 0)] == '«gnotation»:N:0'
