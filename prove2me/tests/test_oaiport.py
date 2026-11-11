@@ -303,6 +303,16 @@ def test_guard_problems_find_metaprogramming_monads():
     assert got == [(2, 'TermElabM'), (3, 'TacticM'), (4, 'MetaM')]
 
 
+def test_guard_problems_find_run_tac():
+    # q227 (2026-11): OpenAI's BoundaryBridge proved four goals `by run_tac do ...`; the platform refused the bundle
+    # at publish ("`run_tac` -- arbitrary elaboration-time code execution") after the local measure passed
+    from p2mlib import leantext as L
+    text = ('-- run_tac in a comment\ntheorem a : True := by\n  run_tac do\n    pure ()\n'
+            'theorem b : True := by run_tac pure ()\ndef run_tac_count : Nat := 0\n')
+    got = [(n, tok) for n, tok, _ in L.guard_problems(text)]
+    assert got == [(3, 'run_tac'), (5, 'run_tac')]
+
+
 def test_ports_rename_identifiers_the_soundness_guard_refuses():
     # WLTime (2026-10-23): OpenAI's TMConsumer.prelude passed every local check and the published
     # bundle failed on the guard; renamed by hand to preludeCode. Both port routes rename it.

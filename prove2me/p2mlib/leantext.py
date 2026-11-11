@@ -554,6 +554,9 @@ GUARD_TOKENS = {'prelude': 'disables the automatic Init prelude import (refused 
 # that kept an elaborator's helper defs; TacticM and MetaM are the same kind (not yet seen refused)
 GUARD_TOKENS.update({m: 'metaprogramming monad' for m in ('TermElabM', 'TacticM', 'MetaM')})
 GUARD_TOKENS['modifyEnv'] = 'mutates the elaboration environment'   # q151, with `run_cmd`
+# q227 (2026-11): OpenAI's BoundaryBridge closed four goals `by run_tac do ...` (a tactic, not a command at the
+# start of a line); refused at publish after the local measure passed
+GUARD_TOKENS['run_tac'] = 'arbitrary elaboration-time code execution'
 _TOKEN = r"(?<![\w'!?₀-ₜ])%s(?![\w'!?₀-ₜ])"
 
 
