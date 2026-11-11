@@ -4923,8 +4923,16 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
         if 'stubs' in what and n not in external:
             fn = 'Thm_%s.lean' % slug(statement_name(plan, n))
             txt = gen_stub(g, plan, n, collapse_mathlib)
+            nd0 = len(drift)
             put(os.path.join(out, 'lib', fn), monomorphize(txt) if n in monomorphic else txt,
                 frozen_stubs.get(fn))
+            if n in monomorphic and fn in frozen_stubs and len(drift) > nd0:
+                # q240: the stub is locked (published, or released to the publisher) as it was, polymorphic,
+                # while the piece would be written at `Type`: it would prove another theorem than its statement
+                raise CarveError('config monomorphic lists %s, whose statement is frozen (published, or released '
+                                 'to the publisher) and polymorphic: its piece would state another theorem. Set '
+                                 '`monomorphic` before the first publish; for a live statement publish a copy at '
+                                 '`Type` (config statement_suffixes + monomorphic, q151) or fold it' % n)
         if 'pieces' in what:
             put(os.path.join(out, 'solutions', 'Sol_%s.lean' % slug(statement_name(plan, n))),
                 gen_piece(g, plan, n, collapse_mathlib, mono=n in monomorphic))

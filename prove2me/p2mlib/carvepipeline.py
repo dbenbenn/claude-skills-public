@@ -1388,10 +1388,31 @@ class Pipeline:
         user forced), `cost_factors` (pieces measured over their plan), `promote_private` (their private
         lemmas, which the plan may then promote like public ones) and `no_promote` (the lemmas of live
         pieces, which it may not; unions with the user's). Re-applied whenever
-        config.json is rewritten from pipeline.json, so a re-run `config` cannot unfreeze a carve."""
+        config.json is rewritten from pipeline.json, so a re-run `config` cannot unfreeze a carve.
+
+        A person's `no_promote` wins over what the pipeline forced itself (a piece split's new statements), except
+        a statement already frozen (its stub is locked) or forced in pipeline.json: such a name leaves auto_config
+        `forced` and `template_forced` (q240 2026-11-11: a split promoted a `CompleteSpace` instance and 22
+        polymorphic `inst*` lemmas; `no_promote` changed nothing, and pipeline_state.json was edited by hand)."""
         a = self.state.get('auto_config') or {}
         if a.get('frozen'):
             cfg['frozen'] = dict(cfg.get('frozen') or {}, **a['frozen'])
+        unwanted = set(cfg.get('no_promote') or ()) & set(a.get('forced') or ())
+        if unwanted:
+            named = set(self.p.get('forced') or ()) | set((self.p.get('config_set') or {}).get('forced') or ())
+            locked = (unwanted - named) & self.locked_statements()
+            drop = unwanted - named - locked
+            if drop:
+                for k in ('forced', 'template_forced'):
+                    if a.get(k):
+                        a[k] = sorted(set(a[k]) - drop)
+                    if cfg.get(k):
+                        cfg[k] = sorted(set(cfg[k]) - drop)
+                print('== no_promote: no longer forced (a piece split had promoted them): %s'
+                      % ', '.join(sorted(drop)), flush=True)
+            if locked:
+                print('== no_promote: cannot drop %s: frozen (published, or released to the publisher); fold or '
+                      'deprecate instead' % ', '.join(sorted(locked)), flush=True)
         for k in ('forced', 'template_forced', 'no_promote'):
             if a.get(k):
                 cfg[k] = sorted(set(cfg.get(k) or ()) | set(a[k]))
@@ -1403,6 +1424,19 @@ class Pipeline:
                 cf[k] = max(cf.get(k, 1.0), v)
             cfg['cost_factors'] = cf
         return cfg
+
+    def locked_statements(self):
+        """The statements whose stubs are frozen: in the published part (published/plan.json), released by a
+        streaming measure (`streamed_stubs`), or live (publish/run_state.json)."""
+        out = set(self.state.get('streamed_stubs') or ())
+        fz = (self.state.get('auto_config') or {}).get('frozen') or {}
+        for path in (fz.get('plan'), os.path.join(self.published_dir(), 'plan.json')):
+            if path:
+                out |= set((_load_json(path) or {}).get('stubs') or {})
+        st = _load_json(os.path.join(self.d, 'publish', 'run_state.json')) or {}
+        out |= {x.split(':', 1)[1] for x, v in st.items()
+                if x.startswith('statement:') and isinstance(v, dict) and v.get('state') == 'live'}
+        return out
 
     def sync_config_set(self):
         """pipeline.json `config_set` keys changed since `config` applied them go straight into

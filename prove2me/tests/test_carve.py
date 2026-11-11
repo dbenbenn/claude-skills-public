@@ -1148,6 +1148,21 @@ def test_monomorphic_nodes_are_stated_and_proved_at_type(g, plan, tmp_path):
         'universe u v\nvariable {G : Type}\ntheorem t (h : P.{0, 0} G) (E : Type) : Q.{max 0 0} E := sorry')
 
 
+def test_monomorphic_on_a_frozen_polymorphic_statement_stops_gen(g, plan, tmp_path):
+    # q240 (2026-11-11): `monomorphic` set after streaming began did nothing to the statements: the publisher
+    # had locked their stubs (written as published), while the pieces were written at `Type`, so each piece
+    # stated another theorem than its statement and failed late. gen now stops at once and says what to do.
+    C.generate(g, plan, str(tmp_path / 'a'), what=('stubs',), names=['CD.top_pick'])
+    fn = 'Thm_CD_top_pick.lean'
+    poly = open(tmp_path / 'a' / 'lib' / fn).read()
+    with pytest.raises(C.CarveError, match=r'(?s)monomorphic.*CD\.top_pick.*frozen.*statement_suffixes'):
+        C.generate(g, plan, str(tmp_path / 'b'), frozen_stubs={fn: poly}, monomorphic=['CD.top_pick'])
+    # a statement frozen at `Type` already (monomorphic before the first publish) is fine
+    C.generate(g, plan, str(tmp_path / 'c'), monomorphic=['CD.top_pick'])
+    mono = open(tmp_path / 'c' / 'lib' / fn).read()
+    C.generate(g, plan, str(tmp_path / 'd'), frozen_stubs={fn: mono}, monomorphic=['CD.top_pick'])
+
+
 def test_a_file_over_the_size_cap_loses_its_comments(g, plan, tmp_path):
     # q151 (2026-11-02): folding four statements into a live piece made it 1,091,190 bytes, over
     # prove2.me's 1 MiB cap; without OpenAI's comments and docstrings it was 1,016,518

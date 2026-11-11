@@ -2895,6 +2895,39 @@ def test_a_piece_in_flight_is_never_split_for_memory(env, monkeypatch):
     assert split == [], r.stdout + r.stderr
 
 
+def test_no_promote_overrides_what_a_piece_split_forced_unless_it_is_frozen(tmp_path, capsys):
+    # q240 (2026-11-11): the automatic split of a slow piece promoted a `CompleteSpace` instance and polymorphic
+    # `inst*` lemmas; they went into auto_config `forced`, which apply_auto unions into config.json every time, so
+    # listing them in `no_promote` changed nothing and pipeline_state.json was edited by hand twice. A person's
+    # `no_promote` now wins over the pipeline's own `forced`, except for a statement already frozen (published
+    # or released: its stub is locked) and one the person forced in pipeline.json
+    p = object.__new__(CP.Pipeline)
+    p.d = str(tmp_path)
+    p.p = {'forced': ['Mine'], 'config_set': {'no_promote': ['S1', 'Live', 'Mine', 'Lemma']}}
+    pub = tmp_path / 'published'
+    pub.mkdir()
+    (pub / 'plan.json').write_text(json.dumps({'stubs': {'Live': {}, 'Old': {}}}))
+    auto = {'frozen': {'plan': str(pub / 'plan.json'), 'bundles': []},
+            'forced': ['Live', 'Mine', 'Old', 'S1', 'S2', 'Streamed'],
+            'template_forced': ['Live', 'Old', 'S1', 'S2', 'Streamed']}
+    p.state = {'auto_config': json.loads(json.dumps(auto)), 'steps': {}, 'streamed_stubs': ['Streamed']}
+    cfg = {'forced': ['Mine'], 'no_promote': ['S1', 'Live', 'Mine', 'Lemma', 'Streamed']}
+    out = p.apply_auto(cfg)
+    assert out['forced'] == ['Live', 'Mine', 'Old', 'S2', 'Streamed']
+    assert out['template_forced'] == ['Live', 'Old', 'S2', 'Streamed']
+    assert set(out['no_promote']) == {'S1', 'Live', 'Mine', 'Lemma', 'Streamed'}
+    # the state forgets it too, so a later split or freeze does not bring it back
+    assert 'S1' not in p.state['auto_config']['forced'] and 'S1' not in p.state['auto_config']['template_forced']
+    err = capsys.readouterr().out
+    assert 'S1' in err and 'no_promote' in err
+    # frozen ones it cannot drop are named
+    assert 'Live' in err and 'Streamed' in err
+    # nothing to drop: quiet, unchanged
+    p.state = {'auto_config': json.loads(json.dumps(auto)), 'steps': {}}
+    out = p.apply_auto({'forced': []})
+    assert out['forced'] == auto['forced'] and capsys.readouterr().out == ''
+
+
 def test_a_streaming_release_of_pieces_starts_a_gated_publisher_even_with_statements_held(tmp_path):
     # q153 (2026-11-08): with the publisher stopped by hand, three batches released 174-206 pieces and each said
     # "no publisher yet (publish_early has not started one)": held statements kept it from starting. A gated
