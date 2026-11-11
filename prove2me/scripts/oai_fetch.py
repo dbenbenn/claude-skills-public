@@ -19,7 +19,8 @@ usage: oai_fetch.py DEST ROOT_MODULE [--commit SHA] [--git REPO | --no-git] [--f
               DEST/lean verbatim (the port makes module-system files plain: oaiport.demodule); a file
               already there is kept. A module the checkout lacks is named, not fatal (oaiq-093: OpenAI's
               GromovGrowthBridge imports a Gromov.PolynomialGrowth absent at the pin: patch the import).
-              LeanArchitect annotations are not stripped: an `import Architect` shows as a missing root.
+              LeanArchitect annotations (`import Architect`, `@[blueprint …]`, `blueprint_comment`) are
+              stripped from each copied file (leantext.strip_leanarchitect; q233, oaiq-083).
 
 Prints how many files came from DEST already, from the clone and from the network. Exits 1 when the
 closure imports a package that is neither OpenAI's nor in our toolchain (PrimeNumberTheoremAnd,
@@ -33,6 +34,9 @@ import sys
 import time
 import urllib.error
 import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from p2mlib.leantext import strip_leanarchitect  # noqa: E402
 
 COMMIT = 'adc7f1241b42e322a6451854ab7e4b4c146bf78a'
 CANDIDATES = ('~/claude/openai-math',)
@@ -158,8 +162,9 @@ IMPORT = re.compile(r'^(?:public\s+)?(?:meta\s+)?import\s+(?:all\s+)?(\S+)', re.
 
 def copy_foreign(dest, mods, dirs):
     """Copy the foreign modules `mods` ({module: [importers]}) and their import closure inside the roots
-    the checkouts `dirs` hold into DEST/lean, verbatim; files already there are kept (prep_rk.py oaiq-091,
-    prep_gromov.py oaiq-093). Returns ({dir: files copied}, {root: [importers]} of roots no checkout
+    the checkouts `dirs` hold into DEST/lean, LeanArchitect annotations stripped (strip_leanarchitect;
+    prep_upstream.py oaiq-083, q233), otherwise verbatim; files already there are kept (prep_rk.py
+    oaiq-091, prep_gromov.py oaiq-093). Returns ({dir: files copied}, {root: [importers]} of roots no checkout
     holds, {module: [importers]} a holding checkout lacks)."""
     def holder(root):
         for d in dirs:
@@ -186,7 +191,7 @@ def copy_foreign(dest, mods, dirs):
         if os.path.exists(dst):
             t = open(dst, encoding='utf-8').read()
         elif os.path.exists(os.path.join(d, rel)):
-            t = open(os.path.join(d, rel), encoding='utf-8').read()
+            t = strip_leanarchitect(open(os.path.join(d, rel), encoding='utf-8').read())
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             with open(dst, 'w', encoding='utf-8') as f:
                 f.write(t)
@@ -234,8 +239,9 @@ def main(argv):
     missing = missing_packages(foreign, args[0])
     if missing:
         sys.exit('foreign packages in the closure, not in %s: %s. openai/math does not contain them: put their '
-                 'sources beside OAI/ there (the pinned upstream from its lake-manifest, LeanArchitect annotations '
-                 'stripped; references/openai-ports.md "Foreign packages") and run again (oaiq-083)'
+                 'sources beside OAI/ there (the pinned upstream from its lake-manifest; --foreign CHECKOUT copies the '
+                 'closure, LeanArchitect annotations stripped; references/openai-ports.md "Foreign packages") and run '
+                 'again (oaiq-083)'
                  % (os.path.join(args[0], 'lean'), '; '.join('%s (imported by %s)' % (k, ', '.join(sorted(set(v))[:5]))
                                                              for k, v in missing.items())))
 

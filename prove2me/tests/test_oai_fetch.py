@@ -151,7 +151,9 @@ def test_foreign_closures_are_copied_from_a_local_checkout(repo, tmp_path, monke
     (ext / 'StrongPNT').mkdir(parents=True)
     main = 'module\n\npublic import Mathlib.A\npublic import StrongPNT.Aux\n\n@[expose] public section\n'
     (ext / 'StrongPNT' / 'Main.lean').write_text(main)
-    (ext / 'StrongPNT' / 'Aux.lean').write_text('import Architect\nimport StrongPNT.Kept\n')
+    # LeanArchitect annotations are stripped on the way (q233: `import Architect` stopped the fetch as a missing root)
+    (ext / 'StrongPNT' / 'Aux.lean').write_text('import Architect\nimport StrongPNT.Kept\n\n@[blueprint "A"]\n'
+                                                'theorem aux : True := trivial\n')
     (ext / 'StrongPNT' / 'Kept.lean').write_text('-- upstream\n')
     (ext / 'StrongPNT' / 'Unused.lean').write_text('-- not in the closure\n')
     dest = tmp_path / 'dest'
@@ -160,7 +162,7 @@ def test_foreign_closures_are_copied_from_a_local_checkout(repo, tmp_path, monke
     with pytest.raises(SystemExit) as e:
         F.main([str(dest), 'OAI.X.Main', '--commit', sha2, '--git', str(r), '--foreign', str(ext)])
     msg = str(e.value)
-    assert 'PrimeNumberTheoremAnd (imported by OAI.Lib)' in msg and 'Architect (imported by StrongPNT.Aux)' in msg
+    assert 'PrimeNumberTheoremAnd (imported by OAI.Lib)' in msg and 'Architect (imported' not in msg
     assert 'StrongPNT (' not in msg
     out = capsys.readouterr().out
     assert '2 foreign modules from %s' % ext in out and 'StrongPNT.Gone (imported by OAI.Lib)' in out
@@ -169,3 +171,4 @@ def test_foreign_closures_are_copied_from_a_local_checkout(repo, tmp_path, monke
     assert got == ['Aux.lean', 'Kept.lean', 'Main.lean']
     assert (dest / 'lean' / 'StrongPNT' / 'Main.lean').read_text() == main
     assert (dest / 'lean' / 'StrongPNT' / 'Kept.lean').read_text() == '-- edited by hand\n'
+    assert (dest / 'lean' / 'StrongPNT' / 'Aux.lean').read_text() == 'import StrongPNT.Kept\n\ntheorem aux : True := trivial\n'

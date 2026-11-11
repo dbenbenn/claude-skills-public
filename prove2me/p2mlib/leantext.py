@@ -373,6 +373,116 @@ def inline_tactic_macros(text):
     return inline_macro_uses(text, macros), list(macros)
 
 
+def _skip_block_comment(t, i):
+    """Index after the (nested) block comment opening at t[i]."""
+    depth = 0
+    while i < len(t):
+        if t.startswith('/-', i):
+            depth += 1
+            i += 2
+        elif t.startswith('-/', i):
+            depth -= 1
+            i += 2
+            if depth == 0:
+                return i
+        else:
+            i += 1
+    return i
+
+
+def _skip_string(t, i):
+    i += 1
+    while i < len(t) and t[i] != '"':
+        i += 2 if t[i] == '\\' else 1
+    return i + 1
+
+
+def _attribute_items(t, i):
+    """(end, [items]) of the attribute list `@[ … ]` whose `[` is at t[i]: items split at top-level commas,
+    comments and strings skipped."""
+    items, cur, depth, j = [], '', 0, i
+    while j < len(t):
+        if t.startswith('/-', j):
+            k = _skip_block_comment(t, j)
+            cur += t[j:k]
+            j = k
+            continue
+        c = t[j]
+        if c == '"':
+            k = _skip_string(t, j)
+            cur += t[j:k]
+            j = k
+            continue
+        if c in '[(':
+            depth += 1
+            if depth == 1:
+                j += 1
+                continue
+        elif c in '])':
+            depth -= 1
+            if depth == 0:
+                return j + 1, items + [cur]
+        if c == ',' and depth == 1:
+            items.append(cur)
+            cur = ''
+        else:
+            cur += c
+        j += 1
+    raise ValueError('unbalanced attribute list at %d' % i)
+
+
+_ARCHITECT_IMPORT = re.compile(r'^(?:public[ \t]+)?(?:meta[ \t]+)?import[ \t]+Architect(?:\.\S*)?[ \t]*(?:\n|$)', re.M)
+
+
+def strip_leanarchitect(text):
+    """Lean source with LeanArchitect's blueprint annotations removed, which our toolchain lacks
+    (PrimeNumberTheoremAnd, oaiq-083, q233): `import Architect…`, `set_option lang.lemmaCmd …`,
+    `blueprint_comment /-- … -/` commands, and the `blueprint …` items of an `@[…]` attribute list at
+    the start of a line (multi-line, with doc comments and strings inside; the list goes if nothing else is
+    in it). Comments and string literals are skipped, so a commented-out `@[blueprint` stays."""
+    text = _ARCHITECT_IMPORT.sub('', text)
+    text = re.sub(r'(?m)^[ \t]*set_option[ \t]+lang\.lemmaCmd\b[^\n]*(?:\n|$)', '', text)
+    out, i, n = [], 0, len(text)
+    while i < n:
+        if text.startswith('/-', i):
+            k = _skip_block_comment(text, i)
+            out.append(text[i:k])
+            i = k
+            continue
+        if text.startswith('--', i):
+            k = text.find('\n', i)
+            k = n if k < 0 else k
+            out.append(text[i:k])
+            i = k
+            continue
+        if text[i] == '"':
+            k = _skip_string(text, i)
+            out.append(text[i:k])
+            i = k
+            continue
+        bol = i == 0 or text[i - 1] == '\n'
+        if bol and re.match(r'blueprint_comment\b', text[i:i + 18]):
+            j = text.index('/-', i)
+            k = _skip_block_comment(text, j)
+        elif bol and text.startswith('@[', i):
+            k, items = _attribute_items(text, i + 1)
+            kept = [x.strip() for x in items if not re.match(r'\s*blueprint\b', x)]
+            if len(kept) == len(items) or kept:
+                out.append(text[i:k] if len(kept) == len(items) else '@[%s]' % ', '.join(kept))
+                i = k
+                continue
+        else:
+            out.append(text[i])
+            i += 1
+            continue
+        while k < n and text[k] in ' \t':
+            k += 1
+        if k < n and text[k] == '\n':
+            k += 1
+        i = k
+    return ''.join(out)
+
+
 IMPORT_RE = re.compile(r"^(?:public[ \t]+)?(?:meta[ \t]+)?import[ \t]+(?:all[ \t]+)?(\S+)", re.M)
 
 
