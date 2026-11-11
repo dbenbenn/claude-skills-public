@@ -1927,6 +1927,43 @@ def test_an_anonymous_local_instance_whose_name_another_module_took_comes_back(g
             assert 'local instance' not in stub, stub
 
 
+def test_a_local_instance_of_a_prop_class_comes_back_for_every_proof_in_its_scope():
+    # q237-nodal-sets (2026-11-10): 22 modules declare `local instance : Fact (Module.finrank ℝ AmbientBase =
+    # 4+1)` (anonymous, or named by the port); `centeredSphereChart_source` (`stereographic'_source (-p)`) and
+    # three more needed theirs, but nothing recorded a use (the elaborated terms name none, and no class problem
+    # matched), so two bundles and two pieces lost it: "failed to synthesize Fact …". An instance of a Prop class
+    # carries no data: put back in force where it was in force in the port, it cannot change a term, only which
+    # proof instance search finds. So it comes back for every kept proof in its scope; a statement stub still
+    # gets it only on a record of its statement's use (Problem340 above). Here InstA's and InstB's `PropC 3`
+    # with every record of uses_propc_a's and uses_propc_b's use removed.
+    g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    for t in ('CD.LI.uses_propc_a', 'CD.LI.uses_propc_b'):
+        user = g.nodes[t]
+        c = g.infos[user.module].commands[user.cmd]
+        c.insts = c.sig_insts = []
+        for f in ('inst_keys', 'used_keys', 'sig_used_keys'):
+            setattr(c, f, [x for x in getattr(c, f) or () if not x.startswith('CD.LI.PropC')])
+        for n in user.names:
+            for f in ('t', 'v'):
+                g.consts[n][f] = [x for x in g.consts[n][f] if x != 'CD.LI.instPropCOfNatNat']
+        g.nodes[t].deps.discard('CD.LI.instPropCOfNatNat')
+    p = _propc_plan(g)
+    for n, mod in (('CD.LI.uses_propc_a', 'CarveDev.InstA'), ('CD.LI.uses_propc_b', 'CarveDev.InstB')):
+        piece = C.gen_piece(g, p, n)
+        sec = _section(piece, mod)
+        m = re.search(r'^(local instance \S+ : PropC 3|attribute \[local instance\] \S*instPropC)', sec, re.M)
+        assert m and m.start() < sec.index('theorem uses_propc'), piece
+        assert 'local instance' not in C.gen_stub(g, p, n)
+    # a data class's local instance with no record still stays out (dq_for's Dq, its class unnamed by the text)
+    g = _unrecorded_dq_for()
+    nd = g.nodes['CD.LF.dq_for']
+    g.infos[nd.module].commands[nd.cmd].resolved = [r for r in g.infos[nd.module].commands[nd.cmd].resolved
+                                                    if not r[2].startswith('CD.LC.Dq')]
+    keep = {'CD.LC.Dq', 'CD.LF.dq_for'}
+    sec = _section(C.Carver(g).carve(keep, g.have_names(keep)), 'CarveDev.LocalFor')
+    assert not re.search(r'^(local instance|attribute \[local instance\])', sec, re.M), sec
+
+
 @pytest.mark.lean
 def test_local_instances_sharing_a_name_compile(g, tmp_path):
     _compile_in_publish_order(g, _propc_plan(g), tmp_path)
@@ -2159,9 +2196,11 @@ def test_a_local_instance_that_won_a_subproblem_comes_back_though_no_term_names_
     # `Defect →ₗ[ℂ] A` was elaborated, and the final term kept a defeq instance instead: no constant,
     # no `insts` entry. Carved without it, instance search timed out (the agent raised
     # synthInstance.maxHeartbeats). The problems instance search solved (`inst_keys`) still show it.
-    # (uses_local_inst uses Wide, so the carrier rule brings the instance back anyway; it is off
-    # here, to pin the inst_keys test alone.)
+    # (uses_local_inst uses Wide, so the carrier rule brings the instance back anyway, and names
+    # `default`, of Inhabited's namespace, so the q221 rule does too; both are off here, to pin the
+    # inst_keys test alone.)
     monkeypatch.setattr(C.Carver, '_carrier_used', lambda *a: False)
+    monkeypatch.setattr(C.Carver, '_class_named', staticmethod(lambda *a: False))
     for asked, comes_back in ((['Inhabited CD.Wide'], True), (['Inhabited CD.Wide CD.Other'], True),
                               (['Inhabited CD.Other'], False), (['Nonempty CD.Wide'], False), ([], False)):
         g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
@@ -2760,6 +2799,43 @@ def test_a_local_instance_comes_back_when_the_record_names_a_foreign_one_of_its_
         sec = _section(C.Carver(g).carve(keep, g.have_names(keep), sorry=sorry), 'CarveDev.LocalFor')
         s = re.search(r'^local instance instDqProdNatBool_r\w+ : Dq \(Nat × Bool\)', sec, re.M)
         assert s and s.start() < sec.index('theorem dq_for'), sec
+
+
+def _unrecorded_dq_for():
+    """The fixture graph with no record of dq_for's use of its module's local `Dq (Nat × Bool)`: no `insts`,
+    no class problem, no constant naming it (q221)."""
+    g = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    user = g.nodes['CD.LF.dq_for']
+    c = g.infos[user.module].commands[user.cmd]
+    c.insts = c.sig_insts = []
+    for f in ('inst_keys', 'used_keys', 'sig_used_keys'):
+        setattr(c, f, [x for x in getattr(c, f) or () if not x.startswith('CD.LC.Dq')])
+    for n in user.names:
+        for f in ('t', 'v'):
+            g.consts[n][f] = [x for x in g.consts[n][f] if x != 'CD.LF.instDqProdNatBool']
+    return g
+
+
+def test_a_local_instance_comes_back_for_a_declaration_naming_its_class_though_nothing_records_its_use():
+    # q221-finitistic-asymmetry (2026-11-10): Rickard/Orthogonal.lean's `local instance
+    # orthogonalHasDerivedCategory : HasDerivedCategory (ModuleCat R) := HasDerivedCategory.standard _`, and
+    # OrthogonalStalks, ReducedProducts and NonGeneration each an identical one under another name.
+    # `not_generate_of_orthogonal` states `X : @DerivedCategory … (HasDerivedCategory.standard _)` and uses
+    # `(DerivedCategory.singleFunctor _ 0).obj M ⟶ X⟦n⟧`: unification assigned the instance, instance search
+    # only checked it, and nothing recorded a use (no `insts`, no HasDerivedCategory problem, no constant). The
+    # goal piece kept the three siblings and dropped Orthogonal's: "failed to synthesize". A local instance
+    # comes back for a kept declaration in its scope whose source names its class or a constant of the class's
+    # namespace (`HasDerivedCategory.standard`; here `Dq.d`, with LocalCtx's dqPair as the sibling module's).
+    g = _unrecorded_dq_for()
+    keep = {'CD.LC.Dq', 'CD.LF.dq_for'}
+    for sorry in ({'CD.LF.dq_for'}, set()):
+        sec = _section(C.Carver(g).carve(keep, g.have_names(keep), sorry=sorry), 'CarveDev.LocalFor')
+        s = re.search(r'^local instance instDqProdNatBool_r\w+ : Dq \(Nat × Bool\)', sec, re.M)
+        assert s and s.start() < sec.index('theorem dq_for'), sec
+    # carried by a bundle: activated
+    have = g.have_names(keep | {'CD.LF.instDqProdNatBool'})
+    sec = _section(C.Carver(g).carve(keep, have), 'CarveDev.LocalFor')
+    assert re.search(r'^attribute \[local instance\] CD\.LF\.instDqProdNatBool$', sec, re.M), sec
 
 
 def test_a_local_instance_on_a_type_a_declaration_uses_comes_back_though_nothing_records_its_use(g):

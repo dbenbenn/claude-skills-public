@@ -3969,7 +3969,9 @@ class Carver:
                 if not (names | keys) & used and not (not sorried and _could_answer(vc, c)):
                     if not (self._sibling_used(info, vc, c, used) or
                             self._carrier_used(info, vc, c, m, sorried) or
-                            self._library_coercion(vc, ik0)) or \
+                            self._library_coercion(vc, ik0) or
+                            self._class_named(vc, c, sorried) or
+                            (not sorried and self._prop_instance(vc, ik0))) or \
                             self._overtakes(info, vc, c, drop):
                         continue
                     sibling = True
@@ -4014,6 +4016,38 @@ class Carver:
             edit = (anon_at, anon_at, ' ' + name) if anon_at is not None else (decl['start'], decl['end'], name)
             out.append(_cmd_text(info, vc, [edit]).strip() + '\n')
         return ''.join(out)
+
+    @staticmethod
+    def _class_named(vc, c, sorried):
+        """Does kept command c's source (a stub: its statement) name a constant of the namespace of local instance
+        vc's class (`HasDerivedCategory.standard`; the class itself does not count: a statement of the class, a
+        binder supplying one)? Then vc comes back: c works with that class's instances, and a problem that
+        unification answered leaves no record (q221-finitistic-asymmetry: `not_generate_of_orthogonal` states
+        `X : @DerivedCategory … (HasDerivedCategory.standard _)` and maps into it from `(DerivedCategory.singleFunctor _
+        0).obj M`; instance search only checked the assigned instance, which its module's `local instance
+        orthogonalHasDerivedCategory` answered, and no `insts`, class problem or constant shows it; the goal piece
+        kept three sibling modules' identical instances and dropped this one: "failed to synthesize")."""
+        classes = {x[1] for x in vc.declares or () if x[1]}
+        if not classes:
+            return False
+        end = c.value_start.byte if sorried and c.value_start else None
+        for r in c.resolved or ():
+            if len(r) > 3 and r[3] == 'b' or (end is not None and r[0] >= end):
+                continue
+            n = r[2]
+            if any(n.startswith(k + '.') for k in classes):
+                return True
+        return False
+
+    def _prop_instance(self, vc, ik):
+        """Is local instance vc an instance of a Prop class (a theorem: its node's, or for a command that is nobody's
+        node, the node holding its generated name)? It carries no data, so putting it back in force where the port
+        had it cannot change a term, only which proof instance search finds; it comes back for every kept proof in
+        its scope (q237-nodal-sets: `local instance : Fact (Module.finrank ℝ AmbientBase = 4+1)` in 22 modules,
+        whose users' records name none of them; two bundles and two pieces failed "failed to synthesize Fact")."""
+        g = self.g
+        ks = [ik] if ik else [g.owner.get(x[0]) for x in vc.declares or ()]
+        return any(k in g.nodes and g.nodes[k].theorem for k in ks if k)
 
     def _library_coercion(self, vc, ik):
         """Is local instance vc a coercion between types that mention no project declaration
