@@ -2051,6 +2051,41 @@ def _order_chunks(g, chunks, nfrozen):
     return [chunks[i] for i in order]
 
 
+def statement_group_order(g, needs, B):
+    """The order in which make_plan builds the pinned group of each statement that bundles import:
+    `needs` {statement: the bundle material its statement and whole proof need}. A group takes its
+    needs closed under dependencies, less what earlier groups took; so a statement whose needs include
+    material that depends (through bundle material) on another statement `a` must come after `a`, or
+    its group takes what `a`'s proof needs into bundles that wait for `a` to be Proved (q257: the
+    `actualSchwartz_*` fields' group took the operators and the certificate data below them before
+    `tail_finite_column_bound`'s, and the plan had a publish cycle). Name order otherwise; statements
+    caught in a cycle keep name order (check_plan / publish_order report the cycle)."""
+    rev = {}
+    for k in B:
+        for d in g.nodes[k].deps:
+            if d in B or d in needs:
+                rev.setdefault(d, set()).add(k)
+    after = {t: set() for t in needs}           # t -> statements that must come before t
+    for a in needs:
+        seen, todo = set(), [a]
+        while todo:
+            x = todo.pop()
+            for y in rev.get(x, ()):
+                if y not in seen:
+                    seen.add(y)
+                    todo.append(y)
+        for t in needs:
+            if t != a and needs[t] & seen:
+                after[t].add(a)
+    order, done = [], set()
+    while len(order) < len(needs):
+        ready = sorted(t for t in needs if t not in done and after[t] <= done)
+        t = ready[0] if ready else sorted(t for t in needs if t not in done)[0]
+        order.append(t)
+        done.add(t)
+    return order
+
+
 def _bundle_reason(g, seeds, t):
     """Why theorem `t` is bundle material: the definition (a bundle seed) whose dependency chain
     reaches it, with the chain (StrictInverseFirstPower: the instance CompactSpace DiskFamily that
@@ -2228,7 +2263,8 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     if stmts:
         taken = {k for ch in fz_chunks + pin_chunks for k in ch}
         groups = []
-        for t in sorted(stmts):
+        needs = {}
+        for t in stmts:
             # what t's statement and its whole proof need from the bundles: a bundle may import t
             # only once t is Proved ("Imported platform theorems must be Proved at submission
             # time", 2026-10-18), so t's piece must not need a bundle that imports t
@@ -2236,7 +2272,9 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             need_t = set(g.nodes[t].sig)
             for x in reach_t:
                 need_t |= g.nodes[x].sig if x in stmts and x != t else g.nodes[x].deps
-            need_t = sorted(d for d in need_t if d in B and d not in taken)
+            needs[t] = {d for d in need_t if d in B}
+        for t in statement_group_order(g, needs, B):
+            need_t = sorted(d for d in needs[t] if d not in taken)
             grp = (_pin_chunks(g, [need_t], B, taken, extra) or [[]])[0] if need_t else []
             bad = sorted(k for k in grp if t in g.nodes[k].deps)
             if bad:

@@ -338,6 +338,28 @@ def test_a_forced_theorem_definitions_need_is_published_and_their_bundles_import
     assert re.search(r'^theorem double_eq_oai\b', (out / 'solutions' / 'Sol_CD_double_eq.lean').read_text(), re.M)
 
 
+def test_statement_groups_are_built_in_dependency_order():
+    # q257 (triangular atomic certificate, 2026-11-11): forced `actualSchwartz_*` (fields of a structure
+    # definition) and `tail_finite_column_bound` (which the operator definitions need) each got a pinned
+    # group of what their statement and proof need, built in name order. actualSchwartz's group came
+    # first and took the operators with everything below them, certificate data included, so
+    # tail_finite_column_bound's proof needed data in a bundle downstream of the bundle importing
+    # tail_finite_column_bound itself: "publish order: bundle:OAIQ257X005 depends on itself". A statement
+    # whose group needs material that imports another statement goes after that statement.
+    from types import SimpleNamespace as NS
+    D = lambda *deps: NS(theorem=False, deps=set(deps))
+    nodes = {'data': D(), 'op': D('kb', 'data'), 'pair': D('op'), 'other': D()}
+    g = NS(nodes=nodes)
+    B = {'data', 'op', 'pair', 'other'}
+    needs = {'as': {'pair', 'data'}, 'kb': {'data'}, 'zz': {'other'}}
+    assert C.statement_group_order(g, needs, B) == ['kb', 'as', 'zz']
+    # no constraint: name order, as before
+    assert C.statement_group_order(g, {'b': {'data'}, 'a': {'other'}}, B) == ['a', 'b']
+    # a cycle (each needs material importing the other) keeps name order for the rest; plan reports it
+    nodes2 = dict(nodes, op2=D('as'))
+    assert C.statement_group_order(NS(nodes=nodes2), {'as': {'op'}, 'kb': {'op2'}}, B | {'op2'}) == ['as', 'kb']
+
+
 def test_a_piece_needing_a_bundle_that_imports_its_statement_is_made_self_contained(g, tmp_path):
     # ZeroTemperatureSK (2026-10-18): a forced statement's piece imported the bundle that imports
     # that statement; the bundle waits for the statement to be Proved, the proof waits for the
