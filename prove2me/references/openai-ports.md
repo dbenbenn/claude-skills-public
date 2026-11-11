@@ -469,7 +469,8 @@ its target `<name>_oai`.
   and `run_cmd`, `run_elab`, `run_meta`, `modifyEnv` (7bba886: the carver and prune drop OpenAI's
   trailing `run_cmd Lean.modifyEnv … nameDenyListExt.addEntry …` like `#print` diagnostics).
 - **`carve.py plan` refuses** a plan in which a bundle misses a definition one of its members needs, or
-  in which a bundle or piece rests on `sorry`. A published bundle is frozen (`frozen` in the config), so a
+  in which a bundle or piece rests on `sorry`, or a forced `instance` command (its stub would hold no
+  theorem: patch it to `@[instance] theorem` in the port; f480e83, q241). A published bundle is frozen (`frozen` in the config), so a
   later re-plan keeps it as it is.
 - **Measure before publishing.** Build every bundle locally (`-j1`), re-pack any over budget, and only
   then publish; never re-carve published bundles while publishing (the first Erdős 3 split did, and two
@@ -544,8 +545,12 @@ its target `<name>_oai`.
   `synthInstance.maxHeartbeats` patches needed); restricted attributes (`RESTRICTED_ATTRIBUTES`) and
   constant-declaring ones (`reassoc`, `simps`, `to_additive`, …) only in the file holding their target;
   `@[local X]` attributes as `attribute [local X] _root_.N`; pins for short names a dotted declaration
-  could misread; `export` blocks that still export something. What it cannot hide (an instance declared
-  later in the same module, reached through a bundle) `plan`/`gen` warn about.
+  could misread; `export` blocks that still export something; local instances whose use left no record
+  (one of a Prop class such as `Fact (finrank …)` for every kept proof in its scope, and one whose
+  class's namespace the source names; 54fdd6c, q221, q237). What it cannot hide (an instance declared
+  later in the same module, reached through a bundle) `plan`/`gen` warn about. Not handled: a re-emitted
+  anonymous instance's name (`instFactEq…_5`) can collide with the name Lean gave one in an imported
+  bundle ("has already been declared"): rename it by post-carve patch (q237).
 - **Diagnosing a carved file the carver got wrong.** For "unsolved goals" after `simp` in a bundle, run
   `simp?` at that line in the original module and look for each lemma it names in the bundles. For
   "Invalid pattern" or a type mismatch on a short name, `#check` it at that point of a truncated copy of
@@ -947,7 +952,8 @@ Profile before forcing or splitting anything.
      folding (q151). Keep the set consistent: a live polymorphic statement's piece needs its imports
      polymorphic (fold the CoeT ones among them); every other CoeT statement and its unpublished
      importers up to the goals go in `monomorphic`, with the pieces of live `Type`-only importers. Compute
-     it on the folded plan and iterate (folding changes imports); q151's script is in its RESUME.md.
+     it on the folded plan and iterate (folding changes imports); q151's script is in its RESUME.md. Set
+     it before the first publish: `gen` stops if it would change a frozen stub (b8be844, q240).
   3. **Fold, last** (folding makes the importers' pieces slow). `carve.py fold CONFIG NODE…` (config
      `folded`) folds the statement into every importer's piece, whose live statements stay; only those
      pieces are resubmitted, through split_run with a `comparisons/` note on each, since the old sketches
