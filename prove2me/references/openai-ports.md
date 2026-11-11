@@ -20,7 +20,9 @@ openai/math at `adc7f12`.
   (`/theorems?theorem_name=`, `/definitions?q=`, by title). Someone else's existing statement is
   imported or proved, never published a second time. If the goal overlaps published work or is
   already proved, see "After publishing" (**Overlap with someone else's published work**, **A goal
-  someone else has already proved**).
+  someone else has already proved**). Also ask whether a *stronger* Proved result of the same family
+  implies the goal in a few lines (read the family's `docs/NNN.md` and its other challenges): q230
+  proved two goals from the family's Proved 7/8 zero-free half-plane, with no port.
 
 ## The single-file route
 
@@ -77,8 +79,9 @@ and how to repair it.
   rather than marking it `allow_drop` blindly (oaiq-090). If the dropped patch carried another repair
   in the same hunk, re-add that as its own entry (q136).
 - **Make patches from a diff against a pristine port**, so each `count` is taken over the unpatched
-  port, never the patched workspace (oaiq-063, -071). Keep the port run with patches `[]` as
-  PRISTINE, repair by hand, then `scripts/mkpatches.py PRISTINE REPAIRED OUT.json`: it grows each hunk's
+  port, never the patched workspace (oaiq-063, -071). Keep the whole port run with patches `[]`, on the
+  current snapshot, as PRISTINE (q220: a PRISTINE of two modules counted 1 for a hunk the port has 96
+  times; q234: a pristine from before a tool fix makes patches the new rules already cover), repair by hand, then `scripts/mkpatches.py PRISTINE REPAIRED OUT.json`: it grows each hunk's
   context until `old` is unique and not cut mid-identifier, merges into an existing OUT.json, and checks
   the result reproduces the repair byte for byte (oaiq-043, -080). A line patch whose `old` is also the
   tail of a more-indented line double-counts: anchor it with a leading `\n` (oaiq-086). q141's
@@ -92,7 +95,8 @@ and how to repair it.
   compile it alone (`lake env lean FILE`, seconds), with the pipeline's flags (`lean -j1
   -DautoImplicit=false`; a `-j1` build can hit heartbeats an in-place `lake build` does not).
   - After the first failure of a kind, `rg` the whole port for the pattern and patch every site before
-    rebuilding (oaiq-089); a failing module hides its importers' failures until the next round.
+    rebuilding (oaiq-089). Within a module read the first error: a failed `def` header drops its `variable` binders, so dozens of
+    `Unknown identifier ι` after it are a cascade (q261).
   - Batch compat changes before the first full build: a compat change rebuilds everything (oaiq-091).
   - Let the pipeline's `build` build the modules. An in-place build writes neither module times nor
     the LeanInfo cache, so `graph` elaborates every module itself (oaiq-092: about 6 h) and the plan is
@@ -112,6 +116,13 @@ and how to repair it.
   `set_option maxHeartbeats 1000000 in` per declaration across the whole family at once. Not
   module-wide (carved pieces would not carry it), not one module per round (q145: 450 `Cartan*`
   modules).
+- **A `whnf` or kernel deterministic timeout that a raise does not cure in seconds is not a budget
+  problem**: raising the limit only traded it for 10–22 GiB (q246, q261). Profile (`trace.profiler`) and
+  read the deepest `isDefEq`: usually two instance paths d13f23b unified cheaply (q246:
+  `NonUnitalCStarAlgebra` of `M.toStarSubalgebra`; q261: `Algebra ℚ (FractionRing (MvPolynomial ι ℚ))`
+  by `DivisionRing.toRatAlgebra` against Ore localization, cured by a high-priority instance pinning
+  OpenAI's path), or a `change`/`show` across them (rewrite that step). A priority pin works in every
+  module of the chain or none: in one module alone it made it slower.
 
 ### The compatibility block and shims
 
@@ -210,7 +221,9 @@ toolchain.
   `prove2me_workspace/Solutions/OAIChowla`.
 - **Size.** Very large closures with foreign packages (oaiq-093: 2,679 modules) are a day's work, not
   a batch. Look for statements already published from them (the Chowla split) to use as
-  `external_theorems`.
+  `external_theorems`. A root module that bundles several comparator theorems, only some Open, is
+  scoped first: edit the fetched `src` root to import only the Open goals' branches (a port patch
+  cannot drop imports) and record the edit (q235: 504 modules with a foreign package became 178).
 - **Before the first build, check each package:**
   1. *Its Mathlib* (`lean-toolchain`). The port rewrites every module as if it targeted d13f23b; for a
      package on an older Mathlib (Gromov), where its Mathlib and ours agree the rewrite breaks working
@@ -282,7 +295,9 @@ drops it with a `why:` naming the rule: delete it from the patches file.
   chain can time out at `isDefEq` (oaiq-041). A `measurability` fallback can hit maxRecDepth when no
   named fact exists. The port's `first | infer_instance | exact Measure.isProbabilityMeasure_map …`
   line times out at `whnf` when the measure is a `let`: name `Measure.isProbabilityMeasure_map
-  hφ.aemeasurable` (oaiq-074).
+  hφ.aemeasurable` (oaiq-074). `ProbabilityMeasure.map` with a bare function, after a `)` or across a
+  line break is left too: `rg` them all before the first build (q242: ~20 modules found one build
+  round at a time).
 - **`eLpNorm` sites the port leaves.** An `apply` followed by one bullet per goal (delete the dropped
   goal's bullet); a `rw [foo a b]` that left the removed argument as a side goal; an `AESM_TAC` site
   where nothing fixes the function yet (`simpa … using eLpNorm_sum_le (…)` with no `(f := …)`).
@@ -357,7 +372,8 @@ drops it with a `why:` naming the rule: delete it from the patches file.
   - `exists_contDiff_support_eq_eq_one_iff` is `exists_contMDiff_support_eq_eq_one_iff (I :=
     modelWithCornersSelf ℝ E)` with `contMDiff_iff_contDiff`.
   - `mem_closedBall_zero_iff` on a submodule subtype needs `(E := ↥S)` (oaiq-092).
-  - `ModelWithCorners.MfldCat` is missing (oaiq-091 patched in a local structure for its one model).
+  - Missing here, declared by patch in the lowest user module: `ModelWithCorners.MfldCat` (oaiq-091,
+    a local structure for its one model), `Group.IsVirtuallyCyclic` (q236).
   - `norm_num [table defs]` leaves `vecCons` lookups or `Int.toNat 205` unevaluated where `simp [same]`
     evaluates them.
   - `rw [AddMonoidAlgebra.coeff_zero]` on an `MvPolynomial.coeff` goal is `MvPolynomial.coeff_zero`
@@ -365,8 +381,9 @@ drops it with a `why:` naming the rule: delete it from the patches file.
   - `tauto` no longer unfolds an applied set-builder membership.
   - `simpa only [ite_true]` does not fire on an `if True` with a non-standard `Decidable` instance: use
     `↓reduceIte` (oaiq-056).
-  - A multi-line `convert … using 1; first | rfl | ring` closes only the first goal: use `<;>`
-    (oaiq-045).
+  - `convert … using 1` then per-goal steps: a multi-line `; first | rfl | ring` closes only the first
+    goal (use `<;>`, oaiq-045), and bullets can meet an instance goal or a new order (q233, 12 sites):
+    `refine Eq.trans_le ?_ (h.trans_eq ?_)`, or state the function and value equalities and `rw … at h`.
   - `omit [BorelSpace E]` on a lemma that uses stdGaussian (oaiq-048). `omit [CompleteSpace H] in`
     where our order on `H →L[ℂ] H` needs it: remove only the `omit`s Lean rejects, never all
     (`~/claude/p2m-standalone/openai-ports/oaiq-039/fix_omits_from_errors.py` writes those patches from a
@@ -390,7 +407,8 @@ drops it with a `why:` naming the rule: delete it from the patches file.
     per declaration; else `erw` at the failing step; when the option makes `simp` close a goal,
     `all_goals` or `simp only` for the next tactic.
   - `set_option synthInstance.maxHeartbeats 200000` fixed "failed to synthesize … deterministic
-    timeout" in 12 modules with one patch.
+    timeout" in 12 modules with one patch. A `Spec` structure-sheaf `Algebra B Γ(Spec B, U)` that fails
+    to synthesize wants `backward.isDefEq.respectTransparency.types false` on the theorem (q223).
 - **CStarMatrix takes over `*` on Matrix products** (oaiq-092). For a product whose dimensions are still
   metavariables, CStarMatrix's `@[default_instance 100]` HMul wins over Matrix's: `rw [Matrix.sum_mul]`
   fails with `CStarMatrix.inst…` in the error, while `#synth` shows Matrix's instance. `--compat-imports
@@ -659,7 +677,9 @@ mixed old and new `carve.py` inside one carve).
 - **Once publishing has started** (`pipeline_state.json` `publishing_started`, set the first time
   publish or publish_early runs or `publish/run_state.json` or config `frozen` is seen, and kept), a rule
   change keeps the port: `--redo port` only deliberately. A changed input from outside (an edited patches
-  file, a port folder rewritten under the carve) stops the run until you `--redo` that step.
+  file, a port folder rewritten under the carve) stops the run until you `--redo` that step. The guard
+  hashes bytes: a patches file re-serialised by a JSON library counts as edited (q241; restore it with
+  `git show`).
 - **LeanInfo and graph.** A change to `LeanInfo.lean` re-runs `graph` (with a warning giving the module
   count) while a step that loads the graph is still to run, and re-elaborates the whole graph. A graph
   recorded before a DeclGraph change is re-run after `--upgrade` while planning is ahead; a published carve
@@ -725,7 +745,11 @@ mixed old and new `carve.py` inside one carve).
   replays every imported module, which the local peak under-counts. `gram` imported 709 entry statements
   and was killed four times at ~7,450 MiB, and each split only made it import more. A piece like that
   needs its imports grouped under a layer of intermediate statements (rows of a matrix, say), not a split;
-  calibrate_pieces says so when it stops for a person.
+  calibrate_pieces says so when it stops for a person. The same flat shape cannot be cut by forcing
+  mid-chain lemmas either. Before publishing, add the row lemmas by port patch and force them with
+  `config_set.template_forced`; after (an edited patches file is refused), publish the rows by hand with
+  `publish_standalone.py`, each proved from its entries and the aggregator from the rows (q172: 27 rows
+  in about an hour, all accepted first time).
 - **Kernel computation is invisible to the cost model** (`decide +kernel`, `native_decide`) and is the
   usual cause of a slow item: see **Kernel time** under "Slow or odd failures".
 - **`accept_over`** in pipeline.json excuses an item (`bundle:NAME`, `piece:NAME`) under a 200 s cap. For
@@ -855,8 +879,8 @@ Profile before forcing or splitting anything.
   - A `decide` on `Finset.card` or Finset equality over a long `List.toFinset` is quadratic in the
     kernel. For a sorted list, prove `Nodup` from a strict chain (`List.IsChain (toLex · < toLex ·)` by
     `decide +kernel`, `List.isChain_iff_pairwise`) and use `List.toFinset_card_of_nodup` (85 s to 0.3 s).
-  - A flat certificate chain (one aggregator over 12–48 `fin_cases` leaves) cannot be cut by forcing
-    mid-chain lemmas: add row lemmas by port patch and force them with `config_set.template_forced`.
+  - A flat certificate chain (one aggregator over many `fin_cases` leaves): **Many imports are their own
+    memory cost** under "Measuring and calibrating".
 - **A slow, memory-heavy piece with a short tactic proof** (oaiq-123: 281 s, ~22 GiB): compile it with
   `set_option debug.skipKernelTC true in` on the theorem. If that makes it fast, the kernel is
   re-evaluating a certificate term a cheap `simp` left behind: rewrite the cached-value lemmas in before
@@ -918,7 +942,9 @@ Profile before forcing or splitting anything.
   3. **Fold, last** (folding makes the importers' pieces slow). `carve.py fold CONFIG NODE…` (config
      `folded`) folds the statement into every importer's piece, whose live statements stay; only those
      pieces are resubmitted, through split_run with a `comparisons/` note on each, since the old sketches
-     are live. Regenerate pieces of a published carve with the carve's own snapshot (pipeline_state.json
+     are live. Fold the whole CoeT set at once (q240: one fold at a time promoted new polymorphic
+     statements in the importers each round), and deprecate the folded statements that went live
+     before the fold once the carve is done; they stay Open orphans otherwise. Regenerate pieces of a published carve with the carve's own snapshot (pipeline_state.json
      `snapshot`): a newer carver emits more `attribute [-instance]` lines than the frozen stubs have. A
      re-plan with a snapshot older than 19c7a63 drops the fold.
 
@@ -1042,6 +1068,15 @@ Profile before forcing or splitting anything.
   bundles and lib as `frozen`; the planner takes the frozen plan's `external_defs` as its own (56fd083).
   Not handled: a frozen bundle that imports one of the old carve's statements (then use a fresh
   `statement_suffix`).
+  - **First compare the `Def_` bundles the two goals import** (`fetch_theorems.py --names GOAL`). Each
+    comparator file of a family carries its own copy of the shared declarations, so two different
+    bundles cannot be imported together and no frozen bundle is reusable (q228, q236, q240, q245: hours
+    lost each). Then carve fresh under a `statement_suffix`; or, when the new goal's solution uses only
+    a few results of the old development (read its calls), publish a bridge statement mentioning
+    neither bundle (definitions unfolded into Mathlib terms), prove it in the old bundle's world, and
+    the goal from it (q245: minutes, not a 513-module re-carve).
+  - `defs` comes from the goal stub's own `import Definitions.*` lines, never a sibling carve's
+    pipeline.json (q238), and lists every `Def_` bundle those import in turn (q227).
 - **Extending another carve's frozen plan** (oaiq-088): a private node name embeds the old port folder
   (`_private.Solutions.OAIQ038_FA…`): rewrite the frozen plan's folder name to the new one, or a spurious
   import cycle appears. Every `external_theorems` entry must exist in the new graph (drop those outside
@@ -1058,8 +1093,7 @@ Profile before forcing or splitting anything.
 - **Overlap with someone else's published work** (oaiq-067): `pipeline.json` `defs` replaces the list
   derived from the targets (keep the goal's own `Def_` in it); earlier published statements go in
   `config_set.external_theorems` (`{lean name: "Theorems.Thm_<name with _>"}`) after `fetch_theorems.py
-  --names`. A bundle of another author that declares the same names as the goal's own bundle cannot be
-  combined with it: take a `statement_suffix`. Another user's *stalled* carve of the same goal (oaiq-082:
+  --names`; a clashing bundle is as above. Another user's *stalled* carve of the same goal (oaiq-082:
   a SKETCH_ACCEPTED reduction to Open leaves nobody proved): do not extend their leaves; carve under a
   `statement_suffix` and add the second decomposition, its goal piece sent with a comparisons note.
 - **A goal someone else has already proved** (oaiq-068): split_run's piece is refused by the live-proof
