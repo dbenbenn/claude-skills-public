@@ -2692,6 +2692,64 @@ def test_other_mul_calls_are_left_alone():
     assert O.core_rewrites(src) == src
 
 
+# q231 (Riesz rectifiability): nine MemLp.mul / MemLp.smul sites survived the port unswapped, one build round each.
+# The receivers came from untyped `have h := …_memLp …`, and `MemLp.smul` (likewise swapped: d13f23b `smul hφ hf`,
+# ours `smul hf hφ`, names agreeing) was not handled at all.
+
+def test_memlp_mul_receiver_from_an_untyped_have_of_a_memlp_lemma():
+    src = ("theorem t (hL2 : MemLp w 2 ν) : True := by\n"
+           "  have htestL2 := squared_cutoff_test_memLp ν w χ hw hχ hL2 hbound\n"
+           "  have hprodLp : MemLp (fun x => (χ x ^ 2 * w x) * w x) 1 ν := htestL2.mul hL2\n"
+           "  have hf := weightedDifference_memLp (p + 1) w hw (μ.prod μ)\n"
+           "    (fractionalEnergy_integrable_of_ae_lipschitz p C μ hg w hw K hK r hr hdiam)\n"
+           "  have hgtest := weightedDifference_memLp (p + 1) ψ hψ (μ.prod μ) h\n"
+           "  have hprod : MemLp (fun q : Ambient d × Ambient d =>\n"
+           "      weightedDifference (p + 1) w q.1 q.2 * weightedDifference (p + 1) ψ q.1 q.2)\n"
+           "      1 (μ.prod μ) := hf.mul hgtest\n"
+           "  have ha := normalizedSetIndicator_memLp μ A hA hAf\n"
+           "  have hp : MemLp (fun x => a x * b x) 1 μ :=\n"
+           "    ha.mul hb\n"
+           "  have hφL2 := lipschitz_height_memLp_on_ball m C μ hg φ L hφ a R hR\n"
+           "  have hφw : Integrable (fun x => φ x * w x) ν := memLp_one_iff_integrable.mp (hφL2.mul hwL2)\n")
+    out = O.core_rewrites(src)
+    assert ":= MeasureTheory.MemLp.mul (hφ := htestL2) (hf := hL2)\n" in out
+    assert "      1 (μ.prod μ) := MeasureTheory.MemLp.mul (hφ := hf) (hf := hgtest)\n" in out
+    assert "    MeasureTheory.MemLp.mul (hφ := ha) (hf := hb)\n" in out
+    assert "memLp_one_iff_integrable.mp (MeasureTheory.MemLp.mul (hφ := hφL2) (hf := hwL2))\n" in out
+    assert O.core_rewrites(out) == out
+
+
+def test_memlp_mul_receiver_from_a_have_that_is_not_certainly_memlp_is_left():
+    src = ("theorem t (hm : MemLp m 2 μ) : True := by\n"
+           "  have hi := integrable_of_memLp hm\n"            # concludes Integrable
+           "  exact hi.mul hg\n"
+           "  have hc := foo x\n"
+           "  exact hc.mul hg\n"
+           "  have hm := hm.integrable one_ne_zero\n"         # the last binding of hm wins
+           "  exact hm.mul hg\n")
+    assert O.core_rewrites(src) == src
+
+
+def test_memlp_smul_is_swapped_like_mul():
+    src = ("theorem truncation (f : Ambient d → ℝ) (hf : MemLp f 2 μ) : True := by\n"
+           "  apply memLp_one_iff_integrable.mp\n"
+           "  exact (hf.restrict _).smul (kernel_memLp_two_on_exterior n hn C μ hg x ε hε)\n"
+           "theorem pairing (hf : MemLp f 2 μ) (hu : MemLp u 2 μ) (e : E) : True := by\n"
+           "  have hi : Integrable (fun x => f x • u x) μ := memLp_one_iff_integrable.mp (hf.smul hu)\n"
+           "  exact MemLp.smul hf (Lp.memLp v)\n"
+           "  exact MeasureTheory.MemLp.smul (hφ := hf) (hf := hu)\n")
+    out = O.core_rewrites(src)
+    assert ("  exact MeasureTheory.MemLp.smul (hφ := (hf.restrict _)) "
+            "(hf := (kernel_memLp_two_on_exterior n hn C μ hg x ε hε))\n") in out
+    assert "memLp_one_iff_integrable.mp (MeasureTheory.MemLp.smul (hφ := hf) (hf := hu))\n" in out
+    assert "  exact MemLp.smul (hφ := hf) (hf := (Lp.memLp v))\n" in out
+    assert "  exact MeasureTheory.MemLp.smul (hφ := hf) (hf := hu)\n" in out
+    assert O.core_rewrites(out) == out
+    other = ("lemma a (hg : Integrable g μ) (hm : MemLp m 2 μ) : True := by\n"
+             "  exact hg.smul hm\n  exact hm.const_smul c\n  exact hm.integrable.smul c\n")
+    assert O.core_rewrites(other) == other
+
+
 # ---------------------------------------------------------------- oaiq-054..072 renames and argument changes
 # signatures checked against both Mathlibs (d13f23b vs 0df444a), 2026-10-28
 

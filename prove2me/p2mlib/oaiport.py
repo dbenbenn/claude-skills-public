@@ -1203,11 +1203,20 @@ def _finset_antidiagonal(text):
 _MEMLP_KEEPS = ('restrict', 'neg', 'mono_exponent')
 
 
+def _names_memlp(last):
+    """Does a name's last component name a MemLp fact: memLp before any `of_` (`memLp_top_of_bound`, not
+    `integrable_of_memLp`), and no `…_iff`."""
+    head = re.split(r"(?:^|_)of_", last)[0]
+    return ('memLp' in head or head.startswith('MemLp')) and not last.endswith('_iff')
+
+
 def _is_memlp(term, decl):
     """Is the term textually certain to be a `MemLp` fact? Its head (through `( … )` and the fields
     _MEMLP_KEEPS) is a name whose last component mentions memLp (`f.memLp_top`, `Lp.memLp u`,
-    `centeredSquared_memLp v i j`; an `…_iff` is not), or a bare hypothesis the declaration binds as
-    `MemLp …` (`(hf : MemLp f ∞ μ)`, `(hA : ∀ i k, MemLp (A i k) 2 μ)`, `have hm : MemLp …`)."""
+    `centeredSquared_memLp v i j`; an `…_iff` or `…_of_memLp` is not), or a bare hypothesis the declaration
+    binds as `MemLp …` (`(hf : MemLp f ∞ μ)`, `(hA : ∀ i k, MemLp (A i k) 2 μ)`, `have hm : MemLp …`). A
+    `have` decides over a binder, the last one over earlier ones; an untyped `have h := t` counts when `t`
+    is certain (q231: `have hf := weightedDifference_memLp …`)."""
     t = _norm_term(term)
     if t.startswith('('):
         e = _balanced_end(t, 0)
@@ -1219,24 +1228,31 @@ def _is_memlp(term, decl):
             return _is_memlp(head, decl)
         if fields[-1] in _MEMLP_KEEPS:
             return _is_memlp(head + ''.join('.' + x for x in fields[:-1]), decl)
-        return 'memLp' in fields[-1] and not fields[-1].endswith('_iff')
+        return _names_memlp(fields[-1])
     m = re.match(r"[^\W\d][\w.']*", t)
     if not m:
         return False
     parts = m.group(0).split('.')
     if parts[-1] in _MEMLP_KEEPS and len(parts) > 1:
         return _is_memlp('.'.join(parts[:-1]), decl)
-    if 'memLp' in parts[-1] or parts[-1].startswith('MemLp'):
-        return not parts[-1].endswith('_iff')
+    if _names_memlp(parts[-1]):
+        return True
     if len(parts) == 1:
         n = re.escape(parts[0])
+        haves = list(re.finditer(r"\b(?:have|haveI)[ \t]+%s(?![\w'])[ \t]*((?:\([^()]*\)[ \t]*)*)(:=|:)[ \t]*([^\n]*)"
+                                 % n, decl))
+        if haves:
+            h = haves[-1]
+            rhs = h.group(3).strip() or decl[h.end():].lstrip().split('\n', 1)[0]
+            if h.group(2) == ':':
+                return bool(re.match(r"(?:∀[^,]*,[ \t]*)?(?:MeasureTheory\.)?MemLp\b", rhs))
+            return not h.group(1) and _is_memlp(rhs, decl[:h.start()])
         return bool(re.search(r"[({][^(){}:]*(?<![\w'])%s(?![\w'])[^(){}:]*:[ \t]*(?:∀[^,]*,[ \t]*)?"
-                              r"(?:MeasureTheory\.)?MemLp\b" % n, decl) or
-                    re.search(r"\b(?:have|haveI)[ \t]+%s[ \t]*(?:\([^()]*\)[ \t]*)*:[ \t]*(?:MeasureTheory\.)?MemLp\b" % n,
-                              decl))
+                              r"(?:MeasureTheory\.)?MemLp\b" % n, decl))
     return False
 
 
+_MEMLP_SWAPPED = {'mul': 'mul', 'fun_mul': "mul'", "mul'": "mul'", 'smul': 'smul'}
 _MUL_HEAD_OK = re.compile(r"(?:[(⟨,\[]|:=|<\||=>|\bexact|\busing|\bfrom|\brefine|\bthen|\belse|\breturn)[ \t]*$")
 
 
@@ -1249,9 +1265,11 @@ def _memlp_mul_swap(text):
     (hφ := A) (hf := B)`, `MemLp.mul A B` becomes `MemLp.mul (hφ := A) (hf := B)` (HardSphere oaiq-054,
     Conductivity oaiq-059: six sites of `exact (A).mul (r := 2) (B)`, CoulombAtom oaiq-071, SKGap oaiq-072). Only where it is textually certain: the receiver is a
     MemLp fact (_is_memlp), the call stands at the head of its term (after `(`, `,`, `:=`, `exact`,
-    `using`, … or alone on a line after such a line), and it has exactly one positional argument."""
+    `using`, … or alone on a line after such a line), and it has exactly one positional argument.
+    `MemLp.smul` is swapped the same way (`smul hφ hf` there, `smul hf hφ` here; q231)."""
     out, i = [], 0
-    for m in re.finditer(r"((?<![\w'.])MemLp\.(?:mul|fun_mul|mul')|(?<=[\w')])\.(?:mul|fun_mul|mul'))(?![\w'])", text):
+    for m in re.finditer(r"((?<![\w'.])MemLp\.(?:mul|fun_mul|mul'|smul)|(?<=[\w')])\.(?:mul|fun_mul|mul'|smul))(?![\w'])",
+                         text):
         if m.start() < i:
             continue
         name = m.group(1).rsplit('.', 1)[-1]
@@ -1299,7 +1317,7 @@ def _memlp_mul_swap(text):
                                      or _is_memlp(text[pos[1][1]:pos[1][2]], decl)):
                 continue
             a, b = pos
-            out.append(text[i:m.start()] + ("MemLp.mul'" if name in ('fun_mul', "mul'") else 'MemLp.mul')
+            out.append(text[i:m.start()] + 'MemLp.' + _MEMLP_SWAPPED[name]
                        + text[m.end():a[1]] + '(hφ := %s)' % text[a[1]:a[2]] + text[a[2]:b[1]]
                        + '(hf := %s)' % text[b[1]:b[2]])
             i = b[2]
@@ -1308,7 +1326,7 @@ def _memlp_mul_swap(text):
         if len(pos) != 1 or not _is_memlp(recv, decl):
             continue
         _, q, e, w = pos[0]
-        out.append(text[i:rs] + 'MeasureTheory.MemLp.' + ("mul'" if name in ('fun_mul', "mul'") else 'mul')
+        out.append(text[i:rs] + 'MeasureTheory.MemLp.' + _MEMLP_SWAPPED[name]
                    + ' (hφ := %s)' % recv + text[m.end():w] + text[w:q] + '(hf := %s)' % text[q:e])
         i = e
     return ''.join(out) + text[i:]
