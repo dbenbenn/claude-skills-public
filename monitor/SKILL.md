@@ -169,9 +169,17 @@ again from `X-End`. Code: `agents.py` (summary, phases, safe paths, quota); test
 dbenbenn watches the load and quota but scrolled past the charts to reach the agents and "need a
 person", so the page reads top-down by what wants attention (`www/glance.js`, `www/glance.css`):
 
-1. **Glance tiles**: memory, CPU, load, swap, stalls, disk free, 7-day quota, each a number, one line
-   and a 3-hour sparkline (7 days for quota), amber or red at the banner's thresholds (disk amber
-   below 40 GiB free, where the OAI queue stops); each links to its detailed chart.
+1. **Glance charts** (redesigned 2026-11-11; dbenbenn: the sparklines were "too small and simplified to
+   be useful"): memory and CPU as half-width stacked charts in the System charts' colours (blue Lean,
+   orange queue workers, purple Claude sessions, grey rest), then load, swap and stalls as quarter-width
+   line charts, all the last 3 h with labelled time and value axes, plus disk free and the 7-day quota
+   as compact tiles. Each chart's title line has the current value; the key under it gives each series'
+   value, at the cursor while hovering (cursor synced across the glance charts, key `glance`) or the
+   latest sample. Amber or red at the banner's thresholds (disk amber below 40 GiB free, where the OAI
+   queue stops); each title links to its detailed chart. Grid 4 columns, 2 below 820 px, 1 below 480 px.
+   The charts are built once and fed new data; a new width, theme or set of tiles rebuilds them (`gKey`).
+   About 390 px tall on a 1366 px laptop. Headless Chrome cannot lay out narrower than 500 px, so a
+   390 px screenshot shows charts overflowing: check phones at 500.
 2. **Needs you**: one list of everything waiting for a person: missions waiting on him or ready to
    start, section alerts (with the section's state when not running), STALE sections, unreadable
    section files, the OAI queue's need-a-person groups, and the inboxes (which had their own box
