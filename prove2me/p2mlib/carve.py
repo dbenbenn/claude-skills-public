@@ -1118,11 +1118,40 @@ class Graph:
                         if kinds is not None and used is not None and not kinds & used:
                             continue
                         self.nodes[key].ndeps |= refs - {key}
+        self._cross_module_notation_deps()
         self._add_default_simp_deps()
         for k, nd in self.nodes.items():
             nd.deps = nd.term | nd.sdeps | nd.ndeps | nd.ideps
         self._build_scoped_deps()
         self._build_export_deps()
+
+    def _cross_module_notation_deps(self):
+        """A global (not local, not scoped) notation of a module m imported by m2 is a dependency of
+        the commands of m2 whose syntax contains its kind (by Lean's record). Without it the carved
+        bundle of m2's declarations leaves the notation behind with its module, which is drawn from
+        for nothing else (q249: a module holding only `notation "𝒞" => ContDiff ℝ`, `notation:70 u " ⬝ "
+        φ:65 => …`, used by every later module of the Sphere Eversion library: "unknown identifier" at
+        the first use)."""
+        glob = []                       # (module, node key, declared kinds)
+        for m, info in self.infos.items():
+            for c in info.commands:
+                if c.short_kind in NOTATION and (m, c.index) not in self._scoped_cmds and c.declares_kinds:
+                    key = self.cmd_node.get((m, c.index))
+                    if key:
+                        glob.append((m, key, set(c.declares_kinds)))
+        if not glob:
+            return
+        for m, info in self.infos.items():
+            for c in info.commands:
+                if not c.kinds_used:
+                    continue
+                key = self.cmd_node.get((m, c.index))
+                if not key:
+                    continue
+                used = set(c.kinds_used)
+                for gm, gkey, kinds in glob:
+                    if gm != m and gkey != key and kinds & used and self.sees(m, gm):
+                        self.nodes[key].ndeps.add(gkey)
 
     def _build_export_deps(self):
         """An export node depends on the project declarations it exports, and a node whose source

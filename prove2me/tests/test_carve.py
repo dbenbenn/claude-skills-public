@@ -3586,3 +3586,25 @@ def test_command_line_split_only_keeps_a_consistent_plan(tmp_path):
     assert len(Q['bundles']) > len(P['bundles']) and big['name'] in {b['name'] for b in Q['bundles']}
     assert 'plan OK' in run('check', str(cfg))
     assert not (tmp_path / 'pipeline.json').exists()
+
+
+def test_a_global_notation_of_an_imported_module_is_a_dependency_of_its_users():
+    # q249: Sphere Eversion's `Notations` module holds only global notations; the declarations of
+    # later modules that use `⬝` or `𝒞` left it behind and the bundle failed at the first use
+    from types import SimpleNamespace as NS
+    cmd = lambda i, k, declares=None, used=None: NS(index=i, short_kind=k, declares_kinds=declares, kinds_used=used)
+    notation = cmd(0, 'notation', declares=['term_⬝_'])
+    local_nt = cmd(1, 'notation', declares=['term_loc_'])
+    user = cmd(0, 'def', used=['term_⬝_', 'term_loc_'])
+    other = cmd(1, 'def', used=['term_other_'])
+    own = cmd(2, 'def', used=['term_⬝_'])
+    infos = {'N': NS(commands=[notation, local_nt]), 'U': NS(commands=[user, other]),
+             'X': NS(commands=[own])}
+    nodes = {k: NS(ndeps=set()) for k in ('nt', 'lo', 'u', 'o', 'x')}
+    fake = NS(infos=infos, _scoped_cmds={('N', 1)},
+              cmd_node={('N', 0): 'nt', ('N', 1): 'lo', ('U', 0): 'u', ('U', 1): 'o', ('X', 2): 'x'},
+              nodes=nodes, sees=lambda m, d: (m, d) in {('U', 'N')})
+    C.Graph._cross_module_notation_deps(fake)
+    assert nodes['u'].ndeps == {'nt'}          # the local notation never crosses a module
+    assert nodes['o'].ndeps == set()           # a declaration not using it
+    assert nodes['x'].ndeps == set()           # a module that does not import it
