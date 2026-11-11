@@ -29,8 +29,11 @@ usage: oai_port_modules.py LEAN_ROOT FOLDER PREFIX [PREFIX ...] [--patches P.jso
               `subtype` also renames `Convexity.StdSimplex` to `OAI.SStd` (the subtype
               `stdSimplex`, for SimplexCategory.toTop code); `off` never. Once the shim bundle
               Definitions.Def_OAIStdSimplexCompat is in the workspace, carve_prep.py config makes
-              its declarations external, so the carve imports it. carve_prep.py filter-patches
-              takes the same option
+              its declarations external, so the carve imports it. In structure mode `toTopHomeo`
+              and `TopCat.toSSetObjEquiv` (and its four Mathlib lemmas) become `…D` versions with
+              d13f23b's types, from the module StdSimplexTopCompat (lean/StdSimplexTopCompat.lean;
+              published as Definitions.Def_OAIStdSimplexTopCompat, external likewise).
+              carve_prep.py filter-patches takes the same option
   --unif-integrable on|off (default off) the uniform integrability shim: `on` adds the module
               UnifIntegrableCompat (lean/UnifIntegrableCompat.lean: d13f23b's `UnifIntegrable`,
               two-component `UniformIntegrable` and ℝ≥0∞-`UnifTight` as OAI.* declarations that shadow

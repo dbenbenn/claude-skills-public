@@ -141,15 +141,24 @@ and how to repair it.
   - Code that uses `SimplexCategory.toTop.obj` as a `StdSimplex` (Problem340) needs `--stdsimplex
     subtype` (renames `Convexity.StdSimplex` to `OAI.SStd`; needs finite index types, has no
     `ConvexSpace`). Code mixing both uses needs hand work.
-  - `SimplexCategory.toTopHomeo` / `TopCat.toSSetObjEquiv` under `auto` (oaiq-043): structure mode
-    renames `toTopHomeo` to `toTopHomeoD…` from the module `StdSimplexTopCompat` (a040fa7); `subtype` is
-    no way out for code that also uses the structure's fields. `toSSetObjEquiv` on singular simplices
-    needs a subtype-to-structure bridge (oaiq-066: compose with the homeomorphism, add a naturality
-    lemma; an import of `StdSimplexTopCompat` cannot be patched in, so inline it).
+  - `SimplexCategory.toTopHomeo` and `TopCat.toSSetObjEquiv` take the simplex to the structure in
+    d13f23b and to the subtype here. Structure mode renames them, with `toTopHomeo_naturality_apply` and
+    `toSSetObjEquiv_{symm_naturality,naturality_apply,δ_apply,σ_apply}`, to `…D` versions with d13f23b's
+    types from `lean/StdSimplexTopCompat.lean` (module `StdSimplexTopCompat`, imported where used; the
+    single-file route inlines it after the shim). OpenAI's own `toSSetObjEquiv_…` lemmas keep their names.
+    Three ports hand-wrote this bridge before it existed (oaiq-043, oaiq-066, q225; 2026-11-11). What
+    stays manual: a d13f23b `rfl` proof that unfolded through the simplex (oaiq-066's `simplex_face :=
+    rfl`) needs `rw [TopCat.toSSetObjEquivD_δ_apply]` or the like, since the homeomorphism is not
+    definitional. The `D` lemmas fire under `simp` exactly where Mathlib's originals do, and like them not
+    on `TopCat.of X` with a `.symm` inside. `subtype` mode is no way out for code that also uses the
+    structure's fields.
   - The shim is published as `Definitions.Def_OAIStdSimplexCompat` (c7014b9a,
     p2m-standalone/oai-stdsimplex-compat). With that bundle built in the workspace
     (`Definitions/Def_OAIStdSimplexCompat.lean`, byte-identical to `lean/StdSimplexCompat.lean`),
     `oai_port.py` imports it instead of inlining, and `carve_prep.py config` adds it as a `--def`.
+    `StdSimplexTopCompat` is published likewise as `Definitions.Def_OAIStdSimplexTopCompat` (same
+    folder; its text is `oaiport.stdsimplex_top_shim()`, importing the first bundle) and used the same
+    way once in the workspace.
 - **A Mathlib definition that changed shape wants a shadowing shim**, not per-site patches (q141:
   `UnifIntegrable`, `UniformIntegrable`, `UnifTight` at about 260 sites). Write a module under `OAI`
   with d13f23b's shape and its API proved from ours: inside `namespace OAI`, `OAI.X` wins over `open

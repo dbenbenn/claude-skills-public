@@ -23,7 +23,10 @@ usage: oai_port.py TARGET ROOT_MODULE SRC_LEAN_DIR OUT_DIR [--bundle Def_X ...] 
                 Definitions.Def_OAIStdSimplexCompat is imported when it is in the workspace
                 (Definitions/Def_OAIStdSimplexCompat.lean, published c7014b9a, the same text as
                 lean/StdSimplexCompat.lean), else the shim is inlined; --stdsimplex-inline
-                always inlines
+                always inlines. In structure mode `toTopHomeo` and `TopCat.toSSetObjEquiv` (with
+                its four Mathlib lemmas) become their `…D` versions with d13f23b's types, from
+                lean/StdSimplexTopCompat.lean: the bundle Definitions.Def_OAIStdSimplexTopCompat
+                when it is in the workspace (and the StdSimplex bundle is used), else inlined
 
 Steps: merge the closure (build_solution's closure and merge.py, each module section-wrapped);
 inline tactic macros; strip universe lists merge.py already declares; drop the bundles'
@@ -82,8 +85,9 @@ def port_text(target, root, src, bundles, patches=(), compat_ns='OAI', ws=None, 
     block, rewrites = O.compat_block(open(COMPAT, encoding='utf-8').read(), compat_ns)
     text = O.guard_renames(O.apply_rewrites(O.core_rewrites(text, compat_ns), rewrites))
     shim_bundle = os.path.exists(os.path.join(ws, *O.STDSIMPLEX_BUNDLE.split('.')) + '.lean')
+    top_bundle = os.path.exists(os.path.join(ws, *O.STDSIMPLEX_TOP_BUNDLE.split('.')) + '.lean')
     text, shim_imports, shim = O.stdsimplex_single(text, stdsimplex, shim_bundle and not stdsimplex_inline,
-                                                   (names, anon))
+                                                   (names, anon), use_top_bundle=top_bundle)
     text = O.apply_patches(text, patches, route='single')
     t = BS.published(target)
     pre = [l for l in (t.get('preamble') or '').split('\n') if l.startswith('import ')]

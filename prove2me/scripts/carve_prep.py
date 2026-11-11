@@ -15,7 +15,8 @@ usage:
       name (p2mlib.oaiport.bundle_decl_names); narrow it with `ext-defs` after `carve.py graph`.
       The old config's hand-set keys (patches, external_theorems, frozen, pinned, ...) are kept.
       A port carrying the StdSimplex shim (Solutions/FOLDER/StdSimplexCompat.lean) gets the published
-      shim bundle (oaiport.STDSIMPLEX_BUNDLE, once in the workspace) as a --def automatically.
+      shim bundle (oaiport.STDSIMPLEX_BUNDLE, once in the workspace) as a --def automatically, and
+      one carrying StdSimplexTopCompat.lean likewise gets oaiport.STDSIMPLEX_TOP_BUNDLE.
   carve_prep.py ext-defs CONFIG.json [--def Definitions.Def_X ...] [--names FILE] [--lean]
       after `carve.py graph`: external_defs = the bundles' declarations that are graph nodes
       (a field or constructor maps to its owner). --lean lists each bundle's constants with Lean
@@ -136,7 +137,7 @@ def merged_build_log(d, overhead):
     return ''.join('✔ [1/1] Built %s (%.1fs)\n' % (m, max(t - overhead, 0.1)) for m, t in times.items())
 
 
-GENERATED = ('Compat.lean', O.STDSIMPLEX_MODULE + '.lean', 'StdSimplexTopCompat.lean')
+GENERATED = ('Compat.lean', O.STDSIMPLEX_MODULE + '.lean', O.STDSIMPLEX_TOP_MODULE + '.lean')
 
 
 def port_modules(ws, folder):
@@ -213,6 +214,11 @@ def make_config(d, folder, root, target, defmods=(), bundle_prefix=None, forced=
             and os.path.exists(shim_bundle) and O.STDSIMPLEX_BUNDLE not in defmods):
         print('the port uses the StdSimplex shim: external definitions from', O.STDSIMPLEX_BUNDLE)
         defmods.append(O.STDSIMPLEX_BUNDLE)
+    top_bundle = os.path.join(ws, *O.STDSIMPLEX_TOP_BUNDLE.split('.')) + '.lean'
+    if (os.path.exists(os.path.join(ws, 'Solutions', folder, O.STDSIMPLEX_TOP_MODULE + '.lean'))
+            and os.path.exists(top_bundle) and O.STDSIMPLEX_TOP_BUNDLE not in defmods):
+        print('the port uses the StdSimplexTop shim: external definitions from', O.STDSIMPLEX_TOP_BUNDLE)
+        defmods.append(O.STDSIMPLEX_TOP_BUNDLE)
     adj = merged_build_log(d, overhead) + cached_build_lines(d, ws, folder, overhead)
     check_build_log_coverage(adj, ws, folder)
     open(os.path.join(d, 'build_adj.log'), 'w', encoding='utf-8').write(adj)

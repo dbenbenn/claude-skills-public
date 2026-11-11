@@ -1871,12 +1871,34 @@ STDSIMPLEX_SHIM = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(_
 # workspace; carve_prep config treats its declarations as external)
 STDSIMPLEX_BUNDLE = 'Definitions.Def_OAIStdSimplexCompat'
 STDSIMPLEX_MODULE = 'StdSimplexCompat'
-# `SimplexCategory.toTopHomeo` lands in the subtype here and in the structure in d13f23b: structure
-# mode calls `toTopHomeoD` (module-route only), declared in this module on top of the shim
+# `SimplexCategory.toTopHomeo` and `TopCat.toSSetObjEquiv` land in the subtype here and in the
+# structure in d13f23b: structure mode calls `toTopHomeoD` / `toSSetObjEquivD` (and their lemmas),
+# declared in this module on top of the shim, and published as STDSIMPLEX_TOP_BUNDLE
 STDSIMPLEX_TOP_MODULE = 'StdSimplexTopCompat'
 STDSIMPLEX_TOP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                               'StdSimplexTopCompat.lean')
+STDSIMPLEX_TOP_BUNDLE = 'Definitions.Def_OAIStdSimplexTopCompat'
 _TOPHOMEO = re.compile(r"(?<![\w'])toTopHomeo(_naturality_apply)?(?![\w'])")
+# d13f23b's `TopCat.toSSetObjEquiv` and its four Mathlib lemmas; OpenAI's own lemmas named
+# `toSSetObjEquiv_…` (`toSSetObjEquiv_map_apply`) are left alone
+_TOSSETOBJ = re.compile(r"(?<![\w'])toSSetObjEquiv(_symm_naturality|_naturality_apply|_δ_apply|_σ_apply)?(?![\w'])")
+_TOP_D = re.compile(r"(?<![\w'])(?:toTopHomeoD|toSSetObjEquivD)(?![\w'])")
+
+
+def uses_stdsimplex_top(text):
+    """Does the (rewritten) text call a declaration of the StdSimplexTop shim?"""
+    return bool(_TOP_D.search(text))
+
+
+def stdsimplex_top_shim(mod=None, body=False):
+    """The text of lean/StdSimplexTopCompat.lean: as the module importing `mod`.StdSimplexCompat;
+    as the published bundle (mod=None: it imports STDSIMPLEX_BUNDLE); or with body=True without its
+    import lines, for inlining after the StdSimplex shim in a single file."""
+    t = open(STDSIMPLEX_TOP, encoding='utf-8').read()
+    if body:
+        return re.sub(r'^import [^\n]*\n', '', t, flags=re.M).lstrip('\n')
+    return t.replace('import @MOD@.' + STDSIMPLEX_MODULE,
+                     'import ' + (STDSIMPLEX_BUNDLE if mod is None else mod + '.' + STDSIMPLEX_MODULE))
 STDSIMPLEX_MODES = ('auto', 'structure', 'subtype', 'off')
 # Mathlib d13f23b files our Mathlib (0df444a) does not have; the shim provides their content
 STDSIMPLEX_MISSING_IMPORTS = tuple('Mathlib.Geometry.Convex.ConvexSpace.' + m for m in (
@@ -1927,6 +1949,7 @@ def stdsimplex_rewrite(text, mode):
         text = _SIMPLEX.sub('OAI.SStd', text)
     elif mode == 'structure':
         text = _TOPHOMEO.sub(lambda m: 'toTopHomeoD' + (m.group(1) or ''), text)
+        text = _TOSSETOBJ.sub(lambda m: 'toSSetObjEquivD' + (m.group(1) or ''), text)
     return text
 
 
@@ -1939,18 +1962,25 @@ def stdsimplex_shim(body=False):
     return t
 
 
-def stdsimplex_single(text, mode='auto', use_bundle=False, drop=((), ())):
+def stdsimplex_single(text, mode='auto', use_bundle=False, drop=((), ()), use_top_bundle=False):
     """The single-file route: (text, extra import lines, shim block to put after the imports).
     With use_bundle the published bundle is imported; otherwise the shim is inlined, without the
-    declarations `drop` = (full names, anonymous instances) a statement bundle already declares."""
+    declarations `drop` = (full names, anonymous instances) a statement bundle already declares.
+    A text calling `toTopHomeoD` / `toSSetObjEquivD` after the rewrite also gets the StdSimplexTop
+    shim: its published bundle when use_bundle and use_top_bundle (it imports the StdSimplex
+    bundle), else inlined after the StdSimplex shim."""
     mode = stdsimplex_mode([text], mode)
     if mode == 'off':
         return text, [], ''
     text = stdsimplex_rewrite(text, mode)
-    if use_bundle:
-        return text, ['import ' + STDSIMPLEX_BUNDLE], ''
-    block, _ = drop_declarations(stdsimplex_shim(body=True), set(drop[0]), set(drop[1]))
-    return text, [], block
+    top = uses_stdsimplex_top(text)
+    if use_bundle and top and use_top_bundle:
+        return text, ['import ' + STDSIMPLEX_TOP_BUNDLE], ''
+    shim = '' if use_bundle else stdsimplex_shim(body=True)
+    if top:
+        shim += ('\n' if shim else '') + stdsimplex_top_shim(body=True)
+    block, _ = drop_declarations(shim, set(drop[0]), set(drop[1])) if shim else ('', None)
+    return text, (['import ' + STDSIMPLEX_BUNDLE] if use_bundle else []), block
 
 
 # ---------------------------------------------------------------- the uniform integrability shim
@@ -2352,7 +2382,7 @@ def module_texts(sources, mod, compat_text='', compat_ns='OAI', header='', stdsi
             ls = t.split('\n')
             k = max(i for i, l in enumerate(ls) if l.startswith('import ')) + 1
             imps = ['import %s.%s' % (mod, STDSIMPLEX_MODULE)]
-            if 'toTopHomeoD' in t:
+            if uses_stdsimplex_top(t):
                 imps.append('import %s.%s' % (mod, STDSIMPLEX_TOP_MODULE))
             t = '\n'.join(ls[:k] + imps + ls[k:])
         if unifint == 'on' and mentions_unifint(t):
@@ -2474,7 +2504,7 @@ def module_files(sources, mod, patches=(), compat_text='', compat_ns='OAI', head
     if any(('import %s.%s\n' % (mod, STDSIMPLEX_MODULE)) in x for x in files.values()):
         files[STDSIMPLEX_MODULE + '.lean'] = stdsimplex_shim()
     if any(('import %s.%s\n' % (mod, STDSIMPLEX_TOP_MODULE)) in x for x in files.values()):
-        files[STDSIMPLEX_TOP_MODULE + '.lean'] = open(STDSIMPLEX_TOP, encoding='utf-8').read().replace('@MOD@', mod)
+        files[STDSIMPLEX_TOP_MODULE + '.lean'] = stdsimplex_top_shim(mod)
     if any(('import %s.%s\n' % (mod, UNIFINT_MODULE)) in x for x in files.values()):
         files[UNIFINT_MODULE + '.lean'] = unifint_shim()
     return files

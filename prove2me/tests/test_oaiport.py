@@ -436,7 +436,8 @@ def test_unifint_detection_and_rewrites():
 def test_shims_pass_the_soundness_guard():
     # a shim module is carved into a published bundle: no token the platform's guard refuses (q141)
     from p2mlib import leantext as L
-    for text in (O.unifint_shim(), O.stdsimplex_shim(), open(O_COMPAT, encoding='utf-8').read()):
+    for text in (O.unifint_shim(), O.stdsimplex_shim(), O.stdsimplex_top_shim(),
+                 open(O_COMPAT, encoding='utf-8').read()):
         assert L.guard_problems(text) == []
 
 
@@ -492,7 +493,8 @@ def test_every_shim_module_is_known_where_the_stdsimplex_one_is():
     spec = importlib.util.spec_from_file_location('mkpatches', os.path.join(here, 'scripts', 'mkpatches.py'))
     mk = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mk)
-    for mod, path in ((O.STDSIMPLEX_MODULE, O.STDSIMPLEX_SHIM), (O.UNIFINT_MODULE, O.UNIFINT_SHIM)):
+    for mod, path in ((O.STDSIMPLEX_MODULE, O.STDSIMPLEX_SHIM), (O.STDSIMPLEX_TOP_MODULE, O.STDSIMPLEX_TOP),
+                      (O.UNIFINT_MODULE, O.UNIFINT_SHIM)):
         assert mod + '.lean' in mk.GENERATED
         assert mod in PT.SHIM_MODULES
         assert os.path.relpath(path, here) in CP._COMPAT
@@ -1691,6 +1693,99 @@ def test_module_route_adds_the_tophomeo_module_where_used():
     assert 'sorry' not in top
     files = O.module_files({'OAI.G.A': ('A', SIMPLEX_SRC)}, 'Solutions.G', (), '')
     assert 'StdSimplexTopCompat.lean' not in files
+
+
+# `TopCat.toSSetObjEquiv` maps a singular simplex to a continuous map from the subtype `stdSimplex` here
+# and from the structure `Convexity.StdSimplex` in d13f23b. Three ports hand-wrote the same bridge
+# (oaiq-043 Thomason, oaiq-066 FiniteType, q225 ArtinGroups); structure mode now calls the shim's
+# `toSSetObjEquivD` and its four lemmas. OpenAI's own `toSSetObjEquiv_…` lemmas keep their names.
+
+TOSSET_SRC = ('import Mathlib\nnamespace OAI.T\nopen Convexity\n'
+              'def s (X : TopCat) (f : C(StdSimplex ℝ (Fin 3), X)) := (TopCat.toSSetObjEquiv X _).symm f\n'
+              'example := X.toSSetObjEquiv _ x\nexample := h.snd.toSSetObjEquiv\n'
+              'example := TopCat.toSSetObjEquiv_δ_apply\nexample := TopCat.toSSetObjEquiv_σ_apply\n'
+              'example := TopCat.toSSetObjEquiv_naturality_apply\nexample := TopCat.toSSetObjEquiv_symm_naturality\n'
+              'theorem toSSetObjEquiv_map_apply : True := trivial\n'
+              'theorem coverSmallFacet_toSSetObjEquiv_delta_vertex : True := toSSetObjEquiv_map_apply\n'
+              'example := TopCat.toSSetObj₀Equiv\nend OAI.T\n')
+
+
+def test_tossetobjequiv_is_renamed_in_structure_mode_only():
+    s = O.stdsimplex_rewrite(TOSSET_SRC, 'structure')
+    assert '(TopCat.toSSetObjEquivD X _).symm f' in s and 'X.toSSetObjEquivD _ x' in s
+    assert 'h.snd.toSSetObjEquivD\n' in s
+    for lem in ('_δ_apply', '_σ_apply', '_naturality_apply', '_symm_naturality'):
+        assert 'TopCat.toSSetObjEquivD' + lem in s, lem
+    # OpenAI's own lemmas, and the 0- and 1-simplex equivalences, are not d13f23b's API: left alone
+    assert 'theorem toSSetObjEquiv_map_apply' in s and ':= toSSetObjEquiv_map_apply\n' in s
+    assert 'coverSmallFacet_toSSetObjEquiv_delta_vertex' in s and 'TopCat.toSSetObj₀Equiv\n' in s
+    assert 'toSSetObjEquivDD' not in s and O.stdsimplex_rewrite(s, 'structure') == s
+    assert 'toSSetObjEquivD' not in O.stdsimplex_rewrite(TOSSET_SRC, 'subtype')
+
+
+def test_top_shim_declares_every_name_the_rewrite_produces():
+    top = O.stdsimplex_top_shim(body=True)
+    s = O.stdsimplex_rewrite(TOSSET_SRC + TOPHOMEO_SRC, 'structure')
+    for n in set(re.findall(r"(?:toTopHomeoD|toSSetObjEquivD)[\w'₀-₉δσ]*", s)):
+        assert re.search(r'^(?:@\[simp\]\n)?(?:noncomputable )?(?:def|theorem) (?:SimplexCategory\.|TopCat\.)?%s ' % n,
+                         top, re.M) or re.search(r'^(?:noncomputable )?(?:def|theorem) %s\b' % n, top, re.M), n
+    # inlinable into a single file: no imports, one closed section, no top-level universe (merge.py
+    # declares `universe u v` at the top of a single file)
+    assert not re.search(r'^import |^universe ', top, re.M)
+    assert top.lstrip().startswith('/-!') and 'noncomputable section OAIStdSimplexTopCompat' in top
+    assert top.rstrip().endswith('end OAIStdSimplexTopCompat')
+    assert 'sorry' not in top
+
+
+def test_top_shim_module_and_bundle_texts():
+    assert 'import Solutions.G.StdSimplexCompat\n' in O.stdsimplex_top_shim('Solutions.G')
+    bundle = O.stdsimplex_top_shim()
+    assert bundle.startswith('import Mathlib\nimport %s\n' % O.STDSIMPLEX_BUNDLE) and '@MOD@' not in bundle
+
+
+def test_published_shim_bundles_match_the_shim_files():
+    # a published bundle is frozen: the shim text the tools generate must stay byte-identical to it, or a
+    # carve that makes the bundle's declarations external would refer to declarations it does not have
+    from p2mlib.workspace import workspace
+    try:
+        ws = workspace()
+    except SystemExit:
+        pytest.skip('no prove2.me workspace')
+    checked = 0
+    for bundle, text in ((O.STDSIMPLEX_BUNDLE, O.stdsimplex_shim()), (O.STDSIMPLEX_TOP_BUNDLE, O.stdsimplex_top_shim())):
+        path = os.path.join(ws, *bundle.split('.')) + '.lean'
+        if os.path.exists(path):
+            assert open(path, encoding='utf-8').read() == text, bundle
+            checked += 1
+    if not checked:
+        pytest.skip('no shim bundle in the workspace')
+
+
+def test_single_file_route_brings_the_top_shim_when_used():
+    # no bundles: both shims inlined, the top one after the one it builds on
+    t, imports, block = O.stdsimplex_single(TOSSET_SRC, 'auto')
+    assert imports == [] and 'X.toSSetObjEquivD _ x' in t
+    assert block.index('end StdSimplexCompat') < block.index('noncomputable section OAIStdSimplexTopCompat')
+    # the StdSimplex bundle only: imported, the top shim inlined
+    t, imports, block = O.stdsimplex_single(TOSSET_SRC, 'auto', use_bundle=True)
+    assert imports == ['import ' + O.STDSIMPLEX_BUNDLE] and block.startswith('/-!')
+    assert 'section StdSimplexCompat' not in block
+    # both bundles: the top bundle (which imports the other) only
+    t, imports, block = O.stdsimplex_single(TOSSET_SRC, 'auto', use_bundle=True, use_top_bundle=True)
+    assert imports == ['import ' + O.STDSIMPLEX_TOP_BUNDLE] and block == ''
+    # no D call, no top shim
+    t, imports, block = O.stdsimplex_single(SIMPLEX_SRC, 'auto', use_bundle=True, use_top_bundle=True)
+    assert imports == ['import ' + O.STDSIMPLEX_BUNDLE] and block == ''
+    # a statement bundle that already declares one of its names keeps it
+    t, imports, block = O.stdsimplex_single(TOSSET_SRC, 'auto', use_bundle=True,
+                                            drop=({'TopCat.toSSetObjEquivD_apply'}, set()))
+    assert 'theorem toSSetObjEquivD_apply' not in block and 'theorem toSSetObjEquivD_δ_apply' in block
+
+
+def test_module_route_adds_the_top_module_for_tossetobjequiv():
+    files = O.module_files({'OAI.G.A': ('A', TOSSET_SRC)}, 'Solutions.G', (), '')
+    assert 'import Solutions.G.StdSimplexTopCompat' in files['A.lean']
+    assert files['StdSimplexTopCompat.lean'] == O.stdsimplex_top_shim('Solutions.G')
 
 
 # d13f23b's `MvPowerSeries.pderiv i` takes the index only; ours is `MvPowerSeries.pderiv R i` with the

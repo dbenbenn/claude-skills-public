@@ -37,7 +37,7 @@ from .mission import front_matter
 
 MARK = 'carve_prep prose-template'
 MANIFEST = '.template.json'
-SHIM_MODULES = {'Compat', 'StdSimplexCompat', 'UnifIntegrableCompat'}
+SHIM_MODULES = {'Compat', 'StdSimplexCompat', 'StdSimplexTopCompat', 'UnifIntegrableCompat'}
 REPO = 'https://github.com/openai/math'
 
 
