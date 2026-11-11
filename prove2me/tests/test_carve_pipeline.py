@@ -3186,3 +3186,30 @@ def test_calibrate_pieces_sends_a_fast_piece_over_memory_instead_of_splitting_it
     assert r.returncode == 0, r.stdout + r.stderr
     assert 'piece:P0' in json.load(open(env.dir / 'publish' / 'release.json'))['pieces']
     assert not [c for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
+
+
+def test_wait_timeout_on_an_old_run_prints_a_handoff_command(tmp_path, monkeypatch, capsys):
+    # q249 (2026-11-11): re-armed --wait 100 on a 1,900-module rebuild, ~$1.10 a wake, its brief's
+    # "Long waits" rule notwithstanding; the nudge goes where the agent reads it every wake
+    cp = _cp()
+    log = tmp_path / 'logs' / 'driver.log'
+    log.parent.mkdir(parents=True)
+    log.write_text('== detached 2026-10-28 22:51:00 run r1\n== step build\n')
+    monkeypatch.setattr(cp, 'unit_active', lambda unit: True)
+    monkeypatch.setenv('HEADLESS_AGENT_NAME', 'q999-test')
+    assert cp.wait(_wait_args(tmp_path, 0)) == 4
+    out = capsys.readouterr().out
+    assert '== HAND OFF THIS WAIT' in out
+    assert 'add q999-test --brief RECORDS/WRAPUP.md --until-inactive %s' % cp.unit_name(str(tmp_path)) in out
+    assert "--until-log %s '^== driver exit'" % log in out and out.rstrip().endswith('details.)')
+
+
+def test_handoff_nudge_waits_for_a_run_older_than_one_and_a_half_waits(tmp_path):
+    cp = _cp()
+    text = '== detached 2026-11-11 06:00:00 run r1\n'
+    t0 = cp.time.mktime(cp.time.strptime('2026-11-11 06:00:00', '%Y-%m-%d %H:%M:%S'))
+    assert cp.handoff_nudge(str(tmp_path), text, 'build', 100, now=t0 + 149 * 60) is None
+    n = cp.handoff_nudge(str(tmp_path), text, 'build', 100, now=t0 + 151 * 60)
+    assert n and '2 h 31 min and is on build' in n
+    assert cp.handoff_nudge(str(tmp_path), text, 'build', 10, now=t0 + 59 * 60) is None   # floor of an hour
+    assert cp.handoff_nudge(str(tmp_path), 'no detached line\n', 'build', 0) is None

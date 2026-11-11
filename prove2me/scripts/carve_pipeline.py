@@ -124,7 +124,9 @@ DIR/logs/driver.log) and returns at once; --wait [MINUTES] (default 100) then bl
 ends, printing its log's tail and exiting with its status, or exits 4 after MINUTES with the step it is
 on. Each detached run carries an id (`== detached TIME run ID`) and only its own `== driver exit N run ID`
 ends the wait, never while the unit is still active; --wait says which run it reports, and when that run
-had already ended before it started. --detach refuses (exit 3) at once, naming the holder's pid and
+had already ended before it started. A timed-out --wait on a run older than 1.5 waits also prints a
+ready-to-run tools/handoff command for this carve: re-arming costs a full context re-read per wake (q172,
+q249), so hand a wait off unless you will act on the run within the next wait. --detach refuses (exit 3) at once, naming the holder's pid and
 command line, when a driver (a foreground one too) already holds the carve or the unit is still active. Arm --wait, not the driver, in a Bash background command: the harness kills a background command
 at 2 h, which killed many drivers mid-build or mid-graph (oaiq-033..049); a killed wait costs nothing,
 so re-arm it.
@@ -345,8 +347,45 @@ def wait(a):
             nxt = next((k for k in steps if k not in done), '?')
             print('still running after %g min: %d steps done, now on %s (log %s). Re-arm --wait.'
                   % (a.wait, len(done), nxt, log))
+            nudge = handoff_nudge(a.dir, text, nxt, a.wait)
+            if nudge:
+                print(nudge)
             return 4
         time.sleep(15)
+
+
+HANDOFF = os.path.expanduser('~/claude/claude-private/tools/handoff/handoff.py')
+
+
+def handoff_nudge(d, log_text, step, wait_min, now=None):
+    """On a --wait timeout, a hand-off command once the run has outlived 1.5 waits (so this caller has
+    most likely re-armed on it before), else None. Every re-armed wait wakes the agent to re-read its
+    whole context: q172 ~$2.80 a wake (2026-11-07), q249 ~$1.10 a wake on a 1,900-module rebuild
+    (2026-11-11), each re-arming despite the brief's "Long waits" rule. Said here, where the agent
+    reads it on every wake, rather than only in the brief or on the monitor page."""
+    m, _ = last_detached(log_text)
+    try:
+        age = ((now or time.time()) - time.mktime(time.strptime(m.group(1), '%Y-%m-%d %H:%M:%S'))) / 60
+    except (AttributeError, ValueError):
+        return None
+    if age < max(1.5 * wait_min, 60):
+        return None
+    unit = unit_name(d)
+    units = ['--until-inactive %s' % unit]
+    progress = ''
+    if C.OVERLAP_ONLY[0] in mode_steps(d):
+        units.append('--until-inactive %s' % C.publisher_unit(d))
+        progress = ' --progress %s' % os.path.join(d, 'publish', 'PROGRESS.log')
+    cmd = "python3 %s add %s --brief RECORDS/WRAPUP.md %s --until-log %s '^== driver exit'%s --hold RECORDS --section %s --auto" % (
+        HANDOFF if os.path.exists(HANDOFF) else 'handoff.py', os.environ.get('HEADLESS_AGENT_NAME') or 'NAME',
+        ' '.join(units), os.path.join(d, 'logs', 'driver.log'), progress, unit)
+    return ('== HAND OFF THIS WAIT: the run detached %s has been going %d h %02d min and is on %s. Each re-armed '
+            '--wait wakes you to re-read your whole context (~$1-3 a wake) for one status line. Unless you will '
+            'act on what this run does within the next wait, hand the wait off and exit: commit your records, '
+            'note in RESUME.md what is done and left, write RECORDS/WRAPUP.md (what a fresh agent does when '
+            'the run ends: read RESUME.md, check `== driver exit`, fix and resume in place if it stopped, '
+            'finish), then\n    %s\n(RECORDS: your records directory; your brief\'s "Long waits" has the '
+            'details.)' % (m.group(1), age // 60, age % 60, step, cmd))
 
 
 def mode_steps(d):
