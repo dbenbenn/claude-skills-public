@@ -348,8 +348,9 @@ def wait(a):
             print('still running after %g min: %d steps done, now on %s (log %s). Re-arm --wait.'
                   % (a.wait, len(done), nxt, log))
             nudge = handoff_nudge(a.dir, text, nxt, a.wait)
-            if nudge:
-                print(nudge)
+            if nudge:   # stderr too, and last: agents pipe --wait through `| tail -c N` (q249)
+                sys.stdout.flush()
+                print(nudge, file=sys.stderr)
             return 4
         time.sleep(15)
 
@@ -379,13 +380,10 @@ def handoff_nudge(d, log_text, step, wait_min, now=None):
     cmd = "python3 %s add %s --brief RECORDS/WRAPUP.md %s --until-log %s '^== driver exit'%s --hold RECORDS --section %s --auto" % (
         HANDOFF if os.path.exists(HANDOFF) else 'handoff.py', os.environ.get('HEADLESS_AGENT_NAME') or 'NAME',
         ' '.join(units), os.path.join(d, 'logs', 'driver.log'), progress, unit)
-    return ('== HAND OFF THIS WAIT: the run detached %s has been going %d h %02d min and is on %s. Each re-armed '
-            '--wait wakes you to re-read your whole context (~$1-3 a wake) for one status line. Unless you will '
-            'act on what this run does within the next wait, hand the wait off and exit: commit your records, '
-            'note in RESUME.md what is done and left, write RECORDS/WRAPUP.md (what a fresh agent does when '
-            'the run ends: read RESUME.md, check `== driver exit`, fix and resume in place if it stopped, '
-            'finish), then\n    %s\n(RECORDS: your records directory; your brief\'s "Long waits" has the '
-            'details.)' % (m.group(1), age // 60, age % 60, step, cmd))
+    return ('== HAND OFF THIS WAIT: run %s, %d h %02d min old, on %s. Each re-armed --wait re-reads your whole '
+            'context (~$1-3 a wake). Unless you will act on this run within the next wait: commit your records, '
+            'update RESUME.md, write RECORDS/WRAPUP.md for the agent that finishes (your brief\'s "Long waits"), '
+            'run this (RECORDS = your records directory) and exit:\n    %s' % (m.group(1), age // 60, age % 60, step, cmd))
 
 
 def mode_steps(d):

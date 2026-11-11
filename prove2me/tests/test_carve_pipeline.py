@@ -3198,10 +3198,10 @@ def test_wait_timeout_on_an_old_run_prints_a_handoff_command(tmp_path, monkeypat
     monkeypatch.setattr(cp, 'unit_active', lambda unit: True)
     monkeypatch.setenv('HEADLESS_AGENT_NAME', 'q999-test')
     assert cp.wait(_wait_args(tmp_path, 0)) == 4
-    out = capsys.readouterr().out
+    out = capsys.readouterr().err
     assert '== HAND OFF THIS WAIT' in out
     assert 'add q999-test --brief RECORDS/WRAPUP.md --until-inactive %s' % cp.unit_name(str(tmp_path)) in out
-    assert "--until-log %s '^== driver exit'" % log in out and out.rstrip().endswith('details.)')
+    assert "--until-log %s '^== driver exit'" % log in out and out.rstrip().endswith('--auto')
 
 
 def test_handoff_nudge_waits_for_a_run_older_than_one_and_a_half_waits(tmp_path):
@@ -3210,6 +3210,6 @@ def test_handoff_nudge_waits_for_a_run_older_than_one_and_a_half_waits(tmp_path)
     t0 = cp.time.mktime(cp.time.strptime('2026-11-11 06:00:00', '%Y-%m-%d %H:%M:%S'))
     assert cp.handoff_nudge(str(tmp_path), text, 'build', 100, now=t0 + 149 * 60) is None
     n = cp.handoff_nudge(str(tmp_path), text, 'build', 100, now=t0 + 151 * 60)
-    assert n and '2 h 31 min and is on build' in n
+    assert n and '2 h 31 min old, on build' in n
     assert cp.handoff_nudge(str(tmp_path), text, 'build', 10, now=t0 + 59 * 60) is None   # floor of an hour
     assert cp.handoff_nudge(str(tmp_path), 'no detached line\n', 'build', 0) is None
