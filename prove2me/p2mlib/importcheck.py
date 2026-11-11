@@ -35,15 +35,20 @@ def theorem_imports(text):
     return [m for m in imports_of(text) if m.startswith('Theorems.')]
 
 
-def module_theorem(mod, ws):
+def module_theorem(mod, ws, libs=()):
     """The full name of the theorem that the workspace's statement module `mod` declares, or None:
     the declaration whose name, dots read as underscores, is the module's `Thm_<X>`. A first-match
     regex once read a module docstring line beginning "theorem for balls" as the theorem `for`, and
     missed `lemma`s; nested `namespace A` / `namespace B` give `A.B` (an OAI-generated statement
     nests `namespace OAI` and `namespace X`, 2026-10-07); `theorem _root_.A.b` ignores the
-    namespaces in force (carved SWPort pieces, 2026-10-08)."""
+    namespaces in force (carved SWPort pieces, 2026-10-08). A module the workspace lacks is read from the
+    first of `libs` (flat folders of Thm_*.lean, e.g. a carve's published/lib) holding it: a carve
+    statement published without a fetch never reaches the workspace (q172-mutually-unbiased-retry)."""
     path = os.path.join(ws, *mod.split('.')) + '.lean'
     if not os.path.exists(path):
+        path = next((p for p in (os.path.join(d, mod.split('.')[-1] + '.lean') for d in libs)
+                     if os.path.exists(p)), None)
+    if not path:
         return None
     want = mod.split('.', 1)[1][len('Thm_'):]
     cands, stack = [], []

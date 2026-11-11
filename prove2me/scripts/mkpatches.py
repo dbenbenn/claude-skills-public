@@ -2,7 +2,7 @@
 """Port patches from hand-repaired modules: diff the repaired module-route port against the pristine
 one and write the patches.json entries that reproduce the repairs.
 
-usage: mkpatches.py PRISTINE_DIR REPAIRED_DIR OUT.json [--why TEXT] [--drop-stale]
+usage: mkpatches.py PRISTINE_DIR REPAIRED_DIR OUT.json [--why TEXT] [--drop-stale] [--port-dir DIR] [--ws WS]
 
   PRISTINE_DIR  the ported modules as oai_port_modules.py writes them with NO patches (`[]`): copy
                 Solutions/FOLDER/*.lean right after such a port, or port into a scratch workspace
@@ -14,7 +14,18 @@ usage: mkpatches.py PRISTINE_DIR REPAIRED_DIR OUT.json [--why TEXT] [--drop-stal
                 the pristine text first; only what they leave different from the repair becomes new
                 entries, appended. So a re-run after more repairs adds just the new hunks.
   --why TEXT    the `why` of every new entry (default a `TODO: why (MODULE)` placeholder; replace
-                it: each patch says what Mathlib drift it repairs)
+                it: each patch says what Mathlib drift it repairs). It lands in the generated explanation
+                of every piece the patch touches, where check-text looks up each backticked name: one our
+                Mathlib lacks (OpenAI's old lemma name) is refused here, nothing written, since check-text
+                would stop on it hours later at pieces_prep (q243-free-ising, nine NOT FOUND). Name an
+                old lemma without backticks. Looked up as check-text does (carve_prep.missing_names) in
+                the modules and the --ws workspace's Mathlib and Lean core.
+  --port-dir DIR  the whole port PRISTINE was copied from (default: the workspace's Solutions/ folder
+                holding every PRISTINE module, found by name and text). Uniqueness is counted over
+                PRISTINE alone; when it holds fewer modules than the port this warns, and refuses (nothing
+                written) a new `old` that also occurs in a port module PRISTINE lacks: filter_patches
+                counts over the whole port (q220-uniform-kserver: a two-module scratch PRISTINE gave
+                `  rfl` count 1, 96 over the port). Copy all of Solutions/FOLDER as PRISTINE.
   --drop-stale  drop existing entries that no longer apply exactly their `count` times (otherwise
                 they are listed and nothing is written: is PRISTINE_DIR already patched?)
 
@@ -178,24 +189,110 @@ def derive(pristine, repaired, existing, why=None):
     return pats, rep
 
 
-def read_dir(d):
+def read_dir(d, empty_ok=False):
     out = {os.path.basename(f): open(f, encoding='utf-8').read() for f in glob.glob(os.path.join(d, '*.lean'))}
-    if not out:
+    if not out and not empty_ok:
         raise MkPatchError('no .lean files in ' + d)
     return out
 
 
+def why_missing_names(why, texts, ws):
+    """(names, searched): the backticked Lean-looking names of `why` that check-text would report NOT FOUND,
+    looked up as it does (carve_prep.missing_names) in `texts` ({file: text}) and the workspace's Mathlib
+    and Lean core; ([], False) when there is no library or rg to search (nothing can be judged)."""
+    from carve_prep import missing_names, word_index, library_lookup, library_roots, rg_exe
+    roots, rg = library_roots(ws), rg_exe()
+    if not roots or not rg:
+        return [], False
+    local = word_index(texts.values())
+    return missing_names(why, local, library_lookup(ws, roots, rg, os.devnull)), True
+
+
+def port_folder(pristine, repaired, ws):
+    """The workspace's Solutions/<FOLDER> PRISTINE was copied from: a folder holding every PRISTINE module
+    by name, the one holding one of them with PRISTINE's or REPAIRED's text when several do; None when
+    no folder or no single one fits."""
+    names = set(pristine) - set(GENERATED)
+    if not names:
+        return None
+    cands = []
+    for d in sorted(glob.glob(os.path.join(ws, 'Solutions', '*', ''))):
+        try:
+            have = set(os.listdir(d))
+        except OSError:
+            continue
+        if names <= have:
+            cands.append(d.rstrip(os.sep))
+    if len(cands) > 1:
+        def same(d):
+            for f in names:
+                try:
+                    t = open(os.path.join(d, f), encoding='utf-8').read()
+                except OSError:
+                    continue
+                if t == pristine[f] or t == repaired.get(f):
+                    return True
+            return False
+        cands = [d for d in cands if same(d)]
+    return cands[0] if len(cands) == 1 else None
+
+
+def scope_problems(pristine, port, new):
+    """(warning or None, [refusal lines]): PRISTINE against the whole port `port` ({file: text}); a new
+    entry's `old` occurring in a port module PRISTINE lacks is a refusal (filter_patches counts over all)."""
+    extra = {f: t for f, t in port.items() if f not in pristine and f not in GENERATED}
+    if not extra:
+        return None, []
+    total = len([f for f in port if f not in GENERATED])
+    warn = ('WARNING: PRISTINE holds %d of the %d modules of the port; counts are over PRISTINE only, and '
+            'filter_patches counts over the whole port (q220): copy all of Solutions/FOLDER as PRISTINE'
+            % (len([f for f in pristine if f not in GENERATED and f in port]), total))
+    bad = []
+    for p in new:
+        hits = {f: t.count(p['old']) for f, t in sorted(extra.items()) if p['old'] in t}
+        if hits:
+            bad.append('%r also occurs in %s' % (p['old'][:70], ', '.join('%s (%d)' % h for h in hits.items())))
+    return warn, bad
+
+
+VALUED = ('--why', '--port-dir', '--ws')
+
+
 def main(argv):
-    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] != '--why')]
+    pos = [a for i, a in enumerate(argv) if not a.startswith('--') and (i == 0 or argv[i - 1] not in VALUED)]
     if len(pos) != 3:
         sys.exit(__doc__)
     pri, rpd, out = pos
-    why = argv[argv.index('--why') + 1] if '--why' in argv else None
+    val = {k: argv[argv.index(k) + 1] for k in VALUED if k in argv}
+    why = val.get('--why')
+    ws = val.get('--ws')
+    if not ws:
+        try:
+            from p2mlib.workspace import workspace
+            ws = workspace()
+        except SystemExit:
+            ws = None
     existing = json.load(open(out, encoding='utf-8')) if os.path.exists(out) else []
     try:
-        pats, rep = derive(read_dir(pri), read_dir(rpd), existing, why)
+        pristine, repaired = read_dir(pri), read_dir(rpd)
+        pats, rep = derive(pristine, repaired, existing, why)
     except (MkPatchError, O.PortError) as e:
         sys.exit('mkpatches: %s' % e)
+    port_dir = val.get('--port-dir') or (port_folder(pristine, repaired, ws) if ws else None)
+    port = read_dir(port_dir, empty_ok=True) if port_dir else {}
+    refuse = []
+    if why:
+        missing, searched = why_missing_names(why, {**port, **pristine, **repaired}, ws) if ws else ([], False)
+        if not searched:
+            print('warning: no Mathlib or rg to look up the --why\'s backticked names (check-text will)')
+        for nm in missing:
+            refuse.append('--why names `%s` in backticks, which neither the port nor our Mathlib has: check-text '
+                          'stops on it (NOT FOUND) in every piece explanation the patch reaches (q243); write it '
+                          'without backticks' % nm)
+    warn, bad = scope_problems(pristine, port, [p for p in pats[len(pats) - len(rep['new']):]])
+    if warn:
+        print(warn + ' (port %s)' % port_dir)
+    refuse += ['new entry %s: filter_patches would drop it for its count' % b for b in bad]
     for s in rep['skipped']:
         print('skipped:', s)
     for reason, p in rep['stale']:
@@ -207,6 +304,11 @@ def main(argv):
     if rep['stale'] and '--drop-stale' not in argv:
         print('nothing written: %d stale entries (is %s already patched? else --drop-stale)'
               % (len(rep['stale']), pri))
+        return 1
+    if refuse:
+        for r in refuse:
+            print('REFUSED:', r)
+        print('nothing written: %d problem%s' % (len(refuse), '' if len(refuse) == 1 else 's'))
         return 1
     with open(out, 'w', encoding='utf-8') as fh:
         json.dump(pats, fh, indent=1, ensure_ascii=False)

@@ -91,3 +91,12 @@ def test_oai_submit_submits_only_through_submit_solution():
     assert oai_submit.SUBMIT.endswith('/submit_solution.py')
     v = oaiport.classify_attempt(I.disproved_message(['N.dep']))
     assert v[0] == 'REFUSED' and 'Disproved' in v[2]
+
+
+def test_module_theorem_reads_extra_lib_dirs(ws, tmp_path):
+    lib = tmp_path / 'lib'
+    lib.mkdir()
+    (lib / 'Thm_Q_r.lean').write_text('namespace Q\ntheorem r : True := trivial\nend Q\n')
+    assert I.module_theorem('Theorems.Thm_Q_r', str(ws)) is None
+    assert I.module_theorem('Theorems.Thm_Q_r', str(ws), libs=[str(lib)]) == 'Q.r'
+    assert I.module_theorem('Theorems.Thm_N_a', str(ws), libs=[str(lib)]) == 'N.a'     # the workspace first

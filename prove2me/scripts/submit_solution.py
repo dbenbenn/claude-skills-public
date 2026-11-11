@@ -2,10 +2,12 @@
 """Submit a solution, check the graph shows exactly its imports, then retire what it replaces.
 
 usage: submit_solution.py THEOREM FILE --explanation FILE.md [--allow-copy NAME ...] [--differs NOTE.md]
-                           [--replaces SID ...] [--go]
+                           [--carve DIR] [--replaces SID ...] [--go]
        (dry run without --go; THEOREM is a full name like Chou.hasPackingProperty_of_finite,
         or a theorem id; --go refuses without an explanation that passes p2mlib.explanation,
-        unless --no-explanation is given)
+        unless --no-explanation is given; --carve DIR: an `import Theorems.Thm_X` the workspace
+        lacks is read from DIR/published/lib, then DIR/publish/out/lib, where a carve's statements
+        live when they never reached the workspace, q172-mutually-unbiased-retry)
 
 The last step of rewire.py and of any prune that drops a false edge, done the same way every
 time instead of by a per-mission submit script:
@@ -45,16 +47,23 @@ def theorem_id(name):
     return hit[0].get('id') or hit[0].get('theorem_id')
 
 
-def import_names(path):
+def carve_libs(carve):
+    """The folders of a carve's statement texts, published ones first."""
+    return [os.path.join(carve, 'published', 'lib'), os.path.join(carve, 'publish', 'out', 'lib')] if carve else []
+
+
+def import_names(path, carve=None):
     """The theorem each `import Theorems.Thm_<X>` line brings in (p2mlib.importcheck.module_theorem:
-    the declaration whose name, dots read as underscores, is `<X>`)."""
+    the declaration whose name, dots read as underscores, is `<X>`), from the workspace, else from the
+    carve directory `carve` (carve_libs)."""
     from p2mlib.importcheck import theorem_imports, module_theorem
     ws = _workspace()
     out = set()
     for mod in theorem_imports(open(path, encoding='utf-8').read()):
-        name = module_theorem(mod, ws)
+        name = module_theorem(mod, ws, libs=carve_libs(carve))
         if not name:
-            sys.exit('cannot find the theorem of %s' % mod)
+            sys.exit('cannot find the theorem of %s%s' % (mod, '' if carve else
+                     ' (not in the workspace; a carve statement: pass --carve DIR)'))
         out.add(name)
     return out
 
@@ -299,6 +308,9 @@ def main():
     differs = None
     if '--differs' in args:
         i = args.index('--differs'); differs = open(args[i + 1], encoding='utf-8').read(); del args[i:i + 2]
+    carve = None
+    if '--carve' in args:
+        i = args.index('--carve'); carve = os.path.expanduser(args[i + 1]); del args[i:i + 2]
     allow = []
     while '--allow-copy' in args:
         i = args.index('--allow-copy'); allow.append(args[i + 1]); del args[i:i + 2]
@@ -313,7 +325,7 @@ def main():
     target = args[0] if not re.fullmatch(r'[0-9a-f-]{36}', args[0]) \
         else call('GET', '/theorems/%s' % tid).get('theorem_name', '')
     check_no_inline_copies(path, target, allow)
-    want = import_names(path)
+    want = import_names(path, carve)
     check_no_disproved_imports(want)
     print('%s\n   file %s\n   edges it should create: %s\n   replaces: %s'
           % (args[0], path, sorted(want) or 'none (a full proof)', replaces or 'nothing'))

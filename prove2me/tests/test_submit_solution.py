@@ -280,3 +280,23 @@ def test_a_draft_import_still_unpublished_is_refused_naming_the_fetch(ws, tmp_pa
         run(monkeypatch, fake_platform(), 'N.target', sol(tmp_path, TOP))
     msg = str(e.value)
     assert 'REFUSED' in msg and 'Theorems.Thm_N_dep' in msg and 'fetch_theorems.py --names N.dep' in msg
+
+
+def test_import_names_falls_back_to_the_carve_published_lib(ws, tmp_path):
+    """q172-mutually-unbiased-retry: hand-built row statements published from a carve never reached the
+    workspace; their texts are in <carve>/published/lib (or publish/out/lib), which --carve DIR reads."""
+    carve = tmp_path / 'carve'
+    lib = carve / 'published' / 'lib'
+    lib.mkdir(parents=True)
+    (lib / 'Thm_OAI_M_row3_e.lean').write_text(
+        'import Mathlib\n\nnamespace OAI\n\nnamespace M\n\ntheorem row3_e : True := by\n  sorry\n\nend M\n\nend OAI\n')
+    text = 'import Theorems.Thm_N_dep\nimport Theorems.Thm_OAI_M_row3_e\n\ntheorem solution : True := trivial\n'
+    with pytest.raises(SystemExit):
+        S.import_names(sol(tmp_path, text))
+    assert S.import_names(sol(tmp_path, text), carve=str(carve)) == {'N.dep', 'OAI.M.row3_e'}
+    # publish/out/lib too, when published/lib does not hold it
+    (lib / 'Thm_OAI_M_row3_e.lean').rename(tmp_path / 'x.lean')
+    out = carve / 'publish' / 'out' / 'lib'
+    out.mkdir(parents=True)
+    (tmp_path / 'x.lean').rename(out / 'Thm_OAI_M_row3_e.lean')
+    assert S.import_names(sol(tmp_path, text), carve=str(carve)) == {'N.dep', 'OAI.M.row3_e'}
