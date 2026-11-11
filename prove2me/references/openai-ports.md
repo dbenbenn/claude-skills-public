@@ -167,7 +167,7 @@ and how to repair it.
     p2m-standalone/oai-stdsimplex-compat). With that bundle built in the workspace
     (`Definitions/Def_OAIStdSimplexCompat.lean`, byte-identical to `lean/StdSimplexCompat.lean`),
     `oai_port.py` imports it instead of inlining, and `carve_prep.py config` adds it as a `--def`.
-    `StdSimplexTopCompat` is published likewise as `Definitions.Def_OAIStdSimplexTopCompat` (same
+    `StdSimplexTopCompat` is published likewise as `Definitions.Def_OAIStdSimplexTopCompat` (42fe481c, same
     folder; its text is `oaiport.stdsimplex_top_shim()`, importing the first bundle) and used the same
     way once in the workspace.
 - **A Mathlib definition that changed shape wants a shadowing shim**, not per-site patches (q141:
