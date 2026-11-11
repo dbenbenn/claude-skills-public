@@ -1577,6 +1577,8 @@ def core_rewrites(text, compat_ns='OAI', known=None):
     # d13f23b's `NonUnitalStarRingHom.ofClass f` is the compat block's `nonUnitalStarRingHomOfClass`
     # (Kadison commutator, oaiq-039; Kaplansky quotient, oaiq-015)
     text = re.sub(r"(?<![\w.'])NonUnitalStarRingHom\.ofClass(?![\w'])", pre + 'nonUnitalStarRingHomOfClass', text)
+    # d13f23b's `MDifferentiableAt.mfderiv_abuse` is `MDifferentiableAt.mfderiv` here (CKS q227, SurfaceImmersion q249)
+    text = re.sub(r"\.mfderiv_abuse(?![\w'])", '.mfderiv', text)
     # d13f23b's `OrderHom.ofClass f` is `OrderHomClass.toOrderHom f` here (ArtinGroups Salvetti cover, q225)
     text = re.sub(r"(?<![\w.'])OrderHom\.ofClass(?![\w'])", 'OrderHomClass.toOrderHom', text)
     # d13f23b's hidden-instance names that ours renamed or dropped (CoarseAssembly, q229); the gone

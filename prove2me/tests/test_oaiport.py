@@ -3319,3 +3319,13 @@ def test_compat_has_is_invertible_eventually_nhds():
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                             'compat_4_34.lean')).read()
     assert 'theorem _root_.ContinuousLinearMap.IsInvertible.eventually_nhds ' in src
+
+
+# d13f23b's `MDifferentiableAt.mfderiv_abuse` is `MDifferentiableAt.mfderiv` in our Mathlib
+# (CKS q227, SurfaceImmersion q249).
+
+def test_mfderiv_abuse_is_mfderiv():
+    out = O.core_rewrites("simpa using hd.mfderiv_abuse\n    ((hF p).mdifferentiableAt (by simp)).mfderiv_abuse\n")
+    assert "hd.mfderiv\n" in out and "(by simp)).mfderiv\n" in out
+    assert "mfderiv_abuse" not in out
+    assert O.core_rewrites("my_mfderiv_abuse x", None) == "my_mfderiv_abuse x"
