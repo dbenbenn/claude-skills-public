@@ -484,27 +484,67 @@ def derive_defs(ws, targets):
     return defs
 
 
+def definitions_imports(path):
+    """The `import Definitions.X` modules of the file at `path` ([] when it is absent)."""
+    if not os.path.exists(path):
+        return []
+    out = []
+    for line in open(path, encoding='utf-8', errors='replace'):
+        m = re.match(r'import\s+(Definitions\.\S+)', line)
+        if m and m.group(1) not in out:
+            out.append(m.group(1))
+    return out
+
+
+def def_closure(ws, defs):
+    """`defs` (Definitions.Def_X modules) followed through the Definitions imports of their workspace copies, in
+    order: the listed ones first, then what they import. q227 (2026-11): the statement imported
+    Def_CKSBondiPenrose_002, which imports Def_CKSBondiPenrose; with only _002 as a --def, the other bundle's
+    declarations were not external and its .olean was not copied, and a carve bundle clashed with it."""
+    out = list(dict.fromkeys(defs))
+    i = 0
+    while i < len(out):
+        for m in definitions_imports(os.path.join(ws, *out[i].split('.')) + '.lean'):
+            if m not in out:
+                out.append(m)
+        i += 1
+    return out
+
+
 def missing_inputs(ws, targets, defs):
     """The names to fetch so every target statement and Def_ bundle the carve imports is in the workspace:
     a target whose Theorems/ file is absent, or whose preamble imports a Definitions.Def_X not on disk,
-    and every listed bundle not on disk."""
-    need = []
+    and every listed bundle, or bundle one of them (or a target's) imports, not on disk."""
+    need, direct = [], list(defs)
     for t in targets:
         _, rel = wslib.statement_module(t)
         p = os.path.join(ws, rel)
         if not os.path.exists(p):
             need.append(t)
             continue
-        for line in open(p, encoding='utf-8'):
-            m = re.match(r'import\s+Definitions\.(\S+)', line)
-            if m and not os.path.exists(os.path.join(ws, 'Definitions', m.group(1) + '.lean')):
-                need.append(t)
-                break
-    for d in defs:
+        imps = definitions_imports(p)
+        if any(not os.path.exists(os.path.join(ws, *m.split('.')) + '.lean') for m in imps):
+            need.append(t)
+        else:
+            direct += imps
+    for d in def_closure(ws, direct):
         m = re.match(r'Definitions\.Def_(\S+)$', d)
         if m and not os.path.exists(os.path.join(ws, 'Definitions', 'Def_' + m.group(1) + '.lean')):
             need.append(m.group(1))
     return list(dict.fromkeys(need))
+
+
+def lacking_defs(ws, targets, defs):
+    """[(module, statement file)]: each Definitions import of a target's statement that `defs`, with what its
+    bundles import, does not hold. q238 (2026-11): `defs` copied from a sibling carve named
+    Def_KMedianRefinedRecovery while the goal imports Def_KMedianRecovery (the two redeclare names); it surfaced
+    at measure, after the publisher had posted bundles."""
+    have = set(def_closure(ws, defs))
+    out = []
+    for t in targets:
+        rel = wslib.statement_module(t)[1]
+        out += [(m, rel) for m in definitions_imports(os.path.join(ws, rel)) if m not in have]
+    return out
 
 
 def check_meta(path, lean_src, root_module):
@@ -642,6 +682,9 @@ GRAPH_READERS = ('extdefs', 'plan', 'gen')     # the steps that load the graph (
 # and pieces_prep done, so publish/out kept the old text and split_run resent nothing
 GEN_READERS = {'measure': ('lib',), 'measure_pieces': ('solutions',)}
 GRAPH_CONFIG_KEYS = ('src', 'roots', 'prefix', 'work', 'external_theorems')   # what `carve.py graph` reads
+# the steps that read pipeline.json `defs`: a change re-runs inputs, wsbuild and config each alone (config's consumers
+# then follow its output, as after `--redo config`), and extdefs with everything after it
+DEFS_READERS = ('inputs', 'wsbuild', 'config', 'extdefs')
 
 
 def merged_promote_private(cur, auto):
@@ -754,6 +797,9 @@ class Pipeline:
             'config': {'port': port_out},
             'gen': {'carve patches': hash_paths([cp] if (cp := self.carve_patches_path()) else [])},
         }.get(s, {})
+        if s in DEFS_READERS:
+            # q227 (2026-11): a `defs` edited in pipeline.json alone was "pipeline ok"; it took `--redo config`
+            h['defs'] = json.dumps(sorted(self.p.get('defs') or []))
         if s in GEN_READERS:
             h['gen output'] = self.gen_output_hash(s)
         if s == 'gen' and (cfg := self.read_config()) is not None:
@@ -1071,6 +1117,9 @@ class Pipeline:
         return not open(cl, encoding='utf-8').read().endswith(block)
 
     def stale_message(self, s, k):
+        if k == 'defs' and s != 'extdefs':
+            return ('== stale: %s (pipeline.json `defs` changed since it ran); re-running it (later steps run again '
+                    'only if its output changes)' % s)
         if k not in self.RULE_KEYS:
             return '== stale: %s (its input "%s" changed); re-running it and every later step' % (s, k)
         msg = ('== stale: %s (the skill\'s %s changed since it ran); re-running it (later steps run again only '
@@ -1128,7 +1177,22 @@ class Pipeline:
         return openai_prefixes(self.lean_src)
 
     def defs(self):
-        return self.p.get('defs') or derive_defs(self.ws, self.p['targets'])
+        """pipeline.json `defs` (else the targets' statements' Definitions imports), with every Def_ bundle they
+        import (def_closure)."""
+        return def_closure(self.ws, self.p.get('defs') or derive_defs(self.ws, self.p['targets']))
+
+    def check_defs(self, step):
+        """Stop when pipeline.json `defs` misses a bundle a target's statement imports (lacking_defs, q238)."""
+        if not self.p.get('defs'):
+            return
+        lack = lacking_defs(self.ws, self.p['targets'], self.p['defs'])
+        if lack:
+            raise StepFailed(
+                "step '%s': pipeline.json `defs` (%s) lacks %s, which %s imports. `defs` replaces the list derived "
+                "from the targets' statements, so the goal's own bundle must be in it (q238: a sibling carve's "
+                "`defs` was copied, and measure failed after the bundles were posted). Add it, or drop `defs` to "
+                "derive the list, and resume" % (step, ', '.join(self.p['defs']), ', '.join(m for m, _ in lack),
+                                                 ', '.join(sorted({r for _, r in lack}))))
 
     def root(self):
         files = os.listdir(os.path.join(self.ws, 'Solutions', self.p['folder']))
@@ -1170,13 +1234,15 @@ class Pipeline:
 
     def step_inputs(self):
         names = missing_inputs(self.ws, self.p['targets'], self.p.get('defs') or [])
+        if names:
+            self.run_cmds('inputs', [self.tool('fetch_theorems', '--names', *names, '--no-build')])
+            again = missing_inputs(self.ws, self.p['targets'], self.p.get('defs') or [])
+            if again:
+                raise StepFailed("step 'inputs': still not in the workspace after fetch_theorems: %s "
+                                 "(published yet? see logs/inputs.log)" % ', '.join(again))
+        self.check_defs('inputs')
         if not names:
             return 'skipped'
-        self.run_cmds('inputs', [self.tool('fetch_theorems', '--names', *names, '--no-build')])
-        again = missing_inputs(self.ws, self.p['targets'], self.p.get('defs') or [])
-        if again:
-            raise StepFailed("step 'inputs': still not in the workspace after fetch_theorems: %s "
-                             "(published yet? see logs/inputs.log)" % ', '.join(again))
 
     def check_closure(self, step):
         out, inside = outside_closure(self.lean_src, self.p['root_module'])
@@ -1220,6 +1286,7 @@ class Pipeline:
         bad = check_meta(self.meta, self.lean_src, self.p['root_module'])
         if bad:
             raise StepFailed("step 'config' failed: " + bad)
+        self.check_defs('config')
         a = ['config', self.d, self.p['folder'], self.root(), self.p['targets'][0]]
         for d in self.defs():
             a += ['--def', d]
@@ -2785,7 +2852,7 @@ class Pipeline:
                         and not any(STEPS.index(x) < STEPS.index(st[0]) for x in self.ran_now)):
                     raise StepFailed(self.STALE_AFTER_PUBLISHING % (st[0], st[1], st[0]))
                 print(self.stale_message(*st), flush=True)
-                if st[1] in self.RULE_KEYS:
+                if st[1] in self.RULE_KEYS or (st[1] == 'defs' and st[0] != 'extdefs'):
                     self.state['steps'].pop(st[0])        # like --redo: its consumers check its output
                 else:
                     self.invalidate(st[0])

@@ -181,6 +181,29 @@ def test_measure_copies_every_imported_published_module(tmp_path):
         M.copy_published(str(ws), str(ol), ['Definitions.Def_Missing'])
 
 
+def test_measure_copies_the_published_modules_an_imported_one_imports(tmp_path):
+    # q227 (2026-11): the carve imported Def_CKSBondiPenrose_002, which imports Def_CKSBondiPenrose; only the first
+    # was copied into D/olean, and measure failed on the missing Def_CKSBondiPenrose.olean
+    import carve_measure as M
+    ws, ol = tmp_path / 'ws', tmp_path / 'olean'
+    (ws / 'Definitions').mkdir(parents=True)
+    (ws / 'Theorems').mkdir()
+    (ws / 'Definitions' / 'Def_P_002.lean').write_text('import Mathlib\nimport Definitions.Def_P\n')
+    (ws / 'Definitions' / 'Def_P.lean').write_text('import Mathlib\nimport Definitions.Def_Q\n')
+    (ws / 'Definitions' / 'Def_Q.lean').write_text('import Mathlib\n')
+    (ws / 'Theorems' / 'Thm_T.lean').write_text('import Definitions.Def_P_002\nimport Theorems.Thm_U\n')
+    (ws / 'Theorems' / 'Thm_U.lean').write_text('import Mathlib\n')
+    assert M.published_closure(str(ws), ['Theorems.Thm_T']) == [
+        'Definitions.Def_P', 'Definitions.Def_P_002', 'Definitions.Def_Q', 'Theorems.Thm_T', 'Theorems.Thm_U']
+    wb = ws / '.lake' / 'build' / 'lib' / 'lean'
+    for m in ('Definitions.Def_P_002', 'Definitions.Def_P', 'Definitions.Def_Q'):
+        for ext in ('.olean', '.ilean'):
+            fake_olean(os.path.join(str(wb), *m.split('.')) + ext)
+    M.copy_published(str(ws), str(ol), ['Definitions.Def_P_002'])
+    assert sorted(os.listdir(ol / 'Definitions')) == ['Def_P.ilean', 'Def_P.olean', 'Def_P_002.ilean',
+                                                       'Def_P_002.olean', 'Def_Q.ilean', 'Def_Q.olean']
+
+
 def test_publish_prep_writes_run_files_and_manifest(tmp_path, monkeypatch):
     for x in ('out/lib', 'out/solutions', 'work'):
         (tmp_path / x).mkdir(parents=True)

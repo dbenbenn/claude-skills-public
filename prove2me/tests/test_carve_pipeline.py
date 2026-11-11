@@ -265,7 +265,8 @@ def test_parameters_are_remembered_and_a_change_is_refused(env):
 def test_options_reach_the_tools(env):
     (env.tmp / 'patches.json').write_text('[]')
     r = run(env, *ARGS, '--patches', str(env.tmp / 'patches.json'), '--compat-imports', 'narrow', '--budget', '40',
-            '--forced', 'OAI.X.lemma', '--def', 'Definitions.Def_Z', '--measure-flag=--drop-false-edges')
+            '--forced', 'OAI.X.lemma', '--def', 'Definitions.Def_Z', '--def', 'Definitions.Def_A',
+            '--measure-flag=--drop-false-edges')
     assert r.returncode == 0, r.stderr
     by = {}
     for c in calls(env):
@@ -277,7 +278,7 @@ def test_options_reach_the_tools(env):
     cfg = by[('carve_prep', 'config')]
     assert cfg[cfg.index('--budget') + 1] == '40' and '--forced' in cfg and 'OAI.X.lemma' in cfg
     defs = [cfg[i + 1] for i, a in enumerate(cfg) if a == '--def']
-    assert defs == ['Definitions.Def_Z']                    # explicit --def replaces the derived list
+    assert defs == ['Definitions.Def_Z', 'Definitions.Def_A']   # explicit --def replaces the derived list
     assert '--drop-false-edges' in by[('carve_measure', 'config.json')]
     assert json.load(open(env.dir / 'config.json'))['collapse_mathlib'] is False
     assert ('carve_prep', 'filter-patches') in by
@@ -449,9 +450,80 @@ def test_present_inputs_are_not_fetched(env):
 
 
 def test_explicit_def_missing_from_workspace_is_fetched_by_name(env):
-    assert run(env, *ARGS, '--def', 'Definitions.Def_Z').returncode == 0
+    assert run(env, *ARGS, '--def', 'Definitions.Def_Z', '--def', 'Definitions.Def_A').returncode == 0
     f = [c['argv'] for c in calls(env) if c.get('tool') == 'fetch_theorems']
     assert f == [['--names', 'Z', '--no-build']]
+
+
+# ---------------------------------------------------------------- `defs`: the targets' own bundles, transitively
+
+def _config_defs(env):
+    cfg = [c for c in calls(env) if c.get('tool') == 'carve_prep' and c['argv'][0] == 'config'][-1]['argv']
+    return [cfg[i + 1] for i, a in enumerate(cfg) if a == '--def']
+
+
+def test_defs_without_the_targets_own_bundle_stop_at_inputs(env):
+    # q238 (2026-11): `defs` copied from a sibling carve's pipeline.json named Def_KMedianRefinedRecovery while the
+    # goal's statement imports Def_KMedianRecovery; it surfaced at measure, after the publisher had posted bundles
+    (env.ws / 'Definitions' / 'Def_Z.lean').write_text('def Z := 1\n')
+    r = run(env, *ARGS, '--def', 'Definitions.Def_Z')
+    assert r.returncode == 1
+    out = r.stdout + r.stderr
+    assert "step 'inputs'" in out and 'Definitions.Def_A' in out and 'Thm_OAI_X_main.lean' in out, out
+    assert not any(c.get('tool') == 'oai_port_modules' for c in calls(env))
+
+
+def test_a_def_bundle_importing_another_brings_it_along(env):
+    # q227 (2026-11): the statement imported Def_CKSBondiPenrose_002, which imports Def_CKSBondiPenrose; with only
+    # _002 as --def its declarations were not external, and a carve bundle clashed with it ("environment already
+    # contains OAI.CKSRound.MetricJet.noConfusion")
+    (env.ws / 'Definitions' / 'Def_B.lean').write_text('import Definitions.Def_A\ndef B := 1\n')
+    (env.ws / 'Theorems' / 'Thm_OAI_X_main.lean').write_text(
+        'import Mathlib\nimport Definitions.Def_B\n\ntheorem OAI.X.main : True := by sorry\n')
+    r = run(env, *ARGS, '--stop-after', 'extdefs')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _config_defs(env) == ['Definitions.Def_B', 'Definitions.Def_A']
+    ext = [c['argv'] for c in calls(env) if c.get('tool') == 'carve_prep' and c['argv'][0] == 'ext-defs'][0]
+    assert [ext[i + 1] for i, a in enumerate(ext) if a == '--def'] == ['Definitions.Def_B', 'Definitions.Def_A']
+    assert any('Definitions.Def_A' in l for l in env.log.read_text().splitlines() if l.startswith('lake build'))
+
+
+def test_an_explicit_def_satisfies_the_target_through_its_imports_and_a_missing_import_is_fetched(env):
+    (env.ws / 'Definitions' / 'Def_B.lean').write_text('import Definitions.Def_A\nimport Definitions.Def_C\ndef B := 1\n')
+    r = run(env, *ARGS, '--def', 'Definitions.Def_B', '--stop-after', 'config')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert [c['argv'] for c in calls(env) if c.get('tool') == 'fetch_theorems'] == [['--names', 'C', '--no-build']]
+    assert _config_defs(env) == ['Definitions.Def_B', 'Definitions.Def_A', 'Definitions.Def_C']
+
+
+def test_editing_defs_in_pipeline_json_runs_config_again_without_re_porting(env):
+    # q227: `defs` changed in pipeline.json alone gave "pipeline ok"; it took `--redo config`
+    assert run(env, *ARGS).returncode == 0
+    (env.ws / 'Definitions' / 'Def_Z.lean').write_text('def Z := 1\n')
+    p = json.load(open(env.dir / 'pipeline.json'))
+    p['defs'] = ['Definitions.Def_A', 'Definitions.Def_Z']
+    json.dump(p, open(env.dir / 'pipeline.json', 'w'))
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert ('carve_prep', 'config') in seq and ('carve_prep', 'ext-defs') in seq and ('carve', 'plan') in seq, seq
+    assert not any(t[0] in ('oai_port_modules', 'oai_build_modules') for t in seq) and ('carve', 'graph') not in seq
+    assert _config_defs(env) == ['Definitions.Def_A', 'Definitions.Def_Z'] and 'stale' in r.stdout
+    env.log.write_text('')
+    assert run(env).returncode == 0 and tools_called(env) == []          # recorded: no second re-run
+
+
+def test_once_publishing_started_a_defs_edit_stops_for_a_person(env):
+    assert run(env, *ARGS, '--publish').returncode == 0
+    (env.ws / 'Definitions' / 'Def_Z.lean').write_text('def Z := 1\n')
+    p = json.load(open(env.dir / 'pipeline.json'))
+    p['defs'] = ['Definitions.Def_A', 'Definitions.Def_Z']
+    json.dump(p, open(env.dir / 'pipeline.json', 'w'))
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 1 and 'publishing has started' in r.stdout + r.stderr and 'defs' in r.stdout + r.stderr
+    assert ('carve_prep', 'config') not in tools_called(env)
 
 
 # ---------------------------------------------------------------- oai_meta.json is checked at config

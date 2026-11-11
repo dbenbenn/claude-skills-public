@@ -14,7 +14,10 @@ DIR is the carve directory. The first run needs the parameters, which are stored
   --target T            the published theorem to prove (repeat; the first is the config's target)
   --bundle-prefix P     bundle name prefix        [--budget 55]  seconds per piece
   --def Definitions.Def_X   (repeat) published bundles the ports import (a bare Def_X means
-                        Definitions.Def_X); default: the import lines of the targets' statements
+                        Definitions.Def_X); default: the import lines of the targets' statements. Either way
+                        the Def_ bundles they import come too (def_closure, q227). A list without a bundle
+                        the targets' statements import stops at `inputs` (q238); an edit of `defs` in
+                        pipeline.json re-runs inputs, wsbuild and config alone, then extdefs onward
   --forced NAME         (repeat) theorems published as statements of their own
   --patches FILE        single-file patches, filtered for the module route (carve_prep filter-patches)
   --compat-imports narrow|M1,M2   --stdsimplex auto|structure|subtype|off   (oai_port_modules options)

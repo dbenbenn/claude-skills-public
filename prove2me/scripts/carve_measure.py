@@ -116,9 +116,29 @@ def imported_modules(cfg, plan):
     return sorted(mods)
 
 
+def published_closure(ws, mods):
+    """`mods` with every Definitions/Theorems module their workspace sources import, transitively (sorted). q227
+    (2026-11): the carve imported Def_CKSBondiPenrose_002, which imports Def_CKSBondiPenrose; only the first was
+    copied, and every file importing it failed on the missing .olean. A module without a workspace source (a
+    carve's own core split, already in D/olean) adds nothing."""
+    out, todo = set(), list(mods)
+    while todo:
+        m = todo.pop()
+        if m in out:
+            continue
+        out.add(m)
+        p = os.path.join(ws, *m.split('.')) + '.lean'
+        if os.path.exists(p):
+            for line in open(p, encoding='utf-8', errors='replace'):
+                mm = re.match(r'import\s+((?:Definitions|Theorems)\.\S+)', line)
+                if mm:
+                    todo.append(mm.group(1))
+    return sorted(out)
+
+
 def copy_published(ws, olean, mods):
     wb = os.path.join(ws, '.lake', 'build', 'lib', 'lean')
-    for m in mods:
+    for m in published_closure(ws, mods):
         for ext in ('.olean', '.ilean'):
             src, dst = os.path.join(wb, *m.split('.')) + ext, os.path.join(olean, *m.split('.')) + ext
             if not os.path.exists(src) and os.path.exists(dst):
