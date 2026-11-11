@@ -3396,3 +3396,10 @@ def test_compat_has_matrix_borel_and_cfc_measurable_sqrt():
                    'lemma _root_.Measurable.of_eval_matrix', 'protected lemma _root_.Matrix.measurable_iff',
                    'lemma _root_.CFC.measurable_sqrt'):
         assert needle in src, needle
+
+
+def test_compat_has_matrix_order_closed_topology():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'instance _root_.Matrix.compatOrderClosedTopology' in src

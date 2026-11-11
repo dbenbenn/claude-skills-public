@@ -902,3 +902,14 @@ theorem _root_.ProbabilityTheory.HasLaw.integrable_comp {Ω 𝓧 E : Type*} {mΩ
   have h : MeasureTheory.Integrable f (P.map X) := hX.map_eq ▸ hf
   exact (MeasureTheory.integrable_map_measure h.aestronglyMeasurable hX.aemeasurable).1 h
 end OAICompat434
+open scoped MatrixOrder in
+/-- The Loewner order on real matrices is closed (d13f23b has `OrderClosedTopology` for it; InvariantIsing, q258): the set
+`A ≤ B` is the preimage of the closed positive semidefinite cone. -/
+instance _root_.Matrix.compatOrderClosedTopology {n : Type*} [Fintype n] [DecidableEq n] :
+    OrderClosedTopology (Matrix n n ℝ) :=
+  ⟨by
+    have h : {p : Matrix n n ℝ × Matrix n n ℝ | p.1 ≤ p.2} =
+        (fun p : Matrix n n ℝ × Matrix n n ℝ => p.2 - p.1) ⁻¹' {M | M.PosSemidef} := by
+      ext p; exact Matrix.le_iff
+    rw [h]
+    exact Matrix.posSemidef_is_closed.preimage (continuous_snd.sub continuous_fst)⟩
