@@ -820,6 +820,42 @@ instance. -/
 instance _root_.Matrix.compatMeasurableSpace {m n α : Type*} [MeasurableSpace α] :
     MeasurableSpace (Matrix m n α) :=
   inferInstanceAs <| MeasurableSpace (m → n → α)
+/-- Mathlib d13f23b's `BorelSpace (Matrix m n α)` (Mathlib/Analysis/Matrix/MeasurableSpace.lean; InvariantIsing, q258). -/
+instance _root_.Matrix.compatBorelSpace {m n α : Type*} [Countable m] [Countable n] [MeasurableSpace α]
+    [TopologicalSpace α] [SecondCountableTopology α] [BorelSpace α] : BorelSpace (Matrix m n α) :=
+  inferInstanceAs <| BorelSpace (m → n → α)
+/-- d13f23b's `Measurable.eval_matrix` (q258). -/
+lemma _root_.Measurable.eval_matrix {m n α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+    {i : m} {j : n} {M : β → Matrix m n α} (hM : Measurable M) : Measurable (M · i j) :=
+  (measurable_pi_apply j).comp ((measurable_pi_apply i).comp hM)
+/-- d13f23b's `Measurable.of_eval_matrix` (q258). -/
+lemma _root_.Measurable.of_eval_matrix {m n α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+    (M : β → Matrix m n α) (hM : ∀ i j, Measurable (M · i j)) : Measurable M :=
+  measurable_pi_lambda _ (fun i => measurable_pi_lambda _ (fun j => hM i j))
+/-- d13f23b's `Matrix.measurable_iff` (q258). -/
+protected lemma _root_.Matrix.measurable_iff {m n α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+    {M : β → Matrix m n α} : Measurable M ↔ ∀ i j, Measurable (M · i j) :=
+  ⟨fun h _ _ => h.eval_matrix, fun h => Measurable.of_eval_matrix M h⟩
+/-- d13f23b's `Matrix.measurable_apply` (q258). -/
+protected lemma _root_.Matrix.measurable_apply {m n α : Type*} [MeasurableSpace α] {i : m} {j : n} :
+    Measurable (fun M : Matrix m n α => M i j) := measurable_id.eval_matrix
+/-- d13f23b's `Matrix.measurable_of` (q258). -/
+lemma _root_.Matrix.measurable_of {m n α : Type*} [MeasurableSpace α] :
+    Measurable (Matrix.of (m := m) (n := n) (α := α)) := measurable_id
+/-- d13f23b's `CFC.measurable_sqrt` (Mathlib/Analysis/SpecialFunctions/ContinuousFunctionalCalculus/Rpow/Measurable.lean; q258). -/
+lemma _root_.CFC.measurable_sqrt {A : Type*} [NonUnitalNormedRing A] [StarRing A] [NormedSpace ℝ A]
+    [IsScalarTower ℝ A A] [SMulCommClass ℝ A A] [PartialOrder A] [StarOrderedRing A]
+    [NonnegSpectrumClass ℝ A] [NonUnitalIsometricContinuousFunctionalCalculus ℝ A IsSelfAdjoint]
+    [CompleteSpace A] [ContinuousStar A] [OrderClosedTopology A] [MeasurableSpace A] [BorelSpace A] :
+    Measurable (CFC.sqrt : A → A) := by
+  have h_measurable : MeasurableSet {S : A | 0 ≤ S} :=
+    (isClosed_le continuous_const continuous_id).measurableSet
+  classical
+  convert CFC.continuousOn_sqrt.measurable_piecewise (continuousOn_const (c := 0)) h_measurable
+  ext S
+  by_cases hS : 0 ≤ S
+  · simp [hS]
+  · simp [hS, CFC.sqrt_of_not_nonneg]
 open MeasureTheory ProbabilityTheory in
 /-- Mathlib d13f23b's `ProbabilityTheory.rnDeriv_measure_compProd_right`: `∂(μ ⊗ₘ κ)/∂(μ ⊗ₘ η)` is the kernel's
 Radon-Nikodym derivative (InvariantIsing KernelRelativeEntropy, q251). -/

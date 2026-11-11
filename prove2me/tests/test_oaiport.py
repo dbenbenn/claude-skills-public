@@ -3383,3 +3383,16 @@ def test_compat_has_rnderiv_compprod_right_charfun_and_haslaw_lemmas():
                    'theorem _root_.ProbabilityTheory.HasLaw.memLp ', 'theorem _root_.ProbabilityTheory.HasLaw.memLp_comp ',
                    'theorem _root_.ProbabilityTheory.HasLaw.integrable_comp '):
         assert needle in src, needle
+
+
+# q258 (InvariantIsing): d13f23b's Matrix measurable API beyond the bare instance (BorelSpace, eval/of_eval, measurable_iff)
+# and `CFC.measurable_sqrt`; without them `Measure (Orthogonal N)` has no `MeasurableMul` and the Gram/cavity modules fail.
+
+def test_compat_has_matrix_borel_and_cfc_measurable_sqrt():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for needle in ('instance _root_.Matrix.compatBorelSpace', 'lemma _root_.Measurable.eval_matrix',
+                   'lemma _root_.Measurable.of_eval_matrix', 'protected lemma _root_.Matrix.measurable_iff',
+                   'lemma _root_.CFC.measurable_sqrt'):
+        assert needle in src, needle
