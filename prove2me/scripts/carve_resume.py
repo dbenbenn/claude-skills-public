@@ -18,6 +18,10 @@ it stays on its recorded skill snapshot); a run from before that file gets --pub
 Its publisher is restarted the same way when publish_early.log's last `background publisher` line has no
 `== publisher exit` after it (on the snapshot and gating pipeline_state.json records), before the driver, so what
 was released before the cut goes out at once.
+
+Before a driver is resumed, the .olean files under its DIR/olean that the cut broke (empty, or not a whole .olean:
+p2mlib.leaninfo.olean_ok) go, with their .ilean, and so do empty .ilean files: q172 (2026-11-10) left 33 zero-byte
+ones. carve_measure no longer trusts such a file either; this keeps them from being read at all.
 """
 import importlib.util
 import json
@@ -31,6 +35,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location('carve_pipeline_cli', os.path.join(HERE, 'carve_pipeline.py'))
 CPL = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(CPL)
+sys.path.insert(0, os.path.dirname(HERE))
+from p2mlib import leaninfo  # noqa: E402
 
 PUB_START = re.compile(r'^== \S+ background publisher ', re.M)
 PUB_EXIT = re.compile(r'^== publisher exit ', re.M)
@@ -88,6 +94,22 @@ def _state(d):
         return json.load(open(os.path.join(d, 'pipeline_state.json')))
     except (OSError, ValueError):
         return {}
+
+
+def broken_oleans(d):
+    """The files under carve DIR's olean/ a crash left unusable: each .olean that is not whole (leaninfo.olean_ok)
+    with its .ilean, and every empty .ilean."""
+    out = []
+    for root, _, files in os.walk(os.path.join(d, 'olean')):
+        for f in sorted(files):
+            p = os.path.join(root, f)
+            if f.endswith('.olean') and not leaninfo.olean_ok(p):
+                out.append(p)
+                if os.path.exists(p[:-6] + '.ilean'):
+                    out.append(p[:-6] + '.ilean')
+            elif f.endswith('.ilean') and os.path.getsize(p) == 0:
+                out.append(p)
+    return sorted(set(out))
 
 
 def driver_action(d, since, active=unit_active):
@@ -169,12 +191,18 @@ def main(argv):
             what = 'restart publisher' if kind == 'publisher' else 'resume driver'
             print('%s %s %s: %s%s' % ('would' if dry else '==', what, d, a['why'],
                                       (' (argv %s)' % ' '.join(a['argv'])) if kind == 'driver' else ''), flush=True)
+            broken = broken_oleans(d) if kind == 'driver' else []
             if dry:
+                if broken:
+                    print('   would drop %d broken .olean/.ilean files under %s/olean' % (len(broken), d), flush=True)
                 continue
             if kind == 'driver':
+                for p in broken:
+                    os.remove(p)
                 with open(os.path.join(d, 'logs', 'driver.log'), 'a') as f:
-                    f.write('== %s resumed by carve_resume after a reboot (%s)\n'
-                            % (time.strftime('%Y-%m-%d %H:%M:%S'), a['why']))
+                    f.write('== %s resumed by carve_resume after a reboot (%s)%s\n'
+                            % (time.strftime('%Y-%m-%d %H:%M:%S'), a['why'],
+                               '; dropped %d broken .olean/.ilean files under olean/' % len(broken) if broken else ''))
             start(kind, d, a)
 
 

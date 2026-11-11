@@ -437,8 +437,10 @@ class Measure:
         `run` deletes it before every compile, and a failed compile, a repair loop whose cut text
         matches an earlier "ok" (oaiq-096: a bundle cut by a repair, the next run took it "ok" from
         times.json), or a deleted olean/ dir leaves the entry without its output, and every importer
-        then fails "object file ... does not exist". A piece (module None) has no output of its own."""
-        return module is None or os.path.exists(self.olean_path(module))
+        then fails "object file ... does not exist". A piece (module None) has no output of its own. And only
+        while it is a whole .olean (leaninfo.olean_ok): q172's power cut left zero-byte ones, and the importers
+        of the cached statements failed "invalid header"."""
+        return module is None or leaninfo.olean_ok(self.olean_path(module))
 
     def measure(self, item, env, force=False, repair=True):
         """The item's record (compiled, or cached), with its import closure (import_closure)."""
@@ -551,7 +553,7 @@ class Measure:
         if mod:
             return mod, []
         mod = self.chk_module(n)
-        if not os.path.exists(os.path.join(self.olean, *mod.split('.')) + '.olean'):
+        if not leaninfo.olean_ok(self.olean_path(mod)):          # missing, or cut by a crash (q172)
             path = os.path.join(self.chk, 'Chk_%s.lean' % C.slug(C.statement_name(self.plan, n)))
             open(path, 'w', encoding='utf-8').write(self.chk_text(n))
             self.run(path, mod, env)

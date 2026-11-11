@@ -9,6 +9,8 @@ import os
 
 import pytest
 
+from conftest import fake_olean
+
 
 def _obj(tmp_path, plan):
     import carve_measure as M
@@ -173,7 +175,7 @@ def test_measure_records_the_closure_beside_the_time_also_when_cached(tmp_path):
 
     def run(path, module, env):
         calls.append(module)
-        _olean(tmp_path / 'olean', module, 1)
+        fake_olean(os.path.join(str(tmp_path / 'olean'), *module.split('.')) + '.olean')
         return {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}, ''
     m.run = run
     m.times['bundle:B'] = r = m.measure('bundle:B', {})

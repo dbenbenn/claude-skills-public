@@ -406,3 +406,20 @@ def test_is_cached_uses_the_key_run_reads(tmp_path, monkeypatch):
     open(os.path.join(L.CACHE, key + '.json'), 'w').write('{}')
     assert L.is_cached(str(f), ws=str(tmp_path), **kw)
     assert not L.is_cached(str(f), ws=str(tmp_path), idents=True, module='M')     # other arguments, other key
+
+
+# ---------------------------------------------------------------- olean_ok: a whole .olean, not just a file
+
+def test_olean_ok_refuses_empty_cut_and_zero_filled_files(tmp_path):
+    # q172 (2026-11-10): a power cut mid-measure left zero-byte .olean files whose cached "ok" stood, and three
+    # importers failed "invalid header"; a crash can also leave a file cut short, or zero-filled at full size
+    from conftest import fake_olean
+    good = fake_olean(tmp_path / 'Good.olean', payload=4096)
+    assert LI.olean_ok(str(good))
+    data = open(good, 'rb').read()
+    for name, body in (('Empty', b''), ('Cut', data[:4096]), ('Zeros', b'\0' * len(data)),
+                       ('Odd', data + b'x'), ('Header', data[:96])):
+        p = tmp_path / (name + '.olean')
+        p.write_bytes(body)
+        assert not LI.olean_ok(str(p)), name
+    assert not LI.olean_ok(str(tmp_path / 'Missing.olean'))

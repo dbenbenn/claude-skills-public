@@ -27,6 +27,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 from dataclasses import dataclass, field
 
@@ -43,6 +44,30 @@ name = "leaninfo"
 root = "LeanInfo"
 supportInterpreter = true
 """
+
+
+OLEAN_HEADER = 96      # 'olean', version, flags, Lean version (33 bytes), githash (40), base address, root pointer
+
+
+def olean_ok(path):
+    """Is `path` a whole .olean, not just a file of that name? q172 (2026-11-10): a power cut while
+    carve_measure wrote modules left 33 zero-byte .olean/.ilean files; the resumed driver took their cached
+    "ok" (the file existed) and three pieces importing them failed "invalid header". Checked: the magic
+    `olean`, a size that is a multiple of 8, and the root object (the pointer after the base address) inside
+    the file. Lean writes the root object last (in every workspace and Mathlib .olean, 2026-11-11: 56 bytes
+    before the end), so a file cut at a block boundary, or zero-filled after a crash, fails."""
+    try:
+        size = os.path.getsize(path)
+        if size < OLEAN_HEADER or size % 8:
+            return False
+        with open(path, 'rb') as f:
+            head = f.read(OLEAN_HEADER)
+    except OSError:
+        return False
+    if head[:5] != b'olean':
+        return False
+    base, root = struct.unpack_from('<QQ', head, 80)
+    return OLEAN_HEADER - 8 <= root - base <= size - 8
 
 
 def workspace():

@@ -14,6 +14,20 @@ sys.path.insert(0, SCRIPTS)
 sys.path.insert(0, os.path.dirname(SCRIPTS))          # p2mlib
 
 
+def fake_olean(path, payload=64):
+    """Write `path` as a minimal .olean that p2mlib.leaninfo.olean_ok accepts: the `olean` header, a base
+    address, and a root pointer to an object 56 bytes before the end (as Lean writes one); `payload` bytes
+    (a multiple of 8, at least 56) after the 96-byte header. Returns the path."""
+    import struct
+    base = 0x59cabc30000
+    head = b'olean\x02\x01' + b'4.33.1'.ljust(33, b'\0') + b'0' * 40
+    body = struct.pack('<QQ', base, base + 96 + payload - 56) + b'\0' * payload
+    os.makedirs(os.path.dirname(str(path)) or '.', exist_ok=True)
+    with open(str(path), 'wb') as f:
+        f.write(head + body)
+    return path
+
+
 def pytest_configure(config):
     config.addinivalue_line('markers', 'live: read-only calls to prove2.me (P2M_LIVE=1 to run)')
     config.addinivalue_line('markers', 'lean: runs Lean in the workspace (P2M_LEAN=1 to run)')

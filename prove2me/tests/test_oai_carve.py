@@ -10,6 +10,7 @@ import carve_prep as CP
 import oai_build_modules as BM
 import oai_port_modules as PM
 from p2mlib import oaiport as O
+from conftest import fake_olean
 
 FIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'oaiport_fixtures')
 LEAN = os.path.join(FIX, 'lean')
@@ -693,8 +694,7 @@ def test_measure_cache_key_covers_the_imported_carve_modules(tmp_path, monkeypat
 
     def run(path, module, env):
         calls.append(module)
-        os.makedirs(os.path.dirname(m.olean_path(module)), exist_ok=True)
-        open(m.olean_path(module), 'w').close()
+        fake_olean(m.olean_path(module))
         return {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}, ''
     m.run = run
     m.times['statement:S'] = m.measure('statement:S', {})
@@ -759,9 +759,7 @@ def test_a_cached_ok_needs_its_olean(tmp_path):
 
     def run(path, module, env):
         calls.append(module)
-        o = m.olean_path(module)
-        os.makedirs(os.path.dirname(o), exist_ok=True)
-        open(o, 'w').close()
+        fake_olean(m.olean_path(module))
         return {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}, ''
     m.run = run
     m.times['bundle:B'] = m.measure('bundle:B', {})
@@ -770,6 +768,53 @@ def test_a_cached_ok_needs_its_olean(tmp_path):
     os.remove(m.olean_path('Definitions.Def_B'))
     m.measure('bundle:B', {})
     assert len(calls) == 2 and os.path.exists(m.olean_path('Definitions.Def_B'))
+
+
+def test_a_cached_ok_needs_a_whole_olean_not_an_empty_or_cut_file(tmp_path):
+    # q172 (2026-11-10): a power cut mid-measure left zero-byte .olean files; the resumed driver took the
+    # statements' cached "ok" because the files existed, and three pieces importing them failed in 1.5 s
+    # "failed to read file '...rowsSound9_9_e.olean', invalid header"
+    M, m = _measure_obj(tmp_path, {'bundles': [{'name': 'B', 'imports': [], 'nodes': ['x']}]})
+    src = tmp_path / 'lib' / 'Def_B.lean'
+    src.write_text('import Mathlib\ndef b := 1\n')
+    m.item_files = lambda kind, n: (str(src), 'Definitions.Def_B')
+    m.apply_recorded = lambda s: None
+    calls = []
+
+    def run(path, module, env):
+        calls.append(module)
+        fake_olean(m.olean_path(module), payload=4096)
+        return {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}, ''
+    m.run = run
+    m.times['bundle:B'] = m.measure('bundle:B', {})
+    o = m.olean_path('Definitions.Def_B')
+    whole = open(o, 'rb').read()
+    open(o, 'wb').close()                                   # the power cut: a zero-byte file
+    m.measure('bundle:B', {})
+    assert len(calls) == 2
+    open(o, 'wb').write(whole[:4096])                       # cut at a block boundary
+    m.measure('bundle:B', {})
+    assert len(calls) == 3
+    m.measure('bundle:B', {})
+    assert len(calls) == 3                                  # whole again: the cached ok stands
+
+
+def test_the_edge_check_recompiles_a_piece_whose_olean_is_not_whole(tmp_path):
+    # q172: the power cut also left zero-byte EdgeChk .olean files, which the edge check reads
+    plan = {'bundles': [{'name': 'A', 'imports': [], 'nodes': ['x']}], 'stubs': {'S': {'bundles': ['A']}},
+            'pieces': {'S': {'bundles': ['A'], 'imports': []}}, 'external': []}
+    M, m = _measure_obj(tmp_path, plan)
+    m.item_files = lambda kind, n: (str(tmp_path / 'sol' / 'Sol_S.lean'), None)
+    m.chk_text = lambda n: 'import Mathlib\n'
+    compiled = []
+    m.run = lambda path, module, env: compiled.append(module) or fake_olean(m.olean_path(module))
+    mod = m.chk_module('S')
+    os.makedirs(os.path.dirname(m.olean_path(mod)), exist_ok=True)
+    open(m.olean_path(mod), 'wb').close()
+    assert m.compiled_module('piece:S', {}) == (mod, ['solution'])
+    assert compiled == [mod]
+    m.compiled_module('piece:S', {})
+    assert compiled == [mod]                                # whole now: read as it is
 
 
 def test_a_repair_whose_cut_text_was_ok_before_compiles_it_again(tmp_path, monkeypatch):
@@ -936,8 +981,7 @@ def test_an_ok_measured_with_asynchronous_elaboration_is_measured_again(tmp_path
     m.item_files = lambda kind, n: (str(src), 'Definitions.Def_B')
     m.apply_recorded = lambda s: None
     o = m.olean_path('Definitions.Def_B')
-    os.makedirs(os.path.dirname(o))
-    open(o, 'w').close()
+    fake_olean(o)
     old_key = hashlib.sha1(src.read_bytes()).hexdigest()
     assert m.cache_key(str(src)) != old_key
     m.times['bundle:B'] = {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': [], 'key': old_key}
@@ -945,7 +989,7 @@ def test_an_ok_measured_with_asynchronous_elaboration_is_measured_again(tmp_path
 
     def run(path, module, env):
         calls.append(module)
-        open(o, 'w').close()
+        fake_olean(o)
         return {'secs': 1.0, 'ok': True, 'errors': [], 'axioms': []}, ''
     m.run = run
     m.times['bundle:B'] = m.measure('bundle:B', {})

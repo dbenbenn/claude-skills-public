@@ -100,3 +100,34 @@ def test_detach_records_its_run_and_arguments_for_a_resume(tmp_path):
     CR.CPL.write_detached(str(tmp_path), 'R9', ['--upgrade', '--publish'])
     rec = json.load(open(tmp_path / 'logs' / 'detached.json'))
     assert rec['run_id'] == 'R9' and rec['argv'] == ['--upgrade', '--publish'] and rec['at']
+
+
+def test_a_resumed_driver_first_loses_the_olean_files_the_power_cut_broke(tmp_path, capsys, monkeypatch):
+    # q172 (2026-11-10): the power cut left 33 zero-byte .olean/.ilean files under the carve's olean/; the
+    # resumed driver trusted them and three pieces failed "invalid header". Removed before the restart (a dry
+    # run only counts them); whole files, and stage/ (re-copied on every compile), are left alone
+    import carve_resume as CR
+    from conftest import fake_olean
+    d = _carve(tmp_path, driver=RUNNING, detached={'run_id': 'R1', 'argv': []})
+    o = d / 'olean' / 'Theorems'
+    good = fake_olean(o / 'Thm_Good.olean')
+    (o / 'Thm_Good.ilean').write_text('{}')
+    (o / 'Thm_Empty.olean').write_bytes(b'')
+    (o / 'Thm_Empty.ilean').write_bytes(b'')
+    (o / 'Thm_Cut.olean').write_bytes(open(good, 'rb').read()[:96])
+    (o / 'Thm_Cut.ilean').write_text('{}')
+    (d / 'stage').mkdir()
+    (d / 'stage' / 'Thm_Empty.lean').write_bytes(b'')
+    assert sorted(os.path.basename(p) for p in CR.broken_oleans(str(d))) == [
+        'Thm_Cut.ilean', 'Thm_Cut.olean', 'Thm_Empty.ilean', 'Thm_Empty.olean']
+    started = []
+    monkeypatch.setattr(CR, 'start', lambda *a, **k: started.append(a))
+    monkeypatch.setattr(CR, 'unit_active', lambda u: False)
+    since = str(time.time() - 3600)
+    CR.main(['--roots', str(tmp_path / 'jobs'), '--since', since, '--dry-run'])
+    assert 'would drop 4 broken .olean/.ilean files' in capsys.readouterr().out
+    assert (o / 'Thm_Empty.olean').exists()
+    CR.main(['--roots', str(tmp_path / 'jobs'), '--since', since])
+    assert sorted(os.listdir(o)) == ['Thm_Good.ilean', 'Thm_Good.olean'] and started
+    assert (d / 'stage' / 'Thm_Empty.lean').exists()
+    assert 'dropped 4 broken' in (d / 'logs' / 'driver.log').read_text()
