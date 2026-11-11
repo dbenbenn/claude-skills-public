@@ -3344,3 +3344,15 @@ def test_compat_has_int_fundamental_discr_and_friends():
                    'theorem _root_.Int.sq_emod_four', 'theorem _root_.Int.squarefree_iff_prime_sq_not_dvd',
                    'theorem _root_.logDeriv_fun_comp'):
         assert needle in src, needle
+
+
+# d13f23b has `PositiveLinearMap.norm_map_star_mul_le` (Cauchy-Schwarz with square roots, for non-unital C*-algebras)
+# and `IsUnital.toCStarAlgebra`; ours has neither (weak infiniteness q246: Nuclearity_PositiveFunctional*,
+# Nuclearity_Unital*).
+
+def test_compat_has_norm_map_star_mul_le_and_isunital_tocstaralgebra():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'theorem _root_.PositiveLinearMap.norm_map_star_mul_le ' in src
+    assert 'noncomputable def IsUnital.toCStarAlgebra' in src

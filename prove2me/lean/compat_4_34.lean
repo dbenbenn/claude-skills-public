@@ -461,6 +461,40 @@ noncomputable def IsUnital.toNormedRing {A : Type*} [NonUnitalNormedRing A] [h :
     natCast_succ := fun n => rfl
     intCast_ofNat := fun n => rfl
     intCast_negSucc := fun n => rfl }
+open scoped ComplexOrder in
+/-- d13f23b's `PositiveLinearMap.norm_map_star_mul_le`: Cauchy–Schwarz for a positive functional,
+with square roots (weak infiniteness, q246). -/
+theorem _root_.PositiveLinearMap.norm_map_star_mul_le {A : Type*} [NonUnitalCStarAlgebra A]
+    [PartialOrder A] [StarOrderedRing A] (ψ : A →ₚ[ℂ] ℂ) (a b : A) :
+    ‖ψ (star a * b)‖ ≤ Real.sqrt ‖ψ (star a * a)‖ * Real.sqrt ‖ψ (star b * b)‖ := by
+  have h := norm_inner_le_norm (𝕜 := ℂ) (ψ.toPreGNS a) (ψ.toPreGNS b)
+  rw [PositiveLinearMap.preGNS_inner_def] at h
+  have ha := ψ.preGNS_norm_sq (ψ.toPreGNS a)
+  have hb := ψ.preGNS_norm_sq (ψ.toPreGNS b)
+  simp only [PositiveLinearMap.ofPreGNS_toPreGNS] at h ha hb
+  have hna : ‖ψ.toPreGNS a‖ = Real.sqrt ‖ψ (star a * a)‖ := by
+    rw [← ha, ← Complex.ofReal_pow, Complex.norm_real, Real.norm_of_nonneg (by positivity),
+      Real.sqrt_sq (norm_nonneg _)]
+  have hnb : ‖ψ.toPreGNS b‖ = Real.sqrt ‖ψ (star b * b)‖ := by
+    rw [← hb, ← Complex.ofReal_pow, Complex.norm_real, Real.norm_of_nonneg (by positivity),
+      Real.sqrt_sq (norm_nonneg _)]
+  rw [← hna, ← hnb]
+  exact h
+
+/-- d13f23b's `IsUnital.toCStarAlgebra`: a non-unital C⋆-algebra with an identity is a C⋆-algebra (weak infiniteness, q246). -/
+@[instance_reducible]
+noncomputable def IsUnital.toCStarAlgebra {A : Type*} [NonUnitalCStarAlgebra A] [IsUnital A] :
+    CStarAlgebra A :=
+  letI : NormedRing A := IsUnital.toNormedRing
+  letI : Algebra ℂ A := Algebra.ofModule (fun r x y => smul_mul_assoc r x y)
+    (fun r x y => mul_smul_comm r x y)
+  letI : NormedAlgebra ℂ A := { (inferInstance : Algebra ℂ A) with
+    norm_smul_le := fun r x => norm_smul_le r x }
+  { (inferInstance : NormedRing A), (inferInstance : NormedAlgebra ℂ A) with
+    toStarRing := inferInstance
+    toCompleteSpace := inferInstance
+    toCStarRing := inferInstance
+    toStarModule := inferInstance }
 /-- A closed commutative ⋆-subalgebra of a C⋆-algebra is a commutative C⋆-algebra, found by instance search
 in d13f23b (Kadison similarity, oaiq-075). A def, made a local instance by the port only in modules naming
 `CommCStarAlgebra` or `IsMulCommutative` (`oaiport.comm_cstar_line`): as a global instance it made `whnf` time out in
