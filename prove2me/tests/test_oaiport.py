@@ -3771,3 +3771,12 @@ def test_compat_has_matrix_order_closed_topology():
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                             'compat_4_34.lean')).read()
     assert 'instance _root_.Matrix.compatOrderClosedTopology' in src
+
+
+def test_compat_has_tendstoindistribution_iff_and_measurable_multivariategaussian():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    for needle in ('theorem _root_.MeasureTheory.tendstoInDistribution_iff_forall_integral_rclike_tendsto',
+                   'theorem _root_.ProbabilityTheory.measurable_multivariateGaussian'):
+        assert needle in src, needle

@@ -913,3 +913,67 @@ instance _root_.Matrix.compatOrderClosedTopology {n : Type*} [Fintype n] [Decida
       ext p; exact Matrix.le_iff
     rw [h]
     exact Matrix.posSemidef_is_closed.preimage (continuous_snd.sub continuous_fst)⟩
+open MeasureTheory ProbabilityTheory Filter BoundedContinuousFunction in
+open scoped Topology in
+/-- Mathlib d13f23b's `tendstoInDistribution_iff_forall_integral_rclike_tendsto` (InvariantIsing, q258). -/
+theorem _root_.MeasureTheory.tendstoInDistribution_iff_forall_integral_rclike_tendsto
+    {ι E Ω' : Type*} {Ω : ι → Type*} {m : ∀ i, MeasurableSpace (Ω i)}
+    {μ : (i : ι) → Measure (Ω i)} [∀ i, IsProbabilityMeasure (μ i)]
+    {m' : MeasurableSpace Ω'} {μ' : Measure Ω'} [IsProbabilityMeasure μ']
+    {mE : MeasurableSpace E} {X : (i : ι) → Ω i → E} {Z : Ω' → E} {l : Filter ι}
+    [TopologicalSpace E] (𝕜 : Type*) [RCLike 𝕜] [OpensMeasurableSpace E]
+    (hX : ∀ i, AEMeasurable (X i) (μ i)) (hZ : AEMeasurable Z μ') :
+    TendstoInDistribution X l Z μ μ' ↔
+      ∀ f : E →ᵇ 𝕜, Tendsto (fun i ↦ ∫ ω, f (X i ω) ∂(μ i)) l (𝓝 (∫ ω, f (Z ω) ∂μ')) := by
+  have h_map (i) (f : E →ᵇ 𝕜) :
+      ∫ x, f x ∂(μ i).map (X i) = ∫ ω, f (X i ω) ∂(μ i) := integral_map (hX i) (by fun_prop)
+  have h_map' (f : E →ᵇ 𝕜) :
+      ∫ x, f x ∂μ'.map Z = ∫ ω, f (Z ω) ∂μ' := integral_map hZ (by fun_prop)
+  refine ⟨fun h f ↦ ?_, fun h ↦ ⟨hX, hZ, ?_⟩⟩
+  · have hf := (ProbabilityMeasure.tendsto_iff_forall_integral_rclike_tendsto 𝕜).mp h.tendsto f
+    simpa [h_map, h_map'] using hf
+  · apply (ProbabilityMeasure.tendsto_iff_forall_integral_rclike_tendsto (Ω := E) 𝕜).mpr
+    intro f
+    simpa [h_map, h_map'] using h f
+open Matrix in
+/-- d13f23b's `Matrix.continuous_uncurry_toEuclideanCLM`, for real matrices (q258). -/
+theorem _root_.Matrix.continuous_uncurry_toEuclideanCLM_real {n : Type*} [Fintype n] [DecidableEq n] :
+    Continuous (fun p : Matrix n n ℝ × EuclideanSpace ℝ n => toEuclideanCLM (n := n) (𝕜 := ℝ) p.1 p.2) := by
+  have h : (fun p : Matrix n n ℝ × EuclideanSpace ℝ n => toEuclideanCLM (n := n) (𝕜 := ℝ) p.1 p.2) =
+      fun p => WithLp.toLp 2 (p.1 *ᵥ p.2.ofLp) := by
+    ext p i
+    simp
+  rw [h]
+  refine (PiLp.continuous_toLp 2 _).comp ?_
+  refine continuous_pi fun i => ?_
+  simp only [Matrix.mulVec, dotProduct]
+  fun_prop
+open Matrix in
+@[fun_prop]
+theorem _root_.Matrix.measurable_uncurry_toEuclideanCLM_real {n : Type*} [Fintype n] [DecidableEq n] :
+    Measurable (fun p : Matrix n n ℝ × EuclideanSpace ℝ n => toEuclideanCLM (n := n) (𝕜 := ℝ) p.1 p.2) :=
+  Matrix.continuous_uncurry_toEuclideanCLM_real.measurable
+open scoped MatrixOrder in
+@[fun_prop]
+theorem _root_.Matrix.measurable_cfc_sqrt_real {ι : Type*} [Fintype ι] [DecidableEq ι] :
+    Measurable (fun S : Matrix ι ι ℝ => CFC.sqrt S) := by
+  open scoped Matrix.Norms.L2Operator in
+  exact CFC.measurable_sqrt
+open MeasureTheory ProbabilityTheory Matrix in
+open scoped MatrixOrder in
+set_option maxHeartbeats 1000000 in
+/-- Mathlib d13f23b's `measurable_multivariateGaussian` (InvariantIsing, q258). -/
+theorem _root_.ProbabilityTheory.measurable_multivariateGaussian {ι : Type*} [Fintype ι] [DecidableEq ι] :
+    Measurable (multivariateGaussian (ι := ι)).uncurry := by
+  rw [Measure.measurable_measure]
+  intro s hs
+  simp only [Function.uncurry, multivariateGaussian]
+  conv =>
+    rhs
+    intro b
+    rw [Measure.map_apply (by fun_prop) hs]
+  have hf : Measurable (fun q : (EuclideanSpace ℝ ι × Matrix ι ι ℝ) × EuclideanSpace ℝ ι =>
+      q.1.1 + toEuclideanCLM (𝕜 := ℝ) (CFC.sqrt q.1.2) q.2) := by
+    fun_prop
+  let A := {((μ, S), x) | μ + toEuclideanCLM (𝕜 := ℝ) (CFC.sqrt S) x ∈ s}
+  exact measurable_measure_prodMk_left (s := A) (hs.preimage hf)
