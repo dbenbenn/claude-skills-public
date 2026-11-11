@@ -516,6 +516,30 @@ def test_split_piece_promotes_inside_one_piece_and_leaves_the_rest_of_the_plan_a
     assert C.check_plan(g, Q) == [] and C.piece_cycles(Q) == []
 
 
+def test_an_instance_command_is_never_a_statement(g):
+    # q241 (2026-11-10): the plan promoted `instance poly_forms : PolyTime forms` (an instance of a Prop
+    # class is a theorem), measuring passed, and `prose` failed late with "no theorem in the stub"; q240's
+    # automatic split of a slow piece promoted a `CompleteSpace` instance the same way. A statement stub must
+    # be a `theorem`, so the plan and split-piece never promote an `instance` command, and one forced or
+    # targeted is refused at plan time, saying how to make it a theorem.
+    i = 'CD.LI.instPropCOfNatNat'                     # `local instance : PropC 3`, a theorem
+    assert g.nodes[i].theorem
+    cost = dict(C.size_costs(g, bytes_per_second=10000), **{i: 1.0})
+    kw = dict(budget=0.05, piece_size=10**6, bundle_budget=0.005, bundle_size=10**6, cost=cost, bundle_prefix='PI')
+    p = C.make_plan(g, ['CD.LI.uses_propc_a'], **kw)
+    assert i not in p['nodes'] and i in p['pieces']['CD.LI.uses_propc_a']['keep']
+    q = C.make_plan(g, ['CD.LI.uses_propc_a'], **dict(kw, budget=100))
+    with pytest.raises(C.CarveError, match='nothing in its piece'):
+        C.split_piece(g, q, 'CD.LI.uses_propc_a', 0.0, cost)
+    for kind in ('forced', 'targets'):
+        args = (['CD.LI.uses_propc_a'], [i]) if kind == 'forced' else ([i], [])
+        with pytest.raises(C.CarveError, match=r'instance.*@\[instance\] theorem'):
+            C.make_plan(g, *args, **kw)
+    # a global one too (`instance instPosFive : Pos 5`)
+    with pytest.raises(C.CarveError, match=r'CD\.Co\.instPosFive.*instance'):
+        C.make_plan(g, ['CD.Co.var_user'], ['CD.Co.instPosFive'], **kw)
+
+
 def test_split_piece_refuses_a_piece_with_nothing_to_promote(g):
     P = _whole_plan(g)
     cost = C.size_costs(g, bytes_per_second=10000)

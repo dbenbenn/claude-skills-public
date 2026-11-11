@@ -2272,9 +2272,14 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         # get "stuck at solving universe constraint" there (oaiq-124); it stays in its importers'
         # pieces, as `fold` would put it
         return nd.theorem and not nd.private and ascii_ok(k) and nd.sig <= b_or_ext and \
-            k not in renames and k not in excluded and not max_only_universes(g, k)
+            k not in renames and k not in excluded and not max_only_universes(g, k) and \
+            not instance_command(g, k)
 
     for t in sorted(nodes):
+        if instance_command(g, t):
+            raise CarveError('%s cannot be a published statement: it is an `instance` command, and a statement '
+                             'stub must be a theorem; make it `@[instance] theorem` by a port patch (q241 '
+                             'poly_forms) or leave it out of `forced`' % t)
         if not g.nodes[t].theorem or g.nodes[t].sig - B - set(ext):
             raise CarveError('%s cannot be a published statement: %s' % (
                 t, 'not a theorem' if not g.nodes[t].theorem else
@@ -2291,7 +2296,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
             nd = g.nodes[k]
             return public_ok(k) or ((allowed is None or k in allowed) and nd.private and nd.theorem and ascii_ok(k)
                                     and nd.sig <= b_or_ext and k not in renames and k not in excluded
-                                    and not max_only_universes(g, k))
+                                    and not max_only_universes(g, k) and not instance_command(g, k))
 
     def fresh(n):
         s, todo = set(), [n]
@@ -2453,7 +2458,7 @@ def split_piece(g, plan, node, target, cost, chunker='schedule', promote_private
             return False
         if nd.private and not (promote_private is True or k in set(promote_private or ())):
             return False
-        return ascii_ok(k) and nd.sig <= b_or_ext and not max_only_universes(g, k)
+        return ascii_ok(k) and nd.sig <= b_or_ext and not max_only_universes(g, k) and not instance_command(g, k)
 
     def kids(c):
         return [d for d in g.nodes[c].deps if d in g.nodes and d not in B and d not in ext]
@@ -2517,6 +2522,17 @@ def split_piece(g, plan, node, target, cost, chunker='schedule', promote_private
     if cyc:
         raise CarveError('splitting %s makes publish cycles: %s' % (node, ', '.join('%s -> %s' % x for x in cyc)))
     return plan, new
+
+
+def instance_command(g, k):
+    """Is node k declared by an `instance` command (`instance`, `local instance`, `scoped instance`)? An
+    instance of a Prop class is a theorem, but its stub would be `instance … := sorry`, not the `theorem`
+    a published statement is (q241 `poly_forms : PolyTime forms`, "no theorem in the stub" at `prose`;
+    q240's split promoted a `CompleteSpace` instance): it is never a statement. `@[instance] theorem` is."""
+    nd = g.nodes.get(k)
+    if nd is None or nd.cmd is None:
+        return False
+    return g.infos[nd.module].commands[nd.cmd].decl_kind == 'instance'
 
 
 def max_only_universes(g, k):
