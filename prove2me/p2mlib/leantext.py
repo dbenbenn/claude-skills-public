@@ -155,43 +155,220 @@ _TACTIC_MACRO = re.compile(r'^[ \t]*(?:(?:local|scoped)[ \t]+)?macro[ \t]+"([A-Z
 _DOC_BEFORE = re.compile(r'/--(?:(?!-/).)*-/[ \t]*\n$', re.S)
 
 
+def _remove_command(text, start, end):
+    """text without text[start:end] (whole lines), with the doc comment right above it, leaving no
+    run of two blank lines behind."""
+    d = _DOC_BEFORE.search(text[:start][-20000:])
+    if d:
+        start -= len(text[:start][-20000:]) - d.start()
+    while text[end:end + 1] == '\n' and text[start - 2:start] == '\n\n':
+        end += 1                                   # do not leave two blank lines behind
+    return text[:start] + text[end:]
+
+
+def _quotation_end(text, i):
+    """Index after the `)` closing a `(tactic| …` quotation whose body starts at i."""
+    depth = 1
+    while i < len(text) and depth:
+        depth += {'(': 1, ')': -1}.get(text[i], 0)
+        i += 1
+    return i
+
+
+_SYNTAX_TACTIC = re.compile(r'^[ \t]*(?:(?:local|scoped)[ \t]+)?syntax[ \t]+"([A-Za-z_]\w*)"[ \t]*:[ \t]*tactic'
+                            r'[ \t]*(?:--[^\n]*)?(?:\n|$)', re.M)
+
+
+def _macro_rules_of(name):
+    return re.compile(r'^[ \t]*(?:(?:local|scoped)[ \t]+)?macro_rules\b[ \t]*(?:\([^()\n]*\)[ \t]*)?\s*\|[ \t]*'
+                      r'`\(tactic\|[ \t]*%s[ \t]*\)[ \t]*=>\s*`\(tactic\|' % re.escape(name), re.M)
+
+
 def tactic_macros(text):
     """(text, {name: body}): every `macro "name" : tactic => `(tactic| body)` removed, with the doc
     comment right above it (left behind, it dangles before the next command: WLIdentification
-    2026-10-23), and its body, whitespace-normalized. Uses are not touched (inline_macro_uses)."""
+    2026-10-23), and its body, whitespace-normalized. Uses are not touched (inline_macro_uses).
+
+    Likewise a `syntax "name" : tactic` with one `macro_rules | `(tactic| name) => `(tactic| body)`
+    in the same text (q222, q241: carve.py gen refused the `syntax` command after the whole build).
+    Its body may call `name` itself: close_tactic_macros flattens that. A `syntax` with several
+    arms or `macro_rules` blocks (Lean tries them all, backtracking) is left, with a warning."""
+    import warnings
     macros = {}
     while True:
         m = _TACTIC_MACRO.search(text)
         if not m:
-            return text, macros
-        name, i, depth = m.group(1), m.end(), 1
-        while i < len(text) and depth:
-            depth += {'(': 1, ')': -1}.get(text[i], 0)
-            i += 1
-        macros[name] = ' '.join(text[m.end():i - 1].split())
+            break
+        i = _quotation_end(text, m.end())
+        macros[m.group(1)] = ' '.join(text[m.end():i - 1].split())
         end = text.find('\n', i)
-        end = len(text) if end < 0 else end + 1
-        start = m.start()
-        d = _DOC_BEFORE.search(text[:start][-20000:])
-        if d:
-            start -= len(text[:start][-20000:]) - d.start()
-        while text[end:end + 1] == '\n' and text[start - 2:start] == '\n\n':
-            end += 1                                   # do not leave two blank lines behind
-        text = text[:start] + text[end:]
+        text = _remove_command(text, m.start(), len(text) if end < 0 else end + 1)
+    pos = 0
+    while True:
+        s = _SYNTAX_TACTIC.search(text, pos)
+        if not s:
+            return text, macros
+        name = s.group(1)
+        rules = list(_macro_rules_of(name).finditer(text))
+        blocks = len(re.findall(r'^[ \t]*(?:(?:local|scoped)[ \t]+)?macro_rules\b[^\n]*\n?(?:[ \t]*\n)*[ \t]*\|[ \t]*'
+                                r'`\(tactic\|[ \t]*%s\b' % re.escape(name), text, re.M))
+        if len(rules) == 1 and blocks == 1:
+            r = rules[0]
+            i = _quotation_end(text, r.end())
+            end = text.find('\n', i)
+            end = len(text) if end < 0 else end + 1
+            rest = text[i:end].strip()
+            nxt = text[end:].lstrip()
+            if (not rest or rest.startswith('--')) and not nxt.startswith('|') and r.start() > s.start():
+                macros[name] = ' '.join(text[r.end():i - 1].split())
+                text = _remove_command(text, r.start(), end)
+                text = _remove_command(text, s.start(), s.end())
+                continue
+        if rules or blocks:
+            warnings.warn('tactic `%s`: a `syntax` with %d `macro_rules` arm(s) the port does not read (several arms, '
+                          'or arguments): it is left in place, and carve.py gen will refuse it; expand it by a port '
+                          'patch' % (name, max(len(rules), blocks)), stacklevel=2)
+        pos = s.end()
+
+
+_WRAPPERS = r'(?:(?:with_reducible_and_instances|with_reducible|with_unfolding_all)\s+)*'
+
+
+def _uses(name):
+    return re.compile(r"(?<![\w.'])%s(?![\w'!?])" % re.escape(name))
+
+
+def _top_bars(s):
+    """s split at its top-level `|` (outside brackets; not `<|`, `|>`, `||`)."""
+    parts, depth, cur, i = [], 0, '', 0
+    while i < len(s):
+        c = s[i]
+        if c in '([{⟨':
+            depth += 1
+        elif c in ')]}⟩':
+            depth -= 1
+        if (c == '|' and depth == 0 and s[i - 1:i] not in ('<', '|') and s[i + 1:i + 2] not in ('>', '|')):
+            parts.append(cur)
+            cur = ''
+        else:
+            cur += c
+        i += 1
+    return parts + [cur]
+
+
+def _unparen(a):
+    a = a.strip()
+    while a.startswith('(') and _quotation_end(a, 1) == len(a):
+        a = a[1:-1].strip()
+    return a
+
+
+def close_tactic_macros(macros):
+    """{name: body} with every macro call in a body expanded: {name: closed body, or None where that
+    cannot be done}. A macro that does not reach itself through calls is plain substitution.
+
+    A recursive one (q222's `poly_bound`, q241's `bit_linear`) must be a `[with_reducible…] first | …`
+    whose alternatives call recursive macros only as their last step (`(apply A <;> x)`, `(apply A;
+    x)`, `apply A <;> x`). It becomes `repeat' (WRAP first | alts)`: the call is dropped from each
+    alternative (`apply A`), and the alternatives of every recursive macro it tail-calls follow its
+    own, each once, in source order (q222 unioned `poly_emit` with `rat_emit` by hand). WRAP is the
+    macro's own wrapper.
+
+    What is lost, so a use can need a port patch:
+    * backtracking. The macro retried the next alternative when a recursive call failed further down;
+      `repeat'` commits to the first alternative that applies. q222 had to put `apply PolyBound.mul`
+      before `apply PolyBound.add` (a goal `Nat.mul a (b+35)` unifies with `x + y` by Nat offset
+      unification). The port keeps the source order: it cannot know which order the goals need.
+    * failure. The macro failed where it could not close the goal; `repeat'` succeeds and leaves the
+      goals it could not close, so a use under `first | … ` or `try` means something else.
+    * `;` versus `<;>`: `(apply A; x)` recursed on the first new goal only; `repeat'` works on all.
+    * a union of macros applies all their alternatives to every goal, also those of the other family."""
+    import warnings
+    calls = {n: [m for m in macros if _uses(m).search(b)] for n, b in macros.items()}
+
+    def reach(n):
+        seen, todo = [], list(calls[n])
+        while todo:
+            m = todo.pop(0)
+            if m not in seen:
+                seen.append(m)
+                todo += calls[m]
+        return seen
+
+    recursive = {n for n in macros if n in reach(n)}
+    closed = {}
+
+    def close(n):
+        if n in closed:
+            return closed[n]
+        if n not in recursive:
+            b = macros[n]
+            for m in calls[n]:
+                c = close(m)
+                if c is None:
+                    closed[n] = None
+                    return None
+                b = _uses(m).sub(lambda _, c=c: '(%s)' % c, b)
+            closed[n] = b
+            return b
+        closed[n] = None                      # until done: a cycle through n is not expanded twice
+        m0 = re.fullmatch(r'(%s)first\s*\|(.*)' % _WRAPPERS, macros[n], re.S)
+        if not m0:
+            warnings.warn('tactic `%s` calls itself but is not a `first | …`: expand it by hand (a port patch '
+                          'at each use)' % n, stacklevel=3)
+            return None
+        wrap, order, alts, i = m0.group(1), [n], [], 0
+        while i < len(order):
+            body = re.fullmatch(r'(%s)first\s*\|(.*)' % _WRAPPERS, macros[order[i]], re.S)
+            if not body:
+                warnings.warn('tactic `%s` (called by `%s`) is not a `first | …`: expand it by hand (a port patch '
+                              'at each use)' % (order[i], n), stacklevel=3)
+                return None
+            for a in _top_bars(body.group(2)):
+                a = _unparen(a)
+                t = re.fullmatch(r'(.*?)\s*(?:<;>|;)\s*\(?\s*([A-Za-z_]\w*)\s*\)?', a, re.S)
+                if t and t.group(2) in recursive:
+                    a = _unparen(t.group(1))
+                    if t.group(2) not in order:
+                        order.append(t.group(2))
+                for m in calls[order[i]]:
+                    if not _uses(m).search(a):
+                        continue
+                    if m in recursive:
+                        warnings.warn('tactic `%s` calls `%s` other than as the last step of an alternative '
+                                      '(`%s`): no `repeat\'` form; expand it by hand (a port patch at each use)'
+                                      % (n, m, a), stacklevel=3)
+                        return None
+                    c = close(m)
+                    if c is None:
+                        return None
+                    a = _uses(m).sub(lambda _, c=c: '(%s)' % c, a)
+                if a and a not in alts:
+                    alts.append(a)
+            i += 1
+        closed[n] = "repeat' (%sfirst | %s)" % (wrap, ' | '.join(alts))
+        return closed[n]
+
+    for n in macros:
+        close(n)
+    return closed
 
 
 def inline_macro_uses(text, macros):
-    """Each use of a macro name ({name: body}) replaced by `(body)`."""
-    for name, body in macros.items():
-        text = re.sub(r"(?<![\w.'])%s(?![\w'!?])" % re.escape(name), lambda _, b=body: '(%s)' % b, text)
+    """Each use of a macro name ({name: body}) replaced by `(body)`, calls inside bodies expanded first
+    (close_tactic_macros); a macro that cannot be closed keeps its uses as written."""
+    for name, body in close_tactic_macros(macros).items():
+        if body is not None:
+            text = _uses(name).sub(lambda _, b=body: '(%s)' % b, text)
     return text
 
 
 def inline_tactic_macros(text):
-    """(text, [names]): every `macro "name" : tactic => `(tactic| body)` removed (tactic_macros)
-    and each use of `name` replaced by `(body)`. The verifier rejects all macro registration (CFP
-    §6's `grp`, Lodha-Moore's `gp`, both merged in from development modules); a solution must
-    inline them. The module route (oaiport.module_texts) inlines across modules the same way."""
+    """(text, [names]): every `macro "name" : tactic => `(tactic| body)` (and `syntax` + `macro_rules`
+    tactic) removed (tactic_macros) and each use of `name` replaced by `(body)`. The verifier rejects
+    all macro registration (CFP §6's `grp`, Lodha-Moore's `gp`, both merged in from development
+    modules); a solution must inline them. The module route (oaiport.module_texts) inlines across
+    modules the same way."""
     text, macros = tactic_macros(text)
     return inline_macro_uses(text, macros), list(macros)
 

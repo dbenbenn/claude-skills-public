@@ -2111,6 +2111,136 @@ def test_macro_identifiers_skip_tactic_names_and_binders():
     assert got == ['foo', 'Bar.baz', 'qux', 'quux']
 
 
+# ---------------------------------------------------------------- recursive `syntax` + `macro_rules` tactics
+# q222 (QuantumFactoring: 8 tactics, ~130 use sites) and q241 (thin trees: `bit_linear`, 11 sites): a `syntax "x" :
+# tactic` with a `macro_rules` arm that calls `x` again survived the module port, and `carve.py gen` refused the
+# `syntax` command after the whole build. Lean tactics cannot recurse without a macro, so the port writes each use
+# as `repeat' (WRAP first | …)`: a recursive alternative `(apply A <;> x)` / `(apply A; x)` / `apply A <;> x`
+# becomes `apply A`, and the alternatives of a macro it tail-calls are appended. Backtracking is lost: q222 needed
+# `apply PolyBound.mul` before `apply PolyBound.add` (a goal `Nat.mul a (b+35)` unified with `x + y`); the port keeps
+# the source order, so such a reorder is a port patch.
+
+BIT_LINEAR = ('import Mathlib\n\nnamespace OAI.Thin\n\n'
+              'private def mesh (x : Args) : ℚ := step x\n\n'
+              '/-- Closes `LinearBits` goals. -/\n'
+              'syntax "bit_linear" : tactic\n'
+              'macro_rules\n'
+              '  | `(tactic| bit_linear) => `(tactic|\n'
+              '      with_reducible first\n'
+              '      | assumption\n'
+              '      | exact LinearBits.coordinate _\n'
+              '      | apply LinearBits.add <;> bit_linear\n'
+              '      | apply LinearBits.mul <;> bit_linear)\n\n'
+              'theorem lin_mesh : LinearBits mesh := by\n  unfold mesh; bit_linear\n\n'
+              "theorem other (bit_linear' : Nat) : True := trivial\n\nend OAI.Thin\n")
+BIT_LINEAR_BODY = ("(repeat' (with_reducible first | assumption | exact LinearBits.coordinate _ | "
+                   "apply LinearBits.add | apply LinearBits.mul))")
+
+
+def test_recursive_syntax_macro_rules_tactic_is_inlined_as_repeat_first():
+    from p2mlib import leantext
+    out, names = leantext.inline_tactic_macros(BIT_LINEAR)
+    assert names == ['bit_linear']
+    assert 'syntax' not in out and 'macro_rules' not in out and 'Closes' not in out
+    assert 'theorem lin_mesh : LinearBits mesh := by\n  unfold mesh; %s\n' % BIT_LINEAR_BODY in out
+    assert "(bit_linear' : Nat)" in out and 'private def mesh' in out
+    assert '\n\n\n' not in out
+    assert leantext.inline_tactic_macros(out) == (out, [])
+
+
+QF = 'OAI.Computability.QuantumFactoring.'
+QF_SOURCES = {
+    QF + 'Rational': ('QF_Rational', (
+        'import Mathlib\n\nnamespace ExactQuantumFactoring\n'
+        'lemma NetworkEmission.Emits.rConst : True := trivial\n'
+        'syntax "rat_emit" : tactic\n'
+        'macro_rules\n'
+        '  | `(tactic| rat_emit) => `(tactic|\n'
+        '    with_reducible_and_instances first\n'
+        '    | assumption\n'
+        '    | exact BitStackProgram.Emits.const _ _ _\n'
+        '    | (apply NetworkEmission.Emits.rOfInt;rat_emit)\n'
+        '    | (apply NetworkEmission.Emits.rConst;rat_emit)\n'
+        '    | (apply NetworkEmission.Emits.rIfEq <;> rat_emit))\n'
+        'end ExactQuantumFactoring\n')),
+    QF + 'Polynomial': ('QF_Polynomial', (
+        'import Mathlib\nimport OAI.Computability.QuantumFactoring.Rational\n\nnamespace ExactQuantumFactoring\n'
+        'syntax "poly_emit" : tactic\n'
+        'macro_rules\n'
+        '  | `(tactic| poly_emit) => `(tactic|\n'
+        '    with_reducible_and_instances first\n'
+        '    | assumption\n'
+        '    | exact NetworkEmission.PolyEmits.X\n'
+        '    | (apply NetworkEmission.PolyEmits.add <;> poly_emit)\n'
+        '    | (apply NetworkEmission.PolyEmits.mul <;> poly_emit)\n'
+        '    | (apply NetworkEmission.PolyEmits.neg;poly_emit)\n'
+        '    | (apply NetworkEmission.PolyEmits.C;rat_emit))\n'
+        'end ExactQuantumFactoring\n')),
+    QF + 'Use': ('QF_Use', (
+        'import Mathlib\nimport OAI.Computability.QuantumFactoring.Polynomial\n\nnamespace Elsewhere\n'
+        'lemma a : PolyEmits p := by\n  unfold p;poly_emit\n'
+        'lemma b : Emits q := by\n  · rat_emit\n'
+        'end Elsewhere\n')),
+}
+RAT = ('assumption | exact BitStackProgram.Emits.const _ _ _ | apply NetworkEmission.Emits.rOfInt | '
+       'apply ExactQuantumFactoring.NetworkEmission.Emits.rConst | apply NetworkEmission.Emits.rIfEq')
+
+
+def test_mutually_calling_recursive_tactics_are_unioned_in_source_order_across_modules():
+    out = O.inline_module_macros(QF_SOURCES)
+    use = out[QF + 'Use'][1]
+    assert 'poly_emit' not in use and 'rat_emit' not in use
+    # poly_emit's own alternatives first, in source order (add before mul: no reordering), then rat_emit's
+    # (its tail call `(apply …C; rat_emit)` became `apply …C`); `assumption` once
+    assert ("  unfold p;(repeat' (with_reducible_and_instances first | assumption | exact NetworkEmission.PolyEmits.X | "
+            "apply NetworkEmission.PolyEmits.add | apply NetworkEmission.PolyEmits.mul | "
+            "apply NetworkEmission.PolyEmits.neg | apply NetworkEmission.PolyEmits.C | %s))\n"
+            % RAT.replace('assumption | ', '')) in use
+    # rat_emit is reached only through poly_emit in `Polynomial`, yet its body is checked at poly_emit's use sites:
+    # `Emits.rConst` names the ported `ExactQuantumFactoring.NetworkEmission.Emits.rConst`, which `namespace
+    # Elsewhere` does not see, so it is qualified (the Mathlib-or-hypothesis names stay short)
+    assert "  · (repeat' (with_reducible_and_instances first | %s))\n" % RAT in use
+    for k in (QF + 'Rational', QF + 'Polynomial'):
+        assert 'syntax' not in out[k][1] and 'macro_rules' not in out[k][1]
+
+
+def test_non_recursive_syntax_macro_rules_tactic_is_inlined_like_a_macro():
+    from p2mlib import leantext
+    text = ('syntax "pos_simp" : tactic\nmacro_rules\n  | `(tactic| pos_simp) => `(tactic| (simp; positivity))\n\n'
+            'theorem t : 0 < 1 := by pos_simp\n')
+    out, names = leantext.inline_tactic_macros(text)
+    assert names == ['pos_simp'] and out == '\ntheorem t : 0 < 1 := by ((simp; positivity))\n'
+
+
+def test_a_macro_calling_a_macro_is_expanded_whatever_the_order():
+    from p2mlib import leantext
+    text = ('macro "outer" : tactic => `(tactic| (inner; rfl))\nmacro "inner" : tactic => `(tactic| simp)\n\n'
+            'theorem t : 1 = 1 := by outer\n')
+    out, _ = leantext.inline_tactic_macros(text)
+    assert out.endswith('theorem t : 1 = 1 := by (((simp); rfl))\n')
+
+
+def test_recursive_tactics_the_port_cannot_flatten_are_dropped_with_a_warning_and_uses_kept():
+    # a recursive call that is not the last step of its alternative (`(constructor <;> (go; simp))`) has no
+    # `repeat'` form: the definition still goes (the carve would refuse it after the whole build), each use stays
+    # as written, so the build fails at once where a hand expansion is needed
+    from p2mlib import leantext
+    text = ('syntax "go" : tactic\nmacro_rules\n  | `(tactic| go) => `(tactic|\n    first\n    | rfl\n'
+            '    | (constructor <;> (go; simp)))\n\ntheorem t : True ∧ True := by\n  go\n')
+    with pytest.warns(UserWarning, match=r'`go`.*by hand'):
+        out, names = leantext.inline_tactic_macros(text)
+    assert names == ['go'] and 'macro_rules' not in out and out.endswith(':= by\n  go\n')
+
+
+def test_syntax_with_several_macro_rules_arms_is_left_with_a_warning():
+    from p2mlib import leantext
+    text = ('syntax "two" : tactic\nmacro_rules\n  | `(tactic| two) => `(tactic| rfl)\n'
+            'macro_rules\n  | `(tactic| two) => `(tactic| simp)\n\ntheorem t : 1 = 1 := by two\n')
+    with pytest.warns(UserWarning, match=r'`two`.*macro_rules'):
+        out, names = leantext.inline_tactic_macros(text)
+    assert out == text and names == []
+
+
 def test_elpnorm_norm_drops_its_measurability_argument():
     # d13f23b's `eLpNorm_norm f hf` takes a measurability proof; ours is `eLpNorm_norm f` (oaiq-059)
     src = ("    rw [Lp.norm_toLp,eLpNorm_norm (v i) (Lp.memLp (v i)).aestronglyMeasurable,Lp.norm_def]\n"

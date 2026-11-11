@@ -2170,7 +2170,11 @@ def inline_module_macros(sources):
     that full name in every inlined copy (`_root_.` when a namespace could capture even that). A name
     the definition site does not resolve to one ported declaration (Mathlib's, a hypothesis, an
     ambiguity) is left alone, with a warning when a use site resolves it to a ported one. Not seen:
-    `open … in`, local hypotheses at the use site, structure fields and constructors."""
+    `open … in`, local hypotheses at the use site, structure fields and constructors.
+
+    `syntax "x" : tactic` + `macro_rules` tactics count as macros, recursive ones included
+    (leantext.close_tactic_macros: q222, q241). A macro's body is checked at the use sites of every
+    macro that calls it (its text is inlined there too), not only at its own."""
     import warnings
     from .leantext import tactic_macros, inline_macro_uses
     stripped, own, imps, where = {}, {}, {}, {}
@@ -2179,7 +2183,7 @@ def inline_module_macros(sources):
         imps[oai] = [x for x in re.findall(r'^import (\S+)', t, re.M) if x in sources]
         lines = t.split('\n')
         for name in own[oai]:
-            m = re.search(r'^[ \t]*(?:(?:local|scoped)[ \t]+)?macro[ \t]+"%s"' % re.escape(name), t, re.M)
+            m = re.search(r'^[ \t]*(?:(?:local|scoped)[ \t]+)?(?:macro|syntax)[ \t]+"%s"' % re.escape(name), t, re.M)
             where[name] = (oai, t[:m.start()].count('\n') if m else 0)
     decls_of = {oai: {d[0] for d in declarations(stripped[oai].split('\n')) if d[0]} for oai in sources}
     every = set().union(*decls_of.values()) if decls_of else set()
@@ -2207,18 +2211,30 @@ def inline_module_macros(sources):
 
     scopes = {oai: _scopes(sources[oai][1].split('\n'), known_ns) for oai in sources}
     sscopes = {oai: _scopes(stripped[oai].split('\n'), known_ns) for oai in sources}
+    raw = {n: own[d][n] for n, (d, _) in where.items()}
+    calls = {n: [m for m in raw if re.search(r"(?<![\w.'])%s(?![\w'!?])" % re.escape(m), b)] for n, b in raw.items()}
+    callers = {n: {n} for n in raw}                  # n's text is inlined wherever one of these is used
+    changed = True
+    while changed:
+        changed = False
+        for n, cs in calls.items():
+            for m in cs:
+                if not callers[n] <= callers[m]:
+                    callers[m] |= callers[n]
+                    changed = True
     bodies = {}
     for name, (doai, dline) in where.items():
         body = own[doai][name]
         ns, opens = scopes[doai][dline]
         idents = [(a, b, x, _resolve(x, ns, opens, reach(doai))) for a, b, x in _macro_idents(body)]
         qualify, warned = {}, set()
+        use_rx = re.compile(r"(?<![\w.'])(?:%s)(?![\w'!?])" % '|'.join(re.escape(c) for c in sorted(callers[name])))
         for uoai in sources:
-            if name not in visible(uoai):
+            if not any(c in visible(uoai) for c in callers[name]):
                 continue
             ls = stripped[uoai].split('\n')
             for i, l in enumerate(ls):
-                if not re.search(r"(?<![\w.'])%s(?![\w'!?])" % re.escape(name), l):
+                if not use_rx.search(l):
                     continue
                 uns, uopens = sscopes[uoai][i]
                 for a, b, x, d in idents:
