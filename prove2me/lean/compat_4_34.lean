@@ -983,3 +983,19 @@ theorem _root_.ProbabilityTheory.hasLaw_map {Ω 𝓧 : Type*} {mΩ : MeasurableS
     ProbabilityTheory.HasLaw X (P.map X) P where
   aemeasurable := hX
   map_eq := rfl
+open MeasureTheory in
+/-- The push-forward of a probability measure by an arbitrary function: `ProbabilityMeasure.map` when it is a.e.
+measurable, a Dirac measure otherwise. OpenAI's Mathlib has a total `ProbabilityMeasure.map`; ours needs the proof
+(InvariantIsing `cavityBlockMarkedLaw`, q258). -/
+noncomputable def _root_.MeasureTheory.ProbabilityMeasure.mapAE {Ω Ω' : Type*} [MeasurableSpace Ω]
+    [MeasurableSpace Ω'] [Nonempty Ω'] (ν : ProbabilityMeasure Ω) (f : Ω → Ω') : ProbabilityMeasure Ω' := by
+  classical
+  exact if h : AEMeasurable f (ν : Measure Ω) then ν.map h
+    else ⟨Measure.dirac (Classical.arbitrary Ω'), inferInstance⟩
+open MeasureTheory in
+theorem _root_.MeasureTheory.ProbabilityMeasure.mapAE_eq {Ω Ω' : Type*} [MeasurableSpace Ω]
+    [MeasurableSpace Ω'] [Nonempty Ω'] (ν : ProbabilityMeasure Ω) {f : Ω → Ω'}
+    (h : AEMeasurable f (ν : Measure Ω)) : ν.mapAE f = ν.map h := by
+  classical
+  unfold ProbabilityMeasure.mapAE
+  exact dif_pos h

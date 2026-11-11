@@ -3787,3 +3787,10 @@ def test_compat_has_haslaw_map():
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                             'compat_4_34.lean')).read()
     assert 'theorem _root_.ProbabilityTheory.hasLaw_map' in src
+
+
+def test_compat_has_probabilitymeasure_mapae():
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
+                            'compat_4_34.lean')).read()
+    assert 'ProbabilityMeasure.mapAE ' in src and 'ProbabilityMeasure.mapAE_eq' in src
