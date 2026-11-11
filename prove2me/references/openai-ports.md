@@ -465,6 +465,7 @@ its target `<name>_oai`.
 - **The soundness guard's rules are in `p2mlib.leantext.guard_problems`**; `carve.py gen`, `split_run.py`
   and `submit_solution.py` refuse any file the guard would refuse. Add a newly found rule there. Found so
   far beyond `macro`/`syntax`/`prelude`: `TermElabM` (refused, q151; `TacticM`, `MetaM` assumed; 18ce84c),
+  `run_tac` (334a816; q227 lost a publish round to it: `beta_reduce` + the same `exact` replaced it),
   and `run_cmd`, `run_elab`, `run_meta`, `modifyEnv` (7bba886: the carver and prune drop OpenAI's
   trailing `run_cmd Lean.modifyEnv … nameDenyListExt.addEntry …` like `#print` diagnostics).
 - **`carve.py plan` refuses** a plan in which a bundle misses a definition one of its members needs, or
@@ -703,7 +704,9 @@ mixed old and new `carve.py` inside one carve).
   2026-10-29 can lack most of them (each then costs a default 2 s): `--redo build` once before planning it
   again.
 - **Measure cache.** A kinds-limited `measure` judges only its kinds' edge records, and a cached ok is
-  reused only while its `.olean` exists, so a repair cut needs no `times.json` edit (17b6d76).
+  reused only while its `.olean` exists and is whole, so a repair cut needs no `times.json` edit
+  (17b6d76); after a crash, `carve_resume.py` deletes the broken `.olean`/`.ilean` under `olean/`
+  (1b2b1bc; q172's power cut left 33 empty files the resumed driver trusted).
 
 ### The port folder has an owner
 
@@ -1075,15 +1078,16 @@ Profile before forcing or splitting anything.
   bundles and lib as `frozen`; the planner takes the frozen plan's `external_defs` as its own (56fd083).
   Not handled: a frozen bundle that imports one of the old carve's statements (then use a fresh
   `statement_suffix`).
-  - **First compare the `Def_` bundles the two goals import** (`fetch_theorems.py --names GOAL`). Each
-    comparator file of a family carries its own copy of the shared declarations, so two different
-    bundles cannot be imported together and no frozen bundle is reusable (q228, q236, q240, q245: hours
-    lost each). Then carve fresh under a `statement_suffix`; or, when the new goal's solution uses only
-    a few results of the old development (read its calls), publish a bridge statement mentioning
-    neither bundle (definitions unfolded into Mathlib terms), prove it in the old bundle's world, and
-    the goal from it (q245: minutes, not a 513-module re-carve).
-  - `defs` comes from the goal stub's own `import Definitions.*` lines, never a sibling carve's
-    pipeline.json (q238), and lists every `Def_` bundle those import in turn (q227).
+  - **Clashing `Def_` bundles.** Each comparator file of a family carries its own copy of the shared
+    declarations, so two goals importing different `Def_` bundles usually cannot share a frozen bundle
+    (q228, q236, q240, q245: hours lost each). `config` and `plan` now stop on such a clash (6e16e00;
+    the queue's overlap row names both bundles). Then carve fresh under a `statement_suffix`; or, when
+    the new goal's solution uses only a few results of the old development (read its calls), publish a
+    bridge statement mentioning neither bundle (definitions unfolded into Mathlib terms), prove it in
+    the old bundle's world, and the goal from it (q245: minutes, not a 513-module re-carve).
+  - `defs` must hold every `import Definitions.*` of the targets' stubs (checked at `inputs` and
+    `config`, q238); the `Def_` bundles those import come along by themselves, and a `defs` edit re-runs
+    `config` (6cd9e93, q227).
 - **Extending another carve's frozen plan** (oaiq-088): a private node name embeds the old port folder
   (`_private.Solutions.OAIQ038_FA…`): rewrite the frozen plan's folder name to the new one, or a spurious
   import cycle appears. Every `external_theorems` entry must exist in the new graph (drop those outside
