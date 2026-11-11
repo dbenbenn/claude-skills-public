@@ -1780,6 +1780,30 @@ def test_an_open_reading_a_namespace_through_an_earlier_open_keeps_it(g):
     assert m and m.group(1) in ('Perm', '_root_.List.Perm'), out
 
 
+def test_a_long_open_reads_later_tokens_without_doubling_its_candidates():
+    # q247 2026-11-11: every reading of every token became a prefix for the next, 2^k strings for an
+    # `open` of k tokens (carve gen at 40 GiB on one stub). Only readings under a known namespace
+    # can lead anywhere; one that does (through an earlier token's reading) is still found
+    from types import SimpleNamespace as NS
+    k = 60
+    toks = ['Mathlib%d' % i for i in range(k - 1)] + ['Q']
+    text = ('open ' + ' '.join(toks)).encode()
+    idents, pos = [], len('open ')
+    for t in toks:
+        idents.append({'role': 'open', 'name': t, 'start': pos, 'end': pos + len(t)})
+        pos += len(t) + 1
+    g = NS(proj_ns={'P', 'P.Q'}, ext_ns=set(), ns_stems={'P', 'P.Q'},
+           scope_opens=lambda info, c, m: ['P'],
+           ns_existed=lambda x, m, before=None: x in ('P', 'P.Q'))
+    car = C.Carver.__new__(C.Carver)
+    car.g, car.alive_pos = g, {}
+    c = NS(idents=idents, namespace='', index=5)
+    assert car._open(NS(text_bytes=text), c, 'M', {'P', 'P.Q'}, (0, len(text))) == []
+    # P.Q is gone from the carved file: its token goes
+    r = car._open(NS(text_bytes=text), c, 'M', {'P'}, (0, len(text)))
+    assert r == [(idents[-1]['start'], len(text), '')]
+
+
 def test_renaming_a_declaration_leaves_a_same_named_lean_declaration_alone(g):
     # Kaplansky 2026-10-18: renaming MultipleHNN.of_injective to of_injective_oai also renamed
     # Mathlib's HNNExtension.of_injective, read as dot notation on a local by its short name

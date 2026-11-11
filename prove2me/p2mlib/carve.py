@@ -839,6 +839,9 @@ class Graph:
         self.ns_mask = dict(nsmods)
         self.ns_first = first
         self.proj_ns = set(nsmods)
+        # every namespace a project or external namespace lies under (proj_ns is prefix-closed,
+        # ext_ns need not be): a reading outside these cannot lead an `open` to either (Carver._open)
+        self.ns_stems = self.proj_ns | {p for x in self.ext_ns for p in ns_prefixes(x + '.x')}
 
     def ns_existed(self, ns, m, before=None):
         """Did project namespace ns exist when module m was elaborated (from m's imports or m)?
@@ -4201,7 +4204,11 @@ class Carver:
             cands = [tok[len('_root_.'):]] if tok.startswith('_root_.') else \
                 list(dict.fromkeys([join(p, tok) for p in prefixes(c.namespace)] +
                                    [join(o, tok) for o in prior]))
-            prior += cands      # unknown readings only add candidates no namespace matches
+            # a later token is read under each namespace this one opened, so keep only readings
+            # that can lead somewhere: under a project or external namespace, or alive (prefix-
+            # closed, like proj_ns). Keeping every reading doubled `prior` per token, 2^k strings
+            # for an `open` of k tokens (q247 2026-11-11: carve gen at 40 GiB on one stub)
+            prior += [x for x in cands if (x in g.ns_stems or x in alive) and x not in prior]
             known = [x for x in cands if x in g.proj_ns or x in g.ext_ns]
             if not known:
                 continue                      # Mathlib's, say: carving cannot change it
