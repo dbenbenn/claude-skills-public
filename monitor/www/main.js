@@ -282,6 +282,7 @@ function drawSections(all){
       <p class="meta">${meta}</p>
       ${s.note?`<p class="chart-sub">${esc(s.note)}</p>`:''}
       ${(s.alerts||[]).length?`<ul class="salerts">${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:''}
+      ${s.superseded?`<div class="swarns"><p>Superseded: ${esc(s.superseded.why)}${s.superseded.by?` · <a href="#sec-${esc(s.superseded.by)}">its section</a> · <a href="/page/agent.html?name=${encodeURIComponent(s.superseded.by)}">its log</a>`:''}</p>${(s.warnings||[]).length?`<ul>${s.warnings.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:''}</div>`:''}
       <div class="phases">${ph.map(p => phaseRow(s, p)).join('')}</div>
       ${(s.running||[]).length?'<h3 style="margin-top:10px">Running now</h3>'+procTable(s.running, false):''}
       <div class="chartbox"></div></section>`; }).join('');

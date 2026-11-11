@@ -20,6 +20,7 @@ h1{font-size:22px;margin:0 0 2px} .sub{color:var(--text-secondary);margin:0 0 14
 .run span{overflow-wrap:anywhere}
 @media (max-width:560px){.run{grid-template-columns:minmax(7em,1fr) auto auto auto;gap:3px 10px;font-size:13px}.run .sh{display:none}.run .c{grid-column:1/5}}
 .salerts{color:var(--alarm);font-weight:600;margin:6px 0;padding-left:18px}
+.swarns{color:var(--warn);margin:6px 0;border-left:3px solid var(--warn);padding-left:8px}.swarns p{margin:0;font-weight:600}.swarns ul{margin:2px 0;padding-left:18px}.swarns a{color:inherit}
 .cleared{margin:4px 0 0;padding-left:18px;color:var(--text-secondary);font-size:13px}.cleared li{overflow-wrap:anywhere;margin:2px 0}
 .cleared .when{color:var(--text-muted);font-variant-numeric:tabular-nums}
 h2{font-size:17px;margin:0 0 2px} h3{font-size:14px;margin:0 0 2px} .chart-sub{color:var(--text-secondary);font-size:13px;margin:0 0 6px}

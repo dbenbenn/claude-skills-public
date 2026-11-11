@@ -1427,6 +1427,7 @@ script prints its usage when run with no arguments.
 | `check_server_shape.py` | Compile every statement of a mission in server shape: its preamble + formal_statement, alone. |
 | `decisions.py` | The gap review: every source-audit finding on the goal and the milestones, decided by the human. *(library; used by `draft.py`, `source_audit.py`)* |
 | `deprecate.py` | Deprecate superseded submissions, naming the one that keeps the theorem proved. |
+| `deprecate_run.py` | Deprecate every live bundle and statement one carve run published (its `publish/run_state.json`), with a reason file; e.g. a run built against the wrong definitions bundle (q238). |
 | `draft.py` | Upload a mission proposal Draft from a repo, and verify the live Draft against it. |
 | `edge_audit.py` | Audit graph edges against the proofs that produce them: one auditor, judged by Lean. |
 | `fetch_theorems.py` | Write a mission's published statements into the workspace, so solutions can import them. |

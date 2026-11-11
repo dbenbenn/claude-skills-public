@@ -147,6 +147,12 @@ The main page has two more cards (their order is in "Page layout" below):
   polls every 3 s from the byte offset it has, filters All / Text / Tools / Errors plus a search box, "Load
   earlier events" for the head of long transcripts.
 
+**Superseded queue batches (2026-11-11).** A section of a queue batch that the queue's `overview.json` lists under
+`superseded` (relaunched as a newer batch, goals proved since, retry waiting, or handed off) loses its alerts: they
+move to `warnings`, shown amber under "Superseded: <why>" with links to the newer batch's section and log, and the
+section leaves Needs you (`monitor.queue_batch`, `load_sections(..., superseded)`). The batch is found from the
+section id (`<batch>`, `headless-<batch>`), an owner `queue worker <batch>`, or a worker-log link.
+
 **Routes** (all in `monitor.py`; page files under `www/` are read per request, so page changes need no restart):
 `/` and `/page/<name>.html` (= `www/<name>.html`), any other `www/` path with extension .js .css .html .svg .png
 .ico (plain path segments only, nothing resolving outside `www/`), `/status.json` (now with `quota.series` rows

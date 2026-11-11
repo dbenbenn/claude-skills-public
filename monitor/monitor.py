@@ -485,11 +485,28 @@ def worker_on_it(sec, worker_alive):
     return None
 
 
-def load_sections(d, now, worker_alive=None):
+QUEUE_OWNER = re.compile(r'^queue worker ([\w.-]+)')
+
+
+def queue_batch(sec, superseded):
+    """The queue batch a section belongs to, when the queue's overview lists it as superseded: the agent's own
+    section (`<batch>`), its wrapper's (`headless-<batch>`), or a carve section whose owner or worker log
+    names the batch."""
+    sid = sec['id']
+    cands = [sid, sid[len('headless-'):] if sid.startswith('headless-') else None]
+    m = QUEUE_OWNER.match(sec.get('owner') or '')
+    cands.append(m and m.group(1))
+    cands += [m.group(1) for m in (WORKER_LINK.search(l.get('url') or '') for l in sec.get('links') or []) if m]
+    return next((c for c in cands if c and c in superseded), None)
+
+
+def load_sections(d, now, worker_alive=None, superseded=None):
     """(sections, problems): every valid section file, newest state, marked stale when a running or
     waiting one missed three heartbeats; done/failed ones past expires_secs are left off. A failed one whose
     worker agent is still running (worker_on_it; worker_alive(name) -> bool) shows as waiting on that worker,
-    its alerts moved into the note: the alert comes back if the worker ends without restarting the carve."""
+    its alerts moved into the note: the alert comes back if the worker ends without restarting the carve.
+    A section of a queue batch the queue has moved on from (`superseded`, from queue/overview.json: {batch:
+    {by, why}}) keeps its alerts as `warnings` with `superseded` set, so it leaves Needs you (2026-11-11)."""
     secs, problems = [], []
     for f in sorted(os.listdir(d)) if os.path.isdir(d) else []:
         if not f.endswith('.json'):
@@ -514,8 +531,11 @@ def load_sections(d, now, worker_alive=None):
         if w:
             sec.update(state='waiting', stale=False, alerts=[], handled_by=w,
                        note='worker %s is repairing it; %s' % (w, sec.get('note') or 'stopped'))
+        b = queue_batch(sec, superseded or {}) if not w and (sec.get('alerts') or sec['state'] == 'failed') else None
+        if b:
+            sec.update(warnings=sec.get('alerts') or [], alerts=[], superseded=dict(superseded[b], batch=b))
         secs.append(sec)
-    rank = lambda s: (0 if s.get('alerts') or s['state'] == 'failed' else 1 if s['state'] != 'done' else 2, s['title'].lower())
+    rank = lambda s: (0 if s.get('alerts') or (s['state'] == 'failed' and not s.get('superseded')) else 1 if s['state'] != 'done' else 2, s['title'].lower())
     return sorted(secs, key=rank), problems
 
 
@@ -613,7 +633,8 @@ def step(home, now=None):
     def worker_alive(name):
         st = load_json(os.path.join(AG.AGENTS_DIR, name, 'state.json'), {})
         return isinstance(st, dict) and AG.checked_state(AG.AGENTS_DIR, name, st, args).get('state') == 'running'
-    secs, problems = load_sections(sd, now, worker_alive)
+    ov = load_json(os.path.join(AG.AGENTS_DIR, 'queue', 'overview.json'), {})
+    secs, problems = load_sections(sd, now, worker_alive, (ov or {}).get('superseded') or {})
     groups = [(s['id'], [p['match'] for p in s.get('processes', [])]) for s in secs if s.get('processes')]
     procs = proc_table(groups)
     mi = read_meminfo()

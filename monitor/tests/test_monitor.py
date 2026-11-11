@@ -283,3 +283,26 @@ def test_a_failed_carve_whose_worker_is_still_running_waits_on_it_without_an_ale
     assert by['carve-b']['state'] == 'failed' and by['carve-b']['alerts'] == ['stopped']
     secs, _ = M.load_sections(os.path.join(h, 'sections'), now=110, worker_alive=lambda n: False)
     assert {s['id']: s for s in secs}['carve-a']['alerts'] == ['stopped']
+
+
+def test_sections_of_a_superseded_queue_batch_become_warnings(tmp_path):
+    # 2026-11-11: four agents killed by a DNS outage, already relaunched by the queue, sat under Needs you.
+    # The queue's overview names superseded batches; their sections keep the text as a warning, not an alert.
+    h = str(tmp_path)
+    S.publish('headless-q247-jacobsthal', title='Headless agent: q247', state='failed', alerts=['API Error'], home=h, now=100)
+    S.publish('q247-jacobsthal', title='q247 Jacobsthal', state='failed', alerts=['gave up'], home=h, now=100)
+    S.publish('carve-x', title='q247 carve', state='failed', alerts=['stopped at build'], home=h, now=100,
+              owner='queue worker q247-jacobsthal, driver unit carve-x')
+    S.publish('carve-y', title='q248 carve', state='failed', alerts=['stopped at gen'], home=h, now=100,
+              links=[{'label': 'worker log', 'url': '/page/agent.html?name=q248-edit'}])
+    S.publish('q249-other', title='q249', state='failed', alerts=['real stop'], home=h, now=100)
+    sup = {'q247-jacobsthal': {'by': 'q255-jacobsthal', 'why': 'relaunched as q255-jacobsthal (running)'},
+           'q248-edit': {'by': None, 'why': 'the queue will retry it'}}
+    secs, _ = M.load_sections(os.path.join(h, 'sections'), now=110, superseded=sup)
+    by = {s['id']: s for s in secs}
+    for sid in ('headless-q247-jacobsthal', 'q247-jacobsthal', 'carve-x'):
+        assert by[sid]['alerts'] == [] and by[sid]['superseded']['by'] == 'q255-jacobsthal', sid
+    assert by['carve-x']['warnings'] == ['stopped at build']
+    assert by['carve-y']['alerts'] == [] and by['carve-y']['superseded']['why'] == 'the queue will retry it'
+    assert by['q249-other']['alerts'] == ['real stop'] and 'superseded' not in by['q249-other']
+    assert secs[0]['id'] == 'q249-other'          # the one real stop still sorts first
