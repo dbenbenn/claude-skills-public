@@ -59,7 +59,9 @@ runs again, like --redo, and its consumers follow only if its output changed (gr
 that loads the graph is still to run: it re-warms the LeanInfo cache, which is keyed by LeanInfo.lean, with
 a warning naming the module count). A re-run `config` that changes config.json re-runs from extdefs
 (from graph if a key graph reads changed). Step `config` fails at once if DIR/oai_meta.json is missing or
-its `prefixes` do not match the sources and the root module.
+its `prefixes` do not match the sources and the root module, and `config` and `plan` stop when a Def_ bundle
+of the targets declares names that a hand-set `frozen` bundle, a Def_ bundle one imports, or one an
+external theorem imports also declares (no file can import both: q228, q236, q240, q245).
 
 `calibrate` reads what `measure` found: an item (not frozen) measured over 1.6 x the budget (an unpublished
 bundle over 80 s, BUNDLE_OWN_LIMIT: q172's data bundles of 83-88.6 s timed out on the server's own 300 s) raises

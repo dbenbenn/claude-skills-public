@@ -18,7 +18,7 @@ import sys
 import time
 import uuid
 
-from . import leantext, runlock, snapshot, workspace as wslib
+from . import leantext, oaiport, runlock, snapshot, workspace as wslib
 
 STEPS = ['fetch', 'inputs', 'filter_patches', 'port', 'build', 'wsbuild', 'config', 'graph', 'extdefs', 'plan', 'gen', 'names',
          'order', 'measure', 'calibrate', 'publish_prep', 'prose', 'check_text', 'dryrun', 'publish_early',
@@ -544,6 +544,27 @@ def lacking_defs(ws, targets, defs):
     for t in targets:
         rel = wslib.statement_module(t)[1]
         out += [(m, rel) for m in definitions_imports(os.path.join(ws, rel)) if m not in have]
+    return out
+
+
+def bundle_names(text):
+    """The full names a bundle declares, read outside comments and literals (a `/-! ... -/` line that starts
+    `theorem it gives ...` is prose: oaiport.bundle_decl_names on the raw text took it for `QFS.it`)."""
+    return oaiport.bundle_decl_names(leantext.code_only(text))[0]
+
+
+def def_clashes(goal, others, names):
+    """[(goal bundle, other, role, shared names)]: `goal` and `others` are module names
+    (Definitions.Def_X), `others` {module: role}; `names(module)` its declared names (or None)."""
+    out = []
+    for o, role in others.items():
+        on = names(o)
+        if not on:
+            continue
+        for g in goal:
+            shared = sorted((names(g) or set()) & on)
+            if shared:
+                out.append((g, o, role, shared))
     return out
 
 
@@ -1194,6 +1215,60 @@ class Pipeline:
                 "derive the list, and resume" % (step, ', '.join(self.p['defs']), ', '.join(m for m, _ in lack),
                                                  ', '.join(sorted({r for _, r in lack}))))
 
+    def check_def_clashes(self, step):
+        """Stop when a Def_ bundle of the targets declares names that a frozen bundle (config `frozen` set by
+        hand, not the carve's own published ones), a Def_ bundle one of those imports, or one an external
+        theorem imports also declares: no file can import both, so the extension cannot build. q228, q236,
+        q240, q245 (2026-11): extensions of an earlier carve of the same OpenAI family whose goal used another
+        comparator file's Def_ bundle (identical declarations); each lost an hour or more at measure."""
+        cfg = self.read_config() or {}
+        fz = cfg.get('frozen') or {}
+        own = set(((self.state.get('auto_config') or {}).get('frozen') or {}).get('bundles') or ())
+        frozen = [b for b in fz.get('bundles') or () if b not in own]
+        ext = list((cfg.get('external_theorems') or {}).values())
+        if not frozen and not ext:
+            return
+        goal = self.defs()
+        dirs = ([os.path.expanduser(fz['lib'])] if fz.get('lib') else []) + [os.path.join(self.ws, 'Definitions')]
+        path = {}
+        others = {}
+        for b in frozen:
+            m = 'Definitions.Def_' + b
+            p = next((os.path.join(x, 'Def_%s.lean' % b) for x in dirs
+                      if os.path.exists(os.path.join(x, 'Def_%s.lean' % b))), None)
+            if p is None or m in goal:
+                continue
+            path[m] = p
+            others[m] = 'frozen bundle'
+            for i in def_closure(self.ws, definitions_imports(p)):
+                if i not in goal:
+                    others.setdefault(i, 'imported by frozen bundle Def_%s' % b)
+        for th in ext:
+            for i in def_closure(self.ws, definitions_imports(os.path.join(self.ws, *th.split('.')) + '.lean')):
+                if i not in goal:
+                    others.setdefault(i, 'imported by external theorem %s' % th.split('.')[-1])
+        cache = {}
+
+        def names(m):
+            if m not in cache:
+                p = path.get(m) or os.path.join(self.ws, *m.split('.')) + '.lean'
+                cache[m] = bundle_names(open(p, encoding='utf-8').read()) if os.path.exists(p) else None
+            return cache[m]
+        hits = def_clashes(goal, others, names)
+        if not hits:
+            return
+        def short(m):
+            return m.split('.')[-1]
+        lines = ['%s and %s both declare %d name%s (e.g. %s)'
+                 % (short(g), ('frozen bundle %s' % short(o)) if role == 'frozen bundle' else '%s (%s)' % (short(o), role),
+                    len(s), '' if len(s) == 1 else 's', ', '.join(s[:3]))
+                 for g, o, role, s in hits[:5]]
+        raise StepFailed(
+            "step '%s': %s%s. No file can import both, so an extension of that carve cannot work: take a fresh "
+            "carve with a statement_suffix (drop `frozen`), or bridge through a bundle-free statement "
+            "(references/openai-ports.md, q245)" % (step, '; '.join(lines),
+                                                    ' (and %d more)' % (len(hits) - 5) if len(hits) > 5 else ''))
+
     def root(self):
         files = os.listdir(os.path.join(self.ws, 'Solutions', self.p['folder']))
         return module_root_name(self.p['root_module'], self.prefixes(), files)
@@ -1304,6 +1379,7 @@ class Pipeline:
         self.apply_auto(cfg)
         json.dump(cfg, open(path, 'w'), indent=1)
         self.state['config_set_applied'] = dict(self.p.get('config_set') or {})
+        self.check_def_clashes('config')
 
     def apply_auto(self, cfg):
         """What the pipeline itself set once publishing began (pipeline_state.json `auto_config`), over
@@ -1399,6 +1475,7 @@ class Pipeline:
         self.run_cmds('extdefs', [self.tool('carve_prep', *a)])
 
     def step_plan(self):
+        self.check_def_clashes('plan')          # `frozen` may have come with config_set after config ran
         self.run_cmds('plan', [self.tool('carve', 'plan', 'config.json')])
         self.check_live_pieces('plan')
 

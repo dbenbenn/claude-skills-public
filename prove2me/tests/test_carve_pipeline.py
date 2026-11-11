@@ -526,6 +526,63 @@ def test_once_publishing_started_a_defs_edit_stops_for_a_person(env):
     assert ('carve_prep', 'config') not in tools_called(env)
 
 
+# ---------------------------------------------------------------- frozen bundles that declare the goal's names
+
+CLASH_DEF = 'namespace OAI.X\n\ndef Graph := 1\n\ndef deg := 2\n\nend OAI.X\n'
+
+
+def _frozen(env, text, imports=''):
+    lib = env.tmp / 'frozen_lib'
+    lib.mkdir(exist_ok=True)
+    (lib / 'Def_OLD000.lean').write_text('import Mathlib\n' + imports + text)
+    (env.tmp / 'frozen_plan.json').write_text(json.dumps({'bundles': [{'name': 'OLD000'}]}))
+    return {'frozen': {'plan': str(env.tmp / 'frozen_plan.json'), 'bundles': ['OLD000'], 'lib': str(lib)}}
+
+
+def test_frozen_bundles_declaring_the_goals_definitions_stop_at_config(env):
+    # q228/q236/q240/q245 (2026-11): extensions of an earlier carve whose bundles (or the Def_ bundle they import)
+    # declare the same names as the goal's own Def_ bundle: no file can import both; each cost an hour or more
+    (env.ws / 'Definitions' / 'Def_A.lean').write_text(CLASH_DEF)
+    cs = _frozen(env, 'namespace OAI.X\ndef Graph := 1\n/- def deg := 2 -/\nend OAI.X\n')
+    r = run(env, *ARGS, '--config-set', json.dumps(cs))
+    assert r.returncode == 1
+    out = r.stdout + r.stderr
+    assert "step 'config'" in out and 'Def_A' in out and 'frozen bundle Def_OLD000' in out, out
+    assert 'both declare 1 name' in out and 'OAI.X.Graph' in out and 'statement_suffix' in out
+    assert ('carve', 'graph') not in tools_called(env)
+
+
+def test_a_def_bundle_a_frozen_bundle_imports_is_compared_too(env):
+    # q236/q240: the frozen bundles import the earlier goal's Def_ bundle, a second comparator file's copy
+    (env.ws / 'Definitions' / 'Def_A.lean').write_text(CLASH_DEF)
+    (env.ws / 'Definitions' / 'Def_Other.lean').write_text(CLASH_DEF)
+    cs = _frozen(env, 'def unrelated := 3\n', imports='import Definitions.Def_Other\n')
+    r = run(env, *ARGS, '--config-set', json.dumps(cs))
+    out = r.stdout + r.stderr
+    assert r.returncode == 1 and 'Def_Other (imported by frozen bundle Def_OLD000)' in out, out
+    assert 'both declare 2 names' in out
+
+
+def test_frozen_bundles_with_other_names_pass(env):
+    (env.ws / 'Definitions' / 'Def_A.lean').write_text(CLASH_DEF)
+    cs = _frozen(env, 'namespace OAI.Y\ndef Graph := 1\nend OAI.Y\n')
+    r = run(env, *ARGS, '--config-set', json.dumps(cs), '--stop-after', 'plan')
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_frozen_bundles_set_after_config_are_checked_at_plan(env):
+    (env.ws / 'Definitions' / 'Def_A.lean').write_text(CLASH_DEF)
+    assert run(env, *ARGS).returncode == 0
+    p = json.load(open(env.dir / 'pipeline.json'))
+    p['config_set'] = dict(p.get('config_set') or {}, **_frozen(env, 'namespace OAI.X\ndef deg := 2\nend OAI.X\n'))
+    json.dump(p, open(env.dir / 'pipeline.json', 'w'))
+    env.log.write_text('')
+    r = run(env)
+    out = r.stdout + r.stderr
+    assert r.returncode == 1 and "step 'plan'" in out and 'OAI.X.deg' in out, out
+    assert ('carve', 'plan') not in tools_called(env)
+
+
 # ---------------------------------------------------------------- oai_meta.json is checked at config
 
 def test_missing_meta_fails_at_config(env):
