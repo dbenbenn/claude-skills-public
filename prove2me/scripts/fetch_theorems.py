@@ -44,6 +44,12 @@ def lookup_bundle(name):
     tid = lookup(name)
     if tid:
         return tid
+    # the exact-name filter first: q= ranks a near-namesake above the bundle itself and can push it past
+    # the page (`mm_spectral` lost to `mme_mm_spectral` and others, 2026-11-11)
+    r = call('GET', '/definitions?definition_name=%s' % name)
+    hit = [d for d in (r.get('definitions') or []) if d.get('definition_name') == name]
+    if hit:
+        return hit[0].get('definition_id')
     r = call('GET', '/definitions?q=%s&limit=20' % name)
     hit = [d for d in (r.get('definitions') or []) if d.get('definition_name') == name]
     return hit[0].get('definition_id') if hit else None
