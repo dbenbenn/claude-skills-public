@@ -631,9 +631,13 @@ def _total_map_rewrites(text, known=None):
         decl = s[_decl_start(s, pos):pos]
         return _pm_fallback(_aem_named(_site_maps(window, decl, defs), decl, lemmas))
 
-    text = re.sub(r"(?m)^([ \t]*(?:have|let|haveI|letI)\b[^\n:]*:[ \t]*IsProbabilityMeasure\b[^\n]*?)[ \t]*:=[ \t]*"
-                  r"(?:inferInstance|by infer_instance)[ \t]*$",
-                  lambda m: m.group(1) + ' := by ' + fb(m.string, m.start(), m.group(1)), text)
+    # binders before the colon (`let (i : ι) : …`) and a `∀ i,` instance family proved by `fun _ => inferInstance`,
+    # also on the next line (q234)
+    text = re.sub(r"(?m)^([ \t]*(?:have|let|haveI|letI)\b(?:[^\n:()\[\]{}]|\([^()\n]*\)|\{[^{}\n]*\}|\[[^\[\]\n]*\])*"
+                  r":[ \t]*(?:∀[^,\n]*,[ \t]*)?IsProbabilityMeasure\b[^\n]*?)[ \t]*:=([ \t]*\n[ \t]*)?"
+                  r"(?(2)|[ \t]*)(fun\b[^\n=]*=>[ \t]*)?(?:inferInstance|by infer_instance)[ \t]*$",
+                  lambda m: m.group(1) + ' :=' + (m.group(2) or ' ') + (m.group(3) or '') + 'by '
+                  + fb(m.string, m.start(), m.group(1)), text)
     text = re.sub(r"(?m)^([^\n]*\bIsProbabilityMeasure\b[^\n]*:=[ \t]*by[ \t]+[^\n]*;[ \t]*)infer_instance[ \t]*$",
                   lambda m: m.group(1) + '(%s)' % fb(m.string, m.start(), m.group(1)), text)
     text = re.sub(r"inferInstanceAs[ \t]*\((IsProbabilityMeasure[ \t]+(" + _ARG + r"))\)",

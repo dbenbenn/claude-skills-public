@@ -1481,6 +1481,23 @@ def test_have_let_haveI_of_isprobabilitymeasure_by_inferinstance_get_the_fallbac
     assert O.core_rewrites(out) == out                                      # idempotent
 
 
+def test_isprobabilitymeasure_instance_with_binders_gets_the_fallback():
+    # q234 (irrational rotation): the binder form `let (i : ι) : IsProbabilityMeasure … := inferInstance` and a
+    # `∀ i, IsProbabilityMeasure …` proved by `fun _ => inferInstance` (on the next line) escaped the rule
+    src = ("  let (index : ι) : IsProbabilityMeasure ((μ index).map (obs index)) := inferInstance\n"
+           "  haveI {j : ι} : IsProbabilityMeasure ((μ j).map g) := by infer_instance\n"
+           "  have : ∀ i, IsProbabilityMeasure ((coordinateLaw P i).map (fun z => z.2.1)) :=\n"
+           "    fun _ => inferInstance\n"
+           "  letI : ∀ i, IsProbabilityMeasure ((ν i).map g) := fun i => inferInstance\n")
+    out = O.core_rewrites(src)
+    assert "  let (index : ι) : IsProbabilityMeasure ((μ index).map (obs index)) := by %s\n" % FALLBACK in out
+    assert "  haveI {j : ι} : IsProbabilityMeasure ((μ j).map g) := by %s\n" % FALLBACK in out
+    assert ("  have : ∀ i, IsProbabilityMeasure ((coordinateLaw P i).map (fun z => z.2.1)) :=\n"
+            "    fun _ => by %s\n" % FALLBACK) in out
+    assert "  letI : ∀ i, IsProbabilityMeasure ((ν i).map g) := fun i => by %s\n" % FALLBACK in out
+    assert O.core_rewrites(out) == out
+
+
 def test_other_instances_by_inferinstance_are_left_alone():
     src = "  have : Fintype X := inferInstance\n  let i : Nonempty X := by infer_instance\n"
     assert O.core_rewrites(src) == src
