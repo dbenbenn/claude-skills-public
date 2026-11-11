@@ -80,8 +80,10 @@ and how to repair it.
   in the same hunk, re-add that as its own entry (q136).
 - **Make patches from a diff against a pristine port**, so each `count` is taken over the unpatched
   port, never the patched workspace (oaiq-063, -071). Keep the whole port run with patches `[]`, on the
-  current snapshot, as PRISTINE (q220: a PRISTINE of two modules counted 1 for a hunk the port has 96
-  times; q234: a pristine from before a tool fix makes patches the new rules already cover), repair by hand, then `scripts/mkpatches.py PRISTINE REPAIRED OUT.json`: it grows each hunk's
+  current snapshot, as PRISTINE (q234: a pristine from before a tool fix makes patches the new rules
+  already cover; mkpatches refuses an `old` that also occurs in a port module PRISTINE lacks, q220,
+  `--port-dir` when it cannot find the port), repair by hand, then `scripts/mkpatches.py PRISTINE
+  REPAIRED OUT.json`: it grows each hunk's
   context until `old` is unique and not cut mid-identifier, merges into an existing OUT.json, and checks
   the result reproduces the repair byte for byte (oaiq-043, -080). A line patch whose `old` is also the
   tail of a more-indented line double-counts: anchor it with a leading `\n` (oaiq-086). q141's
@@ -748,7 +750,8 @@ mixed old and new `carve.py` inside one carve).
   calibrate_pieces says so when it stops for a person. The same flat shape cannot be cut by forcing
   mid-chain lemmas either. Before publishing, add the row lemmas by port patch and force them with
   `config_set.template_forced`; after (an edited patches file is refused), publish the rows by hand with
-  `publish_standalone.py`, each proved from its entries and the aggregator from the rows (q172: 27 rows
+  `publish_standalone.py`, each proved from its entries and the aggregator from the rows, submitted with
+  `submit_solution.py --carve DIR` for imports only the carve holds (q172: 27 rows
   in about an hour, all accepted first time).
 - **Kernel computation is invisible to the cost model** (`decide +kernel`, `native_decide`) and is the
   usual cause of a slow item: see **Kernel time** under "Slow or odd failures".
@@ -990,7 +993,8 @@ Profile before forcing or splitting anything.
   explanations while the pieces measure.
 - **A patch `why` lands in the piece's explanation**: write Lean names in it in backticks (oaiq-064: a
   hypothesis `he` failed the pronoun check), except a lemma our Mathlib lacks (a d13f23b-only
-  `Measure.prod_apply₀`), which check-text looks up and stops on. Once publishing has started an edited
+  `Measure.prod_apply₀`), which check-text looks up and stops on (`mkpatches.py` refuses such a `--why`
+  up front, 07a30df; q243 met it after hours of measuring). Once publishing has started an edited
   patches file is refused, so fix the text by hand in the generated `publish/explanations/*.md`, which
   the template keeps (q146).
 - **The `names` step**, right after `gen`, looks every planned bundle and statement up (read-only, a few
