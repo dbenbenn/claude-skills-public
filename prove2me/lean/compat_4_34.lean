@@ -988,13 +988,18 @@ open MeasureTheory in
 measurable, a Dirac measure otherwise. OpenAI's Mathlib has a total `ProbabilityMeasure.map`; ours needs the proof
 (InvariantIsing `cavityBlockMarkedLaw`, q258). -/
 noncomputable def _root_.MeasureTheory.ProbabilityMeasure.mapAE {Ω Ω' : Type*} [MeasurableSpace Ω]
-    [MeasurableSpace Ω'] [Nonempty Ω'] (ν : ProbabilityMeasure Ω) (f : Ω → Ω') : ProbabilityMeasure Ω' := by
+    [MeasurableSpace Ω'] (ν : ProbabilityMeasure Ω) (f : Ω → Ω') : ProbabilityMeasure Ω' := by
   classical
   exact if h : AEMeasurable f (ν : Measure Ω) then ν.map h
-    else ⟨Measure.dirac (Classical.arbitrary Ω'), inferInstance⟩
+    else ⟨Measure.dirac (f (Classical.choice (by
+      by_contra hne
+      rw [not_nonempty_iff] at hne
+      have h1 := measure_univ (μ := (ν : Measure Ω))
+      rw [Set.univ_eq_empty_iff.mpr hne] at h1
+      simp at h1))), inferInstance⟩
 open MeasureTheory in
 theorem _root_.MeasureTheory.ProbabilityMeasure.mapAE_eq {Ω Ω' : Type*} [MeasurableSpace Ω]
-    [MeasurableSpace Ω'] [Nonempty Ω'] (ν : ProbabilityMeasure Ω) {f : Ω → Ω'}
+    [MeasurableSpace Ω'] (ν : ProbabilityMeasure Ω) {f : Ω → Ω'}
     (h : AEMeasurable f (ν : Measure Ω)) : ν.mapAE f = ν.map h := by
   classical
   unfold ProbabilityMeasure.mapAE
