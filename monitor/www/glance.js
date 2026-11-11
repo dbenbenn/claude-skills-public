@@ -2,10 +2,22 @@
 // waiting for a person, gathered from status.json, agents.json and missions.json) and the Missions-in-flight
 // card (missions.json, written by the mission tracker; its buttons post to /request), and the Hand-offs card
 // (handoffs.json, written by tools/handoff; its buttons post to /request with kind 'handoff').
-// Globals used: esc, fmtAt, ago, last, agentsData, sparkSvg, queueLi, store.
+// Globals used: esc, fmtAt, fmtT, fmtDate, ago, last, agentsData, sparkSvg, queueLi, store, css, TZ, $id, keepScroll.
 let missionsData = null;
 let handoffsData = null;
 const GLANCE_SPAN = 3 * 3600;
+
+// ---- At a glance: the machine as small charts of the last 3 h, disk and quota as tiles ----
+// Memory and CPU are stacked by category (monitor.CATS) in the colours of the System resources charts: blue
+// Lean, orange queue workers, purple Claude sessions, grey the rest. Hovering one chart moves a cursor on all
+// of them, and the key under each title reads that moment's values (the latest sample otherwise). The charts
+// are built once and only get new data every 30 s; a new width, theme or set of tiles rebuilds them.
+const G_CAT = {lean: ['--series-1', 'Lean'], queue: ['--series-2', 'queue'], claude: ['--series-4', 'Claude'], rest: ['--rest', 'rest']};
+const G_GROUPS = ['lean', 'queue', 'claude', 'rest'];
+let gCharts = {}, gKey = '', gNow = 0;
+const gSum = o => Object.values(o || {}).reduce((a, b) => a + b, 0);
+const gTick = v => Number.isInteger(v) || Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1);
+const gAlpha = (c, a) => /^#[0-9a-f]{6}$/i.test(c) ? c + a : c;
 
 function tileHtml({label, value, sub, href, level, spark, title}){
   return `<a class="gt${level ? ' ' + level : ''}" href="${href}" title="${esc(title || 'Details below')}">
@@ -13,37 +25,114 @@ function tileHtml({label, value, sub, href, level, spark, title}){
     <span class="gs">${esc(sub || '')}</span>${spark || ''}</a>`;
 }
 
+function chartTile(id, label, cls){
+  return `<div class="gt gc ${cls || ''}" id="gt-${id}"><div class="gh"><a class="gl" href="#t-sys" title="The detailed chart, with any range">${esc(label)} ›</a>
+    <span class="gv" id="gv-${id}"></span><span class="gs" id="gs-${id}"></span></div>
+    <div class="gkey" id="gk-${id}"></div><div class="gplot" id="gc-${id}"></div></div>`;
+}
+
+function setTile(id, {value, sub, level}){
+  $id('gv-' + id).innerHTML = value; $id('gs-' + id).textContent = sub || '';
+  $id('gt-' + id).classList.toggle('warn', level === 'warn'); $id('gt-' + id).classList.toggle('alarm', level === 'alarm');
+}
+
+// the key line under a chart's title: one swatch and value per series, at the cursor (with its time) or the latest sample
+function setKey(id, t, items){
+  const when = t == null || t === 'now' ? '' : `<span class="gkt">${esc(fmtT(t))}</span>`;
+  $id('gk-' + id).innerHTML = when + items.map(([c, l, v]) => `<span><i style="background:var(${c})"></i>${esc(l)} <b>${v}</b></span>`).join('');
+}
+
+function gChart(id, height, series, data, yRange, yLabel, onCursor){
+  const el = $id('gc-' + id);
+  if (!el) return;
+  if (!gCharts[id]) {
+    const ax = {stroke: css('--text-muted'), grid: {stroke: css('--grid'), width: 1}, font: '10.5px system-ui'};
+    gCharts[id] = new uPlot({
+      width: Math.max(180, el.clientWidth), height,
+      tzDate: ts => uPlot.tzDate(new Date(ts*1e3), TZ),
+      padding: [6, 8, 0, 0],
+      cursor: {y: false, sync: {key: 'glance'}, drag: {x: false, y: false, setScale: false}, points: {size: 5}},
+      select: {show: false},
+      legend: {show: false},
+      scales: {x: {time: true, range: () => [gNow - GLANCE_SPAN, gNow]}, y: {range: yRange}},
+      axes: [{...ax, ticks: {stroke: css('--grid'), size: 3}, size: 22, gap: 2, space: 52, values: (u, sp) => sp.map(fmtT)},
+             {...ax, ticks: {show: false}, size: 30, gap: 3, space: 20, values: (u, vals) => vals.map(gTick),
+              label: yLabel, labelSize: 13, labelGap: 0, labelFont: '10.5px system-ui'}],
+      series: [{}, ...series],
+      hooks: {setCursor: [u => u._on && u._on(u.cursor.idx)]},
+    }, data, el);
+  } else gCharts[id].setData(data);
+  gCharts[id]._on = onCursor;
+  onCursor(null);
+}
+
+// stacked areas: cumulative sums, drawn top category first so each lower one paints over it
+function gStacked(id, height, rows, pick, unit, yRange){
+  const x = rows.map(r => r.t), cum = []; let acc = x.map(() => 0);
+  for (const g of G_GROUPS) { acc = acc.map((a, i) => { const v = pick(rows[i]); return v == null ? null : (a ?? 0) + (v[g] ?? 0); }); cum.push(acc); }
+  const order = G_GROUPS.map((g, i) => i).reverse();
+  const series = order.map(i => { const c = css(G_CAT[G_GROUPS[i]][0]); return {stroke: c, fill: c, width: 1, points: {show: false}}; });
+  gChart(id, height, series, [x, ...order.map(i => cum[i])], yRange, unit, idx => {
+    const j = idx ?? rows.length - 1, r = rows[j], v = r && pick(r);
+    setKey(id, idx == null ? 'now' : r.t, G_GROUPS.map(g => [G_CAT[g][0], G_CAT[g][1], v ? (v[g] ?? 0).toFixed(1) : '—']));
+  });
+}
+
+function gLines(id, height, x, defs, unit, yRange, fmt){
+  const series = defs.map(d => { const c = css(d.color); return {stroke: c, width: 1.75, fill: d.fill ? gAlpha(c, '33') : undefined, points: {show: false}}; });
+  gChart(id, height, series, [x, ...defs.map(d => d.ys)], yRange, unit, idx => {
+    const j = idx ?? x.length - 1;
+    setKey(id, idx == null ? 'now' : x[j], defs.map(d => [d.color, d.label, d.ys[j] == null ? '—' : fmt(d.ys[j])]));
+  });
+}
+
 function drawGlance(){
   const el = document.getElementById('glance');
   if (!el || !last || !last.system) return;
   const sy = last.system, M = sy.machine || [], r = M.length ? M[M.length-1] : null, now = last.updated;
-  if (!r) { el.innerHTML = ''; return; }
-  const recent = M.filter(x => x.t >= now - GLANCE_SPAN), cores = sy.cores_total || 1;
-  const sum = o => Object.values(o || {}).reduce((a, b) => a + b, 0);
-  const sp = (ys, top, label) => sparkSvg(recent.map((x, i) => [x.t, ys[i]]).filter(p => p[1] != null), 120, 22, top, label);
-  const tiles = [];
+  if (!r) { el.innerHTML = ''; gKey = ''; return; }
+  gNow = now;
+  const recent = M.filter(x => x.t >= now - GLANCE_SPAN - 60), cores = sy.cores_total || 1;
+  const P = sy.psi || [], lp = P.length ? P[P.length-1] : null, pr = P.filter(x => x[0] >= now - GLANCE_SPAN - 60);
+  const hasSwap = !!sy.swap_total_gib;
+  const key = [hasSwap, !!lp, document.documentElement.clientWidth, matchMedia('(prefers-color-scheme: dark)').matches].join('|');
+  if (key !== gKey) {
+    for (const u of Object.values(gCharts)) u.destroy();
+    gCharts = {}; gKey = key;
+    el.innerHTML = chartTile('mem', 'Memory', 'wide') + chartTile('cpu', 'CPU', 'wide') + chartTile('load', 'Load') +
+      (hasSwap ? chartTile('swap', 'Swap') : '') + (lp ? chartTile('psi', 'Stalls') : '') + '<div class="gmini" id="gmini"></div>';
+  }
   // memory: trouble is memory and swap nearly gone together (the banner's rule), not a full page cache
-  const memUsed = sum(r.mem), avail = sy.free_gib, swapFree = sy.swap_free_gib || 0;
-  tiles.push({label: 'Memory', value: `${memUsed.toFixed(1)}<small> / ${r.total.toFixed(0)} GiB</small>`,
-    sub: `${avail} GiB available`, href: '#t-sys', level: avail + swapFree < 4 ? 'alarm' : avail < 4 ? 'warn' : '',
-    spark: sp(recent.map(x => sum(x.mem)), r.total, 'memory in use, last 3 h')});
-  const cpu = r.cpu ? sum(r.cpu) : null;
-  tiles.push({label: 'CPU', value: cpu == null ? '—' : `${cpu.toFixed(1)}<small> / ${cores} cores</small>`, sub: 'busy now', href: '#t-sys',
-    spark: sp(recent.map(x => x.cpu ? sum(x.cpu) : null), null, 'CPU in use, last 3 h')});
-  tiles.push({label: 'Load', value: r.load1.toFixed(2), sub: `1-min avg · ${cores} cores`, href: '#t-sys',
-    level: r.load1 > cores * 1.5 ? 'warn' : '', spark: sp(recent.map(x => x.load1), null, 'load, last 3 h')});
-  if (sy.swap_total_gib) {
+  const memUsed = gSum(r.mem), avail = sy.free_gib, swapFree = sy.swap_free_gib || 0;
+  setTile('mem', {value: `${memUsed.toFixed(1)}<small> / ${r.total.toFixed(0)} GiB</small>`, sub: `${avail} GiB available`,
+    level: avail + swapFree < 4 ? 'alarm' : avail < 4 ? 'warn' : ''});
+  gStacked('mem', 128, recent, x => x.mem, 'GiB', [0, r.total]);
+  const cpu = r.cpu ? gSum(r.cpu) : null;
+  setTile('cpu', {value: cpu == null ? '—' : `${cpu.toFixed(1)}<small> / ${cores} cores</small>`, sub: 'busy now; scale fits the 3 h'});
+  // scaled to what is visible, so a core or two of use is not lost against all of them
+  gStacked('cpu', 128, recent, x => x.cpu, 'cores', (u, mn, mx) => [0, Math.min(cores, Math.max(1, Math.ceil((mx || 0) * 1.15)))]);
+  setTile('load', {value: r.load1.toFixed(2), sub: `1-min avg · ${cores} cores`, level: r.load1 > cores * 1.5 ? 'warn' : ''});
+  gLines('load', 116, recent.map(x => x.t), [{label: 'load', color: '--series-1', ys: recent.map(x => x.load1), fill: true}], 'load',
+    (u, mn, mx) => [0, Math.max(1, Math.ceil((mx || 0) * 1.15))], v => v.toFixed(2));
+  if (hasSwap) {
     const used = sy.swap_total_gib - sy.swap_free_gib;
-    tiles.push({label: 'Swap', value: `${used.toFixed(1)}<small> / ${sy.swap_total_gib.toFixed(0)} GiB</small>`, sub: 'Lean spills here', href: '#t-sys',
-      level: used > sy.swap_total_gib * 0.5 ? 'warn' : '', spark: sp(recent.map(x => x.swap ?? null), sy.swap_total_gib, 'swap in use, last 3 h')});
+    setTile('swap', {value: `${used.toFixed(1)}<small> / ${sy.swap_total_gib.toFixed(0)} GiB</small>`, sub: 'Lean spills here',
+      level: used > sy.swap_total_gib * 0.5 ? 'warn' : ''});
+    gLines('swap', 116, recent.map(x => x.t), [{label: 'swap used', color: '--series-5', ys: recent.map(x => x.swap ?? null), fill: true}], 'GiB',
+      (u, mn, mx) => [0, Math.max(1, Math.min(sy.swap_total_gib, Math.ceil((mx || 0) * 1.3)))], v => v.toFixed(1) + ' GiB');
   }
-  const P = sy.psi || [], lp = P.length ? P[P.length-1] : null;
   if (lp) {
-    const pr = P.filter(x => x[0] >= now - GLANCE_SPAN);
-    tiles.push({label: 'Stalls', value: `${Math.max(lp[3], lp[5]).toFixed(1)}<small> %</small>`, sub: `mem ${lp[3].toFixed(1)} · I/O ${lp[5].toFixed(1)}`,
-      href: '#t-sys', level: lp[3] > 5 || lp[5] > 20 ? 'alarm' : '', title: 'Share of time every task waited (10 s average); the banner fires at memory 5%, I/O 20%',
-      spark: sparkSvg(pr.map(x => [x[0], Math.max(x[3], x[5])]), 120, 22, null, 'worst full stall, last 3 h')});
+    setTile('psi', {value: `${Math.max(lp[3], lp[5]).toFixed(1)}<small> %</small>`, sub: 'worst of memory, I/O',
+      level: lp[3] > 5 || lp[5] > 20 ? 'alarm' : ''});
+    $id('gt-psi').title = 'Share of time tasks waited (10 s average): memory and I/O full (every task waited, what freezes the box), CPU some. The banner fires at memory 5%, I/O 20%';
+    gLines('psi', 116, pr.map(x => x[0]), [
+        {label: 'mem', color: '--series-4', ys: pr.map(x => x[3])},
+        {label: 'I/O', color: '--series-2', ys: pr.map(x => x[5])},
+        {label: 'CPU', color: '--series-1', ys: pr.map(x => x[1])}], '%',
+      (u, mn, mx) => [0, Math.max(5, Math.ceil((mx || 0) * 1.15))], v => v.toFixed(1) + '%');
   }
+  // disk and quota change over days, not hours: tiles
+  const tiles = [];
   const dn = sy.disk && sy.disk.now;
   if (dn) tiles.push({label: 'Disk', value: `${dn.free.toFixed(0)}<small> GiB free</small>`, sub: `${dn.used.toFixed(0)} of ${dn.total.toFixed(0)} GiB used`, href: '#t-disk',
     level: dn.free < 20 ? 'alarm' : dn.free < 40 ? 'warn' : '', title: 'The banner warns below 20 GiB free; the OAI queue stops launching below 40'});
@@ -53,8 +142,14 @@ function drawGlance(){
     tiles.push({label: 'Quota, 7 days', value: `${qn[3].toFixed(0)}<small> %</small>`, sub: qn[4] ? `resets ${fmtDate(qn[4])}` : '', href: '#t-quota',
       level: qn[3] >= 90 ? 'alarm' : qn[3] >= 75 ? 'warn' : '', spark: sparkSvg(qs, 120, 22, 100, '7-day quota, last 7 days')});
   }
-  el.innerHTML = tiles.map(tileHtml).join('');
+  $id('gmini').innerHTML = tiles.map(tileHtml).join('');
 }
+
+// a new width or theme rebuilds the charts (drawGlance's key); phones fire resize while scrolling, so width only
+let gWidth = document.documentElement.clientWidth;
+window.addEventListener('resize', () => { clearTimeout(window._grz); window._grz = setTimeout(() => {
+  const w = document.documentElement.clientWidth; if (w === gWidth) return; gWidth = w; keepScroll(drawGlance); }, 200); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => keepScroll(drawGlance));
 
 // ---- Needs you ----
 const WAITS = {you: ['WAITING FOR YOU', 'warn'], start: ['READY TO START', 'ready'], claude: ['CLAUDE WORKING', 'running'],
