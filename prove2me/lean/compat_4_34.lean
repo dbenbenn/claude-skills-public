@@ -977,3 +977,9 @@ theorem _root_.ProbabilityTheory.measurable_multivariateGaussian {ι : Type*} [F
     fun_prop
   let A := {((μ, S), x) | μ + toEuclideanCLM (𝕜 := ℝ) (CFC.sqrt S) x ∈ s}
   exact measurable_measure_prodMk_left (s := A) (hs.preimage hf)
+/-- Mathlib d13f23b's `ProbabilityTheory.hasLaw_map` (InvariantIsing, q258). -/
+theorem _root_.ProbabilityTheory.hasLaw_map {Ω 𝓧 : Type*} {mΩ : MeasurableSpace Ω} {m𝓧 : MeasurableSpace 𝓧}
+    {P : MeasureTheory.Measure Ω} {X : Ω → 𝓧} (hX : AEMeasurable X P) :
+    ProbabilityTheory.HasLaw X (P.map X) P where
+  aemeasurable := hX
+  map_eq := rfl
