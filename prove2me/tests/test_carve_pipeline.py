@@ -2002,6 +2002,20 @@ def test_a_split_that_returns_the_bundle_unchanged_profiles_it_instead_of_anothe
     assert st['bundle_splits'] == 1 and st['bundle_split_nodes'] == {'B10': ['d_B10', 'e_B10']}
 
 
+def test_a_split_that_crashed_is_not_taken_for_one_that_returned_the_bundle_unchanged(env, monkeypatch):
+    # q249: `carve.py split --only OAIQ249SI006` raised (an import cycle) after calibrate had recorded the
+    # bundle's declarations; once the bug was fixed, the resume called 006 unshrinkable and never split it
+    _overlap_carve(env, monkeypatch, bundles={'B%d' % i: (55, 20) for i in range(10)} | {'B10': (55, 150)},
+                   seq=[{}, {'bundle:B10': _t(140)}])
+    monkeypatch.setenv('STUB_HOOK_carve_measure_config_json', PROFILE_HOOK + MEASURE_HOOK)
+    monkeypatch.setenv('STUB_HOOK_carve_split', 'sys.exit(1)')
+    r = run(env, *ARGS_NEW, '--stop-after', 'calibrate')
+    assert r.returncode == 1 and tools_called(env).count(('carve', 'split')) == 1
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert not st.get('bundle_split_nodes') and not st.get('bundle_splits')
+    assert _profiled(env) == []
+
+
 def test_a_classic_carve_whose_only_slow_bundle_is_one_declaration_stops_without_replanning(env, monkeypatch):
     _calibration_setup(env, monkeypatch, None)
     plan = _plan({'B0': 55, 'B1': 55})

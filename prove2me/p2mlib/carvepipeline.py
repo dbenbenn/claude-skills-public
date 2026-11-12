@@ -2322,9 +2322,11 @@ class Pipeline:
             'published items are frozen' if self.anything_published(cfg) else
             '%d of %d bundles over: no systematic error' % (len(names), measured)))
         self.calibrate_log(lines)
-        self.remember_split(plan, names)
+        # recorded once the split ran: a split that crashed (q249: an import cycle) left the bundle's
+        # declarations recorded, and the resume called it unshrinkable without ever splitting it
         self.run_cmds('calibrate', [self.tool('carve', 'split', 'config.json', times_path, '--limit',
                                               '%g' % cfg.get('budget', 55), '--only', ','.join(names))])
+        self.remember_split(plan, names)
         self.state['bundle_splits'] = n + 1
         self.invalidate('gen')
         self.restart = True
