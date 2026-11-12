@@ -1811,6 +1811,25 @@ def test_split_bundles_cuts_only_the_slow_ones_and_keeps_the_rest(g):
     assert all(pos[i] < pos[b['name']] for b in q['bundles'] for i in b['imports'])
 
 
+def test_split_bundles_ignores_a_guessed_simp_edge_against_the_plan_order(g, monkeypatch):
+    # q249: implicit_deps said a declaration of the live first bundle "may use" simp lemmas of later
+    # bundles (it compiled without them); split_bundles counted the guess and raised "bundle split
+    # made an import cycle". A guessed edge counts only toward a bundle the old one already imported.
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='S', chunker='schedule')
+    last = next(b for b in reversed(p['bundles']) if b['imports'])
+    first = next(b for b in p['bundles'] if b['name'] == last['imports'][0])
+    k, d = first['nodes'][0], last['nodes'][-1]      # first <- last: the guess closes a cycle
+    real = C.implicit_deps
+    monkeypatch.setattr(C, 'implicit_deps', lambda *a: {**real(*a), k: real(*a).get(k, set()) | {d}})
+    big = max(p['bundles'], key=lambda b: len(b['nodes']))
+    q = C.split_bundles(g, p, [big['name']], C.size_costs(g, bytes_per_second=10000), budget=0.001,
+                        bundle_prefix='S')
+    pos = {b['name']: i for i, b in enumerate(q['bundles'])}
+    assert all(pos[i] < pos[b['name']] for b in q['bundles'] for i in b['imports'])
+
+
 def test_a_local_instance_comes_back_before_a_variable_that_needs_it(g):
     out = C.Carver(g).carve({'CD.uses_hdef'}, g.have_names({'CD.uses_hdef', 'CD.Wide'}),
                             sorry={'CD.uses_hdef'})

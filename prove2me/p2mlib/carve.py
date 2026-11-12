@@ -2735,11 +2735,28 @@ def split_bundles(g, plan, names, cost, budget, bundle_prefix=None, top_keeps_na
             for x in mine_names[:-1]:
                 top_of[x] = b['name']
     bidx = {k: j for j, ch in enumerate(chunks) for k in ch}
+    # an implicit dependency (a simp lemma k may use with no trace) is a guess: it counts only between
+    # parts of one split bundle or toward a bundle the old one already imported (q249: a live bundle's
+    # declaration "may use" simp lemmas of two later bundles; it compiled without them, and the guessed
+    # edges made an import cycle)
+    origin = {k: b['name'] for b in plan['bundles'] for k in b['nodes']}
+    oimp = {b['name']: set(b.get('imports') or ()) for b in plan['bundles']}
+    below = {}
+
+    def under(n):
+        if n not in below:
+            below[n] = set()
+            for i in oimp.get(n, ()):
+                below[n] |= {i} | under(i)
+        return below[n]
     bimp = [set() for _ in chunks]
     for j, ch in enumerate(chunks):
         for k in ch:
-            for d in g.nodes[k].deps | extra.get(k, set()):
+            for d in g.nodes[k].deps:
                 if d in bidx and bidx[d] != j:
+                    bimp[j].add(bidx[d])
+            for d in extra.get(k, set()) - g.nodes[k].deps:
+                if d in bidx and bidx[d] != j and (origin[d] == origin[k] or origin[d] in under(origin[k])):
                     bimp[j].add(bidx[d])
     # a bundle outside a chain-split group imports its top part (the old name) for any part it needs
     for j in range(len(chunks)):
