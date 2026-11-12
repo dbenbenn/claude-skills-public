@@ -3794,3 +3794,20 @@ def test_compat_has_probabilitymeasure_mapae():
     src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lean',
                             'compat_4_34.lean')).read()
     assert 'ProbabilityMeasure.mapAE ' in src and 'ProbabilityMeasure.mapAE_eq' in src
+
+
+def test_apply_natcast_le_one_drops_old_explicit_arguments():
+    # q244/q359 (ClassFieldTheory on Mathlib 5ed2965): `IsNonarchimedean.apply_natCast_le_one` took `f 0 = 0`-style and
+    # `f 1 = 1` arguments; ours takes only the nonarchimedean hypothesis (n implicit). Six sites in two batches.
+    src = ("example := ⟨1, fun n => h.apply_natCast_le_one (by simp) (by simp)⟩\n"
+           "example :=\n  (hvFna.apply_natCast_le_one\n    (map_zero_le vF 1) (map_one vF))\n"
+           "example := IsNonarchimedean.apply_natCast_le_one hvK (by simp) (by simp)\n"
+           "example := h.apply_natCast_le_one\n"
+           "example := (h.apply_natCast_le_one : vF 3 ≤ 1)\n")
+    out = O.core_rewrites(src)
+    assert "fun n => h.apply_natCast_le_one⟩\n" in out
+    assert "  (hvFna.apply_natCast_le_one)\n" in out
+    assert "example := IsNonarchimedean.apply_natCast_le_one hvK\n" in out
+    assert "example := h.apply_natCast_le_one\n" in out
+    assert "example := (h.apply_natCast_le_one : vF 3 ≤ 1)\n" in out
+    assert O.core_rewrites(out) == out

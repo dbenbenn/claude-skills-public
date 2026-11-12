@@ -1858,6 +1858,12 @@ def core_rewrites(text, compat_ns='OAI', known=None):
         text = re.sub(r"(?:(?<![\w'])List|(?<=[\w')\]]))\.%s(?![\w'])" % _old,
                       lambda m, n=_new, o=_old: m.group(0)[:-len(o)] + n, text)
     text = _classical_not_imp(text, known)
+    # ClassFieldTheory's Mathlib (5ed2965): `IsNonarchimedean.apply_natCast_le_one` took two more explicit arguments
+    # (`f 0`- and `f 1 = 1`-hypotheses); ours takes only `hna`, `n` implicit (q244/q359, six sites). Only parenthesized
+    # arguments are dropped, so a tactic on the next line is never taken for one.
+    _parg = r"\((?:[^()]|\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\))*\)"
+    text = re.sub(r"((?<=[\w')\]])\.apply_natCast_le_one|(?<![\w.'])(?:IsNonarchimedean\.)?apply_natCast_le_one\s+"
+                  + _ARG + r")\s+" + _parg + r"\s+" + _parg, r"\1", text)
     text = _elpnorm_smul_measure_of_ne_top(text)
     # d13f23b renames (UnitDistances, StandardMap 2026-10-25)
     text = re.sub(r"(?<![\w.'])birkhoffSum_succ_apply'(?![\w'])", "birkhoffSum_succ'", text)
