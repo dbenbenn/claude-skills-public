@@ -2924,6 +2924,23 @@ def test_an_unseen_instance_on_an_abbrev_is_hidden_where_its_class_was_asked(g):
     assert 'natOptInhabited' not in C.gen_piece(g, p, 'CD.LI.box_get')
 
 
+def test_an_abbrev_headed_instance_matches_a_problem_missing_its_other_heads(g, monkeypatch):
+    # q249: SphereEversion's `Membership (E × F × (E →L[ℝ] F)) (RelLoc E F)`, RelLoc an abbrev of
+    # `Set`, has heads {Prod, RelLoc}; `x ∈ univ` in inductive_construction_of_loc' was recorded as
+    # `Membership {Set}` (the element type, an outParam, still a metavariable), so requiring Prod
+    # left it unhidden and the bundle's `x ∈ univ` stuck. Faked on InstLate's natOptInhabited.
+    cls, probs = g.instance_class, g.inst_problems
+    ci = cls('CD.LI.natOptInhabited')
+    monkeypatch.setattr(g, 'instance_class', lambda k: (ci[0], list(ci[1]) + ['Prod'])
+                        if k == 'CD.LI.natOptInhabited' else cls(k))
+    monkeypatch.setattr(g, 'inst_problems', lambda k: [(ci[0], {'Option'})]
+                        if k == 'CD.LI.box_get' else probs(k))
+    assert C._could_match(g, 'CD.LI.box_get', 'CD.LI.natOptInhabited')
+    monkeypatch.setattr(g, 'inst_problems', lambda k: [('Membership', {'Option'})]
+                        if k == 'CD.LI.box_get' else probs(k))
+    assert not C._could_match(g, 'CD.LI.box_get', 'CD.LI.natOptInhabited')    # another class
+
+
 @pytest.mark.lean
 def test_hidden_abbrev_instances_compile(g, tmp_path):
     _compile_in_publish_order(g, _opt_plan(), tmp_path)

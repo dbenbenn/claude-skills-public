@@ -3117,8 +3117,14 @@ def _could_match(g, k, i):
     if not asked:
         return False
     # a head that is a project abbreviation may show unfolded in the problem (`Subtype`), as it does
-    # to instance search: it matches anything
-    hs = {h for h in ci[1] or () if not _reducible_decl(g, h)}
+    # to instance search: it matches anything. Then so does the instance, for every problem of its
+    # class: its other heads may sit at an outParam the problem still had as a metavariable, which
+    # records no head (q249: `Membership (E × F × (E →L[ℝ] F)) (RelLoc E F)`, RelLoc an abbrev of
+    # `Set`, answered `x ∈ univ` and `t ∈ Set.Icc 0 1`, recorded `Membership {Set}`, with no `Prod`;
+    # unhidden there, the problem stuck or the numerals defaulted to ℕ)
+    if any(_reducible_decl(g, h) for h in ci[1] or ()):
+        return any(cls == ci[0] for cls, _ in asked)
+    hs = set(ci[1] or ())
     return any(cls == ci[0] and hs <= heads for cls, heads in asked)
 
 
