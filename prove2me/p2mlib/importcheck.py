@@ -61,7 +61,7 @@ def module_theorem(mod, ws, libs=()):
         if m and stack:
             stack.pop()
             continue
-        m = re.match(r'^\s*(?:private\s+)?(?:theorem|lemma)\s+(\S+)', line)
+        m = re.match(r'^\s*(?:@\[[^\]]*\]\s*)?(?:private\s+)?(?:theorem|lemma)\s+(\S+)', line)
         if m:
             name = m.group(1)
             cands.append(name[len('_root_.'):] if name.startswith('_root_.') else

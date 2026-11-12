@@ -100,3 +100,13 @@ def test_module_theorem_reads_extra_lib_dirs(ws, tmp_path):
     assert I.module_theorem('Theorems.Thm_Q_r', str(ws)) is None
     assert I.module_theorem('Theorems.Thm_Q_r', str(ws), libs=[str(lib)]) == 'Q.r'
     assert I.module_theorem('Theorems.Thm_N_a', str(ws), libs=[str(lib)]) == 'N.a'     # the workspace first
+
+
+def test_module_theorem_reads_attributed_theorems(ws):
+    # q339: OAI's published `poly_forms` is `@[instance] theorem poly_forms : PolyTime forms` (q241 turned an
+    # `instance` into an attributed theorem); submit_solution.py refused every solution importing it
+    (ws / 'Theorems' / 'Thm_N_p.lean').write_text(
+        'namespace N\nattribute [-instance] _root_.N.q\n@[instance] theorem p : True := by\n  sorry\nend N\n')
+    (ws / 'Theorems' / 'Thm_N_s.lean').write_text('namespace N\n@[simp, instance] private lemma s : True := trivial\nend N\n')
+    assert I.module_theorem('Theorems.Thm_N_p', str(ws)) == 'N.p'
+    assert I.module_theorem('Theorems.Thm_N_s', str(ws)) == 'N.s'
