@@ -1828,6 +1828,14 @@ def test_split_bundles_ignores_a_guessed_simp_edge_against_the_plan_order(g, mon
                         bundle_prefix='S')
     pos = {b['name']: i for i, b in enumerate(q['bundles'])}
     assert all(pos[i] < pos[b['name']] for b in q['bundles'] for i in b['imports'])
+    # the same for a recorded dependency added after the bundle was published (q249: global-notation
+    # nodes, text-detected since e208fd3)
+    monkeypatch.setattr(C, 'implicit_deps', real)
+    monkeypatch.setattr(g.nodes[k], 'deps', g.nodes[k].deps | {d})
+    q = C.split_bundles(g, p, [big['name']], C.size_costs(g, bytes_per_second=10000), budget=0.001,
+                        bundle_prefix='S')
+    pos = {b['name']: i for i, b in enumerate(q['bundles'])}
+    assert all(pos[i] < pos[b['name']] for b in q['bundles'] for i in b['imports'])
 
 
 def test_a_local_instance_comes_back_before_a_variable_that_needs_it(g):
