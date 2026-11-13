@@ -531,3 +531,69 @@ def test_published_replaces_a_stub_by_the_published_theorem_and_a_dev_target_is_
 def test_published_refuses_a_name_that_is_no_stub(tmp_path):
     r, _ = _assemble(tmp_path, PUB_BP, PUB_PART, '--published', 'APT.inv=Theorems.Thm_BlockCycleRotation_one_div_min_le')
     assert r.returncode != 0 and 'not a Blueprint stub' in r.stdout + r.stderr
+
+
+# --- a Blueprint stacked on another Blueprint (q284), a Part outside the Blueprint's namespace (q353) ---
+
+def test_a_helper_with_stubs_that_a_part_restates_is_an_inner_blueprint(tmp_path):
+    # q284 (strong convergence, Puder retry): Q284Cnt imported the Blueprint Q284Sch, whose stubs Parts
+    # S1-S4 proved; Q284Sch was inlined with its `sorry` stubs kept although S1-S4 were on the command line
+    ws = str(tmp_path)
+    a = write(os.path.join(ws, 'Solutions', 'X', 'Sch.lean'),
+              'import Mathlib\n\nnamespace SA\n\ntheorem a_eq : 1 = 1 := by\n  sorry\n\nend SA\n')
+    t = write(os.path.join(ws, 'Solutions', 'X', 'Tools.lean'), 'import Mathlib\n\n-- not sorry\ndef t := 1\n')
+    u = write(os.path.join(ws, 'Solutions', 'X', 'Unused.lean'),
+              'import Mathlib\n\nnamespace SU\n\ntheorem u : 1 = 1 := sorry\n\nend SU\n')
+    v = write(os.path.join(ws, 'Solutions', 'X', 'Via.lean'),
+              'import Mathlib\n\nnamespace SV.Deep\n\ntheorem v : 1 = 1 := sorry\n\nend SV.Deep\n')
+    p1 = write(os.path.join(ws, 'Solutions', 'X', 'PartA1.lean'),
+               'import Solutions.X.Sch\nimport Solutions.X.Tools\n\nnamespace SA.PartA1\n\nend SA.PartA1\n')
+    # a Part reaching the stubs through the outer Blueprint, by its namespace alone
+    p2 = write(os.path.join(ws, 'Solutions', 'X', 'PartV.lean'),
+               'import Solutions.X.Cnt\n\nnamespace SV.Deep.PartV\n\nend SV.Deep.PartV\n')
+    helpers = [('Solutions.X.Sch', a), ('Solutions.X.Tools', t), ('Solutions.X.Unused', u), ('Solutions.X.Via', v)]
+    # Tools has no stub; Unused has one, but no Part imports it or opens a namespace under it
+    assert AB.inner_blueprints(helpers, [p1, p2]) == ['Solutions.X.Sch', 'Solutions.X.Via']
+    assert AB.inner_blueprints(helpers, [p1]) == ['Solutions.X.Sch']
+
+
+def test_another_blueprint_named_blueprint_is_not_the_blueprint(tmp_path):
+    # q284: an inner Blueprint whose module ends in `Blueprint` was taken for the main one and dropped
+    ws = str(tmp_path / 'ws')
+    bp = write(os.path.join(ws, 'Solutions', 'X', 'Blueprint.lean'), 'import Solutions.X.SchBlueprint\n')
+    write(os.path.join(ws, 'Solutions', 'X', 'SchBlueprint.lean'), 'import Mathlib\n')
+    texts = ['import Solutions.X.Blueprint\nimport Solutions.X.SchBlueprint\n']
+    assert AB.blueprint_modules(bp, texts, ws) == {'Solutions.X.Blueprint'}
+    # a Blueprint outside the workspace: an imported *Blueprint is taken for it, as before
+    out = write(str(tmp_path / 'src' / 'Blueprint.lean'), 'import Mathlib\n')
+    assert AB.blueprint_modules(out, texts, ws) == {'Solutions.X.Blueprint', 'Solutions.X.SchBlueprint'}
+
+
+STACK_A = (HDR + 'namespace SA\n\ndef one : Nat := 1\n\ntheorem a_eq : one = 1 := by\n  sorry\n\n'
+           'theorem two : one + one = 2 := by\n  rw [a_eq]\n\nend SA\n')
+STACK_B = (HDR + 'import $M.Sch\n\nnamespace SB\n\ntheorem b_eq : SA.one + SA.one + SA.one = 3 := by\n  sorry\n\n'
+           'theorem top : SA.one + (SA.one + SA.one + SA.one) = 4 := by\n  rw [b_eq, SA.a_eq]\n\nend SB\n')
+
+
+@pytest.mark.lean
+def test_a_blueprint_stacked_on_another_blueprint_assembles(tmp_path):
+    # q284 (strong convergence, Puder retry): Blueprint Cnt imported Blueprint Sch and used its stubs;
+    # assembling Cnt with Sch's Parts S1-S4 on the command line kept Sch's stubs ("still uses sorry:
+    # Puder.Q284S.tr_mem ...; no Part proves it"), and the worker assembled Sch by hand first
+    with Case('AsmStackTest') as c:
+        c.file('Sch', STACK_A)
+        bp = c.file('Cnt', STACK_B)
+        pa = c.file('PartA1', HDR + 'import $M.Sch\n\nnamespace SA.PartA1\n\n'
+                    'theorem a_eq : SA.one = 1 := rfl\n\nend SA.PartA1\n')
+        # Part B1 uses the inner stub, so Part A1's proof and its alias must come first
+        pb = c.file('PartB1', HDR + 'import $M.Cnt\n\nnamespace SB.PartB1\n\n'
+                    'theorem b_eq : SA.one + SA.one + SA.one = 3 := by\n  rw [SA.a_eq]\n\nend SB.PartB1\n')
+        out = tmp_path / 'out.lean'
+        r = run_assemble(bp, out, pb, pa)
+        text = assembled_ok(r, out, c.ws, 'SB.top')
+        assert '(2 stubs replaced)' in r.stdout and 'sorry' not in text and 'import Solutions.' not in text
+        assert 'alias a_eq := SA.PartA1.a_eq' in text and 'alias b_eq := SB.PartB1.b_eq' in text
+        assert text.index('def one') < text.index('theorem a_eq : SA.one = 1 := rfl') \
+            < text.index('alias a_eq') < text.index('theorem two') < text.index('alias b_eq')
+        r = run_assemble(bp, out, pa, pb, '--target', 'SB.top')
+        assembled_ok(r, out, c.ws, 'solution')

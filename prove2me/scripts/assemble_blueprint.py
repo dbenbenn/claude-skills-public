@@ -47,6 +47,10 @@ also given on the command line is not inlined: it is assembled once, as a Part, 
 that import it (inlined and assembled, it was "already declared", q155). A helper that imports the
 Blueprint or a Part, directly or through another helper, uses their text: it is assembled as a Part
 (after what it uses), not inlined ahead of the Blueprint (q188: "unknown identifier tOp").
+A helper that is itself a Blueprint -- it has a `sorry`, and a Part on the command line imports it or
+opens `namespace <its namespace>.Part<X>` -- is stacked, not inlined: it is assembled as a Blueprint
+ahead of this one, its stubs replaced by the Parts that restate them, and those Parts are placed ahead
+of their users (q284: Q284Cnt on Q284Sch, whose stubs were kept although Parts S1-S4 were given).
 
 Parts come in two layouts, told apart per Part:
 * import: the Part imports the Blueprint module (above);
@@ -171,6 +175,30 @@ def promote_helpers(helpers, bp_mods, imported):
     for m, path in helpers:
         if m not in imported and any(x in bp_mods or x in imported or x in out
                                      for x in imports(open(path, encoding='utf-8').read())):
+            out.append(m)
+    return out
+
+
+def inner_blueprints(helpers, parts):
+    """The modules among `helpers` (dependencies first) that are Blueprints themselves: a `sorry` in
+    their text, and a Part on the command line that imports one directly or opens `namespace
+    <one of its namespaces>.Part<X>`. They are assembled as Blueprints, not inlined: each in its own
+    span ahead of the main Blueprint, its stubs replaced by the Parts that restate them, and those
+    Parts placed ahead of their users by the dependency sort (q284: Q284Cnt imported the Blueprint
+    Q284Sch; Sch was inlined with its stubs kept although its Parts S1-S4 were given, and the worker
+    assembled Sch by hand first)."""
+    ptexts = [open(f, encoding='utf-8').read() for f in parts]
+    pimports = {m for t in ptexts for m in imports(t)}
+    pns = {n for t in ptexts for n in re.findall(r'^\s*namespace\s+(\S+)\.Part[^.\s]*\s*$', strip(t), re.M)}
+    out = []
+    for m, path in helpers:
+        if any(same_file(path, f) for f in parts):
+            continue
+        text = strip(open(path, encoding='utf-8').read())
+        if not re.search(r'(?<![\w.])sorry(?!\w)', text):
+            continue
+        own = set(re.findall(r'^\s*namespace\s+(\S+)', text, re.M))
+        if m in pimports or own & pns:
             out.append(m)
     return out
 
@@ -341,7 +369,12 @@ def blueprint_modules(bpf, part_texts, ws):
     imported module named *Blueprint."""
     rel = os.path.relpath(os.path.abspath(bpf), os.path.abspath(ws))
     own = set() if rel.startswith('..') else {os.path.splitext(rel)[0].replace(os.sep, '.')}
-    return own | {m for t in part_texts for m in imports(t) if m.endswith('Blueprint')}
+    named = {m for t in part_texts for m in imports(t) if m.endswith('Blueprint')}
+    if own:
+        # its own module known, another *Blueprint is one only as a copy of it: else it is a Blueprint
+        # this one stacks on (q284), inlined or assembled, never dropped
+        named = {m for m in named if not os.path.exists(module_path(m, ws)) or same_file(module_path(m, ws), bpf)}
+    return own | named
 
 
 def label(path):
@@ -477,6 +510,13 @@ def main():
     ptexts = [read(f) for f in parts]
     bp_mods = blueprint_modules(bpf, ptexts, ws)
     helpers = solution_imports([read(bpf)] + ptexts, bp_mods, ws)
+    inner = inner_blueprints(helpers, parts)
+    inner_paths = [p for m, p in helpers if m in inner]
+    for p in inner_paths:
+        print('%s: a Blueprint with `sorry` stubs that a Part on the command line restates; assembled as a '
+              'Blueprint ahead of this one, its stubs replaced (not inlined)' % label(p))
+    bp_mods |= set(inner)
+    helpers = [h for h in helpers if h[0] not in inner]
     imported = imported_parts(helpers, parts)
     promoted = promote_helpers(helpers, bp_mods, imported)
     for m, path in helpers:
@@ -492,14 +532,17 @@ def main():
                 label(parts[k]), ', '.join(label(p) for p, t in zip(parts, ptexts) if m in imports(t))))
     helpers = [h for h in helpers if h[0] not in imported]
     parts = [parts[k] for k in order_parts(ptexts, imported)]
-    files = [bpf] + parts
+    # the Blueprints, inner ones first (they come before what imports them), then the Parts
+    files = inner_paths + [bpf] + parts
+    nbp = len(inner_paths) + 1
+    main_bp = nbp - 1
     texts = [read(f) for f in files]
-    owners = [None] + [label(p) for p in parts]
+    owners = [label(p) for p in inner_paths] + [None] + [label(p) for p in parts]
     # copy-header Parts (q159): their copies of Blueprint text, checked, are dropped; a Part importing
     # the Blueprint is not parsed at all
     scratch = os.path.dirname(os.path.abspath(out))
     bp_info = None
-    for k in range(1, len(files)):
+    for k in range(nbp, len(files)):
         if not set(imports(texts[k])) & bp_mods:
             bp_info = bp_info or parse_part(bpf, scratch)
             texts[k], copied, assumed = drop_copies(parse_part(files[k], scratch), bp_info, owners[k])
@@ -579,16 +622,20 @@ def main():
         return info.slice(c.value_start.byte, c.end.byte) if c.value_start else ''
 
     decl_of = {d.name: d for d in info.decls}
-    stubs = {n: c.index for c in cmds if owner_of(c) == 0 and c.decl_kind == 'theorem'
+    def in_bp(c):
+        k = owner_of(c)
+        return k is not None and k < nbp
+
+    stubs = {n: c.index for c in cmds if in_bp(c) and c.decl_kind == 'theorem'
              for n in c.names if re.fullmatch(r':=\s*(by\s+)?sorry\s*', value(c.index))}
     # a Blueprint proof started and left with a `sorry` (q187): a stub when a Part restates it
-    partial = {n: c.index for c in cmds if owner_of(c) == 0 and c.decl_kind == 'theorem'
+    partial = {n: c.index for c in cmds if in_bp(c) and c.decl_kind == 'theorem'
                for n in c.names if n not in stubs and re.search(r'(?<![\w.])sorry(?!\w)', strip(value(c.index)))}
     proved = {}                                    # stub full name -> target command
     for i in items:
         c = cmds[i]
         k = owner_of(c)
-        if k and c.decl_kind == 'theorem':
+        if k >= nbp and c.decl_kind == 'theorem':
             for n in c.names:
                 for stub in stub_candidates(c, n, owners[k]):
                     if stub in partial and stub in decl_of and n in decl_of \
@@ -629,7 +676,7 @@ def main():
         deps[i] = {t}
     tgt, suffix = None, '_dev'
     if args.target:
-        named = [i for i in items if owner_of(cmds[i]) == 0 and cmds[i].names]
+        named = [i for i in items if owner_of(cmds[i]) == main_bp and cmds[i].names]
         tgt = next((i for i in named if args.target in cmds[i].names), None)
         if tgt is None:
             # q165 (Tao decay leaf): proved in a Blueprint sub-namespace (TaoBR.TaoDecay.X for TaoBR.X);
@@ -653,17 +700,17 @@ def main():
                      % (', '.join(users), args.target, args.target))
         if any('solution' in c.names for c in cmds):
             sys.exit('refusing: the input already declares a `solution`')
-    for k in range(1, len(files)):                 # a Part keeps its own order
+    for k in range(nbp, len(files)):               # a Part keeps its own order
         mine = [i for i in items if owner_of(cmds[i]) == k]
         for x, y in zip(mine, mine[1:]):
             deps[y].add(x)
     # preference: the Blueprint's order; a Part item just before the stub of its Part's next target
-    bitems = [i for i in items if owner_of(cmds[i]) == 0]
+    bitems = [i for i in items if in_bp(cmds[i])]
     bpos = {i: n for n, i in enumerate(bitems)}
     target_stub = {t: stubs[s] for s, t in proved.items()}
     pref = {}
     for i in items:
-        if owner_of(cmds[i]) == 0:
+        if in_bp(cmds[i]):
             pref[i] = (2 * bpos[i] + 1, i)
         else:
             later = [j for j in items if j >= i and owner_of(cmds[j]) == owner_of(cmds[i]) and j in target_stub]
