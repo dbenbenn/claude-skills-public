@@ -507,7 +507,8 @@ every pair of levels, and a theorem using it can be false at some: Garrido's inv
 property, so quantified, made a four-way equivalence false at `u = 1`, `v = 0` (a large simple
 group with a free subgroup acts trivially on every smaller set). `Type 0` is too small and an
 independent `v` is too loose; `Type (max u v)` keeps "every `X`" and always contains
-`ULift G`. And **re-run every local check file whenever a definition changes**: the universe
+`ULift G`. Siblings sharing a bundle quantify at one universe: q271's `theorem_2_3` at `{F : Type}`
+could not be called from its `Type*` siblings, so the edge 2.10 ← 2.3 cannot exist. And **re-run every local check file whenever a definition changes**: the universe
 check written for exactly this had been failing silently since the edit that broke it.
 
 When Lean needs a structure the paper takes for granted (a quotient known abelian, a rank),
@@ -541,8 +542,10 @@ $A$ is abelian and that $B$ is finitely generated"), even where a proof does not
 general form, if wanted, is a separate theorem. Take quantifier dependence from the result the
 proof cites, not only from the sentence: English statements under-specify it, and the intended
 strength lives in the cited lemma or in a remark after the statement.
-For a conclusion `∃` constants, also look where the paper *uses* the result: quantify each constant
-before every parameter a consumer varies afterwards. "C denotes a constant that changes from line to line"
+For a conclusion `∃` constants or a constructed object, also look where the paper *uses* the result:
+quantify each constant before every parameter a consumer varies afterwards, and state every property of
+the object that a consumer's proof uses (q320: a union bound needed Lemma 3.2's C, f, g to lie in a small
+span, which the published conclusion omitted, so the goal could not import it). "C denotes a constant that changes from line to line"
 hides the order (Tao 1999, oaiq-111: Lemma 3.2's `C₀` stated after `α` could blow up as `α → 0`, so Theorem
 1.2 did not follow from it; the uniform form `∃ C₀, ∀ α, …` was published and the printed form reduced to it).
 
@@ -951,8 +954,10 @@ in under eight minutes each, and the assembly compiled on the first try.
 
 **"Blocked: needs <named theorem>" is not a verdict until these checks have run.** A worker runs them
 before recording a blocker or leaving a reduction on a deep cited leaf; a retry runs them again, against
-what sibling batches have proved since (q209), before accepting one. RESUME says what was tried. From
-2026-11-03 to 11-06, fourteen such blockers fell, each to one of these checks:
+what sibling batches have proved since (q209), before accepting one. RESUME says what was tried, step by step; "not attempted" is a status of its own,
+and the next run treats it as open work. From 2026-11-03 to 11-12 over forty such verdicts fell, most on
+the first retry, many at 300–2,000 lines a stub where the record had estimated "thousands" or "weeks"
+(q293, q342, q350, q354, q357, q358):
 - **What does the proof use from it?** Find each use. A qualitative consequence (bounded, attained, an
   integer inequality), or one property of a cited conjunction, often has a short direct proof. q161: one
   symplectic plane instead of Williamson and John. q162: monotonicity of c_EHZ alone, by Clarke's dual
@@ -960,24 +965,37 @@ what sibling batches have proved since (q209), before accepting one. RESUME says
   Hanany–Puder's limit theorem.
 - **Search prove2.me for the prerequisite and for its textbook ingredients**, by their standard names and
   by any namespace whose hits look related. q188: Arveson and Wittstock were already Proved. q210: the
-  approximate functional equation was there as Riemann–Siegel (`RSInt`, `RSSeam`). q208: a local zero
-  count and the divisor bound were under `Zeta23.RvM` and `CircleMethod`. q190: teorth/expdb ports for
-  analytic number theory.
+  approximate functional equation was there as Riemann–Siegel (`RSInt`). q310, q340, q291: minimax
+  (`AGT.zero_sum_minimax`), hypergraph Ramsey, the Jordan curve theorem, invariance of domain and
+  Janiszewski; for any planar step, also the disk-crossing lemma `RepellingPairs.walks_meet_of_cyclicallyOrdered`
+  (q355). q190: teorth/expdb ports for analytic number theory. Search two more places: the paper itself
+  for its authors' own Lean ("Lean", "formaliz", "github", "code availability"; q345, q351), and the
+  solutions of Proved neighbours (`GET /submissions/:id/solution`) for an internal lemma stronger than
+  their statement (q290: a log⁹ fourth moment inside a T^ε one, then published standalone).
 - **Does a sibling supply the object, or a weaker bound that suffices?** q184: siblings replaced
   Hahn–Banach and Choi. q209: a cited reflection lemma was the B-process another batch had just proved.
 - **Is the abstract hypothesis concrete in the applied case?** q188: a finite-dimensional operator space
   needs no Ruan. For a symmetric object (a regular tree, a free group's Cayley graph, a phase with a
   scaling symmetry), write its exact recursion or rescaling first. q218: an eigenfunction gave Puder's
-  cogrowth bound. q207: rescaling made every stationary-phase integral one constant.
+  cogrowth bound; q341: a supersolution of the exact local recursion bounded a growth rate above, and
+  the same function truncated was the Rayleigh test function below. q207: rescaling made every
+  stationary-phase integral one constant.
 - **Do the estimates fed in have structure a crude substitute can use?** q163: layer-cake interpolation
   instead of Riesz–Thorin. q208: a truncated Taylor series in log(n/N) instead of a smooth-cutoff Fourier
   step. Record the substitute in the Blueprint docstring.
 - **Write the finite-dimensional problem a cited existence or minimization theorem reduces to**, then ask
   whether a duality or KKT certificate gives each inequality (q166).
-- **If the missing input is a result of the source itself** that the bundle can state, publish it
-  standalone (read-back first) and submit the dependant as a reduction to it in the same run (q186). "No
-  work submitted" leaves the dependant with no decomposition, while the deep cited theory belongs on that
-  one Open leaf.
+- **Isolate the deep step.** Read the cited proof step by step: usually one step needs the missing
+  machinery (q338: Bourgain's inequality, one of Hatami's four steps). Publish that step standalone
+  (read-back first) in the weakest form the rest uses: the paper's own sentence saying what the technique
+  delivers here (q336), the conjunct actually used when the other is blocked (q354), or for a computation
+  the verifier cannot run, `∃ d, check P d = true`, checked by diffing the bundle's checker against the
+  authors' (q356). Submit the dependant as a reduction to it in the same run (q186). "No work submitted"
+  leaves the dependant with no decomposition, while the deep cited theory belongs on that one Open leaf.
+- **Calibrate rather than estimate.** Sketch the shortest textbook proof against what is Proved before
+  reducing to a deeper cited result (q289). Then write the Blueprint (below), with the route and constants
+  worked out per stub, and send provers at the two riskiest stubs; their times replace the estimate (q350).
+  Only a stub that needs theory Mathlib lacks, with nothing routing around it, is a blocker.
 
 The same pattern scales to whole theorems. In a **Blueprint**, the definitions are concrete, every
 lemma is `sorry`, and the main theorem is proved from those lemmas. The provers write
@@ -1038,7 +1056,11 @@ Most parts took 5 to 20 minutes.
 
 What made it work:
 - **Write the Blueprint so the main theorem compiles from its stubs.** Check every stub for truth
-  before dispatch: a false stub wastes a prover.
+  before dispatch: a false stub wastes a prover. Instantiate each type-parametrized stub at the empty
+  type and `Unit` (q343: an existential over maps into `X` failed at empty `X`). When a prover finds a
+  cited step false, it states that step as a sorried lemma with the counterexample, and the captain writes
+  the corrected argument into the notes before the next round (q350, q338: printed constants and an
+  Observation were wrong); provers formalize a written repair well and rarely invent one.
 - **Check each interface before dispatch.** For every stub that feeds another, write out the measure,
   weight and exponent on both sides and check that they match: a scoping plan's "gives" is a claim to
   verify (q164: the linearization gave the weight |ψ|^p where the leaf needed |ψ|^q). On a research-level
@@ -1287,6 +1309,7 @@ Failures that no local build reproduces. The detail and the case behind each is 
 | "Module compilation timed out" | A cold worker building imported bundles. Retry unchanged, never split, unless an imported *statement* module takes over about 90 s locally (`lean -o`): then every importer fails, and the statement needs restating (its large sides as `abbrev`s in a bundle). |
 | `whnf` heartbeat timeout on the server only | A `rfl` proof: rewrite it without the deep unfolding. A definition: `set_option maxHeartbeats 1000000 in`. |
 | "Source too large for token scanner" | The 1 MiB cap. Split into published statements; a disproof cannot import, so golf it. |
+| "Source too large for import parser" | An imported published bundle is over 1 MiB. No remedy on our side: ask the admins. |
 | `dependency_oom` ("Lean exited with code 137") | Heavy computations in bundles a piece imports together; see `references/openai-ports.md`. |
 
 To bisect a locationless `WA`, change one thing at a time against a target where a `WA` costs

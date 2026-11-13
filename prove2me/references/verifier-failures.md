@@ -57,7 +57,15 @@ under synchronous elaboration, as `prune_solution.py --check` does; parallel wal
 (q196: 52 s wall, 126 s CPU). Since late October 77–103 s passed first time and 108–142 s timed out at
 least twice (oaiq-078, q159, q196, q209); the 66 s and 81 s timeouts of 2026-10-09/10 predate them. So over 100 s, split into published cuts before the first
 submission (dbenbenn 2026-11-08, also carvepipeline `PIECE_CAP`); under it, submit as is. Memory is a
-separate limit (about 7 GiB peak, `PIECE_RSS_LIMIT`), and `--check` reports both.
+separate limit (about 7 GiB peak, `PIECE_RSS_LIMIT`), and `--check` reports both. A file near both lines
+is the marginal case (q349: 99 s and 7.3 GiB timed out twice; q321: 95 s and 8 GiB passed on the retry).
+After its first timeout, trim before splitting, since a split costs a bundle and statements: profile with
+`set_option trace.profiler true` and `trace.profiler.threshold 2000` (plain `profiler` does not name the
+declarations), then turn `nlinarith` into `linarith`/`omega` with the product facts given, side goals in
+division-heavy contexts into `linarith only [h₁, h₂]` (q290: 25 s off each Part), ascribe the type of a
+large anonymous constructor (q349: one `refine` took 30 s), and lift heavy `field_simp; ring` identities
+to top-level lemmas (q266: 70 s and 8.3 GiB became 17 s and 6.6 GiB). Peak memory follows how much is
+elaborated, not tactic time.
 
 **Retry or split according to how easy the split is** (dbenbenn, 2026-10-08). When the carver can cut an item cleanly into parts that are each much faster, split early, after an own-compile timeout or a slow local check, because a split costs little. Dependency timeouts ("Module compilation timed out") do not depend on the item's own size, so they never justify a split: a 14 s Erdős 3 bundle got four in a row while its 42 s sibling passed first try. When one heavy declaration dominates, or the best cut barely changes the time, keep retrying much longer instead. Never loop re-splitting for a marginal gain: a 76 s bundle that the scheduler kept "splitting" to stay under a 75 s cutoff went through unsplit on a retry.
 
@@ -66,3 +74,9 @@ separate limit (about 7 GiB peak, `PIECE_RSS_LIMIT`), and `--check` reports both
 **A third failure kind is deterministic:** "FAILED: definition does not compile: (deterministic) timeout at `whnf`, maximum number of heartbeats (200000)" can appear on the server for a declaration that compiles locally (Erdős 3 B025, 2026-10-08). Retrying cannot fix it. Put `set_option maxHeartbeats 1000000 in` before that declaration and resubmit.
 
 **The hard size limit is 1 MiB.** The soundness guard refuses a solution over 1,048,576 bytes before compiling it: "Source too large for token scanner" (FAILED, 2026-10-07, a 1.65 MB port of OpenAI's Kaplansky counterexample). Stripping comments saved only 6%. A larger proof has to be split into published intermediate statements, each proved by its own submission. A disproof cannot be split, since it cannot import theorems, so it has to be golfed instead. The Kaplansky disproof went from 1.65 MB to 995 KB by pruning, stripping comments, renaming identifiers to short names, adding `notation` aliases for long Mathlib names, and one global `open scoped Classical`. Tactic `macro`/`syntax` shortcuts are refused by the soundness guard, but `notation` lines pass. 299 KB and 332 KB solutions were accepted.
+
+**The same cap applies to every imported source:** "Source too large for import parser: 1425670 bytes
+(max 1048576)" (q361, 2026-11-13) refuses any definition, statement or proof that imports a published
+bundle over 1 MiB (`Def_EditApproximation`). Nothing on our side cures it: no retry, no carve, since
+everything must import the bundle. Check `wc -c` of a goal's imported bundles before carving, and take
+it to the admins.

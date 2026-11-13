@@ -30,6 +30,11 @@ Same trick for any product of two variable subterms. Supply `Nat.div_add_mod'`
 explicitly when the goal needs `n / k * k + n % k = n` (note the order: the
 primed form multiplies on the right; unprimed `Nat.div_add_mod` is `k * (n / k) + n % k = n`).
 
+`omega` with `j % 2` atoms is slow (q321: 73 calls at 4–5 s each): case-split parity first and write
+the index as `2*q + r` literals. Neither `omega` nor `norm_num` evaluates `2^2048`: use
+`Nat.pow_le_pow_right` / `Nat.le_self_pow`, and `clear` a hypothesis `2^2048 ≤ r` before `positivity`
+or `linarith`, which choke on it (q339).
+
 ## `decide` cannot reduce well-founded recursion
 
 **Symptom:** `decide` times out or reports the proposition is not decidable, on
@@ -257,6 +262,10 @@ The integrand is not what you wrote: see "A binder term swallows the `+` after i
 
 **Symptom:** `zero_le` fails; `norm_num` will not close `2⁻¹ + 2⁻¹ = 1`.
 
+Every `ℝ≥0∞`- or `ℕ∞`-valued family is summable: `(hasSum_of_isLUB _ isLUB_iSup).summable`, then
+`Summable.tsum_le_tsum_of_inj (Set.inclusion h) …` gives tsum monotonicity over subsets with no
+finiteness argument (q285; Mathlib has only `ENNReal.tsum_mono_subtype`).
+
 In `ℝ≥0∞` use `bot_le` for `0 ≤ a`, and the named lemmas for arithmetic
 (`ENNReal.inv_two_add_inv_two`, `ENNReal.add_le_add_iff_left/right` with a
 finiteness side condition). Subtraction is truncated, so never state a step as
@@ -380,3 +389,25 @@ transparency, where `Matrix m n α` is not a function type. Use `simp only`, `sh
 Mathlib's `IsFreeGroup` generators come from `Classical.choose`, so Nielsen–Schreier cannot say which
 elements a subgroup's basis contains (primitivity, free factors). Reuse the explicit-basis rewrite
 (`actionFree`, `endBasis`) in strong-convergence-mission `proofs/isPrimitiveIn_of_isPrimitiveIn_top/PartB.lean` (q216).
+
+## Kernel checks over concrete data
+
+**Symptom:** a `decide +kernel` proof over a literal table compiles locally but peaks at 8–21 GiB, over
+the verifier's ~7 GiB, or the file times out (q304, q337, q358: graphs and certificates of 500–17,000
+entries).
+
+- Put `set_option Elab.async false` at the top of the file: parallel elaboration adds the transient
+  memory of every heavy kernel check at once (q337: 7.66 GiB to 6.75 GiB; the import baseline is ~6.5).
+- Keep each `decide +kernel` to a block of about 100 entries, with shallow indexing. `List.getD` deep
+  into a long literal is the cost (entries 819–909 of a 910-entry table: 8.4 GiB; entries 0–90: 50 MB;
+  q358: ~8 s per 512 lookups into 513 entries). Store a table as `List (List α)` blocks, prove
+  `L.flatten.getD (k*b+m) d = (L.getD k []).getD m d` once, and check block by block; walk tables
+  structurally with `zip`/`drop`/`take` rather than by index.
+- Keep the arithmetic in ℕ (scale reals by 10^30; a ℚ Taylor sum cost ~86 ms each) and replace a
+  whole-table check by a counting argument where one exists (`Finset.card_sdiff_of_subset`; a
+  permutation from `Nodup` and length). `exp (-x) ≤ 1 / ∑_{i<20} xⁱ/i!` (`Real.sum_le_exp_of_nonneg`)
+  holds for every `x ≥ 0` with no range splitting.
+- `rw [← table_eq]` then `getD_eq_getElem` re-evaluated the whole list (+1.7 GiB); `rw [← table_eq,
+  List.getD_map]` did not. Bisect a memory overrun by compiling prefixes of the file under a peak-RSS
+  measurement (getrusage), before splitting into more published statements. `ulimit -v` breaks Lean
+  (`bad_alloc` at the Mathlib import): watch RSS instead.

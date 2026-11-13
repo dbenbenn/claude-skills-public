@@ -126,8 +126,15 @@ and how to repair it.
   read the deepest `isDefEq`: usually two instance paths d13f23b unified cheaply (q246:
   `NonUnitalCStarAlgebra` of `M.toStarSubalgebra`; q261: `Algebra ℚ (FractionRing (MvPolynomial ι ℚ))`
   by `DivisionRing.toRatAlgebra` against Ore localization, cured by a high-priority instance pinning
-  OpenAI's path), or a `change`/`show` across them (rewrite that step). A priority pin works in every
-  module of the chain or none: in one module alone it made it slower.
+  OpenAI's path), or a `change`/`show` across them (rewrite that step). `#synth` the instance in a
+  scratch file to see which path fires. Remedies, best first: when a compat instance opens the second
+  path, pipeline.json `hide_instances` for the whole port (q360: `OAI.vonNeumannToStarSubalgebraIsClosed`;
+  `attribute [-instance]` per module makes a new diamond at every boundary, and a pin that is a new
+  constant still left `rfl` between applied maps timing out); a priority pin, in every module of the chain
+  or none (in one module alone it made it slower); per site, `erw` for the `rw`, `rw … at h; exact h`
+  for `simpa`, a `show` restating the goal, or a local instance stated at the use (q258, q359). A compat
+  instance that a published `Def_*` bundle also declares anonymously meets it in carved pieces the same
+  way (q258: `MeasurableSpace (Matrix …)`).
 
 ### The compatibility block and shims
 
@@ -247,6 +254,12 @@ toolchain.
   d13f23b rules rewrite them again (q142: `Finset.prod_le_prod` became `prod_le_prod'` in the Chowla
   copy of `PrimeNumberTheoremAnd.Erdos970`). Prefer the fork's original text; otherwise expect undo
   patches.
+- **A package on an older Mathlib repairs in layers** (q244, q359: ClassFieldTheory on 5ed2965, 12
+  build rounds of ~1.5 h each): a failed module skips its importers, so fix each recurring pattern across
+  the whole package before rebuilding, never one module per round. Its instance diamonds (`Algebra ℚ` on
+  `SeparableClosure ℚ`: `DivisionRing.toRatAlgebra` against the package's own instance) take the local
+  repairs of "two instance paths" above. `--compat-imports narrow` fails once Compat holds lemmas needing
+  broader imports.
 - **`Finset.one_le_prod` / `one_le_prod'` swap meaning** between d13f23b and ours (ordered monoid vs
   GroupWithZero, `one_le_prod₀` there): the rule maps the monoid lemma, so a source that meant the
   GroupWithZero one (q145's Gromov `PosDef`) needs a per-port patch.
@@ -289,6 +302,11 @@ drops it with a `why:` naming the rule: delete it from the patches file.
   [smul_add, smul_sub]); abel)) …` (ae6d21c).
 
 ### Repaired by hand
+
+Before repairing a drift error, `rg -g '*patches*.json' NAME ~/claude/p2m-standalone/openai-ports
+~/.claude/jobs` (a carve's `pipeline.json` names its patches file): the repairs of every earlier carve are there (q260's 57 for operator theory, q244's and q359's for
+ClassFieldTheory), with the private re-proofs of lemmas missing here. Only patterns that recur go in the
+list below.
 
 - **Pi-form vs lambda-form (`to_fun`).** Our `HasDerivAt.mul/neg/sum/pow`, `DifferentiableAt.sum`
   conclude `c * d`, `-f`, `∑ i, f i` as functions, OpenAI's the lambda, so a `convert … using 1` leaves
@@ -387,8 +405,10 @@ drops it with a `why:` naming the rule: delete it from the patches file.
   - `simpa only [ite_true]` does not fire on an `if True` with a non-standard `Decidable` instance: use
     `↓reduceIte` (oaiq-056).
   - `convert … using 1` then per-goal steps: a multi-line `; first | rfl | ring` closes only the first
-    goal (use `<;>`, oaiq-045), and bullets can meet an instance goal or a new order (q233, 12 sites):
-    `refine Eq.trans_le ?_ (h.trans_eq ?_)`, or state the function and value equalities and `rw … at h`.
+    goal (use `<;>`, oaiq-045), and bullets can meet an instance goal or a new order (q233, 12 sites;
+    q244, q260, q351 in every older-Mathlib source since): `all_goals try with_reducible_and_instances
+    rfl` first, `refine Eq.trans_le ?_ (h.trans_eq ?_)`, or state the function and value equalities and
+    `rw … at h`.
   - `omit [BorelSpace E]` on a lemma that uses stdGaussian (oaiq-048). `omit [CompleteSpace H] in`
     where our order on `H →L[ℂ] H` needs it: remove only the `omit`s Lean rejects, never all
     (`~/claude/p2m-standalone/openai-ports/oaiq-039/fix_omits_from_errors.py` writes those patches from a
@@ -591,7 +611,8 @@ These never show in the module build of the port (oaiq-085, -086, -087).
   that section, so the error shows in a later file (q139).
 - **Test a patch on the stage file** before another re-port and re-measure, and keep the port's module
   compiling too: `LEAN_PATH=<carve>/olean:$(lake env printenv LEAN_PATH) lean -j1 -DautoImplicit=false
-  <stage file>` from the workspace, with `~/claude/claude-private/tools/lean-cap` first on PATH (`which
+  -DElab.async=false <stage file>` (measure's `VERIFIER_FLAGS`; without the last flag a heartbeat
+  timeout at `abstract nested proofs` passes, q359) from the workspace, with `~/claude/claude-private/tools/lean-cap` first on PATH (`which
   lean` shows the wrapper; `lake env env … lean` runs the toolchain's lean outside the cap, oaiq-114).
 - **Post-carve patches naming `<x>_oai`**: after a re-plan, re-read each; it is right only while `x` is
   still a piece target (oaiq-122). A full `carve.py gen` fails naming a post-carve patch that matches no
@@ -1126,7 +1147,8 @@ Profile before forcing or splitting anything.
   by the driver. Do not repair it: start a fresh pipeline carve under a new folder and bundle prefix,
   carrying over only its hand patches; drop those that now count 0 (oaiq-115).
 - **A carve from before 2026-10-29**: before the first `--detach`, check `pipeline.json` and its meta
-  against the current brief: `defs` (bare `Def_X` normalised since 1e02cec), meta `prefixes` (the root's
+  against the current brief: `defs` (bare `Def_X` normalised since 1e02cec; it must include the goal
+  statement's own import, which `inputs` checks only since q238: q256's carve could never finish), meta `prefixes` (the root's
   top directory), `overlap`. A driver killed mid-build shows `build: running` and no failure line;
   resuming replays the built modules in seconds (oaiq-125). Resume with `--upgrade --keep-port` unless the
   port rules' changes are wanted; on an unpublished carve, `--from plan` picks up carver fixes (oaiq-122).
@@ -1144,7 +1166,9 @@ Profile before forcing or splitting anything.
   unchanged output does not re-port, so the workspace holds the port of the old rules while the log reads
   as if the new ones were in force, and `mkpatches.py` diffs against it. Before repairing by hand, `--redo
   port`.
-- **Repairs left only in the workspace** (q147) are overwritten by any re-port. Start a retry by compiling
+- **Repairs left only in the workspace** (q147) are overwritten by any re-port, and a changed
+  patches file re-ports even under `--keep-port` (q260: 14 repaired modules lost). Run `mkpatches.py` as
+  each wave of repairs is done, before any resume. Start a retry by compiling
   the modules the last build log says failed; if they now pass, compare their mtimes with the log, diff
   against a pristine scratch port (`oai_port_modules.py … --ws SCRATCH`, on the carve's own snapshot), and
   turn what you find into patches first. A patch from an `mkpatches.py` before 83161d7 can hold an `import
@@ -1196,3 +1220,10 @@ Profile before forcing or splitting anything.
 - **Some published OAI bundles cannot be imported together**: `Def_OAIQ075A0xx` (Stinespring) clashes with
   `Def_KadisonRingroseSupport2` (`environment already contains OAI.PopaTypeII.AbelianProjection`). Before
   building a route on two ported developments, check that one file importing both compiles.
+- **An "opaque" constant in an OpenAI existential is usually a chain of numeric cutoffs** (q339): trace
+  each `∃ R`/`∀ᶠ` to its numeric inequalities (regex `∃ \w+ : ℕ, … ≤` over the published statements; a
+  search for `∃R` alone missed `∃ qH`), prove them at an explicit cutoff, and publish `*_explicit`
+  versions, before recording "blocked: constant not comparable".
+- **OpenAI's stack-machine library is published**: `Realizes`, `RunsPoly`, `realizedMachine` in
+  `Def_OAIQ241TT000`–`014`. A wrapper for another input encoding took one prover about 20 minutes (q339;
+  q276 had called machine statements blocked for want of it).
