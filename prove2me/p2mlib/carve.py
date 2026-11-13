@@ -3584,6 +3584,9 @@ class Carver:
         salt = '\nsorry:' + '\n'.join(sorted(sorry)) if sorry else ''
         self.tag = hashlib.sha1(('\n'.join(sorted(keep)) + salt).encode()).hexdigest()[:6]
         self.re_count = collections.Counter()
+        # (constant, scope chain): the local instances _reactivate put back in force (activated or emitted
+        # again), so a re-emitted one built from them can count on them (q362)
+        self.in_force = set()
         rename = dict(rename or {})
         self.rename = rename
         self.sorry, self.deprivatize = set(sorry), deprivatize
@@ -4155,6 +4158,7 @@ class Carver:
                 prio = _instance_priority(info.text_bytes[vc.start.byte:vc.end.byte])
                 out.append('attribute [local instance%s] %s\n' % (' ' + prio if prio else '',
                                                                  instance_ref(ik, inst_names, self.rename)))
+                self._note_in_force(vc, ik, chain)
                 continue
             # not imported: its command again under a name unique to this file, anonymous or
             # named (Erdős 3 v2: `local instance forecastModulusNeZero (Pr) (A) : NeZero …`, which
@@ -4171,6 +4175,15 @@ class Carver:
                 continue
             # the earlier local instances its own elaboration used, first
             out.append(self._reactivate(info, vc, m, drop, done, inst_names, have, chain=chain))
+            # and only if everything its elaborated type and value name is here: an instance that instance
+            # synthesis found in its body leaves no identifier (q362: `…_r10b556_1 := FiniteDimensional.trans
+            # ℚ A B` re-declared without the section's two `FiniteDimensional` local instances, which name a
+            # theorem of a later bundle: "failed to synthesize")
+            if ik and self._missing_parts(ik, have, chain):
+                if used is not None and not sibling:
+                    g.lost_instances.append((m, vc.start.line, c.start.line))
+                continue
+            self._note_in_force(vc, ik, chain)
             short = pubname(ik).rsplit('.', 1)[-1] if ik else \
                 (decl['name'].rsplit('.', 1)[-1] if decl else 'localInst')
             self.re_count[short] += 1
@@ -4178,6 +4191,29 @@ class Carver:
             edit = (anon_at, anon_at, ' ' + name) if anon_at is not None else (decl['start'], decl['end'], name)
             out.append(_cmd_text(info, vc, [edit]).strip() + '\n')
         return ''.join(out)
+
+    def _note_in_force(self, vc, ik, chain):
+        """Record that local instance command vc (node ik, or none) is in force in scope chain `chain`, by the
+        constants it declares (an anonymous Prop instance of several modules shares one generated name)."""
+        names = {x[0] for x in vc.declares or ()} | set(self.g.nodes[ik].names if ik else ())
+        self.in_force.update((n, chain) for n in names)
+
+    def _missing_parts(self, ik, have, chain):
+        """The project constants local instance node ik's elaborated type and value name (DeclGraph `t`/`v`)
+        that this file lacks at scope chain `chain`: neither imported, kept, nor put back in force there by
+        _reactivate."""
+        g = self.g
+        out = []
+        for n in g.nodes[ik].names:
+            x = g.consts.get(n) or {}
+            for d in list(x.get('t', ())) + list(x.get('v', ())):
+                o = g.owner.get(d)
+                if o is None or o == ik or o not in g.nodes or o in self.keep or (d, chain) in self.in_force:
+                    continue
+                if pubname(d) in have or instance_imported(o, have, self.rename):
+                    continue
+                out.append(d)
+        return out
 
     @staticmethod
     def _class_named(vc, c, sorried):

@@ -3955,3 +3955,44 @@ def test_a_private_local_instance_of_an_earlier_bundle_comes_back_with_its_prior
     assert 'attribute [local instance 50] CD.PI.fldUnif\n' in sec, sec
     assert 'attribute [local instance] CD.PI.fldInh\n' in sec, sec
     assert sec.index('CD.PI.fldInh\n') < sec.index('theorem fld_later')
+
+
+# ---------------------------------------------------------------- re-declared local instances (q362)
+
+def test_a_local_instance_is_not_redeclared_without_the_instances_it_is_built_from(g):
+    # Duke MainUnconditional (q362): a bundle re-declared `local instance …_r10b556_1 := FiniteDimensional.trans
+    # ℚ A B` but not the section's two local instances whose `FiniteDimensional` instance synthesis found in
+    # its body (they name a theorem of a later bundle): "failed to synthesize". Here `pair_default` uses
+    # fdPairInh, which brings back fdPairFin1 (same carrier) and fdFin1; fdPairFin1 is `Fin1.up (Fd n) Nat`,
+    # whose `[Fin1 (Fd n)]` is fdFin1, which names fin1_fd: the elaborated value names fdFin1, the text does not
+    keep = {'CD.IP.Fd', 'CD.IP.Fin1', 'CD.IP.pair_default'}
+    sec = _section(C.Carver(g).carve(keep, g.have_names(keep | {'CD.IP.Fin1.up'})), 'CarveDev.InstPre')
+    assert re.search(r'^local instance fdPairInh_r\w+', sec, re.M), sec
+    assert not re.search(r'^local instance fd(?:Pair)?Fin1', sec, re.M), sec
+    # with fin1_fd at hand both come back, fdFin1 first
+    sec = _section(C.Carver(g).carve(keep, g.have_names(keep | {'CD.IP.Fin1.up', 'CD.IP.fin1_fd'})),
+                   'CarveDev.InstPre')
+    a = re.search(r'^local instance fdFin1_r\w+', sec, re.M)
+    b = re.search(r'^local instance fdPairFin1_r\w+', sec, re.M)
+    assert a and b and a.start() < b.start(), sec
+    # fdFin1 imported from a bundle: put back in force, and fdPairFin1 re-declared after it
+    sec = _section(C.Carver(g).carve(keep, g.have_names(keep | {'CD.IP.Fin1.up', 'CD.IP.fdFin1'})),
+                   'CarveDev.InstPre')
+    a = sec.find('attribute [local instance] CD.IP.fdFin1\n')
+    b = re.search(r'^local instance fdPairFin1_r\w+', sec, re.M)
+    assert a >= 0 and b and a < b.start(), sec
+
+
+def test_a_used_local_instance_left_out_for_lack_of_its_prerequisites_is_reported(g):
+    # when the kept declaration itself used it, the plan should have kept what it needs: say so (plan/gen
+    # list g.lost_instances)
+    g2 = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    user = g2.nodes['CD.IP.pair_default']
+    c = g2.infos[user.module].commands[user.cmd]
+    c.insts = c.sig_insts = list(c.insts) + ['CD.IP.fdPairFin1']
+    keep = {'CD.IP.Fd', 'CD.IP.Fin1', 'CD.IP.pair_default'}
+    sec = _section(C.Carver(g2).carve(keep, g2.have_names(keep | {'CD.IP.Fin1.up'})), 'CarveDev.InstPre')
+    assert not re.search(r'^local instance fdPairFin1', sec, re.M), sec
+    info = g2.infos['CarveDev.InstPre']
+    vc = info.commands[g2.nodes['CD.IP.fdPairFin1'].cmd]
+    assert ('CarveDev.InstPre', vc.start.line, c.start.line) in g2.lost_instances, g2.lost_instances

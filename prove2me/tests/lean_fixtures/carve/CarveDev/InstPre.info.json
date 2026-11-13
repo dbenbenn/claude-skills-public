@@ -1,0 +1,1615 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 692,
+    "col": 99,
+    "line": 8
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 709,
+    "col": 15,
+    "line": 10
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 709,
+     "name": "CD.IP",
+     "role": "scope",
+     "start": 704
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 694,
+    "col": 0,
+    "line": 10
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.IP.Fd.x",
+     "",
+     []
+    ],
+    [
+     "CD.IP.Fd",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 749,
+    "col": 9,
+    "line": 13
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 723,
+     "name": "Fd",
+     "role": "decl",
+     "start": 721
+    },
+    {
+     "end": 726,
+     "name": "n",
+     "role": "binder",
+     "start": 725
+    },
+    {
+     "end": 732,
+     "name": "Nat",
+     "role": "ref",
+     "start": 729
+    },
+    {
+     "end": 743,
+     "name": "x",
+     "role": "ref",
+     "start": 742
+    },
+    {
+     "end": 749,
+     "name": "Nat",
+     "role": "ref",
+     "start": 746
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 723,
+      "col": 12,
+      "line": 12
+     },
+     "start": {
+      "byte": 721,
+      "col": 10,
+      "line": 12
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IP.Fd"
+   ],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [
+    [
+     721,
+     723,
+     "CD.IP.Fd",
+     "b"
+    ],
+    [
+     721,
+     723,
+     "",
+     "b"
+    ],
+    [
+     725,
+     726,
+     "",
+     "b"
+    ],
+    [
+     729,
+     732,
+     "Nat"
+    ],
+    [
+     742,
+     743,
+     "CD.IP.Fd.x",
+     "b"
+    ],
+    [
+     746,
+     749,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 711,
+    "col": 0,
+    "line": 12
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.IP.Fin1",
+     "",
+     []
+    ],
+    [
+     "CD.IP.Fin1.ok",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 798,
+    "col": 11,
+    "line": 16
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 761,
+     "name": "Fin1",
+     "role": "decl",
+     "start": 757
+    },
+    {
+     "end": 765,
+     "name": "α",
+     "role": "binder",
+     "start": 763
+    },
+    {
+     "end": 791,
+     "name": "ok",
+     "role": "ref",
+     "start": 789
+    },
+    {
+     "end": 798,
+     "name": "True",
+     "role": "ref",
+     "start": 794
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 761,
+      "col": 10,
+      "line": 15
+     },
+     "start": {
+      "byte": 757,
+      "col": 6,
+      "line": 15
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IP.Fin1"
+   ],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [
+    [
+     757,
+     761,
+     "",
+     "b"
+    ],
+    [
+     757,
+     761,
+     "CD.IP.Fin1",
+     "b"
+    ],
+    [
+     763,
+     765,
+     "",
+     "b"
+    ],
+    [
+     789,
+     791,
+     "CD.IP.Fin1.ok",
+     "b"
+    ],
+    [
+     794,
+     798,
+     "True"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 751,
+    "col": 0,
+    "line": 15
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.IP.Fin1.up",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 875,
+    "col": 65,
+    "line": 18
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 815,
+     "name": "Fin1.up",
+     "role": "decl",
+     "start": 808
+    },
+    {
+     "end": 819,
+     "name": "α",
+     "role": "binder",
+     "start": 817
+    },
+    {
+     "end": 822,
+     "name": "β",
+     "role": "binder",
+     "start": 820
+    },
+    {
+     "end": 836,
+     "name": "Fin1",
+     "role": "ref",
+     "start": 832
+    },
+    {
+     "end": 839,
+     "name": "α",
+     "role": "ref",
+     "start": 837
+    },
+    {
+     "end": 847,
+     "name": "Fin1",
+     "role": "ref",
+     "start": 843
+    },
+    {
+     "end": 849,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 849
+    },
+    {
+     "end": 851,
+     "name": "α",
+     "role": "ref",
+     "start": 849
+    },
+    {
+     "end": 857,
+     "name": "β",
+     "role": "ref",
+     "start": 855
+    },
+    {
+     "end": 872,
+     "name": "trivial",
+     "role": "ref",
+     "start": 865
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 815,
+      "col": 15,
+      "line": 18
+     },
+     "start": {
+      "byte": 808,
+      "col": 8,
+      "line": 18
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IP.Fin1.up"
+   ],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [
+    [
+     808,
+     815,
+     "CD.IP.Fin1.up",
+     "b"
+    ],
+    [
+     808,
+     815,
+     "",
+     "b"
+    ],
+    [
+     817,
+     819,
+     "",
+     "b"
+    ],
+    [
+     820,
+     822,
+     "",
+     "b"
+    ],
+    [
+     832,
+     836,
+     "CD.IP.Fin1"
+    ],
+    [
+     837,
+     839,
+     ""
+    ],
+    [
+     843,
+     847,
+     "CD.IP.Fin1"
+    ],
+    [
+     849,
+     851,
+     ""
+    ],
+    [
+     855,
+     857,
+     ""
+    ],
+    [
+     865,
+     872,
+     "trivial"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 800,
+    "col": 0,
+    "line": 18
+   },
+   "used_keys": [
+    "CD.IP.Fin1"
+   ],
+   "value_start": {
+    "byte": 859,
+    "col": 53,
+    "line": 18
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.IP.fin1_fd",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 933,
+    "col": 52,
+    "line": 20
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 892,
+     "name": "fin1_fd",
+     "role": "decl",
+     "start": 885
+    },
+    {
+     "end": 895,
+     "name": "n",
+     "role": "binder",
+     "start": 894
+    },
+    {
+     "end": 901,
+     "name": "Nat",
+     "role": "ref",
+     "start": 898
+    },
+    {
+     "end": 909,
+     "name": "Fin1",
+     "role": "ref",
+     "start": 905
+    },
+    {
+     "end": 911,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 911
+    },
+    {
+     "end": 913,
+     "name": "Fd",
+     "role": "ref",
+     "start": 911
+    },
+    {
+     "end": 915,
+     "name": "n",
+     "role": "ref",
+     "start": 914
+    },
+    {
+     "end": 930,
+     "name": "trivial",
+     "role": "ref",
+     "start": 923
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 892,
+      "col": 15,
+      "line": 20
+     },
+     "start": {
+      "byte": 885,
+      "col": 8,
+      "line": 20
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IP.fin1_fd"
+   ],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [
+    [
+     885,
+     892,
+     "CD.IP.fin1_fd",
+     "b"
+    ],
+    [
+     885,
+     892,
+     "",
+     "b"
+    ],
+    [
+     894,
+     895,
+     "",
+     "b"
+    ],
+    [
+     898,
+     901,
+     "Nat"
+    ],
+    [
+     905,
+     909,
+     "CD.IP.Fin1"
+    ],
+    [
+     911,
+     913,
+     "CD.IP.Fd"
+    ],
+    [
+     914,
+     915,
+     ""
+    ],
+    [
+     923,
+     930,
+     "trivial"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 877,
+    "col": 0,
+    "line": 20
+   },
+   "used_keys": [
+    "CD.IP.Fin1"
+   ],
+   "value_start": {
+    "byte": 917,
+    "col": 40,
+    "line": 20
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 942,
+    "col": 7,
+    "line": 22
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.section",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 935,
+    "col": 0,
+    "line": 22
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 6
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "CD.IP.fdFin1",
+     "CD.IP.Fin1",
+     [
+      "CD.IP.Fd"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1002,
+    "col": 58,
+    "line": 24
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 965,
+     "name": "fdFin1",
+     "role": "decl",
+     "start": 959
+    },
+    {
+     "end": 968,
+     "name": "n",
+     "role": "binder",
+     "start": 967
+    },
+    {
+     "end": 974,
+     "name": "Nat",
+     "role": "ref",
+     "start": 971
+    },
+    {
+     "end": 982,
+     "name": "Fin1",
+     "role": "ref",
+     "start": 978
+    },
+    {
+     "end": 984,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 984
+    },
+    {
+     "end": 986,
+     "name": "Fd",
+     "role": "ref",
+     "start": 984
+    },
+    {
+     "end": 988,
+     "name": "n",
+     "role": "ref",
+     "start": 987
+    },
+    {
+     "end": 1000,
+     "name": "fin1_fd",
+     "role": "ref",
+     "start": 993
+    },
+    {
+     "end": 1002,
+     "name": "n",
+     "role": "ref",
+     "start": 1001
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 965,
+      "col": 21,
+      "line": 24
+     },
+     "start": {
+      "byte": 959,
+      "col": 15,
+      "line": 24
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [
+    "CD.IP.fdFin1"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IP.fdFin1"
+   ],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [
+    [
+     959,
+     965,
+     "CD.IP.fdFin1",
+     "b"
+    ],
+    [
+     959,
+     965,
+     "",
+     "b"
+    ],
+    [
+     967,
+     968,
+     "",
+     "b"
+    ],
+    [
+     971,
+     974,
+     "Nat"
+    ],
+    [
+     978,
+     982,
+     "CD.IP.Fin1"
+    ],
+    [
+     984,
+     986,
+     "CD.IP.Fd"
+    ],
+    [
+     987,
+     988,
+     ""
+    ],
+    [
+     993,
+     1000,
+     "CD.IP.fin1_fd"
+    ],
+    [
+     1001,
+     1002,
+     ""
+    ]
+   ],
+   "sig_insts": [
+    "CD.IP.fdFin1"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 944,
+    "col": 0,
+    "line": 24
+   },
+   "used_keys": [
+    "CD.IP.Fin1 CD.IP.Fd"
+   ],
+   "value_start": {
+    "byte": 990,
+    "col": 46,
+    "line": 24
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 6
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "CD.IP.fdPairFin1",
+     "CD.IP.Fin1",
+     [
+      "Prod"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1082,
+    "col": 77,
+    "line": 26
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1029,
+     "name": "fdPairFin1",
+     "role": "decl",
+     "start": 1019
+    },
+    {
+     "end": 1032,
+     "name": "n",
+     "role": "binder",
+     "start": 1031
+    },
+    {
+     "end": 1038,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1035
+    },
+    {
+     "end": 1046,
+     "name": "Fin1",
+     "role": "ref",
+     "start": 1042
+    },
+    {
+     "end": 1048,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1048
+    },
+    {
+     "end": 1050,
+     "name": "Fd",
+     "role": "ref",
+     "start": 1048
+    },
+    {
+     "end": 1052,
+     "name": "n",
+     "role": "ref",
+     "start": 1051
+    },
+    {
+     "end": 1059,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1056
+    },
+    {
+     "end": 1071,
+     "name": "Fin1.up",
+     "role": "ref",
+     "start": 1064
+    },
+    {
+     "end": 1073,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1073
+    },
+    {
+     "end": 1075,
+     "name": "Fd",
+     "role": "ref",
+     "start": 1073
+    },
+    {
+     "end": 1077,
+     "name": "n",
+     "role": "ref",
+     "start": 1076
+    },
+    {
+     "end": 1082,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1079
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1029,
+      "col": 25,
+      "line": 26
+     },
+     "start": {
+      "byte": 1019,
+      "col": 15,
+      "line": 26
+     }
+    }
+   ],
+   "inst_keys": [
+    "CD.IP.Fin1 CD.IP.Fd"
+   ],
+   "insts": [
+    "CD.IP.fdFin1",
+    "CD.IP.fdPairFin1"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IP.fdPairFin1"
+   ],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [
+    [
+     1019,
+     1029,
+     "CD.IP.fdPairFin1",
+     "b"
+    ],
+    [
+     1019,
+     1029,
+     "",
+     "b"
+    ],
+    [
+     1031,
+     1032,
+     "",
+     "b"
+    ],
+    [
+     1035,
+     1038,
+     "Nat"
+    ],
+    [
+     1042,
+     1046,
+     "CD.IP.Fin1"
+    ],
+    [
+     1048,
+     1050,
+     "CD.IP.Fd"
+    ],
+    [
+     1051,
+     1052,
+     ""
+    ],
+    [
+     1056,
+     1059,
+     "Nat"
+    ],
+    [
+     1064,
+     1071,
+     "CD.IP.Fin1.up"
+    ],
+    [
+     1073,
+     1075,
+     "CD.IP.Fd"
+    ],
+    [
+     1076,
+     1077,
+     ""
+    ],
+    [
+     1079,
+     1082,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [
+    "CD.IP.fdPairFin1"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1004,
+    "col": 0,
+    "line": 26
+   },
+   "used_keys": [
+    "CD.IP.Fin1 CD.IP.Fd",
+    "CD.IP.Fin1 Prod"
+   ],
+   "value_start": {
+    "byte": 1061,
+    "col": 56,
+    "line": 26
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 6
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "CD.IP.fdPairInh",
+     "Inhabited",
+     [
+      "Prod"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1166,
+    "col": 73,
+    "line": 28
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1108,
+     "name": "fdPairInh",
+     "role": "decl",
+     "start": 1099
+    },
+    {
+     "end": 1111,
+     "name": "n",
+     "role": "binder",
+     "start": 1110
+    },
+    {
+     "end": 1117,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1114
+    },
+    {
+     "end": 1130,
+     "name": "Inhabited",
+     "role": "ref",
+     "start": 1121
+    },
+    {
+     "end": 1132,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1132
+    },
+    {
+     "end": 1134,
+     "name": "Fd",
+     "role": "ref",
+     "start": 1132
+    },
+    {
+     "end": 1136,
+     "name": "n",
+     "role": "ref",
+     "start": 1135
+    },
+    {
+     "end": 1143,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1140
+    },
+    {
+     "end": 1152,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1152
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1108,
+      "col": 24,
+      "line": 28
+     },
+     "start": {
+      "byte": 1099,
+      "col": 15,
+      "line": 28
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [
+    "CD.IP.fdPairInh"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IP.fdPairInh"
+   ],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [
+    [
+     1099,
+     1108,
+     "CD.IP.fdPairInh",
+     "b"
+    ],
+    [
+     1099,
+     1108,
+     "",
+     "b"
+    ],
+    [
+     1110,
+     1111,
+     "",
+     "b"
+    ],
+    [
+     1114,
+     1117,
+     "Nat"
+    ],
+    [
+     1121,
+     1130,
+     "Inhabited"
+    ],
+    [
+     1132,
+     1134,
+     "CD.IP.Fd"
+    ],
+    [
+     1135,
+     1136,
+     ""
+    ],
+    [
+     1140,
+     1143,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [
+    "CD.IP.fdPairInh"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1084,
+    "col": 0,
+    "line": 28
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 1145,
+    "col": 60,
+    "line": 28
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 6
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.IP.pair_default",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1237,
+    "col": 68,
+    "line": 30
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1188,
+     "name": "pair_default",
+     "role": "decl",
+     "start": 1176
+    },
+    {
+     "end": 1191,
+     "name": "n",
+     "role": "binder",
+     "start": 1190
+    },
+    {
+     "end": 1197,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1194
+    },
+    {
+     "end": 1202,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1202
+    },
+    {
+     "end": 1209,
+     "name": "default",
+     "role": "ref",
+     "start": 1202
+    },
+    {
+     "end": 1214,
+     "name": "Fd",
+     "role": "ref",
+     "start": 1212
+    },
+    {
+     "end": 1216,
+     "name": "n",
+     "role": "ref",
+     "start": 1215
+    },
+    {
+     "end": 1223,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1220
+    },
+    {
+     "end": 1237,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1234
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1188,
+      "col": 20,
+      "line": 30
+     },
+     "start": {
+      "byte": 1176,
+      "col": 8,
+      "line": 30
+     }
+    }
+   ],
+   "inst_keys": [
+    "Inhabited Prod",
+    "OfNat Nat"
+   ],
+   "insts": [
+    "CD.IP.fdPairInh"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.IP.pair_default"
+   ],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [
+    [
+     1176,
+     1188,
+     "CD.IP.pair_default",
+     "b"
+    ],
+    [
+     1176,
+     1188,
+     "",
+     "b"
+    ],
+    [
+     1190,
+     1191,
+     "",
+     "b"
+    ],
+    [
+     1194,
+     1197,
+     "Nat"
+    ],
+    [
+     1202,
+     1209,
+     "Inhabited.default"
+    ],
+    [
+     1212,
+     1214,
+     "CD.IP.Fd"
+    ],
+    [
+     1215,
+     1216,
+     ""
+    ],
+    [
+     1220,
+     1223,
+     "Nat"
+    ],
+    [
+     1234,
+     1237,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [
+    "CD.IP.fdPairInh"
+   ],
+   "sig_used_keys": [
+    "Inhabited Prod"
+   ],
+   "start": {
+    "byte": 1168,
+    "col": 0,
+    "line": 30
+   },
+   "used_keys": [
+    "Inhabited Prod"
+   ],
+   "value_start": {
+    "byte": 1231,
+    "col": 62,
+    "line": 30
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 6
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1242,
+    "col": 3,
+    "line": 32
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1239,
+    "col": 0,
+    "line": 32
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1253,
+    "col": 9,
+    "line": 34
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1253,
+     "name": "CD.IP",
+     "role": "scope",
+     "start": 1248
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.IP",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1244,
+    "col": 0,
+    "line": 34
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1254,
+    "col": 0,
+    "line": 35
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1254,
+    "col": 0,
+    "line": 35
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/InstPre.lean",
+ "messages": [],
+ "mode": "elaborate"
+}
