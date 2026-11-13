@@ -338,7 +338,7 @@ def _is_local(text):
 MODIFIERS = rb'(?:(?:private|protected|public|noncomputable|unsafe|partial|nonrec)\s+)*'
 
 # a `local instance` command, anonymous when the next token opens its binders or type
-LOCAL_INSTANCE = re.compile(rb'(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?(?:noncomputable\s+)?(?:private\s+)?'
+LOCAL_INSTANCE = re.compile(rb'(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?' + MODIFIERS +
                             rb'local\s+instance(?:\s*\(priority\s*:=[^)]*\))?', re.S)
 
 
@@ -3291,7 +3291,7 @@ def _global_instance(g, k):
     info = g.infos[nd.module]
     c = info.commands[nd.cmd]
     head = info.text_bytes[c.start.byte:c.end.byte][:400].decode('utf-8', 'ignore')
-    return not re.match(r'\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?(?:noncomputable\s+)?(?:private\s+)?'
+    return not re.match(r'\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?' + MODIFIERS.decode() +
                         r'(?:local|scoped)\b', head, re.S)
 
 

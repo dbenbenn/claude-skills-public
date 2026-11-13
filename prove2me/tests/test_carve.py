@@ -3934,3 +3934,24 @@ def test_a_private_noncomputable_anonymous_instance_gets_the_ports_name(g):
     keep = {'CD.PI.Fld', 'CD.PI.Tag', PI + 'instTagFld'}
     txt = C.Carver(g).carve(keep, g.have_names(keep), deprivatize=True)
     assert re.search(r'^noncomputable instance instTagFld\s*:', txt, re.M), txt
+
+
+def test_a_private_local_instance_of_an_earlier_bundle_comes_back_with_its_priority(g):
+    # Duke MainUnconditional (q359): a module's four `private noncomputable local instance`s (a UniformSpace
+    # at priority 50, …) were declared in the bundle holding its first part; the bundle holding the rest
+    # did not put them back in force ("failed to synthesize TopologicalSpace"): the local-instance pattern
+    # read the modifiers only as `noncomputable private`
+    from types import SimpleNamespace as N
+    head = b'private noncomputable local instance (priority := 50)'
+    b = head + b'\n    fldUnif (n : Nat) : Unif (Fld n) := x'
+    assert C._local_instance(N(text_bytes=b), N(start=N(byte=0), end=N(byte=len(b)))) == (True, None)
+    b = head + b' : Unif Nat := x'
+    assert C._local_instance(N(text_bytes=b), N(start=N(byte=0), end=N(byte=len(b)))) == (True, len(head))
+    assert C._instance_priority(b) == '50'
+    assert g.is_local_instance(PI + 'fldUnif') and g.is_local_instance(PI + 'fldInh')
+    keep = {'CD.PI.Fld', 'CD.PI.Unif', 'CD.PI.fld_later'}
+    have = g.have_names(keep | {'CD.PI.fldDefault', PI + 'fldUnif', PI + 'fldInh'})
+    sec = _section(C.Carver(g).carve(keep, have), 'CarveDev.InstPriv')
+    assert 'attribute [local instance 50] CD.PI.fldUnif\n' in sec, sec
+    assert 'attribute [local instance] CD.PI.fldInh\n' in sec, sec
+    assert sec.index('CD.PI.fldInh\n') < sec.index('theorem fld_later')
