@@ -78,5 +78,5 @@ elaborated, not tactic time.
 **The same cap applies to every imported source:** "Source too large for import parser: 1425670 bytes
 (max 1048576)" (q361, 2026-11-13) refuses any definition, statement or proof that imports a published
 bundle over 1 MiB (`Def_EditApproximation`). Nothing on our side cures it: no retry, no carve, since
-everything must import the bundle. Check `wc -c` of a goal's imported bundles before carving, and take
-it to the admins.
+everything must import the bundle. Carve `inputs`/`config` refuse such a goal and split_run logs the
+verdict as `PLATFORM BLOCK`; take it to the admins.

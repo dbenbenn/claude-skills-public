@@ -224,7 +224,8 @@ toolchain.
 
 - **Getting the sources.** Put them beside `OAI/` in `src/lean` (the commit pinned in
   `lean/lake-manifest.json`) and resume; the port takes them as OpenAI's. With a local checkout at the
-  pinned commit, `oai_fetch.py DEST ROOT --foreign <checkout>` (repeatable) copies the package's import
+  pinned commit, pipeline.json `foreign` (or `--foreign DIR`, repeatable; q244) has the fetch step run
+  `oai_fetch.py --foreign <checkout>`, which copies the package's import
   closure, strips LeanArchitect annotations (a8b47ea), and names any module the checkout lacks
   (oaiq-093: a stray import to patch away). Turn `/--` doc comments inside tactic blocks into `/-` by
   hand. Packages written in the module system
@@ -651,7 +652,9 @@ mixed old and new `carve.py` inside one carve).
   plan, gen, names, order, measure (edge check on), calibrate, publish-prep, prose-template, check-text,
   and a `split_run` dry run (`--publish` adds `split_run --go`).
 - **`--fetch`** copies the root's import closure from the local openai/math clone (`~/claude/openai-math`;
-  raw GitHub only for what it lacks, with backoff on 429). Never pass a whole openai/math tree as
+  raw GitHub only for what it lacks, with backoff on 429). `inputs` and `config` refuse a goal whose
+  imports reach a published file over 1 MiB, which the platform's import parser refuses (q361;
+  verifier-failures.md). Never pass a whole openai/math tree as
   `--lean-src`: port and filter-patches refuse more than 50 modules outside the closure.
 - **Write `DIR/oai_meta.json` before starting** (title, date, family, full commit, paper URL, `prefixes`;
   `p2mlib/prosetemplate.py` has the format). `prefixes` are `OAI.<top directory>` of the root module
@@ -714,9 +717,8 @@ mixed old and new `carve.py` inside one carve).
 - **Once publishing has started** (`pipeline_state.json` `publishing_started`, set the first time
   publish or publish_early runs or `publish/run_state.json` or config `frozen` is seen, and kept), a rule
   change keeps the port: `--redo port` only deliberately. A changed input from outside (an edited patches
-  file, a port folder rewritten under the carve) stops the run until you `--redo` that step. The guard
-  hashes bytes: a patches file re-serialised by a JSON library counts as edited (q241; restore it with
-  `git show`).
+  file, a port folder rewritten under the carve) stops the run until you `--redo` that step. A patches
+  file counts by its entries without their `why`, so re-saving it or editing a `why` re-runs nothing (q361).
 - **LeanInfo and graph.** A change to `LeanInfo.lean` re-runs `graph` (with a warning giving the module
   count) while a step that loads the graph is still to run, and re-elaborates the whole graph. A graph
   recorded before a DeclGraph change is re-run after `--upgrade` while planning is ahead; a published carve
@@ -1126,8 +1128,8 @@ Profile before forcing or splitting anything.
     `config` (6cd9e93, q227).
 - **Extending another carve's frozen plan** (oaiq-088): a private node name embeds the old port folder
   (`_private.Solutions.OAIQ038_FA…`): rewrite the frozen plan's folder name to the new one, or a spurious
-  import cycle appears. Every `external_theorems` entry must exist in the new graph (drop those outside
-  the new closure, else `unknown external definition`).
+  import cycle appears. `plan` leaves out `external_theorems` entries outside the new graph, with a note
+  (q260).
 - **Extending a split whose bundle another carver made** (the zero-divisor K(G,1) clause): `carve.py`
   with a `frozen` bundle from an old per-mission carver produced pieces that imported none of the new
   bundles. Instead: merge the whole port (`build_solution.py`), drop by exact full name every declaration
