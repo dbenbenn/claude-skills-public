@@ -333,6 +333,10 @@ def _is_local(text):
         '[local ' in text or '[scoped ' in text
 
 
+# a declaration's modifiers, in any order: Lean writes `private noncomputable` (q359: the patterns read only
+# `noncomputable private`, so no `private noncomputable instance` was taken for one)
+MODIFIERS = rb'(?:(?:private|protected|public|noncomputable|unsafe|partial|nonrec)\s+)*'
+
 # a `local instance` command, anonymous when the next token opens its binders or type
 LOCAL_INSTANCE = re.compile(rb'(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?(?:noncomputable\s+)?(?:private\s+)?'
                             rb'local\s+instance(?:\s*\(priority\s*:=[^)]*\))?', re.S)
@@ -358,7 +362,7 @@ def _local_instance(info, c):
     return True, (mt.end() if nxt in ':([{⦃' else None)
 
 
-ANY_INSTANCE = re.compile(rb'(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?(?:noncomputable\s+)?(?:private\s+)?'
+ANY_INSTANCE = re.compile(rb'(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?' + MODIFIERS +
                           rb'(?:(?:local|scoped)\s+)?instance(?:\s*\(priority\s*:=[^)]*\))?', re.S)
 
 

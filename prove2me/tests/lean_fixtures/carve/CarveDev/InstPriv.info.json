@@ -1,0 +1,1643 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 870,
+    "col": 90,
+    "line": 11
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 887,
+    "col": 15,
+    "line": 13
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 887,
+     "name": "CD.PI",
+     "role": "scope",
+     "start": 882
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 872,
+    "col": 0,
+    "line": 13
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.PI.Fld",
+     "",
+     []
+    ],
+    [
+     "CD.PI.Fld.x",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 928,
+    "col": 9,
+    "line": 16
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 902,
+     "name": "Fld",
+     "role": "decl",
+     "start": 899
+    },
+    {
+     "end": 905,
+     "name": "n",
+     "role": "binder",
+     "start": 904
+    },
+    {
+     "end": 911,
+     "name": "Nat",
+     "role": "ref",
+     "start": 908
+    },
+    {
+     "end": 922,
+     "name": "x",
+     "role": "ref",
+     "start": 921
+    },
+    {
+     "end": 928,
+     "name": "Nat",
+     "role": "ref",
+     "start": 925
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 902,
+      "col": 13,
+      "line": 15
+     },
+     "start": {
+      "byte": 899,
+      "col": 10,
+      "line": 15
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.PI.Fld"
+   ],
+   "namespace": "CD.PI",
+   "opens": [],
+   "resolved": [
+    [
+     899,
+     902,
+     "CD.PI.Fld",
+     "b"
+    ],
+    [
+     899,
+     902,
+     "",
+     "b"
+    ],
+    [
+     904,
+     905,
+     "",
+     "b"
+    ],
+    [
+     908,
+     911,
+     "Nat"
+    ],
+    [
+     921,
+     922,
+     "CD.PI.Fld.x",
+     "b"
+    ],
+    [
+     925,
+     928,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 889,
+    "col": 0,
+    "line": 15
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.PI.Tag",
+     "",
+     []
+    ],
+    [
+     "CD.PI.Tag.t",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 967,
+    "col": 9,
+    "line": 19
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 939,
+     "name": "Tag",
+     "role": "decl",
+     "start": 936
+    },
+    {
+     "end": 943,
+     "name": "α",
+     "role": "binder",
+     "start": 941
+    },
+    {
+     "end": 961,
+     "name": "t",
+     "role": "ref",
+     "start": 960
+    },
+    {
+     "end": 967,
+     "name": "Nat",
+     "role": "ref",
+     "start": 964
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 939,
+      "col": 9,
+      "line": 18
+     },
+     "start": {
+      "byte": 936,
+      "col": 6,
+      "line": 18
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.PI.Tag"
+   ],
+   "namespace": "CD.PI",
+   "opens": [],
+   "resolved": [
+    [
+     936,
+     939,
+     "",
+     "b"
+    ],
+    [
+     936,
+     939,
+     "CD.PI.Tag",
+     "b"
+    ],
+    [
+     941,
+     943,
+     "",
+     "b"
+    ],
+    [
+     960,
+     961,
+     "CD.PI.Tag.t",
+     "b"
+    ],
+    [
+     964,
+     967,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 930,
+    "col": 0,
+    "line": 18
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.structure",
+   "declares": [
+    [
+     "CD.PI.Unif.u",
+     "",
+     []
+    ],
+    [
+     "CD.PI.Unif",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1007,
+    "col": 9,
+    "line": 22
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 979,
+     "name": "Unif",
+     "role": "decl",
+     "start": 975
+    },
+    {
+     "end": 983,
+     "name": "α",
+     "role": "binder",
+     "start": 981
+    },
+    {
+     "end": 1001,
+     "name": "u",
+     "role": "ref",
+     "start": 1000
+    },
+    {
+     "end": 1007,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1004
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 979,
+      "col": 10,
+      "line": 21
+     },
+     "start": {
+      "byte": 975,
+      "col": 6,
+      "line": 21
+     }
+    }
+   ],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.PI.Unif"
+   ],
+   "namespace": "CD.PI",
+   "opens": [],
+   "resolved": [
+    [
+     975,
+     979,
+     "",
+     "b"
+    ],
+    [
+     975,
+     979,
+     "CD.PI.Unif",
+     "b"
+    ],
+    [
+     981,
+     983,
+     "",
+     "b"
+    ],
+    [
+     1000,
+     1001,
+     "CD.PI.Unif.u",
+     "b"
+    ],
+    [
+     1004,
+     1007,
+     "Nat"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 969,
+    "col": 0,
+    "line": 21
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "_private.CarveDev.InstPriv.0.CD.PI.instTagFld",
+     "CD.PI.Tag",
+     [
+      "CD.PI.Fld"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1086,
+    "col": 71,
+    "line": 24
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1047,
+     "name": "n",
+     "role": "ref",
+     "start": 1046
+    },
+    {
+     "end": 1053,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1050
+    },
+    {
+     "end": 1058,
+     "name": "Tag",
+     "role": "ref",
+     "start": 1055
+    },
+    {
+     "end": 1060,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1060
+    },
+    {
+     "end": 1063,
+     "name": "Fld",
+     "role": "ref",
+     "start": 1060
+    },
+    {
+     "end": 1065,
+     "name": "n",
+     "role": "ref",
+     "start": 1064
+    }
+   ],
+   "ids": [],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.instTagFld"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.PI",
+   "opens": [],
+   "private": {
+    "end": 1016,
+    "start": 1009
+   },
+   "resolved": [
+    [
+     1046,
+     1047,
+     "",
+     "b"
+    ],
+    [
+     1050,
+     1053,
+     "Nat"
+    ],
+    [
+     1055,
+     1058,
+     "CD.PI.Tag"
+    ],
+    [
+     1060,
+     1063,
+     "CD.PI.Fld"
+    ],
+    [
+     1064,
+     1065,
+     ""
+    ]
+   ],
+   "sig_insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.instTagFld"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1009,
+    "col": 0,
+    "line": 24
+   },
+   "used_keys": [
+    "CD.PI.Tag"
+   ],
+   "value_start": {
+    "byte": 1067,
+    "col": 56,
+    "line": 24
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.PI.tag_fld",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1140,
+    "col": 52,
+    "line": 26
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1103,
+     "name": "tag_fld",
+     "role": "decl",
+     "start": 1096
+    },
+    {
+     "end": 1106,
+     "name": "n",
+     "role": "binder",
+     "start": 1105
+    },
+    {
+     "end": 1112,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1109
+    },
+    {
+     "end": 1121,
+     "name": "Tag.t",
+     "role": "ref",
+     "start": 1116
+    },
+    {
+     "end": 1123,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1123
+    },
+    {
+     "end": 1126,
+     "name": "Fld",
+     "role": "ref",
+     "start": 1123
+    },
+    {
+     "end": 1128,
+     "name": "n",
+     "role": "ref",
+     "start": 1127
+    },
+    {
+     "end": 1140,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1137
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1103,
+      "col": 15,
+      "line": 26
+     },
+     "start": {
+      "byte": 1096,
+      "col": 8,
+      "line": 26
+     }
+    }
+   ],
+   "inst_keys": [
+    "CD.PI.Tag CD.PI.Fld",
+    "OfNat Nat"
+   ],
+   "insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.instTagFld"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.PI.tag_fld"
+   ],
+   "namespace": "CD.PI",
+   "opens": [],
+   "resolved": [
+    [
+     1096,
+     1103,
+     "CD.PI.tag_fld",
+     "b"
+    ],
+    [
+     1096,
+     1103,
+     "",
+     "b"
+    ],
+    [
+     1105,
+     1106,
+     "",
+     "b"
+    ],
+    [
+     1109,
+     1112,
+     "Nat"
+    ],
+    [
+     1116,
+     1121,
+     "CD.PI.Tag.t"
+    ],
+    [
+     1123,
+     1126,
+     "CD.PI.Fld"
+    ],
+    [
+     1127,
+     1128,
+     ""
+    ],
+    [
+     1137,
+     1140,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.instTagFld"
+   ],
+   "sig_used_keys": [
+    "CD.PI.Tag CD.PI.Fld"
+   ],
+   "start": {
+    "byte": 1088,
+    "col": 0,
+    "line": 26
+   },
+   "used_keys": [
+    "CD.PI.Tag CD.PI.Fld"
+   ],
+   "value_start": {
+    "byte": 1134,
+    "col": 46,
+    "line": 26
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1149,
+    "col": 7,
+    "line": 28
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.section",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.PI",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1142,
+    "col": 0,
+    "line": 28
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "_private.CarveDev.InstPriv.0.CD.PI.fldUnif",
+     "CD.PI.Unif",
+     [
+      "CD.PI.Fld"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1252,
+    "col": 43,
+    "line": 31
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1216,
+     "name": "fldUnif",
+     "role": "decl",
+     "start": 1209
+    },
+    {
+     "end": 1219,
+     "name": "n",
+     "role": "binder",
+     "start": 1218
+    },
+    {
+     "end": 1225,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1222
+    },
+    {
+     "end": 1233,
+     "name": "Unif",
+     "role": "ref",
+     "start": 1229
+    },
+    {
+     "end": 1235,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1235
+    },
+    {
+     "end": 1238,
+     "name": "Fld",
+     "role": "ref",
+     "start": 1235
+    },
+    {
+     "end": 1240,
+     "name": "n",
+     "role": "ref",
+     "start": 1239
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1216,
+      "col": 11,
+      "line": 31
+     },
+     "start": {
+      "byte": 1209,
+      "col": 4,
+      "line": 31
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.fldUnif"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.PI.fldUnif"
+   ],
+   "namespace": "CD.PI",
+   "opens": [],
+   "private": {
+    "end": 1158,
+    "start": 1151
+   },
+   "resolved": [
+    [
+     1209,
+     1216,
+     "_private.CarveDev.InstPriv.0.CD.PI.fldUnif",
+     "b"
+    ],
+    [
+     1209,
+     1216,
+     "",
+     "b"
+    ],
+    [
+     1218,
+     1219,
+     "",
+     "b"
+    ],
+    [
+     1222,
+     1225,
+     "Nat"
+    ],
+    [
+     1229,
+     1233,
+     "CD.PI.Unif"
+    ],
+    [
+     1235,
+     1238,
+     "CD.PI.Fld"
+    ],
+    [
+     1239,
+     1240,
+     ""
+    ]
+   ],
+   "sig_insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.fldUnif"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1151,
+    "col": 0,
+    "line": 30
+   },
+   "used_keys": [
+    "CD.PI.Unif"
+   ],
+   "value_start": {
+    "byte": 1242,
+    "col": 37,
+    "line": 31
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.instance",
+   "declares": [
+    [
+     "_private.CarveDev.InstPriv.0.CD.PI.fldInh",
+     "Inhabited",
+     [
+      "CD.PI.Fld"
+     ]
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1348,
+    "col": 49,
+    "line": 34
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1301,
+     "name": "fldInh",
+     "role": "decl",
+     "start": 1295
+    },
+    {
+     "end": 1304,
+     "name": "n",
+     "role": "binder",
+     "start": 1303
+    },
+    {
+     "end": 1310,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1307
+    },
+    {
+     "end": 1323,
+     "name": "Inhabited",
+     "role": "ref",
+     "start": 1314
+    },
+    {
+     "end": 1325,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1325
+    },
+    {
+     "end": 1328,
+     "name": "Fld",
+     "role": "ref",
+     "start": 1325
+    },
+    {
+     "end": 1330,
+     "name": "n",
+     "role": "ref",
+     "start": 1329
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1301,
+      "col": 10,
+      "line": 34
+     },
+     "start": {
+      "byte": 1295,
+      "col": 4,
+      "line": 34
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.fldInh"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.PI.fldInh"
+   ],
+   "namespace": "CD.PI",
+   "opens": [],
+   "private": {
+    "end": 1261,
+    "start": 1254
+   },
+   "resolved": [
+    [
+     1295,
+     1301,
+     "_private.CarveDev.InstPriv.0.CD.PI.fldInh",
+     "b"
+    ],
+    [
+     1295,
+     1301,
+     "",
+     "b"
+    ],
+    [
+     1303,
+     1304,
+     "",
+     "b"
+    ],
+    [
+     1307,
+     1310,
+     "Nat"
+    ],
+    [
+     1314,
+     1323,
+     "Inhabited"
+    ],
+    [
+     1325,
+     1328,
+     "CD.PI.Fld"
+    ],
+    [
+     1329,
+     1330,
+     ""
+    ]
+   ],
+   "sig_insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.fldInh"
+   ],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1254,
+    "col": 0,
+    "line": 33
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 1332,
+    "col": 41,
+    "line": 34
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.definition",
+   "declares": [
+    [
+     "CD.PI.fldDefault",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1407,
+    "col": 57,
+    "line": 36
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1378,
+     "name": "fldDefault",
+     "role": "decl",
+     "start": 1368
+    },
+    {
+     "end": 1381,
+     "name": "n",
+     "role": "binder",
+     "start": 1380
+    },
+    {
+     "end": 1387,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1384
+    },
+    {
+     "end": 1394,
+     "name": "Fld",
+     "role": "ref",
+     "start": 1391
+    },
+    {
+     "end": 1396,
+     "name": "n",
+     "role": "ref",
+     "start": 1395
+    },
+    {
+     "end": 1407,
+     "name": "default",
+     "role": "ref",
+     "start": 1400
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1378,
+      "col": 28,
+      "line": 36
+     },
+     "start": {
+      "byte": 1368,
+      "col": 18,
+      "line": 36
+     }
+    }
+   ],
+   "inst_keys": [
+    "Inhabited CD.PI.Fld"
+   ],
+   "insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.fldInh"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.PI.fldDefault"
+   ],
+   "namespace": "CD.PI",
+   "opens": [],
+   "resolved": [
+    [
+     1368,
+     1378,
+     "CD.PI.fldDefault",
+     "b"
+    ],
+    [
+     1368,
+     1378,
+     "",
+     "b"
+    ],
+    [
+     1380,
+     1381,
+     "",
+     "b"
+    ],
+    [
+     1384,
+     1387,
+     "Nat"
+    ],
+    [
+     1391,
+     1394,
+     "CD.PI.Fld"
+    ],
+    [
+     1395,
+     1396,
+     ""
+    ],
+    [
+     1400,
+     1407,
+     "Inhabited.default"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1350,
+    "col": 0,
+    "line": 36
+   },
+   "used_keys": [
+    "Inhabited CD.PI.Fld"
+   ],
+   "value_start": {
+    "byte": 1397,
+    "col": 47,
+    "line": 36
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.PI.fld_later",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1503,
+    "col": 88,
+    "line": 38
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1426,
+     "name": "fld_later",
+     "role": "decl",
+     "start": 1417
+    },
+    {
+     "end": 1429,
+     "name": "n",
+     "role": "binder",
+     "start": 1428
+    },
+    {
+     "end": 1435,
+     "name": "Nat",
+     "role": "ref",
+     "start": 1432
+    },
+    {
+     "end": 1440,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1440
+    },
+    {
+     "end": 1447,
+     "name": "default",
+     "role": "ref",
+     "start": 1440
+    },
+    {
+     "end": 1453,
+     "name": "Fld",
+     "role": "ref",
+     "start": 1450
+    },
+    {
+     "end": 1455,
+     "name": "n",
+     "role": "ref",
+     "start": 1454
+    },
+    {
+     "end": 1458,
+     "name": "x",
+     "role": "ref",
+     "start": 1457
+    },
+    {
+     "end": 1473,
+     "name": "Unif.u",
+     "role": "ref",
+     "start": 1467
+    },
+    {
+     "end": 1475,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 1475
+    },
+    {
+     "end": 1478,
+     "name": "Fld",
+     "role": "ref",
+     "start": 1475
+    },
+    {
+     "end": 1480,
+     "name": "n",
+     "role": "ref",
+     "start": 1479
+    },
+    {
+     "end": 1495,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1492
+    },
+    {
+     "end": 1500,
+     "name": "rfl",
+     "role": "ref",
+     "start": 1497
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 1426,
+      "col": 17,
+      "line": 38
+     },
+     "start": {
+      "byte": 1417,
+      "col": 8,
+      "line": 38
+     }
+    }
+   ],
+   "inst_keys": [
+    "CD.PI.Unif CD.PI.Fld",
+    "Inhabited CD.PI.Fld",
+    "OfNat Nat"
+   ],
+   "insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.fldInh",
+    "_private.CarveDev.InstPriv.0.CD.PI.fldUnif"
+   ],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.PI.fld_later"
+   ],
+   "namespace": "CD.PI",
+   "opens": [],
+   "resolved": [
+    [
+     1417,
+     1426,
+     "CD.PI.fld_later",
+     "b"
+    ],
+    [
+     1417,
+     1426,
+     "",
+     "b"
+    ],
+    [
+     1428,
+     1429,
+     "",
+     "b"
+    ],
+    [
+     1432,
+     1435,
+     "Nat"
+    ],
+    [
+     1440,
+     1447,
+     "Inhabited.default"
+    ],
+    [
+     1450,
+     1453,
+     "CD.PI.Fld"
+    ],
+    [
+     1454,
+     1455,
+     ""
+    ],
+    [
+     1457,
+     1458,
+     "CD.PI.Fld.x"
+    ],
+    [
+     1467,
+     1473,
+     "CD.PI.Unif.u"
+    ],
+    [
+     1475,
+     1478,
+     "CD.PI.Fld"
+    ],
+    [
+     1479,
+     1480,
+     ""
+    ],
+    [
+     1492,
+     1495,
+     "rfl"
+    ],
+    [
+     1497,
+     1500,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [
+    "_private.CarveDev.InstPriv.0.CD.PI.fldInh",
+    "_private.CarveDev.InstPriv.0.CD.PI.fldUnif"
+   ],
+   "sig_used_keys": [
+    "CD.PI.Unif CD.PI.Fld",
+    "Inhabited CD.PI.Fld"
+   ],
+   "start": {
+    "byte": 1409,
+    "col": 0,
+    "line": 38
+   },
+   "used_keys": [
+    "CD.PI.Unif CD.PI.Fld",
+    "Inhabited CD.PI.Fld"
+   ],
+   "value_start": {
+    "byte": 1486,
+    "col": 75,
+    "line": 38
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    },
+    {
+     "cmds": [],
+     "opener": 7
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1508,
+    "col": 3,
+    "line": 40
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.PI",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1505,
+    "col": 0,
+    "line": 40
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1519,
+    "col": 9,
+    "line": 42
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 1519,
+     "name": "CD.PI",
+     "role": "scope",
+     "start": 1514
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.PI",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1510,
+    "col": 0,
+    "line": 42
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 1520,
+    "col": 0,
+    "line": 43
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 1520,
+    "col": 0,
+    "line": 43
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/InstPriv.lean",
+ "messages": [],
+ "mode": "elaborate"
+}

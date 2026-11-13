@@ -3913,3 +3913,24 @@ def test_plan_prints_the_entry_table_and_warns(capsys):
     assert 'bundles hold 6 theorem(s) (407 s planned) and 2 definition(s) (5 s)' in out
     assert 'WARNING: definitions pull theorems into bundles' in out and '`forced`' in out
     assert '    350.0 s  fourier (3 theorems; used by pair)' in out
+
+
+# ---------------------------------------------------------------- `private noncomputable` instances (q359)
+
+PI = '_private.CarveDev.InstPriv.0.CD.PI.'
+
+
+def test_a_private_noncomputable_anonymous_instance_gets_the_ports_name(g):
+    # Duke MainUnconditional (q359): `private noncomputable instance : ∀ E, SMul …`, kept deprivatized in a
+    # bundle, stayed anonymous (the instance pattern read the modifiers as `noncomputable private`); Lean
+    # named it differently there, and a later section's `attribute [-instance]` under the port's name was
+    # "Unknown constant"
+    from types import SimpleNamespace as N
+    for head in ('private noncomputable instance', 'noncomputable private instance',
+                 'protected noncomputable instance', '@[simp] private unsafe instance (priority := 5)'):
+        b = (head + ' : ∀ n : Nat, Tag (Fld n) := x').encode()
+        assert C._anonymous_instance(N(text_bytes=b), N(start=N(byte=0), end=N(byte=len(b)))) == \
+            len(head.encode()), head
+    keep = {'CD.PI.Fld', 'CD.PI.Tag', PI + 'instTagFld'}
+    txt = C.Carver(g).carve(keep, g.have_names(keep), deprivatize=True)
+    assert re.search(r'^noncomputable instance instTagFld\s*:', txt, re.M), txt
