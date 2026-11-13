@@ -148,11 +148,23 @@ def load_config(path):
     return cfg
 
 
-def external_map(cfg):
+def external_map(cfg, g=None):
     """external_defs and external_theorems together: both are someone else's published
-    declarations, kept out of bundles and pieces and imported by the files that use them."""
+    declarations, kept out of bundles and pieces and imported by the files that use them. With the
+    graph `g`, an external theorem that is no node of it (outside this carve's closure, so nothing uses
+    it) is left out, with a note: q260 (2026-11-12) extended the KadisonSimilarity carve with all its live
+    statements as external_theorems, and six outside the Kadison-Kastler closure stopped `plan` ("unknown
+    external definition")."""
     ext = dict(cfg.get('external_defs') or {})
-    ext.update(cfg.get('external_theorems') or {})
+    thms = dict(cfg.get('external_theorems') or {})
+    if g is not None:
+        out = sorted(k for k in thms if g.owner.get(k, k) not in g.nodes)
+        if out:
+            print('note: %d external_theorems not in this graph (outside the closure, unused), left out: %s'
+                  % (len(out), ', '.join(out)), flush=True)
+            for k in out:
+                del thms[k]
+    ext.update(thms)
     return ext
 
 
@@ -569,7 +581,7 @@ def main(argv):
                         cfg.get('piece_size', 700_000), cfg.get('bundle_budget', 90),
                         cfg.get('bundle_size', 650_000), cfg.get('band_width', 4), cost,
                         frozen, cfg.get('bundle_prefix', 'Bundle'),
-                        external_defs=external_map(cfg),
+                        external_defs=external_map(cfg, g),
                         statement_suffix=cfg.get('statement_suffix', ''),
                         external=cfg.get('external', ()),
                         chunker=cfg.get('chunker', 'bands'),

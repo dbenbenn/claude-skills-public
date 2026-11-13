@@ -1079,6 +1079,25 @@ def test_external_theorems_are_imported_not_carved(g, tmp_path):
     assert CLI.also_modules(cfg) == ['Theorems.Thm_Ext']
 
 
+def test_external_theorems_outside_the_graph_are_left_out_with_a_note(g, capsys):
+    # q260 (2026-11-12): an extension of the KadisonSimilarity carve listed that carve's live statements as
+    # external_theorems; six lay outside the Kadison-Kastler closure, and `plan` stopped on "unknown external
+    # definition OAI.KadisonSimilarity.list_equal_square_orbit_comparison". They are unused there: left out.
+    CLI = _cli()
+    cfg = {'external_defs': {'CD.double': 'Definitions.Def_Ext'},
+           'external_theorems': {'CD.Aux.aux_eq': 'Theorems.Thm_Ext', 'Far.away': 'Theorems.Thm_Far',
+                                 'Far.other': 'Theorems.Thm_Other'}}
+    ext = CLI.external_map(cfg, g)
+    assert ext == {'CD.double': 'Definitions.Def_Ext', 'CD.Aux.aux_eq': 'Theorems.Thm_Ext'}
+    out = capsys.readouterr().out
+    assert 'Far.away' in out and 'Far.other' in out and '2 external_theorems' in out
+    assert CLI.external_map(cfg) == dict(cfg['external_defs'], **cfg['external_theorems'])   # no graph: all
+    P = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='CDB', external_defs=ext, external=['CD.main'])
+    assert C.check_plan(g, P) == []
+
+
 def test_external_theorem_modules_do_not_leak_their_imports():
     # CrouzeixHilbert (2026-10-19): with external_theorems, DeclGraph reports the Theorems module
     # as a project module (--also), so ext_imports walked into it and every carved file importing
