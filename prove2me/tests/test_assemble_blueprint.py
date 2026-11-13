@@ -597,3 +597,37 @@ def test_a_blueprint_stacked_on_another_blueprint_assembles(tmp_path):
             < text.index('alias a_eq') < text.index('theorem two') < text.index('alias b_eq')
         r = run_assemble(bp, out, pa, pb, '--target', 'SB.top')
         assembled_ok(r, out, c.ws, 'solution')
+
+
+def test_a_part_restating_a_stub_outside_the_blueprint_namespace_is_refused():
+    # q353 (STOC linear max load retry): Parts namespaced `LML.Dev.Part<X>` instead of `LML.Part<X>`
+    # matched no stub, and the assembly kept all seven
+    part_ns = {('PartA', 'LML.Dev.PartA'): ['LML.Dev.PartA.a_eq', 'LML.Dev.PartA.helper'],
+               ('PartB', 'LML.PartB'): ['LML.PartB.b_eq'],
+               ('PartH', 'Aux.PartH'): ['Aux.PartH.h']}
+    bp_ns = {'LML', 'LML.Sub'}
+    refuse, warn = AB.misplaced_parts(part_ns, bp_ns, ['LML.a_eq', 'LML.Sub.c_eq'])
+    assert len(refuse) == 1 and 'PartA' in refuse[0] and 'LML.Dev.PartA' in refuse[0]
+    assert 'LML.PartA' in refuse[0] and 'LML.a_eq' in refuse[0]
+    # a Part-like namespace restating no stub: a loud warning naming the expected namespaces
+    assert len(warn) == 1 and 'Aux.PartH' in warn[0] and 'LML.PartH' in warn[0] and 'LML.Sub.PartH' in warn[0]
+    assert AB.misplaced_parts({('PartB', 'LML.PartB'): ['LML.PartB.b_eq']}, bp_ns, ['LML.a_eq']) == ([], [])
+
+
+@pytest.mark.lean
+def test_a_part_outside_the_blueprint_namespace_is_refused_by_name(tmp_path):
+    # q353: `namespace API.Dev.PartA` restated the stub API.a_eq; the assembly kept it, and the only
+    # message said no Part proves it
+    with Case('AsmPartNsTest') as c:
+        bp = c.file('Blueprint', BP_API)
+        pa = c.file('PartA', HDR + 'import $M.Blueprint\n\nnamespace API.Dev.PartA\n\n'
+                    'theorem a_eq : API.one = 1 := rfl\n\nend API.Dev.PartA\n')
+        pb = c.file('PartB', HDR + 'import $M.Blueprint\n\nnamespace API.PartB\n\n'
+                    'theorem b_eq : API.one + API.one = 2 := rfl\n\nend API.PartB\n')
+        out = tmp_path / 'out.lean'
+        r = run_assemble(bp, out, pa, pb)
+        assert r.returncode != 0 and 'API.Dev.PartA' in r.stderr and 'API.PartA' in r.stderr, r.stdout + r.stderr
+        assert 'expected API.PartA' in r.stderr and not out.exists()
+        # --allow-sorry: assembled with the stub kept, the warning still naming the namespace
+        r = run_assemble(bp, out, pa, pb, '--allow-sorry')
+        assert r.returncode == 0 and 'expected API.PartA' in r.stderr and 'API.a_eq' in r.stderr

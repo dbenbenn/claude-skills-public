@@ -66,6 +66,10 @@ Parts come in two layouts, told apart per Part:
   that differs, such a proof stated differently, or a remaining `sorry` that is not a Blueprint stub
   is refused.
 A Part with neither (only its own names) is assembled as it is.
+A Part's namespace must be `<Blueprint namespace>.Part<X>`: one `<P>.Part<X>` with P no Blueprint
+namespace proves no stub, so a theorem there named like a stub left unproved is refused, naming the
+expected namespace (a warning under --allow-sorry), and any other such namespace is warned about
+(q353: `LML.Dev.Part<X>` kept all seven stubs silently).
 
 --target NAME (the published theorem, which the Blueprint states verbatim and proves from its
 stubs): OUT is then a solution file. The Blueprint's NAME is renamed NAME_dev (a development must
@@ -489,6 +493,33 @@ def stub_candidates(c, n, label):
     return out
 
 
+def misplaced_parts(part_ns, bp_ns, unproved):
+    """(refusals, warnings) for the Parts whose namespace is `<P>.Part<X>` (the last component starting
+    `Part`) with P no namespace of a Blueprint (`bp_ns`): their theorems match no stub, so the assembly
+    kept every stub it meant to prove (q353: `LML.Dev.Part<X>` for `LML.Part<X>`). `part_ns` maps (Part
+    label, namespace) to the names declared there; a refusal when one of them has the last component of
+    a stub no Part proves (`unproved`), naming `<stub namespace>.Part<X>`, else a warning naming the
+    expected namespaces."""
+    refuse, warn = [], []
+    for (lab, ns), names in sorted(part_ns.items()):
+        comps = ns.split('.')
+        k = max((j for j, x in enumerate(comps) if x.startswith('Part')), default=None)
+        if k is None or '.'.join(comps[:k]) in bp_ns:
+            continue
+        part = '.'.join(comps[k:])
+        lasts = {n.rsplit('.', 1)[-1] for n in names}
+        hits = sorted(s for s in unproved if s.rsplit('.', 1)[-1] in lasts)
+        if hits:
+            want = sorted({'%s.%s' % (s.rsplit('.', 1)[0], part) if '.' in s else part for s in hits})
+            refuse.append('%s restates %s in namespace %s, which proves no stub: a Part\'s namespace is '
+                          '<Blueprint namespace>.Part<X>, expected %s' % (lab, ', '.join(hits), ns, ' or '.join(want)))
+        else:
+            want = sorted('%s.%s' % (b, part) if b else part for b in bp_ns)
+            warn.append('%s: namespace %s is not <Blueprint namespace>.Part<X> (expected %s); its theorems prove '
+                        'no Blueprint stub' % (lab, ns, ' or '.join(want)))
+    return refuse, warn
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('blueprint')
@@ -663,6 +694,23 @@ def main():
         pub_of[stubs[n]] = name
         print('%s: proved by the published %s (%s)' % (n, name, mod))
     alias_of = {stubs[s]: (s, t) for s, t in proved.items()}
+    # q353: a Part namespaced outside the Blueprint's (`LML.Dev.Part<X>`) proved nothing, silently
+    bp_ns = set()
+    for i in items:
+        if in_bp(cmds[i]):
+            bp_ns.add(cmds[i].namespace or '')
+            bp_ns |= {n.rsplit('.', 1)[0] if '.' in n else '' for n in cmds[i].names}
+    part_ns = {}
+    for i in items:
+        k = owner_of(cmds[i])
+        if k >= nbp and cmds[i].namespace:
+            part_ns.setdefault((owners[k], cmds[i].namespace), []).extend(cmds[i].names)
+    unproved = [n for n in set(stubs) | set(partial) if n not in proved and stubs.get(n) not in pub_of]
+    refuse, warn = misplaced_parts(part_ns, bp_ns, unproved)
+    for w in warn + (refuse if args.allow_sorry else []):
+        sys.stderr.write('WARNING: %s\n' % w)
+    if refuse and not args.allow_sorry:
+        sys.exit('refusing: ' + '\nrefusing: '.join(refuse))
 
     cmd_of = {d.name: d.command for d in info.decls}
     deps = {i: set() for i in items}
