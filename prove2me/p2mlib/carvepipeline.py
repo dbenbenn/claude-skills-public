@@ -694,6 +694,33 @@ def hash_paths(paths, exts=('',)):
     return h.hexdigest() if seen else None
 
 
+# What a port patch carries for people only: a change to it changes no ported text (q361: a `why` edited in
+# patches.json made filter_patches stale, re-ported past --keep-port, and 1025 modules rebuilt for ~2.5 h)
+PATCH_NOTE_KEYS = ('why',)
+PATCHES_HASH = 'patches:'     # marks a patches_text_hash; a recorded hash without it is the file's bytes (hash_paths)
+
+
+def patches_text_hash(text):
+    """The identity of a port patches file's effect: sha1 over its entries in order, each without the keys in
+    PATCH_NOTE_KEYS, so a `why` edit or a re-serialisation (q241) changes nothing; `old`, `new`, `count`,
+    `route`, `allow_drop` and any other key count. Text that is not a JSON list of objects counts by its bytes."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        data = None
+    if not isinstance(data, list) or not all(isinstance(x, dict) for x in data):
+        return PATCHES_HASH + hashlib.sha1(text.encode('utf-8', 'surrogateescape')).hexdigest()
+    norm = [{k: v for k, v in x.items() if k not in PATCH_NOTE_KEYS} for x in data]
+    return PATCHES_HASH + hashlib.sha1(json.dumps(norm, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def patches_hash(path):
+    """patches_text_hash of the file at `path`, or None when there is none (hash_paths' convention)."""
+    if not path or not os.path.isfile(path):
+        return None
+    return patches_text_hash(open(path, encoding='utf-8', errors='surrogateescape').read())
+
+
 OUTSIDE_CLOSURE_LIMIT = 50
 
 
@@ -883,9 +910,9 @@ class Pipeline:
         port_out = hash_paths([self.folder_dir()], ('.lean',))
         opts = json.dumps(self.compat_args())
         h = {
-            'filter_patches': {'patches file': hash_paths([pp] if pp else []),
+            'filter_patches': {'patches file': patches_hash(pp),
                                'sources': hash_paths([self.lean_src], ('.lean',))},
-            'port': {'filter_patches': hash_paths([self.port_patches()]),
+            'port': {'filter_patches': patches_hash(self.port_patches()),
                      'sources': hash_paths([self.lean_src], ('.lean',)), 'port options': opts},
             'build': {'port': port_out},
             'config': {'port': port_out},
@@ -916,6 +943,19 @@ class Pipeline:
         if rule and (s != 'filter_patches' or pp):
             h[rule[0]] = rules_hash(self.snap, rule[1])
         return h
+
+    def migrate_patches_hashes(self):
+        """Records of filter_patches and port from before patches_hash hold the patches files' byte hashes; where
+        the file is unchanged, put its patches_hash in their place, so an --upgrade is not called stale and a later
+        `why` edit is free. A changed file keeps the old record, which then differs: stale, as it should be."""
+        for s, k, path in (('filter_patches', 'patches file',
+                            os.path.expanduser(self.p['patches']) if self.p.get('patches') else None),
+                           ('port', 'filter_patches', self.port_patches())):
+            had = (self.state['steps'].get(s) or {}).get('in') or {}
+            old = had.get(k)
+            if (path and isinstance(old, str) and not old.startswith(PATCHES_HASH)
+                    and old == hash_paths([path])):
+                had[k] = patches_hash(path)
 
     def gen_out(self):
         """The directory `carve.py gen` writes (config `out`, carve_prep's default DIR/out)."""
@@ -3126,6 +3166,7 @@ class Pipeline:
         self.check_ownership(claim_folder)
         self.recover_interrupted_split()
         self.publishing_started()                 # record evidence seen now as a state fact
+        self.migrate_patches_hashes()
         self.save()
         self.sync_config_set()
         redo = set(only_redo)

@@ -3436,3 +3436,89 @@ def test_foreign_key_added_to_pipeline_json_reaches_a_resumed_fetch(env, monkeyp
     argv = [c['argv'] for c in calls(env) if c.get('tool') == 'oai_fetch'][0]
     got = [argv[i + 1] for i, a in enumerate(argv) if a == '--foreign']
     assert got == [os.path.expanduser('~/no-such-checkout-a'), str(env.tmp / 'b')]
+
+
+# ---- a patch's `why` text is not an input (q361) ---------------------------------------------------
+# q361: only a `why` changed in patches.json; filter_patches went stale, re-ported (dropping --keep-port)
+# and all 1025 modules rebuilt (~2.5 h).
+
+P1 = [{'old': 'a', 'new': 'b', 'count': 1, 'route': 'modules', 'why': 'first reason'}]
+
+
+def test_editing_only_a_patch_why_reruns_nothing(env):
+    extra = _patches_setup(env, json.dumps(P1))
+    (env.dir / 'port_patches.json').write_text(json.dumps(P1))
+    assert run(env, *ARGS, *extra).returncode == 0
+    (env.tmp / 'patches.json').write_text(json.dumps([dict(P1[0], why='a better reason')], indent=2))
+    (env.dir / 'port_patches.json').write_text(json.dumps([dict(P1[0], why='a better reason')]))
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert tools_called(env) == [] and 'stale' not in r.stdout, (tools_called(env), r.stdout)
+
+
+@pytest.mark.parametrize('key,value', [('new', 'c'), ('count', 2), ('route', 'single'), ('old', 'z'),
+                                       ('allow_drop', True)])
+def test_editing_what_a_patch_does_still_reruns_filter_patches(env, key, value):
+    extra = _patches_setup(env, json.dumps(P1))
+    assert run(env, *ARGS, *extra).returncode == 0
+    (env.tmp / 'patches.json').write_text(json.dumps([dict(P1[0], **{key: value})]))
+    env.log.write_text('')
+    r = run(env, '--stop-after', 'filter_patches')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert tools_called(env) == [('carve_prep', 'filter-patches')] and 'stale: filter_patches' in r.stdout
+
+
+def test_a_why_only_change_to_port_patches_leaves_the_port(env):
+    extra = _patches_setup(env, json.dumps(P1))
+    (env.dir / 'port_patches.json').write_text(json.dumps(P1))
+    assert run(env, *ARGS, *extra).returncode == 0
+    (env.dir / 'port_patches.json').write_text(json.dumps([dict(P1[0], why='other')]))
+    env.log.write_text('')
+    assert run(env).returncode == 0 and tools_called(env) == []
+    (env.dir / 'port_patches.json').write_text(json.dumps([dict(P1[0], new='c')]))
+    r = run(env, '--stop-after', 'port')
+    assert r.returncode == 0 and any(c[0] == 'oai_port_modules' for c in tools_called(env)), r.stdout
+
+
+def test_a_byte_hash_recorded_before_the_rule_is_kept_when_the_file_is_unchanged(env):
+    # a carve recorded with the old whole-file hash: an --upgrade must not call it stale, and from then on a
+    # `why` edit is free too
+    sys.path.insert(0, ROOT)
+    from p2mlib import carvepipeline as CP
+    extra = _patches_setup(env, json.dumps(P1))
+    (env.dir / 'port_patches.json').write_text(json.dumps(P1))
+    assert run(env, *ARGS, *extra).returncode == 0
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    st['steps']['filter_patches']['in']['patches file'] = CP.hash_paths([str(env.tmp / 'patches.json')])
+    st['steps']['port']['in']['filter_patches'] = CP.hash_paths([str(env.dir / 'port_patches.json')])
+    json.dump(st, open(env.dir / 'pipeline_state.json', 'w'))
+    env.log.write_text('')
+    assert run(env).returncode == 0 and tools_called(env) == []
+    (env.tmp / 'patches.json').write_text(json.dumps([dict(P1[0], why='edited')]))
+    r = run(env)
+    assert r.returncode == 0 and tools_called(env) == [], (tools_called(env), r.stdout)
+
+
+def test_a_byte_hash_recorded_before_the_rule_still_sees_an_edit(env):
+    sys.path.insert(0, ROOT)
+    from p2mlib import carvepipeline as CP
+    extra = _patches_setup(env, json.dumps(P1))
+    assert run(env, *ARGS, *extra).returncode == 0
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    st['steps']['filter_patches']['in']['patches file'] = CP.hash_paths([str(env.tmp / 'patches.json')])
+    json.dump(st, open(env.dir / 'pipeline_state.json', 'w'))
+    (env.tmp / 'patches.json').write_text(json.dumps([dict(P1[0], new='c')]))
+    env.log.write_text('')
+    r = run(env, '--stop-after', 'filter_patches')
+    assert r.returncode == 0 and tools_called(env) == [('carve_prep', 'filter-patches')], r.stdout
+
+
+def test_patches_hash_ignores_why_and_formatting_only():
+    sys.path.insert(0, ROOT)
+    from p2mlib import carvepipeline as CP
+    h = CP.patches_text_hash
+    assert h(json.dumps(P1)) == h(json.dumps([dict(P1[0], why='x')], indent=1, ensure_ascii=False))
+    assert h(json.dumps(P1)) != h(json.dumps([dict(P1[0], new='c')]))
+    assert h(json.dumps(P1)) != h(json.dumps(P1 + P1))                  # order and number count
+    assert h('not json') != h('not json either')                        # unreadable: its bytes

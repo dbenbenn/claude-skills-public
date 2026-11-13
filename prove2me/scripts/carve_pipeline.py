@@ -52,7 +52,9 @@ re-runs one step; --from STEP forgets it and everything after; --stop-after STEP
 
 Stale steps: each step records content hashes of what it reads from another step (patches file and
 sources -> filter_patches; port_patches.json and sources -> port; the ported modules -> build, config;
-config.json's external_defs, which extdefs writes -> plan).
+config.json's external_defs, which extdefs writes -> plan). A patches file counts by its entries without their
+`why` text (p2mlib.carvepipeline.patches_text_hash): editing a `why`, or re-serialising the file, re-runs nothing
+(q361: a `why` edit re-ported past --keep-port and rebuilt 1025 modules).
 A resume that finds one changed prints `== stale: STEP ...` and re-runs that step and all later ones, so
 editing the patches and running `--redo filter_patches` (or just resuming) re-ports; a --redo whose output
 is unchanged leaves the later steps alone. Steps also record the skill rules they ran with (the port
