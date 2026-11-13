@@ -1983,6 +1983,40 @@ def bundle_chains(plan):
     return memo
 
 
+def import_closures(plan):
+    """{item: frozenset of items} for every bundle, statement and piece of the plan ('bundle:B', 'statement:S',
+    'piece:P'): the bundle and statement modules importing the item builds, transitively, and the item itself.
+    A bundle imports bundles and statements (`statements`), a statement bundles, a piece bundles and statements
+    (`imports`); external statements count as modules too (a cold worker builds them as well)."""
+    B = {b['name']: b for b in plan.get('bundles') or ()}
+    S = plan.get('stubs') or {}
+    deps = {'bundle:' + n: ['bundle:' + i for i in b.get('imports') or () if i in B] +
+            ['statement:' + s for s in b.get('statements') or () if s in S] for n, b in B.items()}
+    deps.update({'statement:' + n: ['bundle:' + i for i in s.get('bundles') or () if i in B] for n, s in S.items()})
+    memo = {}
+
+    def clo(k):
+        if k not in memo:
+            c = {k}
+            for d in deps.get(k, ()):
+                c |= clo(d)
+            memo[k] = frozenset(c)
+        return memo[k]
+    for n in B:                      # in plan order (imports first), so the recursion stays shallow
+        clo('bundle:' + n)
+    out = {k: clo(k) for k in deps}
+    for n, p in (plan.get('pieces') or {}).items():
+        c = {'piece:' + n}
+        for i in p.get('bundles') or ():
+            if i in B:
+                c |= out['bundle:' + i]
+        for s in p.get('imports') or ():
+            if s in S:
+                c |= out['statement:' + s]
+        out['piece:' + n] = frozenset(c)
+    return out
+
+
 CHAIN_WARN = 150        # s: a chain over this is a defect to re-plan before publish_early (q154)
 SERVER_COLD = 300       # s: the verifier's limit, which a cold worker spends building the whole chain
 

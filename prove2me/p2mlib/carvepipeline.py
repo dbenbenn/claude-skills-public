@@ -216,6 +216,72 @@ def measured_chains(plan, times, skip=()):
     return sorted(out, key=lambda r: (-r[0], r[1]))
 
 
+CLOSURE_LIMIT = 1000    # s: an item's closure sum (local -j1 secs of times.json over every bundle and statement module it
+                        # imports, transitively, plus its own) over this, with an import closure over IMPORT_LIMIT,
+                        # stops calibrate before the first publish (pipeline.json `closure_limit`, `closure_stop`).
+                        # q250/q257 `tr` (2026-11-11, accept_heavy_imports, ~300-380 MB closures): every item that went
+                        # live summed <= 1,108 s, the two the verifier gave up on 1,294 s and 1,959 s ("Module
+                        # compilation timed out after 300s", dependency_oom), and 60 more over it waited behind them;
+                        # live bundles froze the shape, so the goal needed a fresh carve. The sum alone does not stop:
+                        # oaiq-031/-081/-091, q221 and oaiq-023/-068 had items summing 1,100-2,239 s accepted (none
+                        # over the import limit), so `closure_stop` "all" is a person's choice, never the default
+CLOSURE_STOP = 'heavy'  # pipeline.json `closure_stop`: 'heavy' (over CLOSURE_LIMIT and IMPORT_LIMIT), 'all', 'off'
+STATEMENT_EST = 5.0     # s: an unmeasured statement module in a planned closure sum (q257: statements measured ~5 s)
+
+
+def closure_sums(plan, times, skip=(), planned=False):
+    """[(secs, item, modules, unmeasured)], heaviest first: for each bundle, statement and piece of the plan not in
+    `skip` (published or in flight, by name; external statements are someone else's), the local -j1 seconds of
+    times.json summed over its import closure (carve.import_closures: every bundle and statement module it imports,
+    transitively, published ones included, and itself). `planned`: an unmeasured bundle or piece counts its plan
+    cost, an unmeasured statement STATEMENT_EST, and `unmeasured` counts those estimates; otherwise they count 0."""
+    from . import carve as CV
+    B = {b['name']: b for b in plan.get('bundles') or ()}
+    P = plan.get('pieces') or {}
+    ext, skip = set(plan.get('external') or ()), set(skip)
+    clos = CV.import_closures(plan)
+
+    def secs(k):
+        t = times.get(k) or (times.get(k.split(':', 1)[1]) if k.startswith('bundle:') else None)
+        if t and t.get('ok'):
+            return t['secs'], 0
+        if not planned:
+            return 0.0, 1
+        kind, n = k.split(':', 1)
+        if kind == 'statement':
+            return STATEMENT_EST, 1
+        return float((B[n] if kind == 'bundle' else P[n]).get('cost') or 0.0), 1
+    own = {k: secs(k) for c in clos.values() for k in c}
+    out = []
+    for k, c in clos.items():
+        kind, n = k.split(':', 1)
+        if n in skip or (kind == 'statement' and n in ext):
+            continue
+        out.append((round(sum(own[x][0] for x in c), 1), k, len(c), sum(own[x][1] for x in c)))
+    return sorted(out, key=lambda r: (-r[0], r[1]))
+
+
+def closure_mb(times, item):
+    """The item's measured import closure in MB (carve_measure `closure_bytes`), or None."""
+    b = (times.get(item) or {}).get('closure_bytes')
+    return b / 1e6 if b else None
+
+
+def closure_stops(rows, times, limit, mode, unknown_heavy=False):
+    """The rows of closure_sums calibrate stops on: over `limit` and, in mode 'heavy', importing more than
+    IMPORT_LIMIT (`unknown_heavy`: an unmeasured import closure counts as heavy); none in mode 'off'."""
+    if not limit or mode in ('off', False, None):
+        return []
+    out = []
+    for r in rows:
+        if r[0] <= limit:
+            continue
+        mb = closure_mb(times, r[1])
+        if mode == 'all' or (mb is None and unknown_heavy) or (mb is not None and mb * 1e6 > IMPORT_LIMIT):
+            out.append(r)
+    return out
+
+
 def importers(plan, name):
     """(bundles, statements) of the plan whose import chain holds bundle `name` (itself not counted)."""
     from . import carve as CV
@@ -1826,6 +1892,10 @@ class Pipeline:
                 len(over_b) >= SYSTEMATIC_FRACTION * measured_b:
             return ('none released: %d of %d measured bundles over the limit, a systematic cost-model error '
                     'calibrate re-plans' % (len(over_b), measured_b))
+        if not self.anything_published(cfg):
+            hold = self.closure_hold(plan, times, fz)
+            if hold:
+                return hold
         from . import carve as CV
         ext = set(plan.get('external') or ())
         order = CV.publish_order(plan, ext)
@@ -2203,6 +2273,70 @@ class Pipeline:
                 print('calibrate:%s' % l, file=sys.stderr, flush=True)
         return lines
 
+    def closure_settings(self):
+        """(limit s, mode) from pipeline.json `closure_limit` (default CLOSURE_LIMIT; 0 turns the stop off) and
+        `closure_stop` ('heavy' default, 'all', 'off')."""
+        limit = self.p.get('closure_limit', CLOSURE_LIMIT)
+        mode = self.p.get('closure_stop', CLOSURE_STOP)
+        return float(limit or 0), (mode if limit else 'off')
+
+    CLOSURE_MSG = (
+        "step 'calibrate': %d item(s) build a cold import closure over %.0f s (local -j1 secs of every bundle and "
+        "statement module they import, plus their own)%s: %s. q257's `tr` published 123 bundles summing <= 1,108 s, "
+        "and nothing summing 1,294 s or more went live; the published bundles froze the shape and the goal took a "
+        "fresh carve. Nothing is published yet, so re-plan now: force the heavy entry theorems `plan` lists under "
+        "\"definitions pull theorems into bundles\", `config_set` `chunker`: \"closure\", or `measured` (an earlier "
+        "plan + times.json of this port) to calibrate the costs. pipeline.json `closure_stop`: \"off\" (or a higher "
+        "`closure_limit`) publishes as is. Log %s")
+
+    def closure_check(self, cfg, plan, times, fz, lines, top=5):
+        """The measured closure sums (closure_sums) of the unpublished items, logged in `lines` with a WARNING over
+        the limit; before anything is published, a stop on those closure_stops picks. Once publishing began (or
+        config `frozen` came from another carve) only the warning: live bundles freeze the shape, and a carve
+        running when this check arrived must not stop on it."""
+        limit, mode = self.closure_settings()
+        rows = closure_sums(plan, times, fz)
+        if not rows:
+            return
+        cap = limit or CLOSURE_LIMIT
+        over = [r for r in rows if r[0] > cap]
+        lines.append('  closure sums (local -j1 s over each unpublished item\'s import closure, itself included): '
+                     'heaviest %.0f s (%s); %d of %d over %.0f s' % (rows[0][0], rows[0][1], len(over), len(rows), cap))
+        for secs, k, n, missing in over[:top]:
+            mb = closure_mb(times, k)
+            lines.append('    %7.1f s  %s (%d modules%s%s)' % (secs, k, n, ', %d unmeasured' % missing if missing else '',
+                                                             ', %.0f MB' % mb if mb else ''))
+        stops = closure_stops(rows, times, limit, mode)
+        if not over:
+            return
+        if not stops or self.anything_published(cfg):
+            lines.append('  WARNING: %d item(s) over the %.0f s closure ceiling (q257: nothing at 1,294 s or more '
+                         'went live there; other carves passed to ~2,200 s with light imports)%s' % (
+                             len(over), cap, '; publishing began, so no stop (pipeline.json `closure_stop`)'
+                             if stops else ''))
+            print('calibrate:%s' % lines[-1], file=sys.stderr, flush=True)
+            return
+        log = self.calibrate_log(lines)
+        raise StepFailed(self.CLOSURE_MSG % (
+            len(stops), limit, ' and import more than %.0f MB' % (IMPORT_LIMIT / 1e6) if mode == 'heavy' else '',
+            ', '.join('%s (%.0f s%s)' % (k, s, ', %.0f MB' % closure_mb(times, k) if closure_mb(times, k) else '')
+                      for s, k, _, _ in stops[:10]), log))
+
+    def closure_hold(self, plan, times, fz):
+        """Before anything is published: why a streaming measure releases nothing yet, or None. The items calibrate
+        may stop on (closure_check), their closures estimated from the measured times and the plan's costs for the
+        rest (closure_sums `planned`; with accept_heavy_imports, an import closure not measured yet counts as
+        heavy), so calibrate can still re-plan the whole carve; without accept_heavy_imports a heavy item is held
+        by the import limit already."""
+        limit, mode = self.closure_settings()
+        if mode == 'heavy' and not self.p.get('accept_heavy_imports'):
+            return None
+        stops = closure_stops(closure_sums(plan, times, fz, planned=True), times, limit, mode, unknown_heavy=True)
+        if not stops:
+            return None
+        return ('none released: %d item(s) estimated over the %.0f s closure ceiling (heaviest %s, %.0f s), which '
+                'calibrate checks measured before anything is frozen' % (len(stops), limit, stops[0][1], stops[0][0]))
+
     def step_calibrate(self):
         got = self.calibrate_inputs()
         if got is None:
@@ -2213,6 +2347,7 @@ class Pipeline:
         res = calibration(plan, times, cfg.get('time_scale', 1.5), cfg.get('budget', 55), fz,
                           accepted=self.p.get('accept_over') or (), rss_limit=self.rss_limit())
         lines = self.calibrate_head(cfg, res) + self.chain_warnings(plan, times, res, fz)
+        self.closure_check(cfg, plan, times, fz, lines)
         log = os.path.join(self.d, 'logs', 'calibrate.log')
         if res['statements_over']:
             self.calibrate_log(lines + ['  statement over: %s measured %.0f s' % x for x in res['statements_over']])
@@ -2295,6 +2430,7 @@ class Pipeline:
                 "unrelated declarations: re-plan with config_set `chunker`: \"closure\" (and a smaller `closure_slack`), "
                 "or split the heavy bundle; pipeline.json `accept_heavy_imports`: true publishes as is. Log %s"
                 % (len(heavy), IMPORT_LIMIT / 1e6, ', '.join('%s (%.0f MB)' % x for x in heavy[:10]), log))
+        self.closure_check(cfg, plan, times, fz, lines)
         if res['statements_over']:
             self.calibrate_log(lines + ['  statement over: %s measured %.0f s' % x for x in res['statements_over']])
             raise StepFailed(self.STATEMENT_OVER_MSG % (

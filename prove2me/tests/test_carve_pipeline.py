@@ -829,6 +829,123 @@ def test_calibrate_logs_measured_chains_and_goes_on(env, monkeypatch):
     assert 'calibrate:  WARNING: a cold verifier worker' in r.stderr
 
 
+# ---- the cold-closure ceiling (q257 lesson, 2026-11-11) -----------------------------------------------
+# q250/q257 `tr`: every item that went live summed <= 1,108 s of local -j1 time over its import closure; the
+# ones the verifier gave up on 1,294 s and 1,959 s. All imported ~300-380 MB (accept_heavy_imports); other
+# carves had light-import items summing up to ~2,200 s accepted.
+
+def _closure_plan():
+    # B0 <- B1 <- B2, B2 also imports statement S1 (which imports B0); S0 imports B1; piece P imports B2 and S0
+    return {'bundles': [{'name': 'B0', 'cost': 50, 'imports': []}, {'name': 'B1', 'cost': 60, 'imports': ['B0']},
+                        {'name': 'B2', 'cost': 70, 'imports': ['B1'], 'statements': ['S1']}],
+            'stubs': {'S0': {'bundles': ['B1']}, 'S1': {'bundles': ['B0']}, 'X': {'bundles': ['B0']}},
+            'pieces': {'P': {'cost': 30, 'bundles': ['B2'], 'imports': ['S0']}},
+            'external': ['X']}
+
+
+def test_import_closures_follow_bundles_statements_and_pieces():
+    from p2mlib import carve as CV
+    c = CV.import_closures(_closure_plan())
+    assert c['bundle:B0'] == {'bundle:B0'}
+    assert c['bundle:B2'] == {'bundle:B0', 'bundle:B1', 'bundle:B2', 'statement:S1'}
+    assert c['statement:S0'] == {'statement:S0', 'bundle:B0', 'bundle:B1'}
+    assert c['piece:P'] == {'piece:P', 'bundle:B0', 'bundle:B1', 'bundle:B2', 'statement:S0', 'statement:S1'}
+
+
+def test_closure_sums_add_measured_times_and_estimate_the_rest_from_the_plan():
+    plan = _closure_plan()
+    times = {'bundle:B0': _t(500), 'bundle:B1': _t(400), 'statement:S0': _t(4), 'statement:S1': _t(6)}
+    rows = {r[1]: r for r in CP.closure_sums(plan, times)}
+    assert rows['bundle:B2'] == (906, 'bundle:B2', 4, 1)            # B2 itself unmeasured
+    assert rows['piece:P'] == (910, 'piece:P', 6, 2)
+    assert 'statement:X' not in rows                                # someone else's
+    est = {r[1]: r for r in CP.closure_sums(plan, times, planned=True)}
+    assert est['bundle:B2'] == (976, 'bundle:B2', 4, 1) and est['piece:P'] == (1010, 'piece:P', 6, 2)
+    assert 'bundle:B0' not in {r[1] for r in CP.closure_sums(plan, times, skip=['B0'])}
+
+
+def test_closure_stops_need_heavy_imports_unless_the_mode_is_all():
+    rows = [(1300, 'bundle:H', 3, 0), (1200, 'bundle:L', 3, 0), (1100, 'bundle:U', 3, 1), (900, 'bundle:S', 2, 0)]
+    times = {'bundle:H': dict(_t(1), closure_bytes=350e6), 'bundle:L': dict(_t(1), closure_bytes=90e6),
+             'bundle:S': dict(_t(1), closure_bytes=400e6)}
+    assert [r[1] for r in CP.closure_stops(rows, times, 1000, 'heavy')] == ['bundle:H']
+    assert [r[1] for r in CP.closure_stops(rows, times, 1000, 'heavy', unknown_heavy=True)] == ['bundle:H', 'bundle:U']
+    assert [r[1] for r in CP.closure_stops(rows, times, 1000, 'all')] == ['bundle:H', 'bundle:L', 'bundle:U']
+    assert CP.closure_stops(rows, times, 1000, 'off') == [] and CP.closure_stops(rows, times, 0, 'all') == []
+
+
+def _deep_carve(env, monkeypatch, n=15, secs=75, mb=350, cost=55, **pipeline):
+    """An overlap carve whose bundles B0 <- B1 <- ... form one chain of n bundles measured `secs` s each (inside
+    the 80 s bundle limit), the top ones importing `mb` MB; pipeline.json gets `pipeline`."""
+    plan = _overlap_carve(env, monkeypatch, bundles={'B%d' % i: (cost, secs) for i in range(n)})
+    for i, b in enumerate(plan['bundles']):
+        b['imports'] = ['B%d' % (i - 1)] if i else []
+    (env.dir / 'carve_work' / 'plan.json').write_text(json.dumps(plan))
+    times = json.load(open(env.dir / 'carve_work' / 'times.orig.json'))
+    for i in range(n):
+        times['bundle:B%d' % i]['closure_bytes'] = mb * 1e6 * (i + 1) / n
+    for f in ('times.orig.json', 'times.json'):
+        (env.dir / 'carve_work' / f).write_text(json.dumps(times))
+    assert run(env, *ARGS_NEW, '--stop-after', 'config').returncode == 0
+    p = json.load(open(env.dir / 'pipeline.json'))
+    (env.dir / 'pipeline.json').write_text(json.dumps(dict(p, **pipeline)))
+    return plan
+
+
+def test_a_heavy_cold_closure_over_the_ceiling_stops_calibrate_before_anything_is_published(env, monkeypatch):
+    _deep_carve(env, monkeypatch, accept_heavy_imports=True)
+    r = run(env, '--stop-after', 'calibrate')
+    assert r.returncode == 1 and "step 'calibrate'" in r.stderr, r.stdout + r.stderr
+    assert 'cold import closure over 1000 s' in r.stderr and 'bundle:B14 (1125 s, 350 MB)' in r.stderr
+    assert 'closure_stop' in r.stderr
+    log = (env.dir / 'logs' / 'calibrate.log').read_text()
+    assert 'closure sums' in log and 'heaviest 1125 s (bundle:B14); 2 of' in log
+
+
+def test_the_closure_stop_can_be_turned_off_or_raised(env, monkeypatch):
+    _deep_carve(env, monkeypatch, accept_heavy_imports=True, closure_stop='off')
+    r = run(env, '--stop-after', 'calibrate')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'WARNING: 2 item(s) over the 1000 s closure ceiling' in r.stderr
+    p = json.load(open(env.dir / 'pipeline.json'))
+    (env.dir / 'pipeline.json').write_text(json.dumps(dict(p, closure_stop='heavy', closure_limit=1200)))
+    r = run(env, '--redo', 'calibrate', '--stop-after', 'calibrate')
+    assert r.returncode == 0 and 'closure ceiling' not in r.stderr, r.stdout + r.stderr
+
+
+def test_a_light_closure_over_the_ceiling_only_warns(env, monkeypatch):
+    # oaiq-081 had items summing ~2,000 s accepted, importing little: the sum alone is no stop by default
+    _deep_carve(env, monkeypatch, mb=100)
+    r = run(env, '--stop-after', 'calibrate')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'calibrate:  WARNING: 2 item(s) over the 1000 s closure ceiling' in r.stderr
+    # closure_stop "all": the sum alone stops
+    p = json.load(open(env.dir / 'pipeline.json'))
+    (env.dir / 'pipeline.json').write_text(json.dumps(dict(p, closure_stop='all')))
+    r = run(env, '--redo', 'calibrate', '--stop-after', 'calibrate')
+    assert r.returncode == 1 and 'bundle:B14 (1125 s, 100 MB)' in r.stderr, r.stdout + r.stderr
+
+
+def test_once_publishing_began_the_closure_ceiling_only_warns(env, monkeypatch):
+    # carves past their first publish when this check arrived: the shape is frozen, a stop would only strand them
+    _deep_carve(env, monkeypatch, accept_heavy_imports=True)
+    (env.dir / 'publish').mkdir(exist_ok=True)
+    (env.dir / 'publish' / 'run_state.json').write_text('{}')
+    r = run(env, '--stop-after', 'calibrate')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'publishing began, so no stop' in r.stderr
+
+
+def test_a_streaming_measure_releases_nothing_while_a_heavy_closure_is_estimated_over_the_ceiling(env, monkeypatch):
+    _deep_carve(env, monkeypatch, cost=75, accept_heavy_imports=True)
+    r = run(env, '--publish', '--stop-after', 'measure')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert any('closure ceiling' in l and 'none released' in l for l in _stream_lines(r)), r.stdout
+    assert not any(l.startswith('systemd-run') for l in _raw(env))
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert 'auto_config' not in st and 'publishing_started' not in st
+
+
 # ---- lean_src must be the root's import closure (2026-10-27) -------------------------------------
 # oaiq-033/034/038/040/046/048: after a GitHub 429, workers passed the whole OpenAI tree (1.4 GB,
 # 121,736 modules) as --lean-src; filter_patches and port then took every OAI.* module as input
