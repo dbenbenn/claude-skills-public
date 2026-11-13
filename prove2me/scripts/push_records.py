@@ -15,6 +15,8 @@ lessons oaiq-112, -113, -123). This script is the only way records get committed
    HEAD, stash and every other file are never read into the commit or modified. (Plumbing rather
    than a temp worktree: no checkout of the ~21k-file tree per push and nothing to clean up if the
    run is killed; the only temp file is the index, removed in all cases.)
+   A file named HOLD (a hand-off service's marker, q360) is skipped, with a note; its removal with --delete
+   still goes through.
 3. Refuse before committing: a path outside the repo or the whole repo; added or modified *.lean
    under openai-ports/, and a carve tree's generated files there (chk/ edge/ stage/ olean/ out/ src/,
    .olean, .ilean; q144) (records hold no OpenAI Lean; --allow-lean overrides); an embedded git repo;
@@ -185,6 +187,15 @@ def is_carve_generated(path):
     return path.endswith(('.olean', '.ilean')) or bool(CARVE_GENERATED & set(path.split('/')[1:-1]))
 
 
+# file names never committed: a hand-off service's HOLD marker (tools/handoff) lives in a records folder only while a
+# wait is handed off (q360 2026-11-13: a wrap-up pushed before `handoff.py done` removed it, and HOLD reached origin)
+NEVER_COMMITTED = ('HOLD',)
+
+
+def never_committed(path):
+    return path.rsplit('/', 1)[-1] in NEVER_COMMITTED
+
+
 def build(top, base, paths, opts, env):
     """Stage PATHS from the working tree onto base's tree in the private index env['GIT_INDEX_FILE'].
     Returns (tree or None if nothing changes, changes, notes)."""
@@ -205,8 +216,15 @@ def build(top, base, paths, opts, env):
     # cheap pre-check on the untracked files before hashing anything (a carve tree is 100k files)
     new = [f for f in out(top, 'ls-files', '-z', '-o', '--exclude-standard', '--', *present,
                           env=env).split('\0') if f]
-    check_files([('A', f) for f in new], opts)
+    check_files([('A', f) for f in new if not never_committed(f)], opts)
     git(top, 'add', '-A' if opts.delete else '--ignore-removal', '--', *present, env=env)
+    held = [p for st, _m, _s, p in parse_raw(out(top, 'diff-index', '--cached', '--raw', '-z', '--no-renames', base,
+                                                 env=env)) if st != 'D' and never_committed(p)]
+    if held:
+        # back to base's entry (none when base lacks it); a removal with --delete still goes through
+        git(top, 'reset', '-q', base, '--', *held, env=env)
+        notes.append('skipped %s (a hand-off marker, never a record): %s'
+                     % ('/'.join(NEVER_COMMITTED), ', '.join(held)))
     if not opts.delete:
         gone = [f for f in out(top, 'ls-files', '-z', '--deleted', '--', *present, env=env).split('\0') if f]
         if gone:

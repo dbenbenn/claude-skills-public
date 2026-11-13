@@ -288,6 +288,46 @@ def test_a_whole_deleted_folder_needs_delete(world):
     assert not any(f.startswith('openai-ports/oaiq-001/') for f in origin_files(world))
 
 
+def test_a_handoff_hold_file_is_never_committed(world):
+    # q360 (2026-11-13): the wrap-up pushed records before `handoff.py done` removed HOLD, and push_records
+    # committed openai-ports/<group>/HOLD to origin; removing it took a second push with --delete
+    sh = world['shared']
+    write(sh, 'openai-ports/oaiq-001/HOLD', 'held by the hand-off\n')
+    write(sh, 'openai-ports/oaiq-001/sub/HOLD', 'nested\n')
+    write(sh, 'openai-ports/oaiq-001/RESUME.md', 'wrapped up\n')
+    write(sh, 'openai-ports/oaiq-001/HOLD.md', 'a record that only looks alike\n')
+    rc, out = run(world, 'openai-ports/oaiq-001', '-m', 'records')
+    assert rc == 0, out
+    files = origin_files(world)
+    assert 'openai-ports/oaiq-001/HOLD' not in files and 'openai-ports/oaiq-001/sub/HOLD' not in files
+    assert origin_show(world, 'openai-ports/oaiq-001/RESUME.md') == 'wrapped up'
+    assert 'openai-ports/oaiq-001/HOLD.md' in files
+    assert 'HOLD' in out and 'skipped' in out
+    # named alone, it is skipped too: nothing to push
+    head = git(world['origin'], 'rev-parse', 'main')
+    rc, out = run(world, 'openai-ports/oaiq-001/HOLD', '-m', 'hold')
+    assert rc == 0 and git(world['origin'], 'rev-parse', 'main') == head, out
+    assert os.path.exists(os.path.join(str(sh), 'openai-ports/oaiq-001/HOLD'))     # never touched locally
+
+
+def test_a_hold_file_already_on_origin_is_left_alone_or_removed_with_delete(world):
+    other = world['other']
+    write(other, 'openai-ports/oaiq-002/HOLD', 'pushed by mistake\n')
+    git(other, 'add', '.')
+    git(other, 'commit', '-qm', 'hold')
+    git(other, 'push', '-q', 'origin', 'main')
+    sh = world['shared']
+    write(sh, 'openai-ports/oaiq-002/HOLD', 'changed locally\n')
+    write(sh, 'openai-ports/oaiq-002/RESUME.md', 'two, more\n')
+    rc, out = run(world, 'openai-ports/oaiq-002', '-m', 'records')
+    assert rc == 0, out
+    assert origin_show(world, 'openai-ports/oaiq-002/HOLD') == 'pushed by mistake'   # not updated
+    os.remove(os.path.join(str(sh), 'openai-ports/oaiq-002/HOLD'))
+    rc, out = run(world, 'openai-ports/oaiq-002', '-m', 'clean', '--delete')
+    assert rc == 0, out
+    assert 'openai-ports/oaiq-002/HOLD' not in origin_files(world)                 # its removal still goes
+
+
 # ---- refusals ----------------------------------------------------------------------------------
 
 def test_refuses_openai_lean_unless_allowed(world):
