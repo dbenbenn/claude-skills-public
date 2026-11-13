@@ -1,0 +1,353 @@
+{
+ "commands": [
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 680,
+    "col": 96,
+    "line": 8
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.moduleDoc",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 0,
+    "col": 0,
+    "line": 1
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 699,
+    "col": 17,
+    "line": 10
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 699,
+     "name": "CD.Dead",
+     "role": "scope",
+     "start": 692
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.namespace",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 682,
+    "col": 0,
+    "line": 10
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 711,
+    "col": 10,
+    "line": 12
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 711,
+     "name": "Array",
+     "role": "open",
+     "start": 706
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.open",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.Dead",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 701,
+    "col": 0,
+    "line": 12
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [
+      2
+     ],
+     "opener": 1
+    }
+   ],
+   "decl_kind": "Lean.Parser.Command.theorem",
+   "declares": [
+    [
+     "CD.Dead.range_zero",
+     "",
+     []
+    ]
+   ],
+   "declares_kinds": [],
+   "end": {
+    "byte": 759,
+    "col": 46,
+    "line": 14
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 731,
+     "name": "range_zero",
+     "role": "decl",
+     "start": 721
+    },
+    {
+     "end": 735,
+     "name": "[anonymous]",
+     "role": "ref",
+     "start": 735
+    },
+    {
+     "end": 740,
+     "name": "range",
+     "role": "ref",
+     "start": 735
+    },
+    {
+     "end": 748,
+     "name": "size",
+     "role": "ref",
+     "start": 744
+    },
+    {
+     "end": 759,
+     "name": "rfl",
+     "role": "ref",
+     "start": 756
+    }
+   ],
+   "ids": [
+    {
+     "end": {
+      "byte": 731,
+      "col": 18,
+      "line": 14
+     },
+     "start": {
+      "byte": 721,
+      "col": 8,
+      "line": 14
+     }
+    }
+   ],
+   "inst_keys": [
+    "OfNat Nat"
+   ],
+   "insts": [],
+   "kind": "Lean.Parser.Command.declaration",
+   "kinds_used": [],
+   "names": [
+    "CD.Dead.range_zero"
+   ],
+   "namespace": "CD.Dead",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "Array"
+    }
+   ],
+   "resolved": [
+    [
+     721,
+     731,
+     "CD.Dead.range_zero",
+     "b"
+    ],
+    [
+     721,
+     731,
+     "",
+     "b"
+    ],
+    [
+     735,
+     740,
+     "Array.range"
+    ],
+    [
+     744,
+     748,
+     "Array.size"
+    ],
+    [
+     756,
+     759,
+     "rfl"
+    ]
+   ],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 713,
+    "col": 0,
+    "line": 14
+   },
+   "used_keys": [],
+   "value_start": {
+    "byte": 753,
+    "col": 40,
+    "line": 14
+   }
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    },
+    {
+     "cmds": [
+      2
+     ],
+     "opener": 1
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 772,
+    "col": 11,
+    "line": 16
+   },
+   "heads": [],
+   "idents": [
+    {
+     "end": 772,
+     "name": "CD.Dead",
+     "role": "scope",
+     "start": 765
+    }
+   ],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.end",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "CD.Dead",
+   "opens": [
+    {
+     "except": [],
+     "namespace": "Array"
+    }
+   ],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 761,
+    "col": 0,
+    "line": 16
+   },
+   "used_keys": []
+  },
+  {
+   "attrs": [],
+   "context": [
+    {
+     "cmds": [],
+     "opener": null
+    }
+   ],
+   "declares": [],
+   "declares_kinds": [],
+   "end": {
+    "byte": 773,
+    "col": 0,
+    "line": 17
+   },
+   "heads": [],
+   "idents": [],
+   "ids": [],
+   "inst_keys": [],
+   "insts": [],
+   "kind": "Lean.Parser.Command.eoi",
+   "kinds_used": [],
+   "names": [],
+   "namespace": "",
+   "opens": [],
+   "resolved": [],
+   "sig_insts": [],
+   "sig_used_keys": [],
+   "start": {
+    "byte": 773,
+    "col": 0,
+    "line": 17
+   },
+   "used_keys": []
+  }
+ ],
+ "decls": [],
+ "file": "CarveDev/NsDead.lean",
+ "messages": [],
+ "mode": "elaborate"
+}

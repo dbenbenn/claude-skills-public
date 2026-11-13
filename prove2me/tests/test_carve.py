@@ -3996,3 +3996,39 @@ def test_a_used_local_instance_left_out_for_lack_of_its_prerequisites_is_reporte
     info = g2.infos['CarveDev.InstPre']
     vc = info.commands[g2.nodes['CD.IP.fdPairFin1'].cmd]
     assert ('CarveDev.InstPre', vc.start.line, c.start.line) in g2.lost_instances, g2.lost_instances
+
+
+# ---------------------------------------------------------------- an empty project namespace (q255)
+
+def test_an_open_keeps_the_library_namespace_an_empty_project_one_shadows(g):
+    # Jacobsthal (q255): `open … Asymptotics` inside `namespace Erdos970`, in a module that never saw the
+    # vendored empty `namespace Erdos970.Asymptotics`, meant Mathlib's. DeclGraph listed Mathlib's
+    # `Asymptotics` only if some project *constant* lay in a namespace ending in `Asymptotics`; none did, so
+    # the carver took the token for the dead project namespace alone and dropped it ("Unknown identifier
+    # `isBigO_iff`"). Here NsDeadA's empty CD.Dead.Array and core's Array.
+    assert 'Array' in g.ext_ns
+    keep = {'CD.Dead.range_zero'}
+    sec = _section(C.Carver(g).carve(keep, g.have_names(keep)), 'CarveDev.NsDead')
+    assert re.search(r'^open _root_\.Array$', sec, re.M), sec
+
+
+def _one_piece_plan(t, bundle_nodes, name):
+    bs = [{'name': name, 'nodes': bundle_nodes, 'imports': []}] if bundle_nodes else []
+    return {'bundles': bs, 'nodes': [t], 'external_defs': {}, 'external': [],
+            'stubs': {t: {'bundles': [b['name'] for b in bs]}},
+            'pieces': {t: {'keep': [t], 'imports': [], 'bundles': [b['name'] for b in bs]}}}
+
+
+@pytest.mark.lean
+def test_private_redeclared_and_shadowed_context_compiles(g, tmp_path):
+    # q359: fld_later's piece puts its bundle's deprivatized local instances back in force, fldUnif at
+    # priority 50; q362: pair_default's piece re-declares fdPairInh and leaves out fdPairFin1, whose
+    # fdFin1 it cannot have; q255: range_zero's piece keeps `open _root_.Array`
+    plans = [_one_piece_plan('CD.PI.fld_later', ['CD.PI.Fld', 'CD.PI.Unif', 'CD.PI.Tag', PI + 'instTagFld',
+                                                 PI + 'fldUnif', PI + 'fldInh', 'CD.PI.fldDefault'], 'PI0'),
+             _one_piece_plan('CD.IP.pair_default', ['CD.IP.Fd', 'CD.IP.Fin1', 'CD.IP.Fin1.up'], 'IP0'),
+             _one_piece_plan('CD.Dead.range_zero', [], None)]
+    for i, p in enumerate(plans):
+        d = tmp_path / str(i)
+        d.mkdir()
+        _compile_in_publish_order(g, p, d)

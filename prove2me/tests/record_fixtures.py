@@ -20,7 +20,8 @@ FIX = os.path.join(HERE, 'lean_fixtures')
 CARVE_ROOTS = ['CarveDev.Top', 'CarveDev.ShadowA', 'CarveDev.ShadowB', 'CarveDev.ShadowC', 'CarveDev.ShadowD',
                'CarveDev.SimpRflB', 'CarveDev.DupTop', 'CarveDev.SimpTop',
                'CarveDev.NotaVar', 'CarveDev.CoeLocal', 'CarveDev.UnivMax', 'CarveDev.LocalFor',
-               'CarveDev.NamedNota', 'CarveDev.ExpUse', 'CarveDev.AttrReg', 'CarveDev.InstPriv', 'CarveDev.InstPre']
+               'CarveDev.NamedNota', 'CarveDev.ExpUse', 'CarveDev.AttrReg', 'CarveDev.InstPriv', 'CarveDev.InstPre',
+               'CarveDev.NsDeadA', 'CarveDev.NsDead']
 REPLAYED = ['Structure', 'Broken', 'Notation', 'Rewire', 'Audit', 'Scope', 'Alias', 'Variable', 'ScopedVariable']
 
 

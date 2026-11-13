@@ -176,6 +176,18 @@ unsafe def main (args0 : List String) : IO UInt32 := do
     while !p.isAnonymous do
       projLast := projLast.insert (p.componentsRev.head!.toString)
       p := p.getPrefix
+  -- and of every namespace a project module declares, constants or not (q255: the vendored, empty
+  -- `namespace Erdos970.Asymptotics` made `open Asymptotics` inside `Erdos970` look like a project
+  -- namespace only, and Mathlib's `Asymptotics` went unlisted): the module's `namespacesExt` entries
+  for i in [0:modNames.size] do
+    unless isProjMod modNames[i]! do continue
+    for (extName, ents) in env.header.moduleData[i]!.entries do
+      unless extName matches .str _ "namespacesExt" do continue
+      for e in ents do
+        let mut p : Name := unsafeCast e
+        while !p.isAnonymous do
+          projLast := projLast.insert (p.componentsRev.head!.toString)
+          p := p.getPrefix
   let mut ext : NameSet := {}
   for (n, _) in env.constants.toList do
     if isProj n || n.isInternal then continue
