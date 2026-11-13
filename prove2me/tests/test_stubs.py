@@ -19,11 +19,11 @@ def env(tmp_path):
 def test_install_writes_published_shape_and_records_drafts(env):
     mdir, ws = env
     problems, written = stubs.sync(mdir, ws)
-    assert problems == [] and sorted(written) == ['Theorems.Thm_Mini_goal', 'Theorems.Thm_Mini_t1']
+    assert problems == [] and sorted(written) == ['Definitions.Def_Mini', 'Theorems.Thm_Mini_goal', 'Theorems.Thm_Mini_t1']
     text = open(os.path.join(ws, 'Theorems', 'Thm_Mini_t1.lean')).read()
     # exactly the text fetch_theorems writes for a published statement: preamble, blank line, statement
     assert text.startswith('import Mathlib\nimport Definitions.Def_Mini\n\nnamespace Mini\n\ntheorem t1')
-    assert W.drafts(ws) == {'Theorems.Thm_Mini_goal': mdir, 'Theorems.Thm_Mini_t1': mdir}
+    assert W.drafts(ws) == {'Definitions.Def_Mini': mdir, 'Theorems.Thm_Mini_goal': mdir, 'Theorems.Thm_Mini_t1': mdir}
     assert W.published_by_full(ws) == {}                      # drafts are not published
     # ... except to a pre-submission audit, for which they are the siblings about to be published
     assert sorted(W.published_by_full(ws, with_drafts=True)) == ['Mini.goal', 'Mini.t1']
@@ -54,7 +54,7 @@ def test_a_dropped_milestone_loses_its_stub(env):
     assert stubs.sync(mdir, ws, check=True)[0] == ['LEFTOVER Theorems.Thm_Mini_t1: no longer a statement of the mission']
     stubs.sync(mdir, ws)
     assert not os.path.exists(os.path.join(ws, 'Theorems', 'Thm_Mini_t1.lean'))
-    assert list(W.drafts(ws)) == ['Theorems.Thm_Mini_goal']
+    assert list(W.drafts(ws)) == ['Definitions.Def_Mini', 'Theorems.Thm_Mini_goal']
 
 
 def test_a_published_statement_is_never_overwritten(env):
@@ -63,7 +63,7 @@ def test_a_published_statement_is_never_overwritten(env):
     open(pub, 'w').write('import Mathlib\n\ntheorem Mini.t1 : 2 = 2 := by sorry\n')
     problems, written = stubs.sync(mdir, ws)
     assert problems == ['PUBLISHED-DIFFERS Theorems.Thm_Mini_t1: the platform has another statement under this name']
-    assert written == ['Theorems.Thm_Mini_goal'] and '2 = 2' in open(pub).read()
+    assert written == ['Definitions.Def_Mini', 'Theorems.Thm_Mini_goal'] and '2 = 2' in open(pub).read()
 
 
 def test_submit_refuses_a_draft_import(env, monkeypatch, tmp_path):
@@ -211,3 +211,45 @@ def test_a_stub_copied_by_hand_is_listed_and_adopted_on_request(env):
     assert stubs.unlisted(mdir, ws) == ['Theorems.Thm_Mini_t1']
     assert stubs.sync(mdir, ws, adopt=True) == ([], [])
     assert W.drafts(ws)['Theorems.Thm_Mini_t1'] == mdir and stubs.unlisted(mdir, ws) == []
+
+
+def test_a_new_bundle_is_installed_as_a_draft_and_retired_on_publish(tmp_path, monkeypatch):
+    # q263 (2026-11-11): stubs.py wrote the statement stubs of p2m-standalone/strong-convergence-puder but not its
+    # new Def_StrongConvPuderAlg, so the build failed "bad import"; the bundle was copied into Definitions/ by hand
+    import fetch_theorems as F
+    d = tmp_path / 'folder'
+    (d / 'lib').mkdir(parents=True)
+    (d / 'lib' / 'Def_Bun.lean').write_text('import Mathlib\n\ndef Bun.k : Nat := 1\n')
+    (d / 'lib' / 'Thm_t.lean').write_text('import Definitions.Def_Bun\nimport Mathlib\n\nnamespace Q\n\n'
+                                          'theorem t : Bun.k = 1 := by\n  sorry\n\nend Q\n')
+    (d / 'mission.py').write_text("NAMESPACE = 'Q'\nDEFINITIONS = [dict(name='Bun', page='1', result='Def 1')]\n"
+                                  "THEOREMS = [dict(name='t', page='2', result='Lemma 1')]\n")
+    ws = tmp_path / 'ws'
+    (ws / 'Theorems').mkdir(parents=True)
+    mdir, ws = str(d), str(ws)
+    problems, written = stubs.sync(mdir, ws)
+    assert problems == [] and sorted(written) == ['Definitions.Def_Bun', 'Theorems.Thm_Q_t']
+    assert open(os.path.join(ws, 'Definitions', 'Def_Bun.lean')).read() == 'import Mathlib\n\ndef Bun.k : Nat := 1\n'
+    assert W.drafts(ws) == {'Definitions.Def_Bun': mdir, 'Theorems.Thm_Q_t': mdir}
+    assert stubs.sync(mdir, ws, check=True) == ([], [])
+    # the bundle publishes: fetch_theorems writes the same text and retires the draft, as for a statement
+    def call(m, p, b=None):
+        if p.startswith('/theorems?theorem_name='):
+            return {'theorems': []}
+        if p == '/definitions?definition_name=Bun':
+            return {'definitions': [{'definition_name': 'Bun', 'definition_id': 'D'}]}
+        if p == '/theorems/D':
+            return {'theorem_name': 'Bun', 'status': 'Definition', 'definition': 'import Mathlib\n\ndef Bun.k : Nat := 1'}
+        raise AssertionError(p)
+    monkeypatch.setattr(F, 'call', call)
+    monkeypatch.setenv('P2M_WORKSPACE', ws)
+    monkeypatch.setattr(F, '_workspace', lambda: ws)
+    monkeypatch.setattr(F.sys, 'argv', ['fetch_theorems.py', '--names', 'Bun', '--no-build'])
+    F.main()
+    assert W.drafts(ws) == {'Theorems.Thm_Q_t': mdir}
+    assert stubs.sync(mdir, ws) == ([], [])                  # published and identical: left alone
+    # a published bundle is never overwritten; a difference is reported
+    (d / 'lib' / 'Def_Bun.lean').write_text('import Mathlib\n\ndef Bun.k : Nat := 2\n')
+    problems, written = stubs.sync(mdir, ws)
+    assert problems == ['PUBLISHED-DIFFERS Definitions.Def_Bun: the platform has another bundle under this name']
+    assert 'Nat := 1' in open(os.path.join(ws, 'Definitions', 'Def_Bun.lean')).read()

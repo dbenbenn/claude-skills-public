@@ -5,13 +5,14 @@ usage: stubs.py MISSION_DIR [--check] [--adopt] [--no-build]
 
 Each statement of mission.py becomes Theorems/Thm_<NS>_<name>.lean in the workspace: its preamble
 and formal_statement with proof `sorry`, byte for byte the module the platform publishes at Submit
-(one writer, p2mlib.workspace.statement_text, shared with fetch_theorems.py). A milestone's proof
+(one writer, p2mlib.workspace.statement_text, shared with fetch_theorems.py); each DEFINITIONS bundle
+lib/Def_<name>.lean likewise becomes Definitions/Def_<name>.lean (q263). A milestone's proof
 can then `import Theorems.Thm_<NS>_<sibling>` from the start, exactly as its submission will: the
 dependency edges are written, not recovered by rewire.py from copies afterwards. A proof that
 imports an unproved sibling is a reduction, as on the platform; the development is complete when
 every milestone's proof compiles and every sibling it imports has one too.
 
-The stubs are listed in Theorems/.drafts.json. published() ignores them (a submission importing a
+The stubs (statements and bundles) are listed in Theorems/.drafts.json. published() ignores them (a submission importing a
 statement the platform does not have yet fails), and fetch_theorems.py retires each one when the
 platform publishes it, reporting any difference. The stub of a milestone renamed or dropped from
 mission.py is removed. A name already published is never overwritten: it is compared, and a
@@ -32,10 +33,18 @@ from p2mlib.workspace import workspace, statement_module, statement_text, drafts
 
 
 def wanted(mdir):
-    """{module: (path relative to the workspace, text)} for the mission's statements."""
+    """{module: (path relative to the workspace, text)} for the mission's statements and for its
+    DEFINITIONS bundles (lib/Def_<name>.lean -> Definitions/Def_<name>.lean, the text fetch_theorems.py
+    writes once the bundle is published). q263 (2026-11-11): a standalone folder's new bundle was not
+    installed, so its statements failed "bad import" until it was copied in by hand."""
     M = load(mdir)
     pay = M.payloads()
     out = {}
+    for D in getattr(M, 'DEFINITIONS', []):
+        f = os.path.join(mdir, 'lib', 'Def_%s.lean' % D['name'])
+        if os.path.exists(f):
+            rel = os.path.join('Definitions', 'Def_%s.lean' % D['name'])
+            out['Definitions.Def_' + D['name']] = (rel, open(f, encoding='utf-8').read().rstrip() + '\n')
     for T in M.THEOREMS:
         mod, rel = statement_module(T.get('namespace', M.NAMESPACE) + '.' + T['name'])
         out[mod] = (rel, statement_text(*pay[T['name']]))
@@ -69,7 +78,8 @@ def sync(mdir, ws=None, check=False, adopt=False):
         cur = open(p, encoding='utf-8').read() if os.path.exists(p) else None
         if cur is not None and mod not in dr:
             if cur.rstrip() != text.rstrip():
-                problems.append('PUBLISHED-DIFFERS %s: the platform has another statement under this name' % mod)
+                problems.append('PUBLISHED-DIFFERS %s: the platform has another %s under this name'
+                                % (mod, 'bundle' if mod.startswith('Definitions.') else 'statement'))
             elif adopt and not check:
                 adopted.append(mod)
             continue
