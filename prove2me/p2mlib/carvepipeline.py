@@ -828,6 +828,11 @@ class Pipeline:
             # timeouts) changed plan.json, and the resume measured the old out/lib; calibrate's own splits
             # invalidate gen themselves, a hand split or fold has only this
             h['plan'] = hash_paths([self.work_paths(cfg)[1]])
+        if s == 'plan' and (cfg := self.read_config()) is not None:
+            # q361: config.json is not hashed, but plan reads its external_defs, which extdefs writes; a
+            # `--redo extdefs` that added a derived instance left the old plan, re-declaring it in a bundle
+            h['external defs'] = hashlib.sha1(json.dumps(sorted((cfg.get('external_defs') or {}).items()))
+                                              .encode()).hexdigest()
         if s in GRAPH_READERS and (gp := self.graph_path()):
             # oaiq-123: a `graph` re-run by a LeanInfo change is popped alone, "its consumers check its
             # output": without this, a changed graph left the old plan in place

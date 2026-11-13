@@ -514,6 +514,24 @@ def test_editing_defs_in_pipeline_json_runs_config_again_without_re_porting(env)
     assert run(env).returncode == 0 and tools_called(env) == []          # recorded: no second re-run
 
 
+
+def test_a_changed_external_defs_makes_plan_stale(env):
+    # q361 (2026-11-13): `--redo extdefs` added a derived instance to config.json's external_defs, and the
+    # run went on to measure with the old plan and gen output, which still re-declared it
+    assert run(env, *ARGS).returncode == 0
+    cfg = json.load(open(env.dir / 'config.json'))
+    cfg['external_defs'] = dict(cfg.get('external_defs') or {}, **{'X.instDecidableEqT': 'Definitions.Def_A'})
+    json.dump(cfg, open(env.dir / 'config.json', 'w'))
+    env.log.write_text('')
+    r = run(env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    seq = tools_called(env)
+    assert ('carve', 'plan') in seq and ('carve', 'gen') in seq, seq
+    assert ('carve_prep', 'ext-defs') not in seq and 'stale: plan' in r.stdout, r.stdout
+    env.log.write_text('')
+    assert run(env).returncode == 0 and tools_called(env) == []          # recorded: no second re-run
+
+
 def test_once_publishing_started_a_defs_edit_stops_for_a_person(env):
     assert run(env, *ARGS, '--publish').returncode == 0
     (env.ws / 'Definitions' / 'Def_Z.lean').write_text('def Z := 1\n')

@@ -48,7 +48,8 @@ first failure stops the run with the log's tail (re-run the same command to resu
 re-runs one step; --from STEP forgets it and everything after; --stop-after STEP stops there.
 
 Stale steps: each step records content hashes of what it reads from another step (patches file and
-sources -> filter_patches; port_patches.json and sources -> port; the ported modules -> build, config).
+sources -> filter_patches; port_patches.json and sources -> port; the ported modules -> build, config;
+config.json's external_defs, which extdefs writes -> plan).
 A resume that finds one changed prints `== stale: STEP ...` and re-runs that step and all later ones, so
 editing the patches and running `--redo filter_patches` (or just resuming) re-ports; a --redo whose output
 is unchanged leaves the later steps alone. Steps also record the skill rules they ran with (the port
