@@ -13,7 +13,8 @@ backslash into five Lusin-Novikov statements). Also and optionally DEFINITIONS [
 extra, tags]}] with code in DIR/lib/Def_<name>.lean, published first; DIR/lib/Thm_<name>.lean holds the statement (imports, then
 the namespaced `theorem … := by sorry`). Already-published names (published_ids.json) are skipped,
 so a rerun only verifies. Before anything is sent (and under --dry), a new item's title or statement with a
-gendered pronoun is refused, by the check submit_solution.py runs on explanations (q286, q338). Generalised 2026-09-30 from the per-folder publish.py of
+gendered pronoun is refused, by the check submit_solution.py runs on explanations (q286, q338), and so is an
+`import Definitions.Def_X` whose bundle is neither published nor a DEFINITIONS entry (q324). Generalised 2026-09-30 from the per-folder publish.py of
 p2m-standalone/t-finitely-presented and grigorchuk-growth.
 """
 import json, os, sys, time
@@ -48,6 +49,39 @@ def pronoun_hits(payloads, defs, ids):
             ws = pronouns(text)
             if ws:
                 out.append('%s %s: %s' % (name, field, ', '.join(repr(w) for w in ws)))
+    return out
+
+
+def unknown_bundles(payloads, defs, call, ws=None):
+    """`item imports Definitions.Def_X` for each bundle a statement (or bundle) imports that is neither a
+    DEFINITIONS entry of the folder nor published: the workspace's Definitions/Def_X.lean that is not a draft
+    stub (fetch_theorems writes published bundles there), else the platform's exact-name lookup. q324
+    (2026-11-12): DEFINITIONS 'Claim13Aux' publishes as Def_Claim13Aux, the statements imported
+    Def_RepellingPairs_Claim13Aux, and the statement publish failed "unknown import" after the bundle was live."""
+    import re
+    from p2mlib.workspace import workspace, drafts
+    ours = {d['definition_name'] for d in defs}
+    items = [(p['theorem_name'], p['preamble']) for p in payloads]
+    items += [('Def_' + d['definition_name'], d['definition']) for d in defs]
+    imports = [(name, x) for name, text in items
+               for x in re.findall(r'^import Definitions\.Def_(\S+)', text or '', re.M) if x not in ours]
+    if not imports:
+        return []
+    try:
+        ws = ws or workspace()
+    except SystemExit:
+        ws = None
+    dr = drafts(ws) if ws else {}
+    out, known = [], {}
+    for name, x in imports:
+        if x not in known:
+            local = ws and os.path.exists(os.path.join(ws, 'Definitions', 'Def_%s.lean' % x)) \
+                and 'Definitions.Def_' + x not in dr
+            known[x] = bool(local) or any(
+                d.get('definition_name') == x
+                for d in (call('GET', '/definitions?definition_name=' + x).get('definitions') or []))
+        if not known[x]:
+            out.append('%s imports Definitions.Def_%s' % (name, x))
     return out
 
 
@@ -105,6 +139,12 @@ def main():
     long = long_titles(payloads, defs)
     if long:
         sys.exit('title over %d characters: %s' % (TITLE_MAX, ', '.join(long)))
+    unk = unknown_bundles(payloads, defs, call)
+    if unk:
+        sys.exit('import of a bundle that is neither published nor in DEFINITIONS (a DEFINITIONS entry `name` '
+                 'publishes as Def_<name>, so `name` is the whole suffix after Def_):\n  ' + '\n  '.join(unk)
+                 + '\n  DEFINITIONS: ' + (', '.join(repr(d['definition_name']) for d in defs) or '(none)')
+                 + '\n  (a published bundle missing from the workspace: fetch_theorems.py --names Def_<name>)')
     ids_path = os.path.join(here, 'published_ids.json')
     ids = json.load(open(ids_path)) if os.path.exists(ids_path) else {}
     hits = pronoun_hits(payloads, defs, ids)

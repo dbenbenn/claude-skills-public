@@ -164,12 +164,16 @@ def src(page, result, extra=None, ref=None):
 
 
 class FakePublisher:
-    def __init__(self, queued=None):
+    def __init__(self, queued=None, bundles=()):
         self.posted, self.store, self.queued = [], {}, dict(queued or {})   # queued: {name: job id}
+        self.bundles = list(bundles)                                         # other published bundles
 
     def call(self, m, p, b=None):
         if m == 'GET' and p.startswith('/theorems?theorem_name='):
             return {'theorems': []}                                          # nothing published yet
+        if m == 'GET' and p.startswith('/definitions?definition_name='):
+            n = p.split('=', 1)[1].split('&')[0]
+            return {'definitions': [{'definition_name': n, 'definition_id': 'B_' + n}] if n in self.bundles else []}
         if m == 'GET' and p.startswith('/publish-jobs?status=PENDING'):
             return {'publish_jobs': [{'id': j, 'theorem_name': n} for n, j in self.queued.items()]}
         if m == 'GET' and p.startswith('/publish-jobs?status='):
@@ -338,3 +342,49 @@ def test_pronoun_check_skips_code_math_and_published_items(folder, monkeypatch, 
     capsys.readouterr()
     PS.main()                                     # nothing new to check: the rerun verifies and reports
     assert fake.posted == [] and 'MISMATCH' in capsys.readouterr().out
+
+
+def test_publish_refuses_an_import_of_a_bundle_nobody_publishes(folder, monkeypatch, tmp_path_factory):
+    # q324 (2026-11-12): DEFINITIONS named the bundle 'Claim13Aux', which publishes as Def_Claim13Aux, but the
+    # statements imported Definitions.Def_RepellingPairs_Claim13Aux; the statement publish then failed
+    # "unknown import" after the bundle was live, and --dry had said nothing
+    import p2m
+    ws = tmp_path_factory.mktemp('ws')
+    monkeypatch.setenv('P2M_WORKSPACE', str(ws))
+    t = folder / 'lib' / 'Thm_t.lean'
+    t.write_text(t.read_text().replace('import Definitions.Def_Bun', 'import Definitions.Def_Q_Bun'))
+    fake = FakePublisher()
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    for argv in (['publish_standalone.py', str(folder), '--dry'], ['publish_standalone.py', str(folder)]):
+        monkeypatch.setattr(PS.sys, 'argv', argv)
+        with pytest.raises(SystemExit) as e:
+            PS.main()
+        msg = str(e.value)
+        assert 'Def_Q_Bun' in msg and 'Q.t' in msg and "'Bun'" in msg
+    assert fake.posted == []
+
+
+def test_publish_accepts_an_import_of_a_published_bundle(folder, monkeypatch, tmp_path_factory, capsys):
+    # a bundle published earlier is in the workspace's Definitions/ (fetch_theorems), or at least on the platform
+    import p2m
+    ws = tmp_path_factory.mktemp('ws')
+    (ws / 'Definitions').mkdir()
+    (ws / 'Definitions' / 'Def_Old.lean').write_text('import Mathlib\n\ndef Old.k : Nat := 1\n')
+    monkeypatch.setenv('P2M_WORKSPACE', str(ws))
+    t = folder / 'lib' / 'Thm_t.lean'
+    t.write_text('import Definitions.Def_Old\nimport Definitions.Def_Live\n' + t.read_text())
+    fake = FakePublisher(bundles=['Live'])
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    monkeypatch.setattr(PS.time, 'sleep', lambda s: None)
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_standalone.py', str(folder)])
+    PS.main()
+    assert fake.posted == [('def', 'Bun'), ('thm', 'Q.t')]
+    # a draft stub of another folder's unpublished bundle is not published
+    (ws / 'Definitions' / 'Def_Drafted.lean').write_text('import Mathlib\n')
+    (ws / 'Theorems').mkdir()
+    (ws / 'Theorems' / '.drafts.json').write_text('{"Definitions.Def_Drafted": "/elsewhere"}\n')
+    t.write_text('import Definitions.Def_Drafted\n' + t.read_text())
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_standalone.py', str(folder), '--dry'])
+    with pytest.raises(SystemExit) as e:
+        PS.main()
+    assert 'Def_Drafted' in str(e.value)
