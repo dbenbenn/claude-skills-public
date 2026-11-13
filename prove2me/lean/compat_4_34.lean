@@ -330,6 +330,25 @@ instance vonNeumannToStarSubalgebraIsClosed {H : Type*} [NormedAddCommGroup H] [
 instance starSubalgebraStarOrderedRing {A : Type*} [CStarAlgebra A] [PartialOrder A]
     [StarOrderedRing A] (S : StarSubalgebra ℂ A) [IsClosed (S : Set A)] : StarOrderedRing S :=
   Subtype.starOrderedRing S
+/-- A closed non-unital ⋆-subalgebra of a C⋆-algebra is star ordered (d13f23b's `Subtype.starOrderedRing` is an
+instance for every closed non-unital ⋆-subalgebra class; OpenAI's projection corners rely on it, q360). -/
+instance nonUnitalStarSubalgebraStarOrderedRing {A : Type*} [CStarAlgebra A] [PartialOrder A]
+    [StarOrderedRing A] (S : NonUnitalStarSubalgebra ℂ A) [IsClosed (S : Set A)] : StarOrderedRing S := by
+  refine StarOrderedRing.of_nonneg_iff' (fun {a b} h c => ?_) (fun {s} => ?_)
+  · show ((c : A) + (a : A)) ≤ (c : A) + (b : A)
+    exact add_le_add le_rfl (show (a : A) ≤ (b : A) from h)
+  · constructor
+    · intro hs
+      have hs' : (0 : A) ≤ (s : A) := hs
+      have hmem : CFC.sqrt (s : A) ∈ S := by
+        rw [CFC.sqrt_eq_real_sqrt _ hs']
+        exact cfcₙ_mem (𝕜 := ℝ) (𝕜' := ℂ) (s := S) _ s.property
+      refine ⟨⟨CFC.sqrt (s : A), hmem⟩, Subtype.ext ?_⟩
+      show (s : A) = star (CFC.sqrt (s : A)) * CFC.sqrt (s : A)
+      rw [CFC.sqrt_nonneg _ |>.isSelfAdjoint.star_eq, CFC.sqrt_mul_sqrt_self _ hs']
+    · rintro ⟨t, rfl⟩
+      show (0 : A) ≤ star (t : A) * (t : A)
+      exact star_mul_self_nonneg _
 instance vonNeumannAlgebraStarOrderedRing {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
     [CompleteSpace H] (P : VonNeumannAlgebra H) : StarOrderedRing P :=
   Subtype.starOrderedRing P.toStarSubalgebra

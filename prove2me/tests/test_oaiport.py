@@ -2411,6 +2411,25 @@ def test_the_compat_block_declares_subtype_star_ordered_ring():
     assert re.search(r'^instance vonNeumannAlgebraStarOrderedRing\b', block, re.M)
 
 
+def test_the_compat_block_declares_the_non_unital_subalgebra_star_ordered_ring_instance():
+    # d13f23b's `Subtype.starOrderedRing` is an instance for every closed non-unital ⋆-subalgebra; OpenAI's
+    # projection corners (`ProjectionCorner q hq hqq`, a `NonUnitalStarSubalgebra`) rely on it (q360)
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    assert re.search(r'^instance nonUnitalStarSubalgebraStarOrderedRing\b', block, re.M)
+
+
+@pytest.mark.lean
+def test_the_non_unital_subalgebra_star_ordered_ring_instance_is_found(tmp_path):
+    from p2mlib import carve as C
+    block, _ = O.compat_block(open(O_COMPAT, encoding='utf-8').read())
+    f = tmp_path / 'SOR.lean'
+    f.write_text('import Mathlib\n\n' + block + '\n'
+                 'example {A : Type*} [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A]\n'
+                 '    (S : NonUnitalStarSubalgebra ℂ A) [IsClosed (S : Set A)] : StarOrderedRing S :=\n'
+                 '  inferInstance\n', encoding='utf-8')
+    C.compile_file(str(f), None, str(tmp_path / 'olean'))
+
+
 def test_pow_antitone_takes_the_upper_bound_by_name():
     # d13f23b's `CStarAlgebra.pow_antitone hb1 hb0 hnm`; ours has `ha₀ ha₁` (Kadison similarity, oaiq-075)
     out = O.core_rewrites('simpa only [pow_zero] using CStarAlgebra.pow_antitone hb1 hb0 (Nat.zero_le n)\n')
