@@ -576,7 +576,7 @@ its target `<name>_oai`.
   class's namespace the source names; 54fdd6c, q221, q237), whatever the order of their modifiers
   (`private noncomputable local instance (priority := 50)`, q359), each re-declared only when everything
   its compiled body names is in the file (q362); and the library reading of an `open` behind an empty
-  project namespace, as `open _root_.Asymptotics` (q255; graphs before 93589f0 need `graph` re-run).
+  project namespace, as `open _root_.Asymptotics` (q255; graphs before aa00a6c need `graph` re-run).
   What it cannot hide (an instance declared
   later in the same module, reached through a bundle) `plan`/`gen` warn about. Not handled: a re-emitted
   anonymous instance's name (`instFactEq…_5`) can collide with the name Lean gave one in an imported
