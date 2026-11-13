@@ -18,6 +18,8 @@ def test_fetch_writes_server_shape_and_skips_unchanged(tmp_path, monkeypatch, ca
             return {'theorems': [{'theorem_name': 'N_defs', 'id': 'D'}]}
         if p.startswith('/theorems?theorem_name='):
             return {'theorems': []}                                   # not published yet
+        if p.startswith('/definitions?definition_name='):
+            return {'definitions': []}                                # no such bundle either
         if p.startswith('/definitions?q='):
             return {'definitions': []}
         if p == '/theorems/T':
@@ -97,15 +99,20 @@ def test_names_also_fetches_the_theorems_a_bundle_imports(tmp_path, monkeypatch)
 def test_imported_bundle_found_by_definitions_search(tmp_path, monkeypatch):
     # 2026-10-18: `--names MilnorDynamics.locally_bounded_holomorphic_subseq_locally_uniform`
     # reported "imported bundle not found on the platform: Def_MilnorDynamics_NormalFamilies":
-    # /theorems?theorem_name= does not find definition bundles; /definitions?q= does.
+    # /theorems?theorem_name= does not find definition bundles; /definitions?... does.
+    # 2026-11-11 (cc6a62b): the exact `definition_name=` filter comes first, since q= ranked near-namesakes
+    # (`mme_mm_spectral`) above `mm_spectral` and pushed it off the page
+    asked = []
     def call(m, p, b=None):
+        asked.append(p)
         if p.startswith('/theorems?theorem_name=N.t&'):
             return {'theorems': [{'theorem_name': 'N.t', 'id': 'T'}]}
         if p.startswith('/theorems?theorem_name='):
             return {'theorems': [], 'total': 0}
-        if p.startswith('/definitions?q=Bun_defs&'):
-            return {'definitions': [{'definition_name': 'Bun_defs_extra', 'definition_id': 'X'},
-                                    {'definition_name': 'Bun_defs', 'definition_id': 'D'}]}
+        if p == '/definitions?definition_name=Bun_defs':
+            return {'definitions': [{'definition_name': 'Bun_defs', 'definition_id': 'D'}]}
+        if p.startswith('/definitions?q=Bun_defs&'):                # near-namesakes only: the bundle is off the page
+            return {'definitions': [{'definition_name': 'Bun_defs_extra', 'definition_id': 'X'}]}
         if p == '/theorems/T':
             return {'theorem_name': 'N.t', 'status': 'Open', 'preamble': 'import Mathlib\nimport Definitions.Def_Bun_defs',
                     'formal_statement': 'theorem N.t : N.k = 1 := by\n  sorry'}
@@ -116,6 +123,26 @@ def test_imported_bundle_found_by_definitions_search(tmp_path, monkeypatch):
     monkeypatch.setattr(F.sys, 'argv', ['fetch_theorems.py', '--names', 'N.t', '--out', str(tmp_path)])
     F.main()
     assert (tmp_path / 'Definitions' / 'Def_Bun_defs.lean').read_text().endswith('def N.k := 1\n')
+    assert not any(p.startswith('/definitions?q=') for p in asked)
+
+
+def test_bundle_lookup_falls_back_to_q_search(monkeypatch):
+    # the exact filter answering nothing (or ignoring the name) leaves the old q= search, which still
+    # takes only the exact namesake among its hits
+    def call(m, p, b=None):
+        if p.startswith('/theorems?theorem_name='):
+            return {'theorems': []}
+        if p.startswith('/definitions?definition_name='):
+            return {'definitions': [{'definition_name': 'Other', 'definition_id': 'O'}]}
+        if p.startswith('/definitions?q=Bun_defs&'):
+            return {'definitions': [{'definition_name': 'Bun_defs_extra', 'definition_id': 'X'},
+                                    {'definition_name': 'Bun_defs', 'definition_id': 'D'}]}
+        if p.startswith('/definitions?q='):
+            return {'definitions': []}
+        raise AssertionError(p)
+    monkeypatch.setattr(F, 'call', call)
+    assert F.lookup_bundle('Bun_defs') == 'D'
+    assert F.lookup_bundle('Nope') is None
 
 
 @pytest.fixture
@@ -253,7 +280,7 @@ def test_names_finds_a_bundle_by_name(tmp_path, monkeypatch):
     def call(m, p, b=None):
         if p.startswith('/theorems?theorem_name='):
             return {'theorems': []}
-        if p.startswith('/definitions?q=B0'):
+        if p == '/definitions?definition_name=B0':
             return {'definitions': [{'definition_name': 'B0', 'definition_id': 'D'}]}
         if p == '/theorems/D':
             return {'theorem_name': 'B0', 'status': 'Definition', 'definition': 'import Mathlib\n\ndef N.k := 1'}
