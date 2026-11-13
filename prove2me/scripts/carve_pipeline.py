@@ -27,6 +27,9 @@ DIR is the carve directory. The first run needs the parameters, which are stored
                         what the clone lacks. Else DIR/src/lean (or --lean-src) must exist and hold the
                         closure only: port and filter_patches refuse a tree with more than 50 OpenAI
                         modules outside it (a whole openai/math checkout ports every module)
+  --foreign DIR         (repeat; pipeline.json `foreign`) a local checkout of a foreign package the closure
+                        imports, at the commit openai/math pins: the fetch step passes it to oai_fetch.py
+                        --foreign, which copies that package's part of the closure beside OAI/ (q244)
   --meta FILE           oai_meta.json for the prose templates (default DIR/oai_meta.json)
   --config-set JSON     keys merged into config.json after `carve_prep config` (pinned, frozen, ...)
   --measure-flag=FLAG   (repeat) passed to carve_measure.py, e.g. --measure-flag=--drop-false-edges
@@ -196,6 +199,7 @@ def parse(argv):
     ap.add_argument('--lean-src')
     ap.add_argument('--fetch', action='store_true', default=None)
     ap.add_argument('--commit')
+    ap.add_argument('--foreign', action='append')
     ap.add_argument('--meta')
     ap.add_argument('--tags')
     ap.add_argument('--config-set', type=json.loads)

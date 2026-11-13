@@ -3407,3 +3407,32 @@ def test_handoff_nudge_waits_for_a_run_older_than_one_and_a_half_waits(tmp_path)
     assert n and '2 h 31 min old, on build' in n
     assert cp.handoff_nudge(str(tmp_path), text, 'build', 10, now=t0 + 59 * 60) is None   # floor of an hour
     assert cp.handoff_nudge(str(tmp_path), 'no detached line\n', 'build', 0) is None
+
+
+# ---- foreign packages reach the fetch step (q244) --------------------------------------------------
+# q244 (ClassFieldTheory): `--fetch` stopped on the foreign package; workers ran
+# `oai_fetch.py DIR/src ROOT --commit C --foreign <checkout>/Lean4` by hand, then resumed.
+
+def test_foreign_checkouts_reach_oai_fetch(env):
+    co = env.tmp / 'cft' / 'Lean4'
+    co.mkdir(parents=True)
+    r = run(env, *ARGS, '--fetch', '--commit', 'c' * 40, '--foreign', str(co), '--stop-after', 'fetch')
+    assert r.returncode == 0, r.stdout + r.stderr
+    argv = [c['argv'] for c in calls(env) if c.get('tool') == 'oai_fetch'][0]
+    assert argv[argv.index('--foreign') + 1] == str(co) and argv[argv.index('--commit') + 1] == 'c' * 40
+    assert json.load(open(env.dir / 'pipeline.json'))['foreign'] == [str(co)]
+
+
+def test_foreign_key_added_to_pipeline_json_reaches_a_resumed_fetch(env, monkeypatch):
+    monkeypatch.setenv('STUB_FAIL', 'oai_fetch ' + str(env.dir / 'src'))
+    r = run(env, *ARGS, '--fetch', '--stop-after', 'fetch')
+    assert r.returncode == 1
+    pj = json.load(open(env.dir / 'pipeline.json'))
+    pj['foreign'] = ['~/no-such-checkout-a', str(env.tmp / 'b')]
+    json.dump(pj, open(env.dir / 'pipeline.json', 'w'))
+    monkeypatch.delenv('STUB_FAIL')
+    env.log.write_text('')
+    assert run(env, '--stop-after', 'fetch').returncode == 0
+    argv = [c['argv'] for c in calls(env) if c.get('tool') == 'oai_fetch'][0]
+    got = [argv[i + 1] for i, a in enumerate(argv) if a == '--foreign']
+    assert got == [os.path.expanduser('~/no-such-checkout-a'), str(env.tmp / 'b')]

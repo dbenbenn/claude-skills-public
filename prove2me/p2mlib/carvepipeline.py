@@ -33,7 +33,7 @@ DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
               'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags',
               'overlap', 'unif_integrable', 'stream_bundles', 'stream_pieces', 'accept_orphans',
-              'try_over_memory', 'piece_rss_limit', 'try_unsplit_rss']
+              'try_over_memory', 'piece_rss_limit', 'try_unsplit_rss', 'foreign']
 
 
 LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
@@ -1383,6 +1383,9 @@ class Pipeline:
         a = [os.path.join(self.d, 'src'), self.p['root_module']]
         if self.p.get('commit'):
             a += ['--commit', self.p['commit']]
+        # q244 (ClassFieldTheory): a foreign package stopped the fetch, and workers ran oai_fetch --foreign by hand
+        for f in self.p.get('foreign') or []:
+            a += ['--foreign', os.path.abspath(os.path.expanduser(f))]
         self.run_cmds('fetch', [self.tool('oai_fetch', *a)])
 
     def step_inputs(self):
