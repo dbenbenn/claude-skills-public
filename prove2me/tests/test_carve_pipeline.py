@@ -3214,6 +3214,51 @@ def test_calibrate_pieces_lets_a_trial_piece_through_without_stopping(env, monke
     assert not [c for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
 
 
+def test_a_piece_a_little_over_memory_that_splits_stopped_shrinking_is_tried_as_it_is():
+    # q334 (2026-11-12): frozenTaylorRowBox_mem, 22 s, 18 imports, 7,461 MiB before its second split and 7,409 after
+    # (limit 7,150): calibrate_pieces stopped the run; listed in try_over_memory, the verifier accepted it
+    p = object.__new__(CP.Pipeline)
+    p.p, p.state = {}, {}
+    lim = CP.PIECE_RSS_LIMIT
+    plan = {'pieces': {n: {'keep': [n, 'l'], 'imports': ['a'] * 18} for n in ('Q', 'R', 'S', 'T', 'U', 'V')}}
+    plan['pieces']['V']['imports'] = ['e%d' % i for i in range(709)]
+    times = {'statement:Q': _tm(4, 6566), 'statement:U': _tm(4, CP.PIECE_RSS_TARGET + 10)}
+    over = [('piece:Q', 7409, 22.1), ('piece:R', 7409, 22), ('piece:S', int(lim * 1.06), 22), ('piece:T', 7300, 22),
+            ('piece:U', 7300, 22), ('piece:V', 7300, 22)]
+    tried = {'Q': {'secs': 33.9, 'rss_mib': 7461, 'parts': 2, 'memory_rounds': 2},      # q334: 52 MiB a round
+             'R': {'secs': 30, 'rss_mib': 7900, 'parts': 2, 'memory_rounds': 1},        # shrinking: split again
+             'S': {'secs': 30, 'rss_mib': int(lim * 1.07), 'parts': 2, 'memory_rounds': 2},   # over 5%
+             'V': {'secs': 30, 'rss_mib': 7310, 'parts': 2, 'memory_rounds': 2}}        # 709 imports: group them
+    # T: never split, its imports leave room; U: its imports alone are over the split target, no split helps
+    assert p.near_memory_tries(plan, times, over, tried) == {'Q', 'U'}
+    rest = p.take_near_memory(plan, times, over, tried)
+    assert [m[0] for m in rest] == ['piece:R', 'piece:S', 'piece:T', 'piece:V']
+    assert sorted(p.state['near_memory']) == ['Q', 'U'] and p.state['near_memory']['Q']['rss_mib'] == 7409
+    assert {'Q', 'U'} <= p.trying_pieces()
+    p.p = {'try_near_memory': 0}
+    assert p.near_memory_tries(plan, times, over, tried) == set()
+
+
+def test_calibrate_pieces_tries_a_piece_splits_stopped_shrinking_instead_of_stopping(env, monkeypatch):
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30)})
+    work = env.dir / 'carve_work'
+    for f in ('times.json', 'times.orig.json'):
+        t = json.load(open(work / f))
+        t['piece:P0'] = _tm(22.1, 7409)
+        t['statement:P0'] = _tm(4, 6566)
+        (work / f).write_text(json.dumps(t))
+    assert run(env, *ARGS_NEW, '--no-stream-bundles', '--stop-after', 'order').returncode == 0
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    st['auto_split'] = {'P0': {'secs': 33.9, 'rss_mib': 7461, 'parts': 2, 'memory_rounds': CP.MAX_MEMORY_ROUNDS}}
+    (env.dir / 'pipeline_state.json').write_text(json.dumps(st))
+    r = run(env, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not [c for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert 'P0' in st['near_memory']
+    assert 'sent as it is' in (env.dir / 'logs' / 'calibrate.log').read_text()
+
+
 def test_an_unsplittable_piece_over_memory_is_sent_once_and_the_round_goes_on(env, monkeypatch):
     # q153 (2026-11-09): density0_r0_10_eq, one declaration peaking at 8,049 MiB (its statement alone 6,939), was asked
     # into 8 parts; split-piece refused ("nothing in its piece can be a statement") and the driver stopped. Such a piece

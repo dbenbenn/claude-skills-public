@@ -92,6 +92,13 @@ PIECE_RSS_TARGET = 7050 # MiB: what a memory split sizes its parts to stay under
 MAX_MEMORY_PARTS = 8    # most parts one memory split makes
 MAX_MEMORY_ROUNDS = 2   # automatic memory splits of one piece before a person looks. q153 (2026-11-08): of the first 32
                         # halved pieces measured, 9 stayed just over (7,053-7,095 MiB): the proof's share does not halve exactly
+NEAR_MEMORY_FRACTION = 0.05  # a piece at most this share over the memory limit, importing at most TRY_UNSPLIT_IMPORTS
+NEAR_SHRINK_MIB = 100   # statements, is sent once as it is when no split helps (its imports alone are over the split
+                        # target), its splits ran out (MAX_MEMORY_ROUNDS), or its last split took off less than this.
+                        # q334 (2026-11-12): frozenTaylorRowBox_mem (18 imports, 316 MB) went 7,461 -> 7,409 MiB over
+                        # its second split and calibrate_pieces stopped the run; listed in try_over_memory, as on q257,
+                        # the verifier accepted it (each stop cost about a day). pipeline.json `try_near_memory` (a
+                        # fraction; 0: off) overrides. A memory kill of such a piece leaves it for a person
 STREAM_SPLIT_MINUTES = 60   # memory splits while the measure streams: the first at once, then at most this often
 MEASURE_JOBS = 8        # pieces measured at once (carve_measure --jobs; pipeline.json measure_jobs); lean-cap queues them and
                         # starts each past its base 3 only while memory and load allow (dbenbenn 2026-11-09; was 3)
@@ -2492,7 +2499,7 @@ class Pipeline:
         for x, v in sorted(st.items()):
             n = x.split(':', 1)[1]
             if not (x.startswith('piece:') and v.get('state') == 'split') or self.piece_split_rounds(n) >= MAX_PIECE_SPLITS \
-                    or n in (self.state.get('unsplittable') or {}):
+                    or n in (self.state.get('unsplittable') or {}) or n in (self.state.get('near_memory') or {}):
                 continue
             if v.get('sha') and n in (plan.get('pieces') or {}):
                 slug = CV.slug(CV.statement_name(plan, n))
@@ -2579,8 +2586,47 @@ class Pipeline:
         split-piece found unsplittable (q153 2026-11-09; a memory kill of one leaves it for a person), and, given
         `times` and `plan`, every fast piece a little over the limit with few imports (fast_over_memory; a memory
         kill splits it)."""
-        out = set(self.p.get('try_over_memory') or ()) | set(self.state.get('unsplittable') or {})
+        out = set(self.p.get('try_over_memory') or ()) | set(self.state.get('unsplittable') or {}) | \
+            set(self.state.get('near_memory') or {})
         return out | self.fast_over_memory(times, plan) if times and plan else out
+
+    def near_memory_tries(self, plan, times, memory_over, tried):
+        """The pieces of calibration's `memory_over` a split no longer helps, little over the limit: at most
+        NEAR_MEMORY_FRACTION (pipeline.json `try_near_memory`) over it, importing at most TRY_UNSPLIT_IMPORTS
+        statements, and either their imports alone are over the split target (memory_parts None), their automatic
+        splits ran out (MAX_MEMORY_ROUNDS), or the last one took off less than NEAR_SHRINK_MIB."""
+        frac = self.p.get('try_near_memory', NEAR_MEMORY_FRACTION)
+        if not frac:
+            return set()
+        cap, pieces, out = self.rss_limit() * (1 + float(frac)), plan.get('pieces') or {}, set()
+        for key, rss, secs in memory_over:
+            n = key.split(':', 1)[1]
+            if rss > cap or len((pieces.get(n) or {}).get('imports') or ()) > TRY_UNSPLIT_IMPORTS:
+                continue
+            base = (times.get('statement:' + n) or {}).get('rss_mib')
+            t = tried.get(n) or {}
+            rounds = t.get('memory_rounds', 1 if n in tried else 0)
+            if memory_parts(rss, base) is None or (t.get('rss_mib') and (
+                    rounds >= MAX_MEMORY_ROUNDS or t['rss_mib'] - rss < NEAR_SHRINK_MIB)):
+                out.add(n)
+        return out
+
+    def take_near_memory(self, plan, times, memory_over, tried, lines=None, step='calibrate_pieces'):
+        """Record near_memory_tries in pipeline_state.json `near_memory` (trying_pieces sends them once as they
+        are; server_split_wanted never splits them again) and return the rest of `memory_over`."""
+        near = self.near_memory_tries(plan, times, memory_over, tried)
+        if not near:
+            return memory_over
+        rec = self.state.setdefault('near_memory', {})
+        got = [m for m in memory_over if m[0].split(':', 1)[1] in near]
+        for key, rss, secs in got:
+            rec[key.split(':', 1)[1]] = {'rss_mib': rss, 'secs': secs, 'at': _now()}
+        line = ('sent as it is (a little over the %d MiB memory limit, and a split no longer shrinks it): %s' % (
+            self.rss_limit(), ', '.join('%s %d MiB' % (k, rss) for k, rss, _ in got)))
+        if lines is not None:
+            lines.append(line)
+        print('%s: %s' % (step, line), file=sys.stderr, flush=True)
+        return [m for m in memory_over if m[0].split(':', 1)[1] not in near]
 
     def fast_over_memory(self, times, plan):
         """Pieces measured over the memory limit but at most TRY_UNSPLIT_RSS (pipeline.json `try_unsplit_rss`),
@@ -2648,6 +2694,7 @@ class Pipeline:
         # pipeline.json `try_over_memory`: sent whatever their peak; a memory kill splits them (server_split_wanted)
         trying = self.trying_pieces(times, plan)
         res['memory_over'] = [m for m in res['memory_over'] if m[0].split(':', 1)[1] not in trying]
+        res['memory_over'] = self.take_near_memory(plan, times, res['memory_over'], tried, step='measure')
         auto_mem, _ = self.memory_triage(plan, times, res['memory_over'], tried)
         # and those the verifier rejected (state `split`: a memory kill, or own timeouts), sized from their peak
         server = {}
@@ -2691,6 +2738,9 @@ class Pipeline:
         trying = self.trying_pieces(times, plan)
         res['memory_over'] = [m for m in res['memory_over'] if m[0].split(':', 1)[1] not in trying]
         lines = self.calibrate_head(cfg, res, 'pieces: ')
+        # a little over, and splitting stopped helping: sent once as it is rather than ending the run (q334)
+        res['memory_over'] = self.take_near_memory(plan, times, res['memory_over'],
+                                                   self.state.setdefault('auto_split', {}), lines)
         heavy = heavy_imports(plan, times, live, kinds=('piece',))
         if heavy:
             lines.append('WARNING %d piece(s) import more than %.0f MB (the verifier may run out of memory; a split does '
