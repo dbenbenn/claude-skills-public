@@ -506,6 +506,11 @@ its target `<name>_oai`.
 
 ### Bundle shape
 
+- **Definitions with proof fields pull the development into bundles** (q257: a structure-valued `def`
+  whose fields are proofs made 184 bundles, no statements; 123 published before the shape froze). `plan`
+  prints bundled theorem cost against definition cost and warns at 4× and 300 s, listing the entry
+  theorems with their chain costs: force the heavy ones before the first publish. On a re-carve, config
+  `measured` (an earlier plan plus its times.json) calibrates costs per declaration.
 - **Heavy computations do not belong in bundles; publish them as statements.** Eilenberg–Ganea: about
   850 `decide +kernel` lemmas under a *definition* went into 17 bundles of about 58 s; each published
   alone, but every bundle importing several failed with `dependency_oom` ("Failed to compile modules …:
@@ -771,7 +776,8 @@ mixed old and new `carve.py` inside one carve).
   about 7 GiB; `import Mathlib` alone peaks at 6.5 GiB. carve_measure records each run's peak
   (`rss_mib`). A piece over `PIECE_RSS_LIMIT` (7,150 MiB; pipeline.json `piece_rss_limit`) is split alone,
   into enough parts for the proof's share (its peak minus its statement's) to fit, with two exceptions
-  that are sent once as they are: a piece listed in `try_over_memory` or found unsplittable, and a fast
+  that are sent once as they are: a piece listed in `try_over_memory`, found unsplittable, or at most 5%
+  over once splitting stops shrinking it (`near_memory`, pipeline.json `try_near_memory`; q334), and a fast
   piece a little over (at most `TRY_UNSPLIT_RSS` 8,600 MiB and `TRY_UNSPLIT_SECS` 20 s) that imports at
   most `TRY_UNSPLIT_IMPORTS` (120) statements; q153 had all 331 pieces over 7,150 MiB accepted, each
   importing at most 119. A memory kill (verdicts `hidden`/`dependency_oom`) puts a piece in state `split`.
@@ -951,7 +957,10 @@ Profile before forcing or splitting anything.
   159 an hour to about 10, and D297 ended `dependency_oom`, though every bundle measured under 90 s. When
   bundle publishes slow down or time out, re-plan the unpublished part with its lemmas as statements (the
   live bundles `frozen`) instead of pushing it through. `plan` and `check` give each heavy chain a verdict
-  against the 300 s cold build, and calibrate warns on measured chain sums over 150 s (17a5cac). Closure
+  against the 300 s cold build, and calibrate warns on measured chain sums over 150 s (17a5cac). It also
+  sums each item's local seconds over its whole closure, warns over 1,000 s, and before the first publish
+  stops on such an item that also imports over 160 MB (pipeline.json `closure_stop`, `closure_limit`):
+  q257's `tr` failed there at 1,294 s, while light-import items elsewhere went live up to ~2,200 s. Closure
   *bytes* look like a second ceiling (q149, oaiq-106: every published bundle's closure was ≤ 0.74 GB of
   .olean; above 0.87 GB, "Module compilation timed out after 300s" every time). That is one carve's
   correlation, not a platform-stated limit; `carve_measure.py` warns over 0.7 GB. A goal piece that must
