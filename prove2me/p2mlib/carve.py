@@ -2063,6 +2063,54 @@ def chain_report(g, plan, top=5):
     return rows
 
 
+ENTRY_RATIO = 4.0       # bundled theorems this many times the definitions' planned cost: definitions pull the
+ENTRY_MIN = 300.0       # development into bundles (and at least this many s of theorems). q257 `tr`: 5,420 s vs 300 s
+
+
+def definition_entries(g, plan, cost, top=None):
+    """The theorems the plan's (unfrozen) bundles hold because definitions need them: {'theorems', 'theorem_cost',
+    'definitions', 'definition_cost', 'entries': [{entry, chain, theorems, users}], 'warn'}. An entry is a bundled
+    theorem a bundled non-theorem uses directly, or one the type of a statement or of a declaration a piece keeps
+    names (`sig:<name>` among its users); its chain is the bundled theorems it reaches through theorems only (itself included), costed in
+    planned seconds, heaviest first. `warn` when the bundled theorems cost ENTRY_RATIO times the definitions and
+    at least ENTRY_MIN s. q250/q257 `tr` (2026-11-11): a structure-valued def with proof fields and operator defs
+    using kernel-bound theorems made 184 bundles and 0 statements, whose closures outgrew what the verifier builds;
+    forcing the heavy entries made them statements."""
+    frozen = set(plan.get('frozen') or ())
+    B = {k for b in plan.get('bundles') or () if b['name'] not in frozen for k in b.get('nodes') or () if k in g.nodes}
+    th = {k for k in B if g.nodes[k].theorem}
+    users = {}
+    for k in sorted(B - th):
+        for d in g.nodes[k].deps:
+            if d in th:
+                users.setdefault(d, set()).add(k)
+    stated = set(plan.get('stubs') or {}) | {k for p in (plan.get('pieces') or {}).values() for k in p.get('keep') or ()}
+    for s in sorted(stated):
+        if s in g.nodes:
+            for d in g.nodes[s].sig:
+                if d in th:
+                    users.setdefault(d, set()).add('sig:' + s)
+
+    def chain(e):
+        seen, todo = {e}, [e]
+        while todo:
+            for d in g.nodes[todo.pop()].deps:
+                if d in th and d not in seen:
+                    seen.add(d)
+                    todo.append(d)
+        return seen
+    rows = []
+    for e, us in users.items():
+        c = chain(e)
+        rows.append({'entry': e, 'chain': round(sum(cost.get(x, 0.0) for x in c), 1), 'theorems': len(c),
+                     'users': sorted(us)})
+    rows.sort(key=lambda r: (-r['chain'], r['entry']))
+    tc = round(sum(cost.get(k, 0.0) for k in th), 1)
+    dc = round(sum(cost.get(k, 0.0) for k in B - th), 1)
+    return {'theorems': len(th), 'theorem_cost': tc, 'definitions': len(B - th), 'definition_cost': dc,
+            'entries': rows[:top] if top else rows, 'warn': tc >= ENTRY_MIN and tc >= ENTRY_RATIO * dc}
+
+
 def _order_chunks(g, chunks, nfrozen):
     """Chunks topologically sorted by their dependencies (frozen ones first, as given)."""
     where = {k: i for i, ch in enumerate(chunks) for k in ch}

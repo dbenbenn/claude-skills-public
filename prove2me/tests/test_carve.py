@@ -3845,3 +3845,52 @@ def test_a_module_of_notations_alone_gets_a_node_its_users_depend_on(monkeypatch
     C.Graph._cross_module_notation_deps(fake)
     assert nodes['f'].ndeps == {'«gnotation»:N:0'}
     assert nodes['«gnotation»:N:0'].module == 'N' and fake.cmd_node[('N', 0)] == '«gnotation»:N:0'
+
+
+# ---- definitions that pull the development into bundles (q257 lesson, 2026-11-11) ----------------------
+# q250 `tr`: `largeGaussianPair` is a structure-valued def whose fields are proofs, and the operator defs use
+# kernel-bound theorems: 184 bundles, 0 statements; 5,420 s of bundled theorems against 300 s of definitions.
+
+def _entries_graph():
+    from types import SimpleNamespace as NS
+    D = lambda *deps: NS(theorem=False, deps=set(deps), sig=set())
+    T = lambda *deps: NS(theorem=True, deps=set(deps), sig=set())
+    nodes = {'pair': D('fourier', 'radial'), 'op': D('kbound'), 'fourier': T('f1', 'f2'), 'f1': T('f2'),
+             'f2': T(), 'radial': T(), 'kbound': T('f2'), 'lonely': T(), 'goal': T('pair')}
+    nodes['goal'].sig = {'pair', 'radial'}
+    plan = {'bundles': [{'name': 'X0', 'nodes': ['pair', 'op', 'fourier', 'f1', 'f2', 'radial', 'kbound', 'lonely']}],
+            'stubs': {'goal': {'bundles': ['X0']}}}
+    cost = {'pair': 2, 'op': 3, 'fourier': 100, 'f1': 200, 'f2': 50, 'radial': 10, 'kbound': 40, 'lonely': 7}
+    return NS(nodes=nodes), plan, cost
+
+
+def test_definition_entries_list_the_theorems_definitions_pull_in_with_their_chains():
+    g, plan, cost = _entries_graph()
+    r = C.definition_entries(g, plan, cost)
+    assert (r['theorems'], r['theorem_cost'], r['definitions'], r['definition_cost']) == (6, 407, 2, 5)
+    rows = {e['entry']: e for e in r['entries']}
+    assert sorted(rows) == ['fourier', 'kbound', 'radial']          # `lonely` is no definition's
+    assert rows['fourier']['chain'] == 350 and rows['fourier']['theorems'] == 3 and rows['fourier']['users'] == ['pair']
+    assert rows['kbound']['chain'] == 90 and rows['radial']['users'] == ['pair', 'sig:goal']
+    assert [e['entry'] for e in r['entries']] == ['fourier', 'kbound', 'radial']   # heaviest chain first
+    assert r['warn']
+
+
+def test_definition_entries_stay_quiet_when_definitions_carry_the_bundles():
+    g, plan, cost = _entries_graph()
+    cost.update({'pair': 500, 'op': 500})
+    assert not C.definition_entries(g, plan, cost)['warn']
+    small = {k: v / 100 for k, v in _entries_graph()[2].items()}     # theorems far over, but cheap in all
+    assert not C.definition_entries(g, plan, small)['warn']
+    # frozen (published) bundles are past re-planning: left out
+    assert C.definition_entries(g, dict(plan, frozen=['X0']), cost)['entries'] == []
+
+
+def test_plan_prints_the_entry_table_and_warns(capsys):
+    cli = _carve_script()
+    g, plan, cost = _entries_graph()
+    cli.print_entries(g, plan, cost)
+    out = capsys.readouterr().out
+    assert 'bundles hold 6 theorem(s) (407 s planned) and 2 definition(s) (5 s)' in out
+    assert 'WARNING: definitions pull theorems into bundles' in out and '`forced`' in out
+    assert '    350.0 s  fourier (3 theorems; used by pair)' in out

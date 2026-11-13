@@ -306,6 +306,30 @@ def print_chains(g, P, cfg):
               'measured; re-plan before publish_early if they stay far over' % C.CHAIN_WARN)
 
 
+def print_entries(g, P, cost, top=10):
+    """The theorems definitions pull into plan P's bundles (C.definition_entries): a summary line, and when the
+    bundled theorems outweigh the definitions, the entry theorems with their theorem-only chains; a WARNING when
+    they far outweigh them (q257: 5,420 s against 300 s, no statements, a fresh carve after 123 live bundles)."""
+    r = C.definition_entries(g, P, cost, top)
+    print('bundles hold %d theorem(s) (%.0f s planned) and %d definition(s) (%.0f s)' % (
+        r['theorems'], r['theorem_cost'], r['definitions'], r['definition_cost']))
+    if r['theorem_cost'] <= r['definition_cost'] or not r['entries']:
+        return
+    print('entry theorems (a definition uses them, or a statement\'s type names them), with the planned cost of the '
+          'theorems each brings into bundles:')
+    for e in r['entries']:
+        us = e['users']
+        print('  %7.1f s  %s (%d theorems; used by %s%s)' % (e['chain'], e['entry'], e['theorems'], ', '.join(us[:3]),
+                                                         ' and %d more' % (len(us) - 3) if len(us) > 3 else ''))
+    if r['warn']:
+        print('WARNING: definitions pull theorems into bundles (%.0f s of theorems against %.0f s of definitions): '
+              'their import closures grow past what a cold verifier worker builds (q257: nothing summing 1,294 s or '
+              'more went live, and the 123 live bundles froze the shape). Before the first publish, add the heavy '
+              'entries to `forced` (and `pinned` the definitions their statements mention); one whose statement '
+              'another forced statement\'s type needs cannot be forced. calibrate checks the measured closures'
+              % (r['theorem_cost'], r['definition_cost']))
+
+
 def keep_backup(path, tag):
     """The path to save the plan at `path` under before changing it: PLAN<tag>.json, an older copy there
     first moved to the first free PLAN<tag>.N.json (q172: a second split round overwrote the first's)."""
@@ -539,10 +563,11 @@ def main(argv):
         # its proof inside them, as they will be after the fold (q160: forced live folded statements
         # made seven in-budget pieces that the fold summed into one of 271 s)
         folded = set(cfg.get('folded', ()))
+        cost = costs(cfg, g)
         P = C.make_plan(g, cfg['targets'], [f for f in cfg.get('forced', ()) if f not in folded],
                         cfg.get('budget', 60),
                         cfg.get('piece_size', 700_000), cfg.get('bundle_budget', 90),
-                        cfg.get('bundle_size', 650_000), cfg.get('band_width', 4), costs(cfg, g),
+                        cfg.get('bundle_size', 650_000), cfg.get('band_width', 4), cost,
                         frozen, cfg.get('bundle_prefix', 'Bundle'),
                         external_defs=external_map(cfg),
                         statement_suffix=cfg.get('statement_suffix', ''),
@@ -570,6 +595,7 @@ def main(argv):
         for c, n in worst:
             print('  %7.1f s  %s' % (c, n))
         print_chains(g, P, cfg)
+        print_entries(g, P, cost)
         probs = C.check_plan(g, P)
         warn_leaks(g, P)
         report_duplicates(g)
