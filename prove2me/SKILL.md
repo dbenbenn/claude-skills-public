@@ -520,7 +520,8 @@ the object is isomorphic to the paper's; the read-back will render the construct
 **Each statement is a workspace module from the start** (dbenbenn, 2026-10-02). A new mission keeps
 every statement as `statements/Thm_<NS>_<name>.lean`, byte for byte the module the platform will
 publish: imports and opens, a blank line, the statement with proof `sorry`. `scripts/stubs.py
-MISSION_DIR` installs them in the workspace at `Theorems/Thm_<NS>_<name>.lean`, so the local state
+MISSION_DIR` installs them in the workspace at `Theorems/Thm_<NS>_<name>.lean`, and unpublished
+bundles (`lib/Def_<name>.lean`) at `Definitions/`, so the local state
 is always the current plan:
 - **Proving:** a milestone's proof imports its siblings exactly as its submission will.
 - **Changing or adding a milestone:** edit or add its file, run `stubs.py`, recompile what
@@ -782,7 +783,9 @@ keeps its prose out of Python: `prose/<name>.md` per item, a front matter of `ti
 `## Milestone` section for the milestone description. `p2mlib.mission.load` merges the files
 into `mission.py`'s items by name and refuses a field set in both places or a file naming no
 item. Older missions keep their layout. A p2m-standalone folder (`publish_standalone.py`) works
-the same way and refuses a new item whose prose is in `mission.py`. Write the `.md` files
+the same way and refuses a new item whose prose is in `mission.py`, a gendered pronoun in a new item's
+title or statement (the explanation check; q286, q338), and an import of a `Def_X` that is neither
+published nor a DEFINITIONS entry (entry `name` publishes as `Def_<name>`, the whole suffix; q324). Write the `.md` files
 themselves (Write/Edit; when the background guard refuses a direct write, Write into the job's tmp
 directory and `cp` the file in) and pass paths to the scripts. A Python string or a bash heredoc
 brings the escaping layer back: Lusin–Novikov published `\"Borel\"` with the backslash in five
