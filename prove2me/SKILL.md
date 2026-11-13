@@ -972,7 +972,8 @@ the first retry, many at 300–2,000 lines a stub where the record had estimated
   (`AGT.zero_sum_minimax`), hypergraph Ramsey, the Jordan curve theorem, invariance of domain,
   Janiszewski, and the Riemann mapping and Carathéodory–Torhorst theorems (q363); for any planar step, also the disk-crossing lemma `RepellingPairs.walks_meet_of_cyclicallyOrdered`
   (q355). q190: teorth/expdb ports for analytic number theory. Search two more places: the paper itself
-  for its authors' own Lean ("Lean", "formaliz", "github", "code availability"; q345, q351), and the
+  for its authors' own Lean ("Lean", "formaliz", "github", "code availability"; q345, q351; building it is
+  pre-approved after a scan for `#eval`, `run_cmd`, `elab`, `macro`, IO, `unsafe`, `axiom`), and the
   solutions of Proved neighbours (`GET /submissions/:id/solution`) for an internal lemma stronger than
   their statement (q290: a log⁹ fourth moment inside a T^ε one, then published standalone).
 - **Does a sibling supply the object, or a weaker bound that suffices?** q184: siblings replaced
