@@ -3522,3 +3522,54 @@ def test_patches_hash_ignores_why_and_formatting_only():
     assert h(json.dumps(P1)) != h(json.dumps([dict(P1[0], new='c')]))
     assert h(json.dumps(P1)) != h(json.dumps(P1 + P1))                  # order and number count
     assert h('not json') != h('not json either')                        # unreadable: its bytes
+
+
+# ---- the import parser's 1 MiB cap on imported sources (q361) -------------------------------------
+# q361: every item importing Def_EditApproximation (1,425,670 bytes) failed "Source too large for import
+# parser: 1425670 bytes (max 1048576)", after a ~2.5 h build; no carve change helps.
+
+BIG = 1048576 + 1
+
+
+def test_a_target_importing_a_bundle_over_the_cap_stops_at_inputs(env):
+    (env.ws / 'Definitions' / 'Def_A.lean').write_text('-' * BIG)
+    r = run(env, *ARGS)
+    assert r.returncode == 1 and "step 'inputs'" in r.stderr, r.stderr
+    assert 'Definitions.Def_A' in r.stderr and '1048577' in r.stderr and 'import parser' in r.stderr
+    assert not any(c[0] in ('oai_port_modules', 'oai_build_modules') for c in tools_called(env))
+
+
+def test_the_cap_follows_imports_of_bundles_and_statements(env):
+    (env.ws / 'Definitions' / 'Def_A.lean').write_text('import Mathlib\nimport Theorems.Thm_Q\n')
+    (env.ws / 'Theorems' / 'Thm_Q.lean').write_text('import Definitions.Def_Big\n')
+    (env.ws / 'Definitions' / 'Def_Big.lean').write_text('-' * BIG)
+    r = run(env, *ARGS, '--stop-after', 'inputs')
+    assert r.returncode == 1 and 'Definitions.Def_Big' in r.stderr, r.stderr
+    assert 'Definitions.Def_A' in r.stderr          # the chain that reaches it
+
+
+def test_a_bundle_exactly_at_the_cap_passes(env):
+    (env.ws / 'Definitions' / 'Def_A.lean').write_text('-' * 1048576)
+    assert run(env, *ARGS, '--stop-after', 'inputs').returncode == 0
+
+
+def test_an_external_theorem_importing_a_bundle_over_the_cap_stops_before_the_build(env):
+    (env.ws / 'Theorems' / 'Thm_E.lean').write_text('import Definitions.Def_Big\n')
+    (env.ws / 'Definitions' / 'Def_Big.lean').write_text('-' * BIG)
+    r = run(env, *ARGS, '--config-set', json.dumps({'external_theorems': {'E': 'Theorems.Thm_E'}}),
+            '--stop-after', 'config')
+    assert r.returncode == 1 and 'Definitions.Def_Big' in r.stderr, r.stderr
+    assert not any(c[0] == 'oai_build_modules' for c in tools_called(env))
+
+
+def test_oversized_imports_lists_each_big_file_once_with_its_chain(tmp_path):
+    sys.path.insert(0, ROOT)
+    from p2mlib import carvepipeline as CP
+    (tmp_path / 'Definitions').mkdir()
+    (tmp_path / 'Theorems').mkdir()
+    (tmp_path / 'Theorems' / 'Thm_T.lean').write_text('import Definitions.Def_A\nimport Definitions.Def_B\n')
+    (tmp_path / 'Definitions' / 'Def_A.lean').write_text('import Definitions.Def_B\n')
+    (tmp_path / 'Definitions' / 'Def_B.lean').write_text('x' * 60)
+    assert CP.oversized_imports(str(tmp_path), ['Theorems.Thm_T'], cap=50) == [
+        ('Definitions.Def_B', 60, ['Theorems.Thm_T', 'Definitions.Def_B'])]
+    assert CP.oversized_imports(str(tmp_path), ['Theorems.Thm_T', 'Definitions.Missing'], cap=60) == []

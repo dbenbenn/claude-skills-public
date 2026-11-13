@@ -30,6 +30,11 @@
                  on PlanarPacking (q152) siblings with the same import closure published: retried
                  DEPENDENCY_OOM_CAP times, then move the heavy proofs out of the bundles (publish
                  them as statements).
+  platform_block a permanent refusal by the platform that no retry and no change to the item cures: "Source too
+                 large for import parser: N bytes (max 1048576)", the import parser's 1 MiB cap on each *imported*
+                 source (q361 2026-11-13: every item importing the 1,425,670-byte Def_EditApproximation). Stops at once;
+                 ask the admins. Not the token scanner's cap on the submitted file itself, which is the file's
+                 (compile_error: split it).
   compile_error  CE, or FAILED "... does not compile" for a real reason: fix the file.
   wrong          WA: the solution does not prove the published statement (a target renamed wrong,
                  a signature mismatch, an import clash with the statement's own imports).
@@ -66,6 +71,8 @@ _SOLUTION_BUILD = re.compile(r"^Failed to compile solution module: Failed to com
 _ERROR_LINE = re.compile(r"(?m)^(error: |\u2716 )")
 _DEP_OOM = re.compile(r"Failed to compile modules? .*exited with code 137", re.S)
 _UNPROVED = re.compile(r"Imported platform theorems must be Proved")
+_PLATFORM_BLOCK = re.compile(r"Source too large for import parser")
+IMPORT_SOURCE_CAP = 1048576   # bytes: the import parser's cap on each imported source (q361)
 _HEART = re.compile(r"\(deterministic\) timeout|maximum number of heartbeats")
 
 
@@ -79,6 +86,8 @@ def classify(status, error_message):
         return 'heartbeats'
     if _UNPROVED.search(m):
         return 'unproved_imports'
+    if _PLATFORM_BLOCK.search(m):
+        return 'platform_block'
     # a database drop or import-parser timeout inside a FAILED is still the platform's fault
     if _TRANSIENT.search(m):
         return 'transient'

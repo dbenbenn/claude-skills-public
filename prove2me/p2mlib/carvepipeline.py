@@ -607,6 +607,44 @@ def missing_inputs(ws, targets, defs):
     return list(dict.fromkeys(need))
 
 
+IMPORT_SOURCE_CAP = 1048576   # bytes: the platform's import parser refuses an item importing a larger source (q361)
+
+
+def platform_imports(path):
+    """The `import Definitions.X` and `import Theorems.X` modules of the file at `path` ([] when it is absent)."""
+    if not os.path.exists(path):
+        return []
+    out = []
+    for line in open(path, encoding='utf-8', errors='replace'):
+        m = re.match(r'import\s+((?:Definitions|Theorems)\.\S+)', line)
+        if m and m.group(1) not in out:
+            out.append(m.group(1))
+    return out
+
+
+def oversized_imports(ws, modules, cap=IMPORT_SOURCE_CAP):
+    """[(module, bytes, chain)]: each workspace file in the Definitions/Theorems import closure of `modules` (module
+    names, e.g. Definitions.Def_X, Theorems.Thm_Y) larger than `cap` bytes, with the import chain that reaches it.
+    q361 (2026-11-13): the import parser refuses every submission whose imports include a source over 1 MiB ("Source
+    too large for import parser: 1425670 bytes (max 1048576)"), the comparator bundle Def_EditApproximation, so no
+    bundle, statement or proof of that carve could be published; it surfaced after a ~2.5 h build."""
+    chain = {m: [m] for m in modules}
+    todo, out = list(dict.fromkeys(modules)), []
+    while todo:
+        m = todo.pop(0)
+        p = os.path.join(ws, *m.split('.')) + '.lean'
+        if not os.path.exists(p):
+            continue
+        n = os.path.getsize(p)
+        if n > cap:
+            out.append((m, n, chain[m]))
+        for i in platform_imports(p):
+            if i not in chain:
+                chain[i] = chain[m] + [i]
+                todo.append(i)
+    return out
+
+
 def lacking_defs(ws, targets, defs):
     """[(module, statement file)]: each Definitions import of a target's statement that `defs`, with what its
     bundles import, does not hold. q238 (2026-11): `defs` copied from a sibling carve named
@@ -1437,8 +1475,23 @@ class Pipeline:
                 raise StepFailed("step 'inputs': still not in the workspace after fetch_theorems: %s "
                                  "(published yet? see logs/inputs.log)" % ', '.join(again))
         self.check_defs('inputs')
+        self.check_import_sizes('inputs', (self.p.get('config_set') or {}).get('external_theorems'))
         if not names:
             return 'skipped'
+
+    def check_import_sizes(self, step, external=None):
+        """Stop when the targets' statements, the Def_ bundles or the external theorems import (transitively) a source
+        over the import parser's cap: the platform would refuse every item of the carve (q361)."""
+        mods = [wslib.statement_module(t)[0] for t in self.p['targets']] + list(self.p.get('defs') or [])
+        mods += [m for m in (external or {}).values() if isinstance(m, str)]
+        big = oversized_imports(self.ws, mods)
+        if big:
+            raise StepFailed(
+                "step '%s': %s over the platform's %d-byte cap on an imported source: every bundle, statement and "
+                "proof importing it is refused (\"Source too large for import parser\"; no retry or carve change "
+                "helps, q361). Ask the prove2.me admins; do not carve this goal meanwhile"
+                % (step, '; '.join('%s is %d bytes (%s)' % (m, n, ' -> '.join(c) if len(c) > 1 else 'imported directly')
+                                   for m, n, c in big), IMPORT_SOURCE_CAP))
 
     def check_closure(self, step):
         out, inside = outside_closure(self.lean_src, self.p['root_module'])
@@ -1501,6 +1554,7 @@ class Pipeline:
         json.dump(cfg, open(path, 'w'), indent=1)
         self.state['config_set_applied'] = dict(self.p.get('config_set') or {})
         self.check_def_clashes('config')
+        self.check_import_sizes('config', cfg.get('external_theorems'))
 
     def apply_auto(self, cfg):
         """What the pipeline itself set once publishing began (pipeline_state.json `auto_config`), over

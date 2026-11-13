@@ -1154,3 +1154,33 @@ def test_a_bundle_waiting_long_for_proved_imports_finds_a_stale_sketch_below_it(
     t[0] += R.STALE_BUNDLE_WAIT + 1
     r.step()
     assert r.state['piece:A.mid']['state'] in ('todo', 'inflight') and r.state['piece:A.mid'].get('recheck')
+
+
+def test_an_import_over_the_parser_cap_is_a_platform_block_not_a_compile_error(split):
+    # q361: every item importing a 1,425,670-byte comparator bundle failed so; "NEEDS A PERSON: compile_error"
+    # sent workers to fix files that had nothing wrong
+    d, cfg = split
+    big = ('FAILED', 'definition does not compile: Source too large for import parser: 1425670 bytes (max 1048576)')
+    api = FakeApi(script={'XB001': [big]})
+    r, summary = run(cfg, api)
+    assert api.posted.count(('def', 'XB001')) == 1
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['bundle:XB001']['state'] == 'stop' and st['bundle:XB001']['history'] == {'platform_block': 1}
+    log = (d / 'PROGRESS.log').read_text()
+    assert 'PLATFORM BLOCK' in log and 'compile_error' not in log and '1048576' in log
+
+
+def test_a_refused_post_over_the_parser_cap_says_platform_block(split):
+    d, cfg = split
+    msg = 'definition does not compile: Source too large for import parser: 1425670 bytes (max 1048576)'
+
+    class Refusing(FakeApi):
+        def submit_definition(self, body):
+            if body['definition_name'] == 'XB001':
+                raise RuntimeError(msg)
+            return FakeApi.submit_definition(self, body)
+    r, summary = run(cfg, Refusing())
+    st = json.loads((d / 'run_state.json').read_text())
+    assert st['bundle:XB001']['state'] == 'stop'
+    log = (d / 'PROGRESS.log').read_text()
+    assert 'PLATFORM BLOCK' in log, log

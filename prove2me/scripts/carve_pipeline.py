@@ -42,7 +42,9 @@ DIR is the carve directory. The first run needs the parameters, which are stored
                         instances that slow a development with its own instances (oaiq-122)
 
 Steps (STEPS in p2mlib.carvepipeline): fetch, inputs (the targets' published statements and their Def_
-bundles are fetched into the workspace when missing), filter_patches, port, build, wsbuild, config, graph,
+bundles are fetched into the workspace when missing; inputs and config stop when they, the Def_ bundles or the
+external theorems import, through any chain, a file over 1,048,576 bytes: the platform's import parser refuses
+every item importing it, q361), filter_patches, port, build, wsbuild, config, graph,
 extdefs, plan, gen, names (planned names already live with other text fail here, before measuring),
 order, measure, calibrate, publish_prep, prose, check_text, dryrun (split_run.py without
 --go: lookups only), and with --publish the real `split_run.py --go`. Each step is idempotent and

@@ -54,6 +54,13 @@ from . import verdicts as V
 from .mission import front_matter
 
 FINAL_JOB = {'PUBLISHED', 'FAILED', 'ERROR'}
+def platform_block_note(msg):
+    """What the log says of a verdicts `platform_block` (q361: "Source too large for import parser"), instead of
+    `NEEDS A PERSON: compile_error`: nothing in the item is wrong, and no retry helps."""
+    return ('PLATFORM BLOCK (permanent; no retry or carve change helps): an imported source is over the import '
+            'parser\'s %d-byte cap (%s); ask the prove2.me admins' % (V.IMPORT_SOURCE_CAP, (msg or '').strip()[:160]))
+
+
 TERMINAL = {'split', 'stop', 'give_up', 'raise_heartbeats'}
 RAISED_HEARTBEATS = 1000000
 STALE_PENDING_HOURS = 3
@@ -566,7 +573,7 @@ class Runner:
                        st['history'].get('own_timeout', 0)) if kind == 'own_timeout' else
                        'killed for memory %d times: carve_pipeline splits it (calibrate_pieces)' % (
                            st['history'].get('hidden', 0) + st['history'].get('dependency_oom', 0))),
-                   'stop': 'NEEDS A PERSON: %s' % (
+                   'stop': platform_block_note(st['last']) if kind == 'platform_block' else 'NEEDS A PERSON: %s' % (
                        'hidden: the platform cut the log before the error (see verdicts.py); compare a '
                        'local verifier-flags compile, then retry or split' if kind == 'hidden' else kind),
                    'give_up': 'NEEDS A PERSON: transient cap reached',
@@ -733,7 +740,8 @@ class Runner:
                     self.save()
                     continue
                 st.update(state='stop', last=str(e)[:500], sha=self.file_sha(x))
-                self.log(x, 'refused', str(e)[:200])
+                self.log(x, 'refused', str(e)[:200] + (
+                    '  -> ' + platform_block_note(str(e)) if V.classify(None, str(e)) == 'platform_block' else ''))
                 self.save()
         for i in range(0, len(stmts), BATCH):
             batch = stmts[i:i + BATCH]

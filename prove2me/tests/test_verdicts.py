@@ -56,6 +56,12 @@ CASES = [
               'Replayed Theorems.Thm_A\nwarning: Theorems/Thm_A.lean:15:6: declaration uses `sorry`\n'
               '\u2716 [8844/8844] Building Submissions.Job_d825_Sol (138s)\nerror: Lean exited with code 137\n'
               'Some required targets logged failures:\nerror: build failed', 'dependency_oom'),
+    # q361 (2026-11-13): the import parser's 1 MiB cap on each imported source (a 1,425,670-byte comparator
+    # bundle): no retry or carve change helps
+    ('FAILED', 'definition does not compile: Source too large for import parser: 1425670 bytes (max 1048576)',
+     'platform_block'),
+    ('FAILED', 'formal statement does not compile: Source too large for import parser: 1425670 bytes (max 1048576)',
+     'platform_block'),
     ('PUBLISHED', None, 'accepted'),
     (None, '<urlopen error [Errno -3] Temporary failure in name resolution>', 'transient'),
 ]
@@ -113,3 +119,8 @@ def test_a_proof_killed_for_memory_is_split_not_stopped():
     assert V.decide('dependency_oom', {'hidden': 1}, 'piece') == 'split'
     assert V.decide('hidden', {'dependency_oom': 1}, 'piece') == 'split'
     assert V.decide('hidden', {'hidden': V.HIDDEN_CAP}) == 'stop'          # a bundle or statement: a person
+
+
+def test_a_platform_block_is_never_retried():
+    assert V.decide('platform_block', {}) == 'stop'
+    assert V.decide('platform_block', {}, 'piece') == 'stop'
