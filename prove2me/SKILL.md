@@ -1036,8 +1036,9 @@ as real modules, then one stage module per stub group with each stub an `alias` 
 with `merge.py` (q188: 5,073 lines passed `prune_solution.py --check` first time;
 strong-convergence-mission `proofs/exists_linearization/final/`).
 
-Stacking one assembled Blueprint on another (q159's `pbr` over `parab`) is still by hand: its
-stubs from the other Blueprint are kept with a warning.
+A Blueprint may stack on another (q284): list the inner Blueprint's Parts on the command line too,
+and the inner one is assembled first with its stubs aliased to them. A Part namespaced outside
+`<Blueprint namespace>.Part<X>` is refused or warned about by name (q353).
 
 Placing a Part's chunks by position fails in both directions. A helper defined before a
 late-stubbed target can be used by an early one, and a helper can mention a definition that the
