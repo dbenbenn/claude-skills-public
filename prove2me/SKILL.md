@@ -969,8 +969,8 @@ the first retry, many at 300–2,000 lines a stub where the record had estimated
 - **Search prove2.me for the prerequisite and for its textbook ingredients**, by their standard names and
   by any namespace whose hits look related. q188: Arveson and Wittstock were already Proved. q210: the
   approximate functional equation was there as Riemann–Siegel (`RSInt`). q310, q340, q291: minimax
-  (`AGT.zero_sum_minimax`), hypergraph Ramsey, the Jordan curve theorem, invariance of domain and
-  Janiszewski; for any planar step, also the disk-crossing lemma `RepellingPairs.walks_meet_of_cyclicallyOrdered`
+  (`AGT.zero_sum_minimax`), hypergraph Ramsey, the Jordan curve theorem, invariance of domain,
+  Janiszewski, and the Riemann mapping and Carathéodory–Torhorst theorems (q363); for any planar step, also the disk-crossing lemma `RepellingPairs.walks_meet_of_cyclicallyOrdered`
   (q355). q190: teorth/expdb ports for analytic number theory. Search two more places: the paper itself
   for its authors' own Lean ("Lean", "formaliz", "github", "code availability"; q345, q351), and the
   solutions of Proved neighbours (`GET /submissions/:id/solution`) for an internal lemma stronger than
