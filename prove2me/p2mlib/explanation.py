@@ -9,13 +9,22 @@ import re
 
 PRON = re.compile(r'(?<![\w-])(he|him|his|she|her|hers)(?![\w-])', re.I)
 CODE = re.compile(r'`[^`]*`|\$\$.*?\$\$|\$[^$\n]*\$', re.S)
+FENCE = re.compile(r'^```.*?^```[ \t]*$', re.M | re.S)
 BANNED = ('elegant', 'clever trick', 'beautiful')
 MIN_CHARS = 200
 
 
 def prose_only(text):
-    """The text with code spans and math blanked out, so `hE` or $h$ is never read as prose."""
+    """The text with fenced code blocks, code spans and math blanked out, so `hE`, a Lean binder `he` in a
+    ```lean block, or $h$ is never read as prose."""
+    text = FENCE.sub(lambda m: re.sub(r'[^\n]', ' ', m.group(0)), text)
     return CODE.sub(lambda m: ' ' * len(m.group(0)), text)
+
+
+def pronouns(text):
+    """The gendered pronouns in the prose of `text`, in order. The one check every outgoing prose goes
+    through: explanations here, standalone titles and statements in publish_standalone.py (q286/q338)."""
+    return [m.group(0) for m in PRON.finditer(prose_only(text or ''))]
 
 
 def problems(text):
@@ -27,8 +36,8 @@ def problems(text):
     if '$$' not in t:
         out.append('no display math: open with the statement in a $$...$$ display')
     prose = prose_only(t)
-    for m in PRON.finditer(prose):
-        out.append('gendered pronoun %r (use the surname, "the paper" or "they")' % m.group(0))
+    for w in pronouns(t):
+        out.append('gendered pronoun %r (use the surname, "the paper" or "they")' % w)
     low = prose.lower()
     for w in BANNED:
         if w in low:

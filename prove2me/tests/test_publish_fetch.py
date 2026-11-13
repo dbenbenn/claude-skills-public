@@ -298,3 +298,43 @@ def test_names_accepts_the_module_form_of_a_bundle():
     assert F.platform_name('Def_OAIQ65Sa000') == 'OAIQ65Sa000'
     assert F.platform_name('OAIQ65Sa000') == 'OAIQ65Sa000'
     assert F.platform_name('OAI.SimpleAmenable.main') == 'OAI.SimpleAmenable.main'
+
+
+@pytest.mark.parametrize('where', ['nls', 'title', 'bundle'])
+def test_publish_refuses_a_gendered_pronoun_in_new_prose(folder, monkeypatch, where):
+    # q286/q338 (2026-11-11/12): "proves his (1.9)" and "his Theorem 2.8" went live through publish_standalone,
+    # and minutes later submit_solution's explanation check refused the same phrase; the NLs needed a PATCH
+    import p2m
+    if where == 'nls':
+        (folder / 'prose' / 't.md').write_text('---\ntitle: Lemma 1 — t\n---\n\nHuxley proves his (1.9), so it is $1$.\n')
+    elif where == 'title':
+        (folder / 'prose' / 't.md').write_text('---\ntitle: Huxley, his Lemma 1\n---\n\nIt is $1$.\n')
+    else:
+        (folder / 'prose' / 'Bun.md').write_text('---\ntitle: A bundle\n---\n\nThe bundle of her Definition 1.\n')
+    fake = FakePublisher()
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    for argv in (['publish_standalone.py', str(folder), '--dry'], ['publish_standalone.py', str(folder)]):
+        monkeypatch.setattr(PS.sys, 'argv', argv)
+        with pytest.raises(SystemExit) as e:
+            PS.main()
+        assert 'gendered pronoun' in str(e.value) and ('his' in str(e.value) or 'her' in str(e.value))
+        assert ('Q.t' if where != 'bundle' else 'Def_Bun') in str(e.value)
+    assert fake.posted == []
+
+
+def test_pronoun_check_skips_code_math_and_published_items(folder, monkeypatch, capsys):
+    # a Lean binder `he` or $h_{is}$ is not prose; an item already in published_ids.json is only verified
+    import p2m
+    (folder / 'prose' / 't.md').write_text('---\ntitle: Lemma 1 — t\n---\n\nWith `he : x = 1` and\n\n'
+                                           '```lean\nexample (he : True) : True := he\n```\n\nit is $1$.\n')
+    fake = FakePublisher()
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    monkeypatch.setattr(PS.time, 'sleep', lambda s: None)
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_standalone.py', str(folder)])
+    PS.main()
+    assert fake.posted == [('def', 'Bun'), ('thm', 'Q.t')]
+    (folder / 'prose' / 'Bun.md').write_text('---\ntitle: A bundle\n---\n\nHer bundle.\n')
+    fake.posted.clear()
+    capsys.readouterr()
+    PS.main()                                     # nothing new to check: the rerun verifies and reports
+    assert fake.posted == [] and 'MISMATCH' in capsys.readouterr().out

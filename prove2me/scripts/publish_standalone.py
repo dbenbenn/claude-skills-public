@@ -12,7 +12,8 @@ a PROSE {name: {title, nls}} dict in mission.py is read only to verify a folder 
 backslash into five Lusin-Novikov statements). Also and optionally DEFINITIONS [{name, title, nls, page, result[,
 extra, tags]}] with code in DIR/lib/Def_<name>.lean, published first; DIR/lib/Thm_<name>.lean holds the statement (imports, then
 the namespaced `theorem … := by sorry`). Already-published names (published_ids.json) are skipped,
-so a rerun only verifies. Generalised 2026-09-30 from the per-folder publish.py of
+so a rerun only verifies. Before anything is sent (and under --dry), a new item's title or statement with a
+gendered pronoun is refused, by the check submit_solution.py runs on explanations (q286, q338). Generalised 2026-09-30 from the per-folder publish.py of
 p2m-standalone/t-finitely-presented and grigorchuk-growth.
 """
 import json, os, sys, time
@@ -29,6 +30,25 @@ def long_titles(payloads, defs, limit=TITLE_MAX):
     out = [p['theorem_name'] for p in payloads if len(p.get('theorem_title') or '') > limit]
     out += ['Def_' + d['definition_name'] for d in defs if len(d.get('definition_title') or '') > limit]
     return sorted(out)
+
+
+def pronoun_hits(payloads, defs, ids):
+    """`name field: 'his', ...` for each new item (not in published_ids.json) whose title or natural-language
+    statement has a gendered pronoun, by the check submit_solution.py runs on explanations
+    (p2mlib.explanation.pronouns). q286 and q338 (2026-11-11/12) published "proves his (1.9)" and "his
+    Theorem 2.8" here, and the explanation check refused the same phrase minutes later."""
+    from p2mlib.explanation import pronouns
+    out = []
+    items = [(p['theorem_name'], p['theorem_title'], p['natural_language_statement']) for p in payloads]
+    items += [('Def_' + d['definition_name'], d['definition_title'], d['natural_language_statement']) for d in defs]
+    for name, title, nls in items:
+        if name in ids:
+            continue
+        for field, text in (('title', title), ('statement', nls)):
+            ws = pronouns(text)
+            if ws:
+                out.append('%s %s: %s' % (name, field, ', '.join(repr(w) for w in ws)))
+    return out
 
 
 def main():
@@ -85,10 +105,14 @@ def main():
     long = long_titles(payloads, defs)
     if long:
         sys.exit('title over %d characters: %s' % (TITLE_MAX, ', '.join(long)))
-    if '--dry' in sys.argv:
-        return
     ids_path = os.path.join(here, 'published_ids.json')
     ids = json.load(open(ids_path)) if os.path.exists(ids_path) else {}
+    hits = pronoun_hits(payloads, defs, ids)
+    if hits:
+        sys.exit('gendered pronoun in the prose of a new item (use the surname, "the paper" or "they"):\n  '
+                 + '\n  '.join(hits))
+    if '--dry' in sys.argv:
+        return
 
     def wait(job_id):
         while True:
