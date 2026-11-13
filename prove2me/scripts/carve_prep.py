@@ -191,13 +191,16 @@ def bundle_constants(ws, defmods):
     """bundle_names, plus, for a bundle with an anonymous instance, every constant Lean lists for
     it: an anonymous instance's name is Lean's to generate (DiamondDistortion 2026-10-19: the
     published bundle's `instance : Nonempty T.Family` is SegmentSystem.instNonemptyFamily, which
-    the port also declares)."""
+    the port also declares). A `deriving` clause or `deriving instance` command names its instances
+    the same way (q361: Def_EditApproximation's instDecidableEqTargetInterval, re-derived in our
+    bundle, broke simp lemmas over the published instance)."""
     ext = {}
     for m in defmods:
-        names, anon = O.bundle_decl_names(open(os.path.join(ws, *m.split('.')) + '.lean', encoding='utf-8').read())
+        text = open(os.path.join(ws, *m.split('.')) + '.lean', encoding='utf-8').read()
+        names, anon = O.bundle_decl_names(text)
         for n in names:
             ext[n] = m
-        if anon:
+        if anon or re.search(r'\bderiving\b', text):
             for n in lean_constants(ws, m):
                 ext.setdefault(n, m)
     return ext

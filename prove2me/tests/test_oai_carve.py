@@ -247,6 +247,32 @@ def test_ext_defs_ask_lean_for_a_bundle_with_anonymous_instances(tmp_path, monke
     assert names == {'X.f': 'Definitions.Def_A', 'X.instNonemptyNat': 'Definitions.Def_B'}
 
 
+
+def test_ext_defs_ask_lean_for_a_bundle_with_deriving(tmp_path, monkeypatch):
+    # q361 (2026-11-13): Def_EditApproximation's `deriving instance DecidableEq for TargetInterval`
+    # generates instDecidableEqTargetInterval, which the source parse cannot see; missing from
+    # external_defs, the port's copy was re-derived in our bundle, and simp lemmas stopped matching
+    ws = tmp_path / 'ws'
+    (ws / 'Definitions').mkdir(parents=True)
+    (ws / 'Definitions' / 'Def_A.lean').write_text('namespace X\ndef f : Nat := 1\nend X\n')
+    (ws / 'Definitions' / 'Def_B.lean').write_text(
+        'namespace X\nstructure T where\n  a : Nat\n\nderiving instance DecidableEq for X.T\nend X\n')
+    (ws / 'Definitions' / 'Def_C.lean').write_text(
+        'namespace X\ninductive U | a | b\n  deriving DecidableEq\nend X\n')
+    asked = []
+
+    def fake(ws_, m):
+        asked.append(m)
+        return {'Definitions.Def_B': ['X.T', 'X.instDecidableEqT'],
+                'Definitions.Def_C': ['X.U', 'X.instDecidableEqU']}[m]
+    monkeypatch.setattr(CP, 'lean_constants', fake)
+    names = CP.bundle_constants(str(ws), ['Definitions.Def_A', 'Definitions.Def_B', 'Definitions.Def_C'])
+    assert asked == ['Definitions.Def_B', 'Definitions.Def_C']
+    assert names['X.instDecidableEqT'] == 'Definitions.Def_B'
+    assert names['X.instDecidableEqU'] == 'Definitions.Def_C'
+    assert names['X.f'] == 'Definitions.Def_A'
+
+
 # ---------------------------------------------------------------- patches, counted as the port sees them
 
 TENSOR = ('import Mathlib\n\nnamespace OAI.Fam\n\ntheorem t (x : M ⊗[R] N) : f x = 0 := by\n'
