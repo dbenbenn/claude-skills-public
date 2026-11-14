@@ -1029,7 +1029,9 @@ the first retry, many at 300–2,000 lines a stub where the record had estimated
   scaling symmetry), write its exact recursion or rescaling first. q218: an eigenfunction gave Puder's
   cogrowth bound; q341: a supersolution of the exact local recursion bounded a growth rate above, and
   the same function truncated was the Rayleigh test function below. q207: rescaling made every
-  stationary-phase integral one constant.
+  stationary-phase integral one constant. T38 (2026-11-14): a universality theorem (BvH Cor 2.17) applied to
+  bounded summands with ‖X‖² ≈ ‖EX²‖ needed only a Lindeberg swap on tr(1+θM/n)ⁿ against the Gaussian of equal
+  covariance, whose norm bound was already Proved (`GaussianMatrix.sudakov_fernique`); two parked papers bypassed.
 - **Do the estimates fed in have structure a crude substitute can use?** q163: layer-cake interpolation
   instead of Riesz–Thorin. q208: a truncated Taylor series in log(n/N) instead of a smooth-cutoff Fourier
   step. Record the substitute in the Blueprint docstring.
