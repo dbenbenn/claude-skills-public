@@ -21,7 +21,9 @@ Meanwhile `discover.md` had documented `GET /submissions/:id/solution` since Jul
 **Sync the rulebook to head at the start of every session**, before reading it:
 `scripts/sync_workspace.py`.
 - It fetches, lists the incoming platform releases, saves the incoming diff of `references/` and
-  `SKILL.md` for you to **read**, and fast-forwards.
+  `SKILL.md` for you to **read**, and fast-forwards. Tell the human about any changed rule.
+- It prints `workspace_audit.py`'s summary of untracked workspace files: read its list before
+  deleting anything there. `Solutions/OAI*` is the OpenAI ports' only source tree; never clean it.
 - It then runs the live read-only contract tests (`tests/test_live_contract.py`), which pin the
   API assumptions that once broke scripts. Running them here means they never depend on
   remembering.
@@ -69,12 +71,15 @@ measurements behind the audit rules).
    "an informed decision, including what you think the best answer is"). For every row, first
    *research* it: the quoted sentence and its context on the page image, the auditor's full
    coverage note (near-misses, a suggested direct form), and the cited paper when the finding
-   turns on what a citation says. Then: (1) **fix** what a standing rule already decides --
-   restating to match the source, a provable typo -- re-read-back and re-audit, and cite the rule
-   on the `decided:` line; (2) bring **only the genuine choices** to the human, **one at a time,
-   each self-contained**: the quote, what the Lean says, what the auditor is unhappy about in
-   plain words, what the research found, the options, and the recommended answer with reasons,
-   naming the file rows it covers (section heading + id; never invented labels or merged
+   turns on what a citation says (fetch it, keep its page images, quote it in the proposal; a
+   precedent from another mission is weaker evidence). Then: (1) **fix** what a standing rule
+   already decides -- restating to match the source, a provable typo -- re-read-back and re-audit,
+   and cite the rule on the `decided:` line; a rival reading of an "is similar" or "analogously"
+   sentence under which it would be false is likewise decided *keep*, since such a sentence gets
+   the reading that makes the argument correct (dbenbenn, 2026-10-05); (2) bring **only the
+   genuine choices** to the human, **one at a time, each self-contained**: the quote, what the
+   Lean says, what the auditor is unhappy about in plain words, what the research found, the
+   options, and the recommended answer with reasons, naming the file rows it covers (section heading + id; never invented labels or merged
    counts); (3) give the human a **summary list of the findings fixed directly** under (1) -- each with
    the finding, what changed, and the rule -- and list the rest (carried by a named sibling,
    unformalizable history) for skimming (dbenbenn, 2026-10-02: "I like the idea of seeing a
@@ -99,6 +104,19 @@ measurements behind the audit rules).
 While a task list has an unblocked item, keep going; report progress without stopping. Ask the
 human only at the decision points marked in the expansions: the item list, the gap review
 (6b), the split into missions, deletions, and anything the docs call irreversible.
+
+**Standing permissions** (dbenbenn's; act, then report in a line). Disproofs, restating to match the
+source, a mission's repo, stale live text and the paper's own Lean sit with their steps; the rest:
+- submit any proof we have, including another route to a proved theorem (2026-10-02; Expansion 10's
+  meaningfully-different rule still applies);
+- publish a new statement that a reduction needs (a cited result in full as its Open leaf) and
+  submit the reduction, never a HOLD (2026-11-06); linking it as a milestone follows earlier
+  milestone decisions;
+- deprecate theorems, definitions and submissions, since deprecation is reversible, always with a
+  reason naming the replacement (2026-10-16);
+- port other users' published proofs to our Mathlib and publish or submit them, crediting the authors
+  and ids in every `source` and explanation (2026-10-08);
+- merge a pushed, stable mission branch into main (fast-forward via `gh api`, never force; 2026-09-26).
 
 ## The double-check list
 
@@ -270,7 +288,8 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   is read as: define the *goal's* objects operationally, and introduce every symbol the
   description itself uses before using it; it is not a restatement of the definitions bundle.
   Milestone-only notions get a sentence each; their precise definitions live in the bundle's and
-  the milestones' natural-language statements (dbenbenn, 2026-09-30).
+  the milestones' natural-language statements (dbenbenn, 2026-09-30). Trim Setting, never a dated
+  research timeline, when the description runs past the word guideline (same day).
 - Backticked Lean names in the prose must be live: `draft.py verify` resolves every backticked
   head name (`Monod.H ⊥` -> `Monod.H`) against the mission's declarations, `#check` with its
   imports, and the platform, and reports a renamed or removed name as BAD. It looks every
@@ -323,9 +342,11 @@ description.
 theorem from elsewhere that Mathlib lacks, keep the result as a milestone and add the external
 theorem as its own milestone (or a reference item if it is already published), stated faithfully
 from *its* source in the form the paper applies, and say in the description that it is cited,
-not proved. Scope the mission by the paper, not by Mathlib. Exclude only what cannot be *stated*
-without a missing definition. (dbenbenn, 2026-09-17: a milestone naming a missing external
-theorem "will just give more motivation for people to add those external theorems.")
+not proved. Scope the mission by the paper, not by Mathlib: missing library support changes the
+effort, never the scope, so argue scope from how central a claim is to the paper (dbenbenn,
+2026-11-05). Exclude only what cannot be *stated* without a missing definition. (dbenbenn,
+2026-09-17: a milestone naming a missing external theorem "will just give more motivation for
+people to add those external theorems.")
 
 Which result is the goal is the author's call before it is ours: read the introduction for the
 sentence in which the paper says what it shows ("More precisely, we will show that…"). The most
@@ -335,8 +356,11 @@ mission's theorem is not a goal for this one.
 ## Expansion 1 — the source
 
 Keep the PDF, a diffable text extraction, and the repository from day one: the human audits the
-primary source and wants a copy that diffs. Project Euclid serves old journals at the article
-path with `.pdf` in place of `.full`; its Download endpoint returns a bot page.
+primary source and wants a copy that diffs. Each mission gets its own private repo,
+`dbenbenn/<mission>`, created without asking (dbenbenn, 2026-10-29); work outside a mission goes
+in a folder of `p2m-standalone`, never a new repo (2026-09-25). Project Euclid serves old
+journals at the article path with `.pdf` in place of `.full`; its Download endpoint returns a bot
+page.
 
 **Render the pages and read them.** `pdftotext` of a scanned 1960s–80s journal turns `≥` into
 `>`, `α` into `a`, drops subscripts and splits displays. On one mission the goal was written
@@ -377,7 +401,8 @@ names) for the goal and the named results. Registrations are frozen snapshots, n
 grep: GitHub code search rate-limits after a few queries. A hit is prior art to credit in the
 description, and sometimes a reason not to run the mission; an arbitrary GitHub repository found
 along the way is less salient. Garrido II was designed without this step, and the Banach–Tarski
-paradox turned out to be formalized already in a Lean Pool candidate.
+paradox turned out to be formalized already in a Lean Pool candidate. These sites are search
+sources only: never mirror a mission to GitHub to register it there (dbenbenn, 2026-09-24).
 
 The platform carries a large layer of auto-generated theorems with private definition bundles and
 no source text (one account uploaded twelve percent of the catalogue in a week, one stub per
@@ -472,7 +497,9 @@ prove it contains nothing else (the set is already a subgroup), which is the cla
 implicitly. Give every object the source names a definition of its own (Monod's $G$ and $H$ were
 first only `G ⊤` and `H ⊤`), and state any identification the source makes ("$H = H(\mathbf{R})$")
 as a milestone rather than a docstring. dbenbenn: make the bundle agree with the source as closely
-as possible.
+as possible. Keep the source's notion even when a library one would let proofs be reused, and
+bridge the two with a milestone: a deep Open milestone that states the source accurately is what
+p2m exists for (dbenbenn, 2026-10-01, Lodha–Moore).
 
 **A sentence that introduces notation gets a bundle definition whose type carries the sentence's
 assumptions, and the statements use it wherever the source does.** Notation packs claims: Garrido
@@ -550,8 +577,14 @@ span, which the published conclusion omitted, so the goal could not import it). 
 hides the order (Tao 1999, oaiq-111: Lemma 3.2's `C₀` stated after `α` could blow up as `α → 0`, so Theorem
 1.2 did not follow from it; the uniform form `∃ C₀, ∀ α, …` was published and the printed form reduced to it).
 
+**Add a hypothesis only once a counterexample proves it is needed** (dbenbenn, 2026-10-03, CFW
+Corollaries 12–13). When a sentence fails under a strict reading, look first for a reading of the
+source's own slack ("up to a null set", "a.e.") under which it holds, and build that into the
+definitions; present the strict reading with its counterexample beside the generous one with a
+proof sketch, and recommend the generous one unless it fails.
+
 **A printed formula that Lean can express is stated as printed, never "generously".** The generous
-reading (dbenbenn, "conditions only when proven needed") is for a hypothesis the print omits, not for
+reading is for a hypothesis the print omits, not for
 replacing a formula the print gives with a safer one. A real cube root of a possibly negative quantity is
 `Real.sign s * |s| ^ (1/3 : ℝ)`, not `|s| ^ (1/3 : ℝ)`. Guth–Maynard's Proposition 4.6 first shipped
 $|\sum I_m|^{1/3}$ with a note that the print "presupposes" a sign, and dbenbenn caught it in review
@@ -761,9 +794,15 @@ and PATCH them through the milestones endpoint with an echo check.
 
 **Natural-language statements say what the Lean says**, written from the declaration in front of
 you and not from a sibling: what it asserts, where it is stronger or weaker than the source,
-which hypotheses the source does not state. Describe; never assert a hypothesis is necessary
-without a witness. **One home per fact**: the statement's fine print in the NL, the role and the
-route in the milestone; a milestone may name its conclusion in one orienting clause. Milestones
+which hypotheses the source does not state. **A mathematical claim in our own prose** (notes,
+descriptions, decisions: that a printed sentence fails, two readings agree, a hypothesis is needed)
+**links to a Lean proof** -- a milestone, a printed-fails item, a published lemma -- or is cut;
+remarks about the text itself (a misprint, which page defines what) need none (dbenbenn,
+2026-10-04). **One home per fact**: the statement's fine print in the NL, the role and the
+route in the milestone; a milestone may name its conclusion in one orienting clause. A shared
+definition's reading, ambiguity or counterexample is discussed once, in the bundle's note; a
+statement's note covers only its own deviations, and a caveat audit's "definition-level gap not
+disclosed in this statement" is not a defect (dbenbenn, 2026-10-01). Milestones
 are read standalone, so "the previous milestone" is broken for the actual reader.
 
 **Titles are claims.** A substituted verb ("vanish" for "is the identity") and a conjunction
@@ -822,6 +861,7 @@ page's Missions card; `tracker.py add KEY --proposal ID --repo DIR --memory FILE
 own `--after-submit` and `--after-approval` tasks: its readings package, its queue groups, its pending
 live fixes). The human then sees Submit, publishing and review on the card and starts the after-Submit
 and post-approval steps there with one click, instead of telling a session that the mission moved.
+A step done by hand is marked `tracker.py done KEY STEP`, so the card stops offering it.
 
 The human confirms each draft item on the platform and clicks Submit. **Submit is asynchronous**:
 one publish job per item, compiled one at a time in `item_order` (about two minutes per theorem
@@ -863,7 +903,9 @@ in the browser, for each non-reference item in the listed order, `POST
 `compiling` and abandoned after 20 minutes; then `POST /mission-proposals/:id/launch`. A job
 PENDING longer than 20 minutes (Lodha–Moore: 20–50) therefore shows "Compile failed" or "Failed to
 fetch" while the server job carries on, and each item needs a re-click; published items turn into
-references and are skipped. Tell the human this rather than reading the failure as a compile error.
+references and are skipped. Tell the human this rather than reading the failure as a compile error,
+and suggest `~/claude/claude-private/tools/p2m_submit.py PROPOSAL_ID`, which makes the same calls
+without the 20-minute cap; the human runs it, never you.
 The failed attempt need not stay visible in `/publish-jobs` (Moore M24, 2026-10-02: only the
 re-queued PENDING job was listed). What the captain can do is tell transient from real: run
 `scripts/check_server_shape.py MISSION_DIR NAME` on the failed item. It compiled in 3 s locally, so
@@ -880,6 +922,10 @@ together all had verdicts within 15 minutes, against about 13 minutes per verdic
 - The run ends by listing everything that needs attention.
 - `--build-only` (then `edge_audit.py --local`, then a plain run) is the order when the proofs use
   one another.
+
+Whoever submits a proof, by any route, watches it to its verdict (no routine does), and fixes and
+resubmits a real rejection (dbenbenn, 2026-10-06). After `--replaces`, confirm the old submission's
+`deprecated_at`: two stale sketches once stayed live behind an unread "STOPPED … undone" line.
 
 **Every proof carries an explanation**, written before it is submitted:
 `MISSION_DIR/explanations/<name>.md`, in prove.md's format.
@@ -1121,7 +1167,9 @@ Otherwise the entry is overwritten, or the statement is submitted twice.
 
 **A script that has had a bug is tracked and reused.** Every per-mission copy of a job carried its
 own defects, and each fix stayed stranded in one repo. When a one-off script needs a fix, or the
-same job is about to be written a second time, it moves into `scripts/` here.
+same job is about to be written a second time, it moves into `scripts/` here. A finished mission's
+repo is archived: leave it alone even when an audit finds a bug there, and work on copies of its
+files elsewhere (dbenbenn, 2026-09-24).
 
 **The platform serves every submission's Lean source.** `GET /submissions/:id/solution` returns
 `content`, the exact `solution.lean`, for any submission, other users' and failed ones included.
@@ -1195,7 +1243,9 @@ read the live copy from `GET /missions?limit=…`, not from the proposal. `GET
 launch is fixed by publishing a corrected statement and relinking with `PATCH /milestones/:id`
 and a `reason`, never by softening the description. `DELETE` on a milestone cascades its history
 with no undo: archive first, confirm with the human. Mission pages are addressed by URL-encoded
-name; the id form renders "doesn't exist" while answering 200.
+name; the id form renders "doesn't exist" while answering 200. Out-of-date live text (a proved item
+still called open, a stale route) is fixed without asking (dbenbenn, 2026-10-06), keeping
+before/after copies in `p2m-standalone/maintenance/`; that covers text, not new milestones or relinks.
 
 **Milestones added post-launch** go through `POST /submit-problem`, immediate and with no
 read-back field, so the blind read-back runs before the POST and the repo keeps it.
@@ -1206,9 +1256,10 @@ the session wrote (copy them out of the job scratch directory before it disappea
 inputs as evidence, never bulk-edited (`chmod` both the files and the directory: `sed -i` needs
 the directory writable, a redirect needs the file). Render prose fields to markdown so edits diff.
 
-**Lessons go here, not into memory.** Process rules belong in this file, in the public skills
-repo, committed and pushed in the same turn; memories hold the human's preferences and the state
-of live work. When a mission teaches something, edit the algorithm, the list or an expansion.
+**Lessons go here, not into memory.** Process rules and the human's standing permissions belong
+in this file, in the public skills repo, committed and pushed in the same turn; memories hold only
+generic preferences and the state of live work. When a mission teaches something, edit the
+algorithm, the list or an expansion.
 Headless queue workers do not edit this file or `references/`: they file lessons in the lessons
 inbox (`p2m-standalone/openai-ports/lessons-inbox`), and `sync_workspace.py` counts what is
 waiting. Triage each one at the next opportunity: merge it into the rule it belongs to, make it
@@ -1230,6 +1281,10 @@ is wrong; verified against the API). Two paths reach publish: `POST /submit-prob
 every draft field is editable, statements included. Do not carry over the belief that a drafted
 statement is committed. Get the statement right before publishing, not the proof; verify
 mechanically that the published statement matches the repo's.
+
+**Never rename, move, delete or reuse the name of a repo that published items link into.** GitHub
+redirects a renamed repo only until another takes the old name. Grep the mission's live JSON for the
+URL first; a public release gets a new repo name (QFS, 2026-09-28: `quadratic-forms-sobolev-lean`).
 
 ## The variant trap
 
@@ -1313,6 +1368,7 @@ Failures that no local build reproduces. The detail and the case behind each is 
 | `SORRY` on a carved piece whose local `#print axioms` is clean | The server could not elaborate it (an unknown identifier, say). Compile the *submitted* source against the published bundles before resubmitting (oaiq-120). |
 | "Module compilation timed out" | A cold worker building imported bundles. Retry unchanged, never split, unless an imported *statement* module takes over about 90 s locally (`lean -o`): then every importer fails, and the statement needs restating (its large sides as `abbrev`s in a bundle). |
 | `whnf` heartbeat timeout on the server only | A `rfl` proof: rewrite it without the deep unfolding. A definition: `set_option maxHeartbeats 1000000 in`. |
+| Publish: "formal statement does not compile: … Unknown constant `<name>`", local compile clean | A `namespace` command in the *preamble* (2026-10-14). Keep the preamble to imports, `open` and `variable`; put `namespace … end` in `formal_statement`, or name the theorem fully qualified. |
 | "Source too large for token scanner" | The 1 MiB cap. Split into published statements; a disproof cannot import, so golf it. |
 | "Source too large for import parser" | An imported published bundle is over 1 MiB. No remedy on our side: ask the admins. |
 | `dependency_oom` ("Lean exited with code 137") | Heavy computations in bundles a piece imports together; see `references/openai-ports.md`. |
@@ -1345,7 +1401,7 @@ comparison tool, not the mathematics.
 **Every accepted submission adds its own sketch node**, edges running
 `child -> sketch-<submission_id> -> parent`. Resubmitting a cleaner proof therefore *adds* a
 decomposition beside the old one, and the old edges stay visible until that submission is
-deprecated. Decide deprecation with the human *before* resubmitting a rewired proof, then
+deprecated. Decide deprecation (ours to decide) *before* resubmitting a rewired proof, then
 `scripts/deprecate.py --keep NEW_SID OLD_SID… [--go]`. Deprecating a superseded reduction is safe
 when the new one is a superset, and the way to know is the frontier: record
 `GET /theorems/:id/open-leaves` before submitting and compare after deprecating. A reduction is the
@@ -1417,14 +1473,19 @@ are hypotheses: verify each against the source before fixing it.
 
 Ports of openai/math proofs have their own reference, `references/openai-ports.md`: the
 single-file route, carving with `scripts/carve_pipeline.py`, the compatibility shims and the
-Mathlib drift between OpenAI's Mathlib and ours. Read it before any port. Three rules hold even for
+Mathlib drift between OpenAI's Mathlib and ours. Read it before any port. Four rules hold even for
 a one-off: search prove2.me for the goal and each named result before publishing anything;
-submit a port as it is before optimizing it; and never copy a skill script into a job directory
-or write a job-dir driver, since every private copy has drifted from the shared fixes.
+submit a port as it is before optimizing it; never copy a skill script into a job directory
+or write a job-dir driver, since every private copy has drifted from the shared fixes; and a named
+theorem a proof establishes inside itself (Brown's F∞ criterion, Brunn–Minkowski) is published as
+its own statement, proved, and imported, unless Lean blocks a reusable statement, already-accepted
+proofs included (dbenbenn, 2026-10-18).
 
 ## Contributing outside a mission
 
-Almost every existing mission milestone is proved; the productive seams are milestones whose
+Open items on other users' missions are fair targets: prove or disprove them as readily as our own,
+crediting any outside source (dbenbenn, 2026-10-07; `mission_solver.md`). Almost every existing
+mission milestone is proved; the productive seams are milestones whose
 linked theorem is `Disproved` through an encoding accident (`ConvexCone` need not contain `0`,
 `AffineSubspace` may be empty), repaired by publishing the corrected statement and asking the
 captain in the mission discussion to relink, which takes about a week; and infrastructure that is

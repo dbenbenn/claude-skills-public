@@ -75,7 +75,8 @@ a pristine tree (`git archive <sha> | tar -x -C tmpdir`), selected by an env var
 reachable from a `def`'s body — typically because the definition is built by `.choose`
 from an existence lemma — lives *inside* that bundle. Publishing it under its own name
 fails with "has already been declared". Publish a restatement under a new name instead
-(`ref_cones_paper`), proved from the bundled one in a line.
+(`ref_cones_paper`), proved from the bundled one in a line. For a new bundle, publish the theorem
+first: a bundle may import `Theorems.Thm_*`, but only theorems already Proved when it is submitted.
 
 **Structure accessors share the structure's span.** A `Prop`-valued field of a
 structure is a theorem whose declaration span *is* the structure's. Inlining one

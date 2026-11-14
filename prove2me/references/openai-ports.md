@@ -182,6 +182,9 @@ and how to repair it.
     `StdSimplexTopCompat` is published likewise as `Definitions.Def_OAIStdSimplexTopCompat` (42fe481c, same
     folder; its text is `oaiport.stdsimplex_top_shim()`, importing the first bundle) and used the same
     way once in the workspace.
+- **Drift that a second port hits gets one reusable layer** (dbenbenn, 2026-10-24): a shim, an
+  automatic port rewrite with tests, and its own standalone bundle where items need it; never
+  per-port patches. Diagnose it against our Mathlib first (StdSimplex: 0df444a has the structure).
 - **A Mathlib definition that changed shape wants a shadowing shim**, not per-site patches (q141:
   `UnifIntegrable`, `UniformIntegrable`, `UnifTight` at about 260 sites). Write a module under `OAI`
   with d13f23b's shape and its API proved from ours: inside `namespace OAI`, `OAI.X` wins over `open
@@ -493,6 +496,9 @@ its target `<name>_oai`.
   in which a bundle or piece rests on `sorry`, or a forced `instance` command (its stub would hold no
   theorem: patch it to `@[instance] theorem` in the port; f480e83, q241). A published bundle is frozen (`frozen` in the config), so a
   later re-plan keeps it as it is.
+- **A locally verified bundle, statement or piece is frozen too** (dbenbenn, 2026-10-17): a carver fix
+  aimed at later items regenerates into scratch and copies over only unverified files, unless the plan
+  changes that item (Erdős 3 v2: a fix for two statements rewrote three verified bundles).
 - **Measure before publishing.** Build every bundle locally (`-j1`), re-pack any over budget, and only
   then publish; never re-carve published bundles while publishing (the first Erdős 3 split did, and two
   published chains re-declared 169 names; archive `p2m-standalone/openai-erdos3-split-v1`).
@@ -696,6 +702,9 @@ mixed old and new `carve.py` inside one carve).
   the records, write a self-contained wrap-up brief, hand the wait to the machine's hand-off service if it
   has one (the brief names it), and exit; a fresh agent does the wrap-up. Keep `--wait` for build and
   measuring, where a failure needs you soon.
+- **After a reboot**, `carve_resume.py` (at boot) resumes each detached carve whose run ended without a
+  driver exit; read its log before restarting a carve by hand, and `touch NO_RESUME` in a carve stopped
+  on purpose.
 - **The carve's own section on the monitoring page.** The driver publishes `carve-<hash>`
   (p2mlib.carvemonitor: step, steps done, modules built, items measured and live, processes), refreshed
   every minute, and marks it done or failed with the reason; `split_run --go` keeps the counts current

@@ -390,6 +390,13 @@ Mathlib's `IsFreeGroup` generators come from `Classical.choose`, so Nielsen–Sc
 elements a subgroup's basis contains (primitivity, free factors). Reuse the explicit-basis rewrite
 (`actionFree`, `endBasis`) in strong-convergence-mission `proofs/isPrimitiveIn_of_isPrimitiveIn_top/PartB.lean` (q216).
 
+## An inline structure literal that hangs at `whnf`
+
+A structure or instance written inline (`where`, `{ … }`, `⟨…⟩`) over a type with a heavy instance
+hierarchy (`MonoidAlgebra R D`, `D` abstract) can time out at `whnf` past 4M heartbeats while each
+field, as its own top-level lemma with an explicit type, compiles in milliseconds. Prove the fields
+as lemmas first, then assemble from their names; raising `maxHeartbeats` does not help.
+
 ## Kernel checks over concrete data
 
 **Symptom:** a `decide +kernel` proof over a literal table compiles locally but peaks at 8–21 GiB, over

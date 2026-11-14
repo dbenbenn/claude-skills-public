@@ -29,7 +29,8 @@ with no arguments.
   block above a command with it, and re-creates a command's scope anywhere (`scope_wrap`).
 - **A bug is a test first.** A known bug lands as a strict xfail, with a check that the regression
   test fails on the pre-fix code. A change to shared tooling is run against a real corpus before it
-  ships: every accepted Moore solution, every mission's payloads, a live mission's audit.
+  ships: every accepted Moore solution, every mission's payloads, a live mission's audit. Golden
+  files are fetched once and kept, never refetched per run; no fixture comes from a private mission.
 
 ## What LeanInfo reports
 

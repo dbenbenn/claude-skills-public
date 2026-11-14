@@ -56,7 +56,9 @@ size first from the record: a 102KB solution had been accepted, so a 70KB one is
 under synchronous elaboration, as `prune_solution.py --check` does; parallel wall time hides the cost
 (q196: 52 s wall, 126 s CPU). Since late October 77–103 s passed first time and 108–142 s timed out at
 least twice (oaiq-078, q159, q196, q209); the 66 s and 81 s timeouts of 2026-10-09/10 predate them. So over 100 s, split into published cuts before the first
-submission (dbenbenn 2026-11-08, also carvepipeline `PIECE_CAP`); under it, submit as is. Memory is a
+submission (dbenbenn 2026-11-08, also carvepipeline `PIECE_CAP`); under it, submit as is. Briefs set
+provers and packagers no time target, and each partly optimized version is submitted as it appears
+(dbenbenn, 2026-10-18). Memory is a
 separate limit (about 7 GiB peak, `PIECE_RSS_LIMIT`), and `--check` reports both. A file near both lines
 is the marginal case (q349: 99 s and 7.3 GiB timed out twice; q321: 95 s and 8 GiB passed on the retry).
 After its first timeout, trim before splitting, since a split costs a bundle and statements: profile with
