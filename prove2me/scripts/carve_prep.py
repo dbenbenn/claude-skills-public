@@ -800,15 +800,18 @@ def cmd_check_text(argv):
 NAME_CHECK_WORKERS = 4     # concurrent read-only lookups (a small pool: the platform is shared)
 
 
-def prefetch_names(lookup, keys, workers=NAME_CHECK_WORKERS, say=None, every=10.0):
+def prefetch_names(lookup, keys, workers=NAME_CHECK_WORKERS, say=None, every=10.0, save=None, save_every=300.0):
     """{(kind, name): lookup(kind, name)} for every key, `workers` lookups at a time, with a progress
     line about every `every` seconds and a last one (oaiq-088: ~110 names one at a time took 30 min
-    with no output). A failed lookup is left out (reconcile asks for it again and reports it)."""
+    with no output). A failed lookup is left out (reconcile asks for it again and reports it).
+    `save(got)`, if given, is called about every `save_every` seconds and at the end, so a run stopped
+    part way keeps its lookups (q259 2026-11-15: 18,194 lookups took 9.5 h and were saved only at the end)."""
     import concurrent.futures as cf
     import time
     say = say or (lambda m: print(m, flush=True))
     keys = list(dict.fromkeys(keys))
     got, t0, last = {}, time.time(), time.time()
+    saved = t0
     if not keys:
         return got
     say('names: looking up %d planned bundle and statement names, %d at a time' % (len(keys), workers))
@@ -822,10 +825,16 @@ def prefetch_names(lookup, keys, workers=NAME_CHECK_WORKERS, say=None, every=10.
             if time.time() - last >= every or i == len(keys):
                 last = time.time()
                 say('names: %d/%d looked up (%.0f s)' % (i, len(keys), last - t0))
+            if save and (time.time() - saved >= save_every or i == len(keys)):
+                saved = time.time()
+                save(got)
     return got
 
 
 NAMES_CACHE_HOURS = 24   # a lookup this young is reused by the next name-check (work/names_cache.json)
+# ... and a lookup that found the name live is reused at any age: a live statement or bundle is frozen and
+# keeps its name and author (q259 2026-11-15: the 24 h expiry re-asked all 18,194 names, ~2 s each, and the
+# driver sat in `names` for 9.5 h; it would have again every day). The publisher's reconcile still checks.
 
 
 def name_check(cfg):
@@ -867,19 +876,22 @@ def name_check(cfg):
     now = time.time()
     for k, n in keys:
         c = cache.get('%s:%s' % (k, n))
-        if c and now - c.get('t', 0) < NAMES_CACHE_HOURS * 3600:
+        if c and (c.get('v') is not None or now - c.get('t', 0) < NAMES_CACHE_HOURS * 3600):
             known[(k, n)] = c.get('v')
     ask = [x for x in keys if x not in known]
     if len(ask) < len(keys):
-        print('names: %d of %d from the lookups of the last %d h' % (len(keys) - len(ask), len(keys), NAMES_CACHE_HOURS),
-              flush=True)
-    got = prefetch_names(lambda k, n: live.existing(k, n), ask)
-    known.update(got)
-    if cpath:
+        print('names: %d of %d from earlier lookups (live names at any age, free ones of the last %d h)'
+              % (len(keys) - len(ask), len(keys), NAMES_CACHE_HOURS), flush=True)
+
+    def save(got):
+        if not cpath:
+            return
         cache.update({'%s:%s' % kn: {'t': now, 'v': v} for kn, v in got.items()})
         tmpf = cpath + '.tmp'
         json.dump(cache, open(tmpf, 'w'))
         os.replace(tmpf, cpath)
+    got = prefetch_names(lambda k, n: live.existing(k, n), ask, save=save)
+    known.update(got)
     adopted, bad = runner.reconcile(write=False)
     if bad:
         return False, ('%d planned name(s) are live on prove2.me with other text:\n%s\nFresh names: pipeline.json '

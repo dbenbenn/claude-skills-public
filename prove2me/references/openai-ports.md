@@ -596,6 +596,16 @@ its target `<name>_oai`.
 
 These never show in the module build of the port (oaiq-085, -086, -087).
 
+- **`attribute [irreducible] f` after lemmas that unfold `f` by defeq** (q259): the attribute goes into
+  the bundle with `f`, so a piece that inlines such a lemma sees `f` irreducible and fails "Application type
+  mismatch". It fails in every piece that inlines the lemma (3,548 there), and since failures are not cached,
+  each hourly stream-split cycle recompiled about 700 of them, so publishing nearly stopped. Watch for the same
+  `FAIL ... file:line` in many pieces of `measure.log`. Patch the generated pieces (config `patches`, e.g.
+  `unfold f at h` before the defeq step); `unfold` works on an irreducible def.
+- **A healthy-looking driver can be stuck in `names`.** Before skill fix (2026-11-15), the name-lookup cache
+  expired after 24 h and was written only at the end, so a big carve re-asked every name daily (18,194 names,
+  9.5 h). Kill a driver in `names` only after its final `names: ... no clash` line.
+
 - **A `have` that states a hand-written `match`** (`have h : … (match vs with …) …; simp_rw [h]`) breaks
   when the function with the same `match` comes from a bundle: Lean shares a matcher only within one
   module (oaiq-018). Patch the generated piece (config `patches`) with a defeq congruence instead of the

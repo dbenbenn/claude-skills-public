@@ -983,6 +983,38 @@ def test_name_check_reconciles_from_the_prefetched_lookups(tmp_path, monkeypatch
     assert len(asked) == 3                                                     # stale: all looked up again
 
 
+def test_name_check_keeps_live_names_past_the_expiry_and_saves_as_it_goes(tmp_path, monkeypatch):
+    # q259 (2026-11-15): the 24 h expiry re-asked all 18,194 names (9.5 h), and a stopped run saved none of them
+    from p2mlib import splitrun as R
+    out, work = tmp_path / 'out', tmp_path / 'work'
+    (out / 'lib').mkdir(parents=True)
+    work.mkdir()
+    (out / 'lib' / 'Def_B0.lean').write_text('def b := 1\n')
+    (out / 'lib' / 'Thm_A_t.lean').write_text('theorem A.t : True := trivial\n')
+    plan = {'bundles': [{'name': 'B0', 'imports': [], 'nodes': ['b']}], 'stubs': {'A.t': {'bundles': ['B0']}},
+            'pieces': {'A.t': {'bundles': ['B0'], 'imports': []}}, 'external': []}
+    (work / 'plan.json').write_text(json.dumps(plan))
+    asked = []
+
+    class Live:
+        def existing(self, kind, name):
+            asked.append((kind, name))
+            return {'id': 'x', 'author': 'me', 'definition': 'def b := 1\n'} if kind == 'bundle' else None
+    monkeypatch.setattr(R, 'LiveApi', Live)
+    assert CP.name_check({'out': str(out), 'work': str(work)})[0]
+    cache = json.load(open(work / 'names_cache.json'))
+    for v in cache.values():
+        v['t'] -= (CP.NAMES_CACHE_HOURS + 1) * 3600
+    (work / 'names_cache.json').write_text(json.dumps(cache))
+    asked.clear()
+    assert CP.name_check({'out': str(out), 'work': str(work)})[0]
+    assert asked == [('statement', 'A.t')]                 # the live bundle is not asked again; the free name is
+    saves = []
+    got = CP.prefetch_names(lambda k, n: n, [('statement', 'a'), ('statement', 'b')], say=lambda m: None,
+                            save=lambda g: saves.append(dict(g)), save_every=0.0)
+    assert got == {('statement', 'a'): 'a', ('statement', 'b'): 'b'} and len(saves) == 2 and saves[-1] == got
+
+
 # ---- the verifier elaborates synchronously (q128, 2026-10-30) -----------------------------------
 # Bundles OAIQ023F039 and F028 measured clean with plain `lean -j1 -DautoImplicit=false`, and the verifier
 # timed out at `«abstract nested proofs»`; with `-DElab.async=false` the same files failed locally as on the
