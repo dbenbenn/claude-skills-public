@@ -1027,8 +1027,15 @@ Profile before forcing or splitting anything.
   re-plan's new statements wait for `measure_pieces` (its CoeT check) before the publisher posts them
   (2f6bb06).
 - **Platform lexer timeouts** ("Token scanner timed out after 10s", "Import parser timed out after 5s")
-  are platform load and retried automatically (2675af1). An item an older snapshot stopped:
-  `split_run.py publish/run.json --go --reset statement:NAME` once (oaiq-089).
+  are usually platform load and retried automatically (2675af1). An item an older snapshot stopped:
+  `split_run.py publish/run.json --go --reset statement:NAME` once (oaiq-089). **Unless a bundle has
+  very long lines:** the scanner's time grows with line length, not file size. q259 (2026-11-15):
+  bundles with one-line `EdgeChoices` data terms of 72k–163k characters failed 31 retries each, twice;
+  one at 72k got through once; bundles at 45k and 65k went live. The same text line-broken (newline + 4
+  spaces before a subterm once a line passes 1,500 characters) went live first try, and its local
+  compile was unchanged. Fix it with post-carve patches: one per long line, the exact line as
+  `literal_old` and the line-broken text as `literal_new`. Any bundle line over ~50k characters deserves
+  this before the first send. A bundle already live with the old text is frozen: leave its lines out.
 - **Heartbeat timeouts on the server.** A bundle or piece that compiled in `measure` can still hit the
   verifier's `maxHeartbeats 200000` (oaiq-055: `rfl` lemmas, instance-heavy statements). split_run adds
   `set_option maxHeartbeats 1000000` after the imports and resends once (updating the frozen
