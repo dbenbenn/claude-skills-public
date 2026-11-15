@@ -1033,9 +1033,15 @@ Profile before forcing or splitting anything.
   bundles with one-line `EdgeChoices` data terms of 72k–163k characters failed 31 retries each, twice;
   one at 72k got through once; bundles at 45k and 65k went live. The same text line-broken (newline + 4
   spaces before a subterm once a line passes 1,500 characters) went live first try, and its local
-  compile was unchanged. Fix it with post-carve patches: one per long line, the exact line as
-  `literal_old` and the line-broken text as `literal_new`. Any bundle line over ~50k characters deserves
-  this before the first send. A bundle already live with the old text is frozen: leave its lines out.
+  compile was unchanged. `gen` now does this itself (`leantext.wrap_long_lines`, lines over 20,000
+  characters, after the patches and before the repairs, never in a frozen file), but only at spaces in
+  code directly inside `(`, `⟨` or `[`, where Lean ignores columns. A long line with `by`, `do`,
+  `match`, `calc`, `where` or `|` stays as it is, and `gen` prints `LONG LINE file:n`; break that one by
+  a post-carve patch (the exact line as `literal_old`, the line-broken text as `literal_new`). A carve on
+  an older snapshot gets the line-breaking only on `--upgrade`, and its non-live bundles and pieces with
+  long lines are re-generated and re-measured. If you publish a line-broken bundle by hand, write its
+  live text into `published/lib/Def_<name>.lean` before the publisher adopts it: adoption freezes the
+  generated text, and `gen` then refuses patches that hit it.
 - **Heartbeat timeouts on the server.** A bundle or piece that compiled in `measure` can still hit the
   verifier's `maxHeartbeats 200000` (oaiq-055: `rfl` lemmas, instance-heavy statements). split_run adds
   `set_option maxHeartbeats 1000000` after the imports and resends once (updating the frozen

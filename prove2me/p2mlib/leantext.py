@@ -577,3 +577,54 @@ def guard_problems(text):
 def guard_message(problems, limit=5):
     return '; '.join('line %d: `%s` (%s)' % p for p in problems[:limit]) + \
         (' (and %d more)' % (len(problems) - limit) if len(problems) > limit else '')
+
+
+# prove2.me's token scanner times out (10 s, "Token scanner timed out") on very long lines, not on large
+# files: q259 (2026-11-15) bundles with one-line `EdgeChoices` data terms of 72k-163k characters failed 31
+# retries each; the same text line-broken went live first try. Lines of 45k and 65k passed, one of 72k
+# passed once in 41 tries: the limit keeps a wide margin below them.
+LONG_LINE = 20000
+WRAP_WIDTH = 1500
+_SPACE = '\x01'
+_WRAP_OPEN = {'(': ')', '⟨': '⟩', '[': ']'}
+_WRAP_CLOSE = {v: k for k, v in _WRAP_OPEN.items()}
+_OTHER_OPEN = {'{': '}'}
+# a column-sensitive block may start inside brackets (a `by` tactic sequence, `match` alternatives, `do`)
+_POSITIONAL = re.compile(r"(?<![\w'.!?₀-ₜ])(by|do|match|calc|where|termination_by|decreasing_by|fun\s*\|)"
+                         r"(?![\w'!?₀-ₜ])|\|")
+
+
+def wrap_long_lines(text, limit=LONG_LINE, width=WRAP_WIDTH, indent='    '):
+    """`text` with each line longer than `limit` broken into lines of about `width` characters: a newline
+    and `indent` replace a space that stands in code (not a comment or literal) directly inside `(`, `⟨` or
+    `[`, which Lean parses without column positions, preferably the space before an opening bracket.
+    A long line with a column-sensitive construct (`by`, `do`, `match`, `calc`, `where`, `|`) is left alone.
+    Returns (text, [1-based line numbers of long lines left as they were])."""
+    lines = text.split('\n')
+    if all(len(x) <= limit for x in lines):
+        return text, []
+    code = code_only(text.replace(' ', _SPACE))     # a real code space stays _SPACE; literal text blanks to ' '
+    out, left, stack, pos = [], [], [], 0
+    for no, line in enumerate(lines, 1):
+        cl = code[pos:pos + len(line)]
+        pos += len(line) + 1
+        long_ = len(line) > limit and not _POSITIONAL.search(cl.replace(_SPACE, ' '))
+        if len(line) > limit and not long_:
+            left.append(no)
+        start, buf = 0, []
+        for i, ch in enumerate(cl):
+            if ch in _WRAP_OPEN or ch in _OTHER_OPEN:
+                stack.append(ch)
+            elif ch in _WRAP_CLOSE or ch == '}':
+                if stack:
+                    stack.pop()
+            elif (long_ and ch == _SPACE and stack and stack[-1] in _WRAP_OPEN and i + 1 < len(cl)
+                  and cl[i + 1] != _SPACE and i - start >= width
+                  and (cl[i + 1] in _WRAP_OPEN or i - start >= 2 * width)):
+                buf.append(line[start:i])
+                start = i + 1
+        if buf:
+            out.append(('\n' + indent).join(buf + [line[start:]]))
+        else:
+            out.append(line)
+    return '\n'.join(out), left

@@ -4032,3 +4032,39 @@ def test_private_redeclared_and_shadowed_context_compiles(g, tmp_path):
         d = tmp_path / str(i)
         d.mkdir()
         _compile_in_publish_order(g, p, d)
+
+
+def test_gen_line_breaks_long_lines_but_not_frozen_copies(tmp_path):
+    # q259 (2026-11-15): one-line data terms of 72k-163k characters timed out prove2.me's token scanner
+    # 31 times each; line-broken, the same bundle went live first try. gen breaks such lines itself.
+    from p2mlib.leantext import LONG_LINE
+    long_def = 'def auxOnly : Nat := ' + 'Nat.add 0 (' * 3000 + '1' + ')' * 3000
+    assert len(long_def) > LONG_LINE
+    patches = tmp_path / 'patches.json'
+    patches.write_text(json.dumps([{'literal_old': 'def auxOnly : Nat := 1', 'literal_new': long_def, 'why': 'test'}]))
+    cfg, work, out, run = _carve_cli(tmp_path, 'first', patches=str(patches))
+    run('plan', str(cfg))
+    msg = run('gen', str(cfg))
+    hit = [p for p in (out / 'lib').glob('Def_*.lean') if 'auxOnly' in p.read_text()]
+    assert hit and 'LONG LINE' not in msg
+    txt = hit[0].read_text()
+    assert 'def auxOnly : Nat := Nat.add 0' in txt and max(len(x) for x in txt.split('\n')) < LONG_LINE
+    assert re.sub(r'\s+', ' ', txt).count(re.sub(r'\s+', ' ', long_def)) == 1          # whitespace only
+    # a published (frozen) copy keeps its long line as published (bundles published before this, q259's
+    # OAIQ259US018), and is not reported as drift: undo the line breaks in it
+    pub = tmp_path / 'published'
+    pub.mkdir()
+    for p in (out / 'lib').glob('Def_*.lean'):
+        (pub / p.name).write_text(p.read_text())
+    a = txt.index('def auxOnly')
+    b = txt.index('\n', txt.index('1' + ')' * 100, a))
+    flat = txt[:a] + txt[a:b].replace('\n    ', ' ') + txt[b:]
+    assert long_def in flat
+    (pub / hit[0].name).write_text(flat)
+    names = sorted(p.name[4:-5] for p in (out / 'lib').glob('Def_*.lean'))
+    cfg2, work2, out2, run2 = _carve_cli(tmp_path, 'second', patches=str(patches),
+                                         frozen={'plan': str(work / 'plan.json'), 'bundles': names, 'lib': str(pub)})
+    run2('plan', str(cfg2))
+    msg2 = run2('gen', str(cfg2))
+    assert (out2 / 'lib' / hit[0].name).read_text() == flat
+    assert 'FROZEN %s' % hit[0].name not in msg2, msg2[-600:]

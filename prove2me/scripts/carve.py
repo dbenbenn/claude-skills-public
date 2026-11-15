@@ -134,6 +134,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from p2mlib import carve as C  # noqa: E402
 from p2mlib import leaninfo  # noqa: E402
+from p2mlib.leantext import LONG_LINE  # noqa: E402
 
 
 def load_config(path):
@@ -463,6 +464,10 @@ def run_gen(cfg, g, P, kinds, names):
     report_fallbacks(g)
     for f in r['over_cap']:
         print('OVER 1 MiB', f)
+    for f, n in r.get('long_lines_left', ()):
+        print('LONG LINE %s:%d: over %d characters with a column-sensitive construct (by/do/match/|), left '
+              'unbroken; prove2.me\'s token scanner may time out on it (q259): line-break it by carve patch'
+              % (f, n, LONG_LINE))
     # a patch no generated file contains is stale (a collision suffix `_r<hex>_<n>` that changed
     # with the snapshot, a statement folded away): a full gen fails on it, as filter_patches does
     # for port patches (oaiq-123); a partial gen cannot tell

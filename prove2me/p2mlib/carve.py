@@ -34,7 +34,7 @@ import sys
 from dataclasses import dataclass, field
 
 from . import leanedit, leaninfo
-from .leantext import import_names
+from .leantext import import_names, wrap_long_lines
 from . import repair as RP
 from .leantext import guard_message, guard_problems, strip
 
@@ -5045,7 +5045,7 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
     was live ran "cleanly", and no copy carried it)."""
     repairs, frozen_text = repairs or {}, frozen_text or {}
     frozen_stubs = frozen_stubs or {}
-    stale, drift, frozen_hits = [], [], []
+    stale, drift, frozen_hits, long_left = [], [], [], []
     os.makedirs(os.path.join(out, 'lib'), exist_ok=True)
     os.makedirs(os.path.join(out, 'solutions'), exist_ok=True)
     files = []
@@ -5062,12 +5062,18 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
                     used.add(old)          # written, or the published copy carries it already
                 else:
                     frozen_hits.append((old, base))
+        # q259: prove2.me's token scanner times out on very long lines; break them before the repairs, which
+        # measure recorded from the file it compiled (this one), and never in a frozen file (written as published)
+        wrapped, left = wrap_long_lines(txt)
+        if published is None:
+            txt = wrapped
+            long_left.extend((base, n) for n in left)
         if repairs.get(base):
             txt, _, bad = RP.apply_cuts(txt, repairs[base])
             stale.extend((base, c) for c in bad)
         if published is not None:
-            if txt != published:
-                drift.append(base)
+            if txt != published and RP.apply_cuts(wrapped, repairs.get(base) or [])[0] != published:
+                drift.append(base)       # a published copy that a hand publish line-broke is not drift
             txt = published
         elif len(txt.encode('utf-8')) > SIZE_CAP and base.startswith(('Thm_', 'Sol_')):
             # q151: a piece four folds made 1,091,190 bytes was 1,016,518 without OpenAI's comments
@@ -5139,4 +5145,4 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
             'patches_unused': [pt['literal_old'] for pt in patches
                                if pt['literal_old'] not in used and all(pt['literal_old'] != o for o, _ in frozen_hits)],
             'patches_frozen': [(o, f) for o, f in frozen_hits if o not in used],
-            'stale_repairs': stale, 'frozen_drift': drift}
+            'stale_repairs': stale, 'frozen_drift': drift, 'long_lines_left': long_left}

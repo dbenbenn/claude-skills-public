@@ -1,3 +1,4 @@
+import re
 
 
 def test_import_names_reads_module_system_forms():
@@ -34,3 +35,37 @@ def test_strip_leanarchitect_removes_the_blueprint_annotations():
     assert strip_leanarchitect(out) == out
     plain = 'import Mathlib\n\ntheorem a : True := trivial\n'
     assert strip_leanarchitect(plain) == plain
+
+
+def _data_line(n):
+    # q259's shape: one `def` whose value is a nested term on a single line
+    return 'def big : Nat := ' + 'Nat.add 0 (' * n + '0' + ')' * n
+
+
+def test_wrap_long_lines_breaks_a_long_data_line_inside_brackets_only():
+    from p2mlib.leantext import wrap_long_lines
+    line = _data_line(4000)                                  # ~48k characters
+    text = 'import Mathlib\n\n%s\n\ntheorem t : True := trivial\n' % line
+    out, left = wrap_long_lines(text, limit=20000, width=1500)
+    assert left == []
+    body = out.split('\n')[2:-3]
+    assert max(len(x) for x in body[:-1]) < 1600 and body[-1].rstrip(')').endswith('0')   # a run of `)` has no space
+    assert re.sub(r'\s+', ' ', out) == re.sub(r'\s+', ' ', text)       # whitespace only
+    for x in body[1:]:
+        assert x.startswith('    (') or x.startswith('    Nat.add')   # a continuation, inside the term
+    assert out.split('\n')[0] == 'import Mathlib' and 'theorem t : True := trivial' in out
+    assert wrap_long_lines(text, limit=len(line)) == (text, [])      # nothing over the limit: unchanged
+
+
+def test_wrap_long_lines_keeps_literals_comments_and_column_sensitive_lines():
+    from p2mlib.leantext import wrap_long_lines
+    s = '"' + 'a b (c ' * 400 + '"'
+    lit = 'def s : List String := [' + ', '.join([s] * 20) + ']'           # spaces inside strings only... and after commas
+    out, left = wrap_long_lines(lit, limit=20000, width=1500)
+    assert left == [] and all(s in out for _ in [0])                     # no string was cut
+    assert re.sub(r'\s+', ' ', out) == re.sub(r'\s+', ' ', lit)
+    tactic = 'theorem x : P := (by ' + 'simp; ' * 5000 + 'rfl)'          # a tactic block: columns matter
+    out, left = wrap_long_lines('-- c\n' + tactic, limit=20000)
+    assert out == '-- c\n' + tactic and left == [2]
+    com = '/- ' + 'x (y ' * 6000 + '-/'                                 # a comment has no code to break
+    assert wrap_long_lines(com, limit=20000) == (com, [])
