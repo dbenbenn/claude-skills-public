@@ -1042,10 +1042,14 @@ the first retry, many at 300–2,000 lines a stub where the record had estimated
   (read-back first) in the weakest form the rest uses: the paper's own sentence saying what the technique
   delivers here (q336), the conjunct actually used when the other is blocked (q354), or for a computation
   the verifier cannot run, `∃ d, check P d = true`, checked by diffing the bundle's checker against the
-  authors' (q356). Submit the dependant as a reduction to it in the same run (q186). "No work submitted"
+  authors' (q356). When the deep step is one external lemma whose proof the source omits, reconstruct that
+  proof with standard tools, and re-derive the cited combinatorics for exactly the applied range, where tight
+  bounds make cases vanish (q366: Szőnyi–Weiner's planar case by a subresultant determinant, 10 Parts). Submit the dependant as a reduction to it in the same run (q186). "No work submitted"
   leaves the dependant with no decomposition, while the deep cited theory belongs on that one Open leaf.
 - **Calibrate rather than estimate.** Sketch the shortest textbook proof against what is Proved before
-  reducing to a deeper cited result (q289). Then write the Blueprint (below), with the route and constants
+  reducing to a deeper cited result (q289). A leaf named for a classical theorem is not deep until a
+  combinatorial proof has been looked for (q364: Borsuk–Ulam in every dimension by Tucker's lemma on the Kuhn
+  triangulation, 1,900 lines in an hour). Then write the Blueprint (below), with the route and constants
   worked out per stub, and send provers at the two riskiest stubs; their times replace the estimate (q350).
   Only a stub that needs theory Mathlib lacks, with nothing routing around it, is a blocker.
 
@@ -1110,7 +1114,8 @@ Most parts took 5 to 20 minutes.
 What made it work:
 - **Write the Blueprint so the main theorem compiles from its stubs.** Check every stub for truth
   before dispatch: a false stub wastes a prover. Instantiate each type-parametrized stub at the empty
-  type and `Unit` (q343: an existential over maps into `X` failed at empty `X`). When a prover finds a
+  type and `Unit` (q343: an existential over maps into `X` failed at empty `X`), and a conclusion that builds
+  a map into `Fin b` at `b = 0` (q364). When a prover finds a
   cited step false, it states that step as a sorried lemma with the counterexample, and the captain writes
   the corrected argument into the notes before the next round (q350, q338: printed constants and an
   Observation were wrong); provers formalize a written repair well and rarely invent one.
