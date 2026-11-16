@@ -1041,7 +1041,10 @@ Profile before forcing or splitting anything.
   an older snapshot gets the line-breaking only on `--upgrade`, and its non-live bundles and pieces with
   long lines are re-generated and re-measured. If you publish a line-broken bundle by hand, write its
   live text into `published/lib/Def_<name>.lean` before the publisher adopts it: adoption freezes the
-  generated text, and `gen` then refuses patches that hit it.
+  generated text, and `gen` then refuses patches that hit it. Do **not** `--reset` (or delete the run-state
+  record of) a stopped bundle you fix by patch: a terminal state (`give_up`, `stop`) is what thaws it for
+  `gen`, and split_run resends it once its text changes. Reset, it counts as being published, so it stays
+  locked and `gen` fails with "PATCH ON A FROZEN FILE ONLY" (q259, 2026-11-16).
 - **Heartbeat timeouts on the server.** A bundle or piece that compiled in `measure` can still hit the
   verifier's `maxHeartbeats 200000` (oaiq-055: `rfl` lemmas, instance-heavy statements). split_run adds
   `set_option maxHeartbeats 1000000` after the imports and resends once (updating the frozen
