@@ -1040,8 +1040,9 @@ Profile before forcing or splitting anything.
   a post-carve patch (the exact line as `literal_old`, the line-broken text as `literal_new`). A carve on
   an older snapshot gets the line-breaking only on `--upgrade`, and its non-live bundles and pieces with
   long lines are re-generated and re-measured. If you publish a line-broken bundle by hand, write its
-  live text into `published/lib/Def_<name>.lean` before the publisher adopts it: adoption freezes the
-  generated text, and `gen` then refuses patches that hit it. Do **not** `--reset` (or delete the run-state
+  live text into `published/lib/Def_<name>.lean` and `publish/out/lib/Def_<name>.lean` before the publisher
+  adopts it: adoption freezes the generated text, `gen` then refuses patches that hit it, and a stale
+  `publish/out/lib` copy fails the `publish_prep --sync` gate, so nothing is released. Do **not** `--reset` (or delete the run-state
   record of) a stopped bundle you fix by patch: a terminal state (`give_up`, `stop`) is what thaws it for
   `gen`, and split_run resends it once its text changes. Reset, it counts as being published, so it stays
   locked and `gen` fails with "PATCH ON A FROZEN FILE ONLY" (q259, 2026-11-16).
