@@ -1161,6 +1161,12 @@ What made it work:
   traps (there: `rw`/`simp`/`group` fail on inverses in `Monoid.Coprod`, an instance diamond; use `exact`).
   Assemble by copying the tree with one `Close<X>` module per Part restating its stubs, in dependency order
   (`missions/bc214-fable/tools/assemble_bcf.py`), then cut at the stubs by measured CPU.
+- **When moments are not rational, condition until they are.** inv-fable (2026-11-16, uniform random involutions,
+  ~16k lines, one evening): conditioning on the fixed-point counts κ made every expectation rational in 1/N along rays
+  with κ fixed, and a second-order engine with constants explicit in `1 + Σκ` (Markov grid starts at max(Cq², κ)) was
+  uniform enough to mix back over κ ≲ √N. The quadratic-in-κ coefficient (two fixed points) needed its own
+  first-passage bound. When all Parts are dispatched and a slot is free, give it to an independent second prover on
+  the riskiest open Part (both A2 provers finished; keep the first, archive the other).
 - **Every prover or helper brief says "do not spawn agents"** when the run has an agent cap: a q159
   helper briefed to "optimize" spawned five of its own.
 
