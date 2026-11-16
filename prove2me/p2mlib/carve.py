@@ -708,8 +708,19 @@ class Graph:
     def ext_imports(self, mods):
         """Non-project imports of mods and of the project modules they import. An external
         theorem's module (`Theorems.…`, reported by DeclGraph through --also) is neither walked
-        nor listed: files import it only where they use the theorem (the external map)."""
+        nor listed: files import it only where they use the theorem (the external map).
+
+        With `stub_definitions` set (config `carry_stub_definitions`; carve_pipeline's native mode sets
+        it), the `Definitions.*` imports of such a theorem module are listed for the module importing
+        it, as that module's own direct imports are: a native tree's module can reach a published
+        bundle only through the theorem stubs it imports and still `open` its namespaces, and a
+        carved file that keeps the `open` line imports a stub only where it uses the theorem (Artin
+        KP 2026-11-16: "unknown namespace `M4aHerbrand`", then `HeckeCharacter`, in two bundles
+        carved from `C0ZA`). Off by default: an OpenAI port re-declares its bundles' material, and
+        there the same imports leaked a theorem's bundle into Mathlib-only statements
+        (CrouzeixHilbert 2026-10-19)."""
         seen, out, todo = set(), [], list(mods)
+        carry = getattr(self, 'stub_definitions', False)
         while todo:
             m = todo.pop()
             if m in seen:
@@ -717,6 +728,10 @@ class Graph:
             seen.add(m)
             for x in self.imports.get(m, []):
                 if x in self.infos and x.startswith('Theorems.'):
+                    if carry:
+                        for y in self.imports.get(x, []):
+                            if y.startswith('Definitions.') and y not in out:
+                                out.append(y)
                     continue
                 if x in self.infos:
                     todo.append(x)
@@ -4829,9 +4844,14 @@ def mark_repaired(g, names):
 
 
 def statement_name(plan, node):
-    """The published name of a node: `<name><suffix>`, or the name itself for an external statement.
+    """The published name of a node: `<name><suffix>`, or the name itself for an external statement;
+    for a node of `proves` ({node: published name}, config: a native development's theorem that proves
+    a statement already published under another name) that published name.
     `statement_suffixes` ({node: suffix}, config) renames single statements, before the plan-wide
     `statement_suffix` (q151: live polymorphic statements published again at `Type` as `<name>_m`)."""
+    proves = plan.get('proves') or {}
+    if node in proves:
+        return proves[node]
     if node in plan.get('external', ()):
         return pubname(node)
     one = (plan.get('statement_suffixes') or {}).get(node, '')
@@ -4958,11 +4978,191 @@ def gen_stub(g, plan, node, collapse_mathlib=True):
     return hdr + '\n' + body.strip('\n') + '\n'
 
 
+def piece_target(plan, node):
+    """The full name a piece gives its own proof of `node`: `<published name>_oai` (the verifier's
+    environment declares `<published name>`), or, for a node of `proves`, the node's own name: it
+    differs from the published one already, so nothing is renamed."""
+    if node in (plan.get('proves') or {}):
+        return pubname(node)
+    return statement_name(plan, node) + '_oai'
+
+
+STATEMENT_SUFFIX = '_Statement'
+
+
+def _type_colon(text, i):
+    """The index of the first `:` at bracket depth 0 at or after i (the colon between a declaration's
+    binders and its type), or -1."""
+    depth = 0
+    pairs = {'(': 1, '[': 1, '{': 1, '⦃': 1, '⟨': 1, ')': -1, ']': -1, '}': -1, '⦄': -1, '⟩': -1}
+    while i < len(text):
+        ch = text[i]
+        if ch in pairs:
+            depth += pairs[ch]
+        elif ch == ':' and depth == 0 and text[i + 1:i + 2] != '=':
+            return i
+        i += 1
+    return -1
+
+
+def target_statement_block(stub_text, name):
+    """(import lines, block) from the published statement module of `name` (imports, context,
+    `theorem name binders : type := by sorry`): the block is the module's text without its imports,
+    the theorem turned into `abbrev <name>_Statement binders : Prop := type`, in the same namespace
+    and `open` context. `<name>_Statement args` is then, by unfolding a reducible definition, what
+    `type_of% (name args)` is."""
+    lines = stub_text.split('\n')
+    imports = [l.split()[1] for l in lines if l.startswith('import ') and len(l.split()) > 1]
+    body = '\n'.join(l for l in lines if not l.startswith('import ')).strip('\n') + '\n'
+    last = name.rsplit('.', 1)[-1]
+    m = re.search(r"(?m)^([ \t]*(?:@\[[^\]]*\]\s*)?(?:protected\s+)?)(theorem|lemma)(\s+)((?:[\w'.]*\.)?%s)(\.\{[^}]*\})?(?![\w'.])"
+                  % re.escape(last), body)
+    if not m:
+        raise CarveError('the published statement of %s declares no theorem `%s`' % (name, last))
+    c = _type_colon(body, m.end())
+    k = body.rfind('sorry')
+    j = body.rfind(':=', 0, k if k >= 0 else len(body))
+    if c < 0 or k < 0 or j < c or not re.fullmatch(r':=\s*(?:by\s+)?', body[j:k]):
+        raise CarveError('the published statement of %s is not `theorem … : type := by sorry`' % name)
+    block = (body[:m.start(2)] + 'abbrev' + m.group(3) + m.group(4) + STATEMENT_SUFFIX + (m.group(5) or '')
+             + body[m.end():c] + ': Prop :=\n  ' + body[c + 1:j].strip() + body[k + len('sorry'):])
+    return imports, block
+
+
+def inline_target_statement(text, name, stub_text):
+    """A piece's text made free of its own published target `name` (config `proves`: the development's
+    theorem is stated as `type_of% (name args)`, so the piece imported the statement it proves, which
+    the verifier does not have in scope and the platform would record as the target resting on itself;
+    Artin KP 2026-11-16). The import of the target's module goes; its statement comes in as the
+    reducible definition `<name>_Statement` (target_statement_block), after the imports, with the
+    bundle imports it needs; each `type_of% (name args)` becomes `(<name>_Statement args)`.
+    Refuses a text that names the target in any other way (a proof that calls it would rest on
+    itself)."""
+    last = name.rsplit('.', 1)[-1]
+    mod = 'Theorems.Thm_' + slug(name)
+    if not re.search(r'(?m)^import %s[ \t]*$' % re.escape(mod), text):
+        return text
+    imports, block = target_statement_block(stub_text, name)
+    if has_name(text, last + STATEMENT_SUFFIX):
+        raise CarveError('the piece already names `%s%s`' % (last, STATEMENT_SUFFIX))
+    use = re.compile(r"type_of%%\s*\(\s*(@?(?:[\w'.]*\.)?%s)(?![\w'.])" % re.escape(last))
+    text, n = use.subn(lambda mt: '(' + mt.group(1) + STATEMENT_SUFFIX, text)
+    left = [l.strip() for l in strip(text).split('\n')
+            if re.search(r"(?<![\w'])%s(?![\w'])" % re.escape(last), l) and not l.startswith('import ')]
+    if left or not n:
+        raise CarveError(
+            'the piece names its own published target %s other than as `type_of%% (%s …)`%s: a proof of a '
+            'statement cannot import it. Restate the theorem with the statement written out (and rebuild '
+            'before `graph`), or keep what uses the target inside this piece in `type_of%%` form'
+            % (name, last, ' (%s)' % left[0][:120] if left else ''))
+    head = [l for l in text.split('\n') if l.startswith('import ')]
+    have = {l.split()[1] for l in head if len(l.split()) > 1}
+    keep = [l for l in head if l.split()[1:2] != [mod]]
+    extra = ['import ' + x for x in imports if x not in have and x != 'Init']
+    end = text.index(head[-1]) + len(head[-1]) + 1
+    rest = '\n'.join(l for l in text[:end].split('\n') if not l.startswith('import ')).strip('\n')
+    return ('\n'.join(keep + extra) + '\n' + (rest + '\n' if rest else '') + '\n' + block.rstrip('\n')
+            + '\n' + text[end:])
+
+
+def has_name(text, x):
+    return re.search(r"(?<![\w'.])%s(?![\w'])" % re.escape(x), text) is not None
+
+
 def solution_tail(g, node, plan=None, mono=False):
     nd = g.nodes[node]
     lv = '.{%s}' % ', '.join(nd.univ) if nd.univ and not mono else ''
-    full = (statement_name(plan, node) if plan else pubname(node)) + '_oai'
+    full = piece_target(plan, node) if plan else pubname(node) + '_oai'
     return 'theorem solution%s : type_of%% @%s%s := @%s%s\n' % (lv, full, lv, full, lv)
+
+
+def proves_problems(g, plan):
+    """Problems of a plan with `proves` ({node: published name}): the published target is an
+    external theorem that the development names only to state its own theorem (`type_of%`), so
+    everything resting on it must stay inside the piece that proves it. A statement, bundle or other
+    piece using it would import the target below the target's own proof (a cycle on the platform)."""
+    out = []
+    ext = plan.get('external_defs') or {}
+    for node, name in sorted((plan.get('proves') or {}).items()):
+        if node not in plan.get('external', ()) or node not in plan['pieces']:
+            out.append('proves: %s must be a target listed in `external` (its statement %s is published already)'
+                       % (node, name))
+            continue
+        if name == pubname(node):
+            out.append('proves: %s is the published name itself; list it in `external` only' % node)
+        tn = g.owner.get(name, name)
+        if tn not in g.nodes:
+            continue                      # the development never names the published statement
+        if tn not in ext:
+            out.append('proves: the published statement %s of %s is a node of the graph but not in '
+                       '`external_theorems`' % (name, node))
+        for b in plan['bundles']:
+            for k in b['nodes']:
+                if tn in g.nodes[k].deps:
+                    out.append('proves: bundle %s holds %s, which uses the published target %s of %s'
+                               % (b['name'], k, name, node))
+        for n in plan['stubs']:
+            if n != node and tn in g.nodes[n].sig and n not in plan.get('external', ()):
+                out.append('proves: the statement of %s is written with the published target %s of %s; it must '
+                           'stay inside that piece (config no_promote, and never forced)' % (n, name, node))
+        for n, p in plan['pieces'].items():
+            if n != node and any(tn in g.nodes[k].deps for k in p['keep'] if k in g.nodes):
+                out.append('proves: the piece of %s keeps a declaration using the published target %s of %s, '
+                           'so it would import the statement its own importer proves; keep what uses it out '
+                           'of the plan\'s statements (config no_promote)' % (n, name, node))
+    return out
+
+
+def target_users(g, name):
+    """The nodes that depend, through any chain, on the declaration `name` (reverse reachability)."""
+    tn = g.owner.get(name, name)
+    if tn not in g.nodes:
+        return set()
+    users = collections.defaultdict(set)
+    for k, nd in g.nodes.items():
+        for d in nd.deps:
+            users[d].add(k)
+    out, todo = set(), [tn]
+    while todo:
+        for u in users.get(todo.pop(), ()):
+            if u not in out:
+                out.add(u)
+                todo.append(u)
+    return out
+
+
+def signature_defs(g, node, external=()):
+    """The definitions (every node that is no theorem) a statement's signature needs: those its
+    `sig` names and, through each definition's `deps`, the definitions those are built from.
+    Declarations of `external` (published elsewhere) are left out and not walked."""
+    out, todo = set(), list(g.nodes[node].sig)
+    while todo:
+        x = todo.pop()
+        if x in out or x not in g.nodes or g.nodes[x].theorem or x in external or x == node:
+            continue
+        out.add(x)
+        todo += list(g.nodes[x].deps)
+    return out
+
+
+def signature_view(g, node, external=()):
+    """(text, definitions, theorems left out): a definitions-only reading view of a statement's
+    signature closure, for a blind read-back (stage_auditor.py --carve-view). The carve's bundles
+    hold the definitions with every theorem they rest on, megabytes of proofs no reader can take
+    as context (Artin KP 2026-11-16: ten bundles, 1.95 MB; one statement's definitions are 1-79 KB).
+    The text is those definitions carved from their modules in import order, each module a section
+    with the namespace, `open` and `variable` lines its definitions sit under, headed by `import`
+    lines of the source modules (so a probe can import the compiled originals). It is not a file to
+    compile: the theorems the definitions use (proof fields, `Classical.choose` of an existence
+    lemma) are not in it; their names are returned."""
+    defs = signature_defs(g, node, external)
+    thms = sorted({d for x in defs for d in g.nodes[x].deps
+                   if d in g.nodes and g.nodes[d].theorem and d != node})
+    if not defs:
+        return '', [], thms
+    body = Carver(g).carve(defs, g.have_names(set(g.nodes)), deprivatize=True, external=external)
+    mods = g.topo({g.nodes[k].module for k in defs})
+    return ''.join('import %s\n' % m for m in mods) + '\n' + body.rstrip('\n') + '\n', sorted(defs), thms
 
 
 def monomorphize(text):
@@ -4985,11 +5185,13 @@ def monomorphize(text):
     return re.sub(r'(\b(?:Type|Sort)[ \t]*\()([^()\n]*)(\))', levels, text)
 
 
-def gen_piece(g, plan, node, collapse_mathlib=True, mono=False):
+def gen_piece(g, plan, node, collapse_mathlib=True, mono=False, target_stub=None):
     """The node's piece: its keep set carved, OpenAI's own declaration of the node renamed
     `<name>_oai` (the verifier's environment already declares `<name>`; a same-named declaration
     that elaborates even slightly differently gives a locationless WA, Chowla 2026-10-08), and
-    `theorem solution : type_of% @<name>_oai := @<name>_oai`."""
+    `theorem solution : type_of% @<name>_oai := @<name>_oai`. A node of `proves` keeps its own
+    name (piece_target), and its piece never imports the statement it proves: `target_stub`, that
+    statement's published module text, is inlined as a definition (inline_target_statement)."""
     p = plan['pieces'][node]
     keep = set(p['keep'])
     bad = sorted(k for k in keep if g.nodes[k].sorry)
@@ -5001,19 +5203,26 @@ def gen_piece(g, plan, node, collapse_mathlib=True, mono=False):
         avail |= _bundle_have(g, plan, plan['stubs'][i]['bundles'])
     ren = dict(g.collision_renames())
     ren.update(_stmt_renames(g, plan, p['imports']))
-    ren[node] = statement_name(plan, node).rsplit('.', 1)[-1] + '_oai'
+    proves = (plan.get('proves') or {}).get(node)
+    if not proves:
+        ren[node] = statement_name(plan, node).rsplit('.', 1)[-1] + '_oai'
     body = Carver(g).carve(keep, g.have_names(keep | avail), rename=ren,
                          external=plan.get('external_defs') or ())
     hdr = header(g, {g.nodes[k].module for k in keep}, p['bundles'],
                  [statement_name(plan, i) for i in p['imports']], collapse_mathlib,
                  extra=_ext_imports(g, plan, keep))
     txt = hdr + '\n' + body.rstrip('\n') + '\n\n' + solution_tail(g, node, plan, mono)
+    if proves and re.search(r'(?m)^import Theorems\.Thm_%s[ \t]*$' % re.escape(slug(proves)), txt):
+        if target_stub is None:
+            raise CarveError('piece %s imports the statement it proves (%s), and gen was given no published '
+                             'text of it to inline (the workspace\'s Theorems/Thm_%s.lean)' % (node, proves, slug(proves)))
+        txt = inline_target_statement(txt, proves, target_stub)
     return monomorphize(txt) if mono else txt
 
 
 def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, external=(),
              collapse_mathlib=True, patches=(), repairs=None, frozen_text=None, frozen_stubs=None,
-             monomorphic=()):
+             monomorphic=(), target_stubs=None):
     """Write out/lib/Def_<bundle>.lean, out/lib/Thm_<slug>.lean (not for `external` nodes,
     published by someone else) and out/solutions/Sol_<slug>.lean. Returns {'files', 'sizes',
     'over_cap'} (files over prove2.me's 1 MiB cap), 'patches_unused'}.
@@ -5139,7 +5348,8 @@ def generate(g, plan, out, what=('bundles', 'stubs', 'pieces'), names=None, exte
                                  '`Type` (config statement_suffixes + monomorphic, q151) or fold it' % n)
         if 'pieces' in what:
             put(os.path.join(out, 'solutions', 'Sol_%s.lean' % slug(statement_name(plan, n))),
-                gen_piece(g, plan, n, collapse_mathlib, mono=n in monomorphic))
+                gen_piece(g, plan, n, collapse_mathlib, mono=n in monomorphic,
+                          target_stub=(target_stubs or {}).get(n)))
     sizes = {f: os.path.getsize(f) for f in files}
     return {'files': files, 'sizes': sizes, 'over_cap': [f for f, s in sizes.items() if s > SIZE_CAP],
             'patches_unused': [pt['literal_old'] for pt in patches

@@ -5,6 +5,8 @@ usage: carve_pipeline.py DIR [parameters] [--stop-after STEP] [--from STEP] [--r
                          [--publish] [--upgrade | --snapshot REV] [--allow-dirty] [--list] [--detach]
                          [--overlap | --no-overlap] [--no-stream-bundles] [--keep-port] [--claim-folder]
                          [--forget-publishing]
+       carve_pipeline.py DIR --native --folder F --root-module Solutions.F.X.Main --target LOCAL
+                         [--proves LOCAL=PUBLISHED[@ID]] --bundle-prefix P [--forced NAME|FILE.json ...]
        carve_pipeline.py DIR --wait [MINUTES]
 
 DIR is the carve directory. The first run needs the parameters, which are stored in DIR/pipeline.json
@@ -40,6 +42,34 @@ DIR is the carve directory. The first run needs the parameters, which are stored
   pipeline.json `hide_instances` (no flag; edit the file): instance names hidden by an `attribute [-instance]`
                         line after the imports of every ported module (the port's --header), e.g. global compat
                         instances that slow a development with its own instances (oaiq-122)
+
+Native mode (--native; pipeline.json "native": true; p2mlib.nativecarve): the development is our own, not an
+openai/math port, and already built in WORKSPACE/Solutions/F (`lake build` of the root). Nothing is fetched,
+ported or built: the steps start at `config` (fetch ... wsbuild do not exist for it), and from `graph` on they
+are the port's, with resume, --detach/--wait, calibrate, overlap publishing and the monitoring section as for
+any carve. Its parameters:
+  --folder F            the tree's folder under Solutions/ (config `prefix` Solutions.F, a dotted module prefix)
+  --root-module M       full module name(s) of the root, comma-separated (config `roots`)
+  --target T            (repeat) the development's theorems to prove; one that is not in --proves becomes a new
+                        published statement
+  --proves LOCAL=PUBLISHED[@ID]   (repeat) target LOCAL proves the statement already published as PUBLISHED
+                        (prove2.me id ID, or a prefix of it, checked in `names`): no stub is published for it,
+                        its piece is Sol_<PUBLISHED slug>.lean, submitted against the existing theorem, and the
+                        piece never imports the statement it proves (carve.inline_target_statement); what rests
+                        on PUBLISHED stays inside that piece (config `no_promote`, set by `extdefs`)
+  --forced NAME|FILE.json   as for a port; a FILE.json is a JSON list of names
+  --times TIMES.jsonl   a per-module measurement ({"module", "build_s"} a line, CPU seconds of `lean` on the
+                        module alone): the cost model's times, less the 3 s import; a module it lacks takes
+                        the time LeanInfo recorded in `graph`. A changed file re-runs from `extdefs`
+  --meta FILE           the native meta file (default DIR/native_meta.json): title, credit, repo, commit, paths,
+                        optional paper, tags, license (p2mlib/nativecarve.py has the format); write it first
+`config` refuses a tree whose .olean files are missing or older than their sources, and writes config.json from
+the roots' import closure: `external_theorems` = the `Theorems.Thm_*` it imports, `extra_olean_modules` = every
+Definitions/Theorems module it reaches, `carry_stub_definitions` (carve.Graph.ext_imports), `external` = the
+--proves targets. `extdefs` runs `carve_prep.py native-prep`: the cost model's build log (DIR/build_adj.log)
+from the per-module elaboration times `graph` recorded (LeanInfo, `jobs` 1), and `no_promote`. An edit of a
+closure module makes `config` stale: rebuild, and the resume re-reads the graph. --fetch, --patches, --def,
+--compat-imports and the other port parameters are refused; post-carve patches go in --config-set `patches`.
 
 Steps (STEPS in p2mlib.carvepipeline): fetch, inputs (the targets' published statements and their Def_
 bundles are fetched into the workspace when missing; inputs and config stop when they, the Def_ bundles or the
@@ -226,10 +256,32 @@ def parse(argv):
     ap.add_argument('--wait', type=float, nargs='?', const=100.0, default=None)
     ap.add_argument('--split-piece', action='append', dest='split_pieces', default=[],
                     metavar='NODE[=PARTS]')
+    ap.add_argument('--native', action='store_true', default=None)
+    ap.add_argument('--proves', action='append', metavar='LOCAL=PUBLISHED[@ID]')
+    ap.add_argument('--times', metavar='TIMES.jsonl')
     a = ap.parse_args(argv)
+    a.forced = expand_forced(a.forced)
     # a bare bundle name is its Definitions module (oaiq-042: `lake build Def_X` is no target)
     a.defs = [('Definitions.' + d if d.startswith('Def_') else d) for d in a.defs] if a.defs else a.defs
     return a
+
+
+def expand_forced(forced):
+    """--forced values, a value naming a .json file replaced by the list of names in it (a plan's forced
+    entry theorems come as a file: Artin KP's plan A1 forces 19)."""
+    out = []
+    for f in forced or []:
+        if f.endswith('.json'):
+            try:
+                names = json.load(open(os.path.expanduser(f), encoding='utf-8'))
+            except (OSError, ValueError) as e:
+                sys.exit('--forced %s: %s' % (f, e))
+            if not (isinstance(names, list) and all(isinstance(x, str) for x in names)):
+                sys.exit('--forced %s: not a JSON list of theorem names' % f)
+            out += names
+        else:
+            out.append(f)
+    return out or forced
 
 
 ENV_KEEP, ENV_PREFIXES = C.ENV_KEEP, C.ENV_PREFIXES
@@ -398,10 +450,10 @@ def handoff_nudge(d, log_text, step, wait_min, now=None):
 def mode_steps(d):
     """The steps of the carve in d: overlap mode's when its pipeline.json says so."""
     try:
-        ov = json.load(open(os.path.join(d, 'pipeline.json'))).get('overlap')
+        p = json.load(open(os.path.join(d, 'pipeline.json')))
     except (OSError, ValueError):
-        ov = False
-    return list(C.STEPS) if ov else [s for s in C.STEPS if s not in C.OVERLAP_ONLY]
+        p = {}
+    return C.steps_for(p)
 
 
 def publisher_note(d):
@@ -451,6 +503,7 @@ def load_params(a):
         for need in ('folder', 'root_module', 'targets', 'bundle_prefix'):
             if not given.get(need):
                 sys.exit('first run of %s needs --folder, --root-module, --target and --bundle-prefix (see usage)' % a.dir)
+        check_native(given)
         # overlap mode is on for every carve created since 2026-10-29 (dbenbenn); a pipeline.json without
         # the key (an older carve) keeps the classic order, so a resumed or upgraded carve never changes mode
         given.setdefault('overlap', True)
@@ -467,6 +520,26 @@ def load_params(a):
     if bad:
         sys.exit('parameters differ from the stored %s: %s (edit that file to change them)' % (path, ', '.join(bad)))
     return old
+
+
+def check_native(given):
+    """Refuse, before anything is stored, parameters that do not fit the mode: a native carve takes none of
+    the port's, --proves belongs to a native carve, and its values must parse."""
+    from p2mlib import nativecarve
+    if not given.get('native'):
+        if given.get('proves'):
+            sys.exit('--proves needs --native: an openai/math port proves the published statement of its own name')
+        if given.get('times'):
+            sys.exit('--times needs --native: a port\'s build step times its modules itself')
+        return
+    bad = ['--' + k.replace('_', '-') for k in C.NATIVE_REFUSED if given.get(k)]
+    if bad:
+        sys.exit('--native carves a tree already built in the workspace: %s belong%s to the port of an openai/math '
+                 'result and cannot be given with it' % (', '.join(bad), 's' if len(bad) == 1 else ''))
+    try:
+        nativecarve.parse_proves(given.get('proves'))
+    except nativecarve.NativeError as e:
+        sys.exit(str(e))
 
 
 def start_monitor(a, p):

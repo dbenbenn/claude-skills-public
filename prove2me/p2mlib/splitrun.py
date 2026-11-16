@@ -220,6 +220,20 @@ class Runner:
                 'text': os.path.join(self.cfg['explanations'], '%s.md' % s), 'node': n,
                 'comparison': os.path.join(cmp_dir, '%s.md' % s)}
 
+    def external_id(self, n):
+        """(theorem id, problem) of the published statement an `external` node's piece proves, looked up by
+        name. For a node of the plan's `proves` (a native development's theorem proving a statement published
+        under another name, carve_pipeline --native --proves LOCAL=PUBLISHED@ID) the live id must begin with
+        the given one (`proves_ids`): the piece goes to that theorem and no other, and a mismatch is a
+        problem, never a submission."""
+        name = self.info('piece:' + n)['name']
+        tid = self.api.theorem_id(name)
+        want = (self.plan.get('proves_ids') or {}).get(name)
+        if tid and want and n in (self.plan.get('proves') or {}) and not str(tid).startswith(want):
+            return None, ('the live statement %s has id %s, not %s (--proves): the wrong statement, or a stale id'
+                          % (name, tid, want))
+        return tid, None
+
     def check(self, item):
         """None if the item's files are ready to send, else why not."""
         f = self.info(item)
@@ -411,7 +425,7 @@ class Runner:
             return hit[1]
         n = item.split(':', 1)[1]
         tid = self.state.get('statement:' + n, {}).get('id') if n not in self.ext \
-            else self.api.theorem_id(self.info(item)['name'])
+            else self.external_id(n)[0]
         try:
             ok = bool(tid) and status(tid) == 'Proved'
         except Exception:
@@ -436,7 +450,7 @@ class Runner:
             return hit[1]
         n = item.split(':', 1)[1]
         tid = self.state.get('statement:' + n, {}).get('id') if n not in self.ext \
-            else self.api.theorem_id(self.info(item)['name'])
+            else self.external_id(n)[0]
         try:
             ok = bool(tid) and status(tid) == 'Proved'
         except Exception:
@@ -790,8 +804,16 @@ class Runner:
             stmts.append(x)
         else:
             n = f['node']
-            tid = self.state.get('statement:' + n, {}).get('id') if n not in self.ext \
-                else self.api.theorem_id(f['name'])
+            why = None
+            if n in self.ext:
+                tid, why = self.external_id(n)
+            else:
+                tid = self.state.get('statement:' + n, {}).get('id')
+            if why:                      # waits for a person: a resend would meet the same live id
+                st.update(state='stop', last=why, sha=self.file_sha(x))
+                self.log(x, 'refused', why)
+                self.save()
+                return
             if not tid:
                 self.blocked[x] = 'no theorem id for ' + f['name']
                 return

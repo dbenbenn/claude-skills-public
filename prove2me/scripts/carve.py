@@ -58,6 +58,14 @@ CONFIG.json (paths may use ~):
                                               # someone else's published standalone theorems the
                                               # port's modules import (fetch_theorems.py --names):
                                               # handled like external_defs, never carved again
+   "proves": {"Mine.goal": "Pub.main_theorem"},  # a target (also in `external`) that proves a statement
+                                              # published under another name: no stub, the piece is
+                                              # Sol_<published slug>.lean and never imports the statement it
+                                              # proves (its `type_of% (Pub.main_theorem …)` uses read a
+                                              # definition gen inlines from SRC/Theorems); carve_pipeline
+                                              # --native --proves sets it
+   "carry_stub_definitions": true,            # a native tree (not a port): a carved file also imports the
+                                              # Definitions bundles of the theorem stubs its modules import
    "statement_suffix": "_s2",                 # published names <name>_s2 (a fresh split of a
                                               # development whose earlier split took the names)
    "statement_suffixes": {"A.b": "_m"},       # one statement published again as A.b_m (q151)
@@ -253,7 +261,21 @@ def load_graph(cfg):
     if isinstance(names, str):
         names = json.load(open(os.path.expanduser(names), encoding='utf-8'))
     g.instance_names = names
+    # a native tree: files carry the Definitions imports of the theorem stubs their modules import
+    g.stub_definitions = bool(cfg.get('carry_stub_definitions'))
     return g
+
+
+def target_stubs(cfg, plan):
+    """{node: published statement module text} for the nodes of `proves`, from SRC/Theorems (where
+    fetch_theorems.py writes published statements): gen inlines it where the piece would otherwise
+    import the statement it proves."""
+    out = {}
+    for n, name in (plan.get('proves') or {}).items():
+        p = os.path.join(cfg['src'], 'Theorems', 'Thm_%s.lean' % C.slug(name))
+        if os.path.exists(p):
+            out[n] = open(p, encoding='utf-8').read()
+    return out
 
 
 def costs(cfg, g):
@@ -452,7 +474,8 @@ def run_gen(cfg, g, P, kinds, names):
     r = C.generate(g, P, cfg['out'], kinds,
                    names, cfg.get('external', ()), cfg.get('collapse_mathlib', True),
                    patches, repairs=recorded_repairs(cfg), frozen_text=frozen_text,
-                   frozen_stubs=frozen_stubs, monomorphic=set(cfg.get('monomorphic', ())))
+                   frozen_stubs=frozen_stubs, monomorphic=set(cfg.get('monomorphic', ())),
+                   target_stubs=target_stubs(cfg, P))
     for f in r['files']:
         print('%9d  %s' % (r['sizes'][f], f))
     for f, c in r['stale_repairs']:
@@ -604,6 +627,10 @@ def main(argv):
             P['folded'] = sorted(set(P.get('folded', [])) | set(cfg['folded']))
         if cfg.get('statement_suffixes'):
             P['statement_suffixes'] = {n: x for n, x in sorted(cfg['statement_suffixes'].items()) if n in P['pieces']}
+        if cfg.get('proves'):
+            P['proves'] = dict(sorted(cfg['proves'].items()))
+            if cfg.get('proves_ids'):
+                P['proves_ids'] = dict(sorted(cfg['proves_ids'].items()))
         out = rest[rest.index('-o') + 1] if '-o' in rest else plan_path(cfg)
         json.dump(P, open(out, 'w'), indent=1, sort_keys=True)
         worst = sorted(((p['cost'], n) for n, p in P['pieces'].items()), reverse=True)[:5]
@@ -613,7 +640,7 @@ def main(argv):
             print('  %7.1f s  %s' % (c, n))
         print_chains(g, P, cfg)
         print_entries(g, P, cost)
-        probs = C.check_plan(g, P)
+        probs = C.check_plan(g, P) + C.proves_problems(g, P)
         warn_leaks(g, P)
         report_duplicates(g)
         for k, us in sorted((P.get('max_only_universes') or {}).items()):

@@ -778,6 +778,46 @@ mixed old and new `carve.py` inside one carve).
   `P2M_WORKSPACE` set to a workspace of its own holding the folder (and its `.lake` build) as copies;
   never on `~/claude/prove2me_workspace`.
 
+### A development of our own: `--native`
+
+A Lean development we wrote ourselves, built in the workspace and too large for one submission, is carved
+by the same driver in native mode (`p2mlib/nativecarve.py`). Artin KP′ (2026-11-16) first had to call the
+carve primitives by hand with a hand-written config; that is what native mode writes.
+
+- **The command.** `carve_pipeline.py DIR --native --folder Artin --root-module Solutions.Artin.KP.GR_Main
+  --target ArtinKP.GR.goal --proves ArtinKP.GR.goal=PUBLISHED@ID --bundle-prefix P [--forced FILE.json]
+  [--times TIMES.jsonl] --detach`. There is no fetch, port, build or workspace build; the steps start at
+  `config`, and from `graph` on they are a port's, with resume, `--detach`/`--wait`, calibrate, overlap
+  publishing and the monitoring section. The port's parameters (`--fetch`, `--patches`, `--def`,
+  `--compat-imports`, …) are refused; a post-carve patch goes in `--config-set` `patches`.
+- **Build the tree first, and do not edit it while the carve runs.** `config` refuses a closure module whose
+  `.olean` is missing or older than its source. An edit to a closure module makes `config` stale on the next
+  resume: rebuild, and the graph is read again. Modules outside the roots' closure are not the carve's input.
+- **`config` writes config.json from the roots' import closure**: the dotted `prefix` `Solutions.FOLDER`,
+  `external_theorems` = the `Theorems.Thm_*` the closure imports, `extra_olean_modules` = every
+  `Definitions`/`Theorems` module it reaches (the carve's olean directory shadows the workspace's, so
+  measure needs them all), `carry_stub_definitions` (a carved file also imports the `Definitions` bundles of
+  the theorem stubs its modules import: without it two Artin bundles failed on an `open` of a namespace only
+  a stub's bundle declares), budget 55, chunker `schedule`, `time_scale` 1.2.
+- **`--times`** is a per-module measurement, `{"module", "build_s"}` a line (CPU of `lean` on one module, -j1),
+  and `extdefs` (`carve_prep.py native-prep`) turns it into the cost model's build log less the 3 s import. A
+  module it lacks takes the time LeanInfo recorded in `graph`; with neither, the step stops rather than plan
+  blind.
+- **`--proves LOCAL=PUBLISHED@ID`: the goal proves a statement already published under another name.** No
+  stub is published for it; its piece is `Sol_<PUBLISHED slug>.lean`, keeps the local name, and is submitted
+  against the live theorem, whose id must begin with `ID` (`names` checks it, and `split_run` stops the piece
+  rather than send it elsewhere). The piece never imports the statement it proves: a `type_of% (PUBLISHED …)`
+  in the development is rewritten to a reducible `<name>_Statement` inlined from the workspace's copy of the
+  stub, and any other use of the target is refused. What rests on the target stays inside the goal's piece
+  (`no_promote`, set by `extdefs`); never force such a theorem.
+- **Write `DIR/native_meta.json` first**: `title`, `credit` (the development's authors), `repo`, the full
+  `commit`, `paths` ({workspace module prefix: directory in the repo}), optional `paper`, `tags`, `license`.
+  The prose templates credit the authors, link each declaration to its line in the repo at that commit, and
+  say nothing of OpenAI; `check-text` runs on them as for a port. The links are only as public as the repo.
+- **For a statement's blind read-back**, the carve's bundles are megabytes of proofs. `stage_auditor.py
+  carve-view DIR/config.json NAME` writes the definitions of its signature closure alone
+  (`readback_views/<slug>.defs.lean`); stage that as the imported file.
+
 ## Measuring and calibrating
 
 - **The cost model is calibrated by the measurement, automatically.** `calibrate` (after `measure`) takes

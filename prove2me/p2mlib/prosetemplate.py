@@ -24,6 +24,12 @@ is written prose and is kept unless `force`.
 oai_meta.json: {"title", "date", "family", "commit" (40 hex), "paper" (URL, optional),
 "prefixes" (OpenAI module prefixes, e.g. ["OAI.Geometry.HeilbronnTriangle"]), "lean_root"
 (optional: the fetched lean/ tree, to map a flattened module name `Sub_X` back to its path)}.
+
+A development of our own (carve_pipeline.py --native) has `native_meta.json` instead (p2mlib.nativecarve
+has the format: title, credit, repo, commit, paths, optional paper and license), and its texts credit
+the authors of that development, link each declaration to its line in the source repository at the
+commit, and say nothing of OpenAI or of a port (native_statement_prose, native_bundle_prose,
+native_explanation).
 """
 import collections
 import hashlib
@@ -33,6 +39,7 @@ import re
 import sys
 
 from . import carve as C
+from . import nativecarve as NC
 from .mission import front_matter
 
 MARK = 'carve_prep prose-template'
@@ -108,7 +115,15 @@ class Context:
         self.plan = json.load(open(os.path.join(self.P, 'plan.json'), encoding='utf-8'))
         cp = os.path.join(d, 'config.json')
         self.cfg = json.load(open(cp, encoding='utf-8')) if os.path.exists(cp) else {}
-        self.meta = check_meta(meta if meta is not None else load_meta(d))
+        meta = meta if meta is not None else load_meta(d)
+        self.native = NC.is_native_meta(meta)
+        if self.native:
+            bad = None if all(meta.get(k) for k in NC.META_KEYS) else \
+                '%s: no %r; the file is %s' % (NC.META_NAME, next(k for k in NC.META_KEYS if not meta.get(k)),
+                                               NC.META_FORMAT)
+            if bad:
+                sys.exit(bad)
+        self.meta = meta if self.native else check_meta(meta)
         self.consts = {}
         for g in (os.path.join(os.path.expanduser(self.cfg.get('work', '')), 'decl_graph.jsonl'),
                   os.path.join(d, 'work', 'decl_graph.jsonl')):
@@ -129,8 +144,10 @@ class Context:
         self.sols = os.path.join(self.P, 'out', 'solutions')
         self.slug_name = {C.slug(C.statement_name(self.plan, n)): C.statement_name(self.plan, n)
                           for n in list(self.plan['stubs']) + list(self.plan['pieces'])}
-        self.paths = module_paths(self.meta)
+        self.paths = (lambda short: None) if self.native else module_paths(self.meta)
         self.versions = versions(self.cfg.get('src'))
+        # the goals by their published names (a native target may prove a statement of another name)
+        self.goal_names = [C.statement_name(self.plan, t) for t in self.targets]
 
     # files
     def read(self, *p):
@@ -176,6 +193,30 @@ class Context:
         m = (self.consts.get(node) or {}).get('m', '')
         return m.rsplit('.', 1)[-1] if m else None
 
+    # a native tree: full module names, the meta file's `paths`
+    def module_full(self, node):
+        return (self.consts.get(node) or {}).get('m') or None
+
+    def module_label(self, module):
+        """A module as the prose names it: without the tree's prefix (`KP.GR_Main`)."""
+        pre = (self.cfg.get('prefix') or '') + '.'
+        return module[len(pre):] if pre != '.' and module.startswith(pre) else module
+
+    def decl_link(self, node):
+        m = self.module_full(node)
+        r = (self.consts.get(node) or {}).get('r')
+        return NC.module_link(self.meta, m, r[0] if r else None) if m else None
+
+    def development(self):
+        m = self.meta
+        return 'the Lean development *%s* by %s ([%s](%s) at commit %s)' % (
+            m['title'], m['credit'], re.sub(r'^https?://', '', m['repo'].rstrip('/')), m['repo'].rstrip('/'),
+            m['commit'][:7])
+
+    def compiles(self):
+        v = self.versions
+        return 'It compiles with Lean %s and Mathlib %s.' % v if v else ''
+
     def link(self, short):
         p = self.paths(short)
         return '%s/blob/%s/%s' % (REPO, self.meta['commit'], p) if p else None
@@ -203,6 +244,9 @@ class Context:
 
 def load_meta(d):
     p = os.path.join(d, 'oai_meta.json')
+    n = os.path.join(d, NC.META_NAME)
+    if not os.path.exists(p) and os.path.exists(n):
+        return json.load(open(n, encoding='utf-8'))
     if not os.path.exists(p):
         sys.exit('no %s: write {"title", "date", "family", "commit", "paper", "prefixes"} '
                  '(p2mlib/prosetemplate.py)' % p)
@@ -275,7 +319,227 @@ def _uses(ctx, node):
     return by
 
 
+def _used_by(ctx, name):
+    bs, ss, ps = ctx.importers('Theorems.Thm_' + C.slug(name))
+    used = ['the proof%s of %s' % ('s' if len(ps) > 1 else '', _names(ps))] if ps else []
+    if ss:
+        used.append('the statement%s %s' % ('s' if len(ss) > 1 else '', _names(ss)))
+    if bs:
+        used.append('the definitions bundle%s %s' % ('s' if len(bs) > 1 else '', _names(bs)))
+    if not used:
+        return '**Used by.** No other item of this split imports it.'
+    subj = ' and '.join(used)
+    return '**Used by.** %s%s of this split import%s it.' % (
+        subj[0].upper(), subj[1:], 's' if len(ps) + len(ss) + len(bs) == 1 else '')
+
+
+def _definitions(ctx, node):
+    uses = _uses(ctx, node)
+    if not uses:
+        return None
+    own = {b['name'] for b in ctx.plan['bundles']}
+    parts = []
+    for where in sorted(uses, key=lambda w: (w not in own, w)):
+        names = _names(uses[where])
+        if where in own:
+            parts.append('%s (definitions bundle `%s` of this split)' % (names, where))
+        else:
+            parts.append('%s (the published bundle `%s`)' % (names, where.split('.')[-1]))
+    return '**Definitions.** The statement is written with %s.' % '; '.join(parts)
+
+
+def _after(ctx):
+    return ' It formalizes %s.' % ctx.meta['paper'].rstrip('.') if ctx.meta.get('paper') else ''
+
+
+def native_statement_prose(ctx, node):
+    """statement_prose for a development of our own: credit to its authors, the declaration linked at its
+    line in the source repository at the commit; nothing about OpenAI."""
+    name = C.statement_name(ctx.plan, node)
+    decl, ns, opens = stub_statement(ctx.stub(node))
+    link = ctx.decl_link(node)
+    title = '%s: intermediate lemma of %s' % (name, ctx.meta['title'])
+    if len(title) > 200:
+        title = '%s (intermediate lemma)' % name
+    src = NC.source_line(ctx.meta) + ('; Lean: %s (declaration %s)' % (link, C.pubname(node)) if link else '')
+    where = ''
+    if link:
+        where = ' There it is the declaration `%s` of [%s](%s).' % (
+            C.pubname(node), NC.module_path(ctx.meta, ctx.module_full(node)), link)
+    out = ['---', 'title: ' + title, 'source: ' + src, 'template: ' + MARK, '---',
+           'An intermediate lemma of the split of the formal proof of %s, carved for this platform from %s. '
+           'The statement and its proof are that development\'s.%s%s %s' % (
+               _names(ctx.goal_names), ctx.development(), where, _after(ctx), ctx.compiles()),
+           '',
+           '**The statement**, as published%s:' % _context_line(ns, opens),
+           '', '```lean', decl, '```', '']
+    defs = _definitions(ctx, node)
+    if defs:
+        out += [defs, '']
+    out += [_used_by(ctx, name), '']
+    return '\n'.join(l.rstrip() if l.startswith('An intermediate') else l for l in out)
+
+
+def native_module_refs(ctx, modules):
+    """Full module names as the prose shows them, each linked to its file at the commit when the meta
+    file maps it and there are only a few."""
+    refs = []
+    for m in modules:
+        lk = NC.module_link(ctx.meta, m) if len(modules) <= LINK_MODULES else None
+        refs.append('[`%s`](%s)' % (ctx.module_label(m), lk) if lk else '`%s`' % ctx.module_label(m))
+    return refs
+
+
+def native_bundle_prose(ctx, b):
+    name = b['name']
+    text = ctx.read(ctx.lib, 'Def_%s.lean' % name)
+    counts, types = {}, []
+    for n in b['nodes']:
+        k = kind_of(ctx.consts.get(n) or {})
+        counts[k] = counts.get(k, 0) + 1
+        if k in ('definition', 'inductive type or structure'):
+            types.append(C.pubname(n))
+    kinds = [_plural(counts[one], one, many) for one, many in KIND if counts.get(one)]
+    mods = sorted(set(re.findall(r'^-- module (\S+)', text, re.M)))
+    title = 'Definitions bundle %s of the split of %s' % (name, ctx.meta['title'])
+    if len(title) > 200:
+        title = 'Definitions bundle %s' % name
+    src = NC.source_line(ctx.meta) + '; definitions carved from that development'
+    out = ['---', 'title: ' + title, 'source: ' + src, 'template: ' + MARK, '---',
+           'A definitions bundle of the split of the formal proof of %s, carved for this platform from %s. '
+           'The declarations and their proofs are that development\'s.%s %s' % (
+               _names(ctx.goal_names), ctx.development(), _after(ctx), ctx.compiles()), '']
+    out[5] = out[5].rstrip()
+    line = '**Contents.** It holds %s of that development%s.' % (
+        _plural(len(b['nodes']), 'declaration', 'declarations'),
+        '' if not kinds else ': ' + (', '.join(kinds[:-1]) + ' and ' + kinds[-1] if len(kinds) > 1 else kinds[0]))
+    if types:
+        cap = 40
+        shown = sorted(types)[:cap]
+        line += ' The definitions and types are %s%s.' % (
+            ', '.join('`%s`' % t for t in shown), ' and %d more' % (len(types) - cap) if len(types) > cap else '')
+    out += [line, '']
+    if mods:
+        out += ['**Sources.** They come from these modules of the development, in whole or in part: %s.'
+                % ', '.join(native_module_refs(ctx, mods)), '']
+    out += [_bundle_imports(ctx, text), '', _bundle_importers(ctx, name), '']
+    return '\n'.join(out)
+
+
+def _bundle_imports(ctx, text):
+    own = {x['name'] for x in ctx.plan['bundles']}
+    imps = imports_of(text)
+    pub = [i.split('.')[-1] for i in imps if i.startswith('Definitions.') and i.split('Def_', 1)[-1] not in own]
+    ours = [i.split('Def_', 1)[-1] for i in imps if i.startswith('Definitions.') and i.split('Def_', 1)[-1] in own]
+    thms = [ctx.slug_name.get(i.split('Thm_', 1)[-1], i.split('Thm_', 1)[-1]) for i in imps if i.startswith('Theorems.')]
+    parts = []
+    if pub:
+        parts.append('the published bundle%s %s' % ('s' if len(pub) > 1 else '', _names(pub)))
+    if ours:
+        parts.append('the bundle%s %s of this split' % ('s' if len(ours) > 1 else '', _names(ours)))
+    if thms:
+        parts.append('the published statement%s %s' % ('s' if len(thms) > 1 else '', _names(thms)))
+    return '**Imports.** %s' % ('It imports %s.' % '; '.join(parts) if parts else
+                                'It imports no bundle or statement, only Mathlib.')
+
+
+def _bundle_importers(ctx, name):
+    bs, ss, ps = ctx.importers('Definitions.Def_' + name)
+    parts = []
+    if bs:
+        parts.append('the bundle%s %s' % ('s' if len(bs) > 1 else '', _names(bs)))
+    if ss:
+        parts.append('the statement%s %s' % ('s' if len(ss) > 1 else '', _names(ss)))
+    if ps:
+        parts.append('the proof%s of %s' % ('s' if len(ps) > 1 else '', _names(ps)))
+    return '**Imported by** (directly, in this split): %s.' % ('; '.join(parts) if parts else 'none')
+
+
+def native_explanation(ctx, node):
+    """explanation for a piece of a development of our own."""
+    name = C.statement_name(ctx.plan, node)
+    goal = node in (ctx.plan.get('proves') or {}) or node in ctx.targets
+    if node in ctx.ext:
+        # the statement is published already: read it from the workspace's copy
+        p = os.path.join(os.path.expanduser(ctx.cfg.get('src') or ''), 'Theorems', 'Thm_%s.lean' % C.slug(name))
+        decl, ns, opens = stub_statement(ctx.read(p))
+    else:
+        decl, ns, opens = stub_statement(ctx.stub(node))
+    sol = ctx.solution(node)
+    m = re.search(r'^theorem solution\S*\s*:\s*type_of%\s*@([^\s.{]+(?:\.[^\s.{]+)*)', sol, re.M)
+    own = m.group(1) if m else None
+    piece = ctx.plan['pieces'].get(node, {})
+    keep = list(piece.get('keep', ()))
+    mods = sorted({ctx.module_full(k) for k in keep if ctx.module_full(k)})
+    refs = native_module_refs(ctx, mods)
+    imps = imports_of(sol)
+    ownb = {x['name'] for x in ctx.plan['bundles']}
+    pubb = [i.split('.')[-1] for i in imps if i.startswith('Definitions.') and i.split('Def_', 1)[-1] not in ownb]
+    ours = [i.split('Def_', 1)[-1] for i in imps if i.startswith('Definitions.') and i.split('Def_', 1)[-1] in ownb]
+    thms = [ctx.slug_name.get(i.split('Thm_', 1)[-1], i.split('Thm_', 1)[-1]) for i in imps if i.startswith('Theorems.')]
+    tex = name.replace('_', r'\_')
+    what = 'the goal of this split' if goal else \
+        'an intermediate lemma of the split of the formal proof of %s' % _names(ctx.goal_names)
+    out = ['$$\\mathtt{%s}$$' % tex, '',
+           'This file proves the published statement `%s`, %s. In Lean%s:' % (name, what, _context_line(ns, opens)),
+           '', '```lean', decl, '```', '']
+    clean = not re.search(r'(?<![\w.])(sorry|admit)(?![\w])', sol) and not re.search(r'^\s*axiom\s', sol, re.M)
+    hyp = '**Hypotheses used.** Those of the statement.'
+    if clean:
+        hyp += ' The file contains no `sorry` and declares no `axiom`.'
+    if thms:
+        hyp += ' It also uses the published statement%s %s, imported as %s.' % (
+            's' if len(thms) > 1 else '', _names(thms), 'lemmas' if len(thms) > 1 else 'a lemma')
+    out += [hyp, '']
+    idea = ('**Proof idea.** The proof is that of %s. The file is carved from that development: it keeps the %s '
+            'of it that this proof reaches' % (ctx.development(), _plural(len(keep), 'declaration', 'declarations')))
+    if refs:
+        idea += ', from the module%s %s' % ('s' if len(refs) > 1 else '', ', '.join(refs))
+    idea += '. ' + ctx.compiles()
+    out += [idea.rstrip(), '']
+    steps, dparts = [], []
+    if pubb:
+        dparts.append('the published bundle%s %s' % ('s' if len(pubb) > 1 else '', _names(pubb)))
+    if ours:
+        dparts.append('the definitions bundle%s %s of this split' % ('s' if len(ours) > 1 else '', _names(ours)))
+    if dparts:
+        steps.append('The definitions come from %s, which the file imports.' % ' and '.join(dparts))
+    if thms:
+        steps.append('The published statement%s %s %s imported rather than re-proved.' % (
+            's' if len(thms) > 1 else '', _names(thms), 'are' if len(thms) > 1 else 'is'))
+    if own:
+        steps.append("The development's own proof of the statement, the theorem `%s`, closes it; "
+                     '`theorem solution` is that theorem.' % (own.rsplit('.', 1)[-1] if own.endswith('_oai') else own))
+    out += ['**Steps.**'] + ['%d. %s' % (i + 1, x) for i, x in enumerate(steps)] + ['']
+    changes = []
+    if own and own.endswith('_oai'):
+        changes.append("The development's theorem is renamed `%s`, so that `solution` is the only declaration "
+                       'matching the published statement.' % own.rsplit('.', 1)[-1])
+    if C.STATEMENT_SUFFIX in sol and node in (ctx.plan.get('proves') or {}):
+        changes.append('The development states its theorem as the type of the published statement; here that '
+                       'statement is written out as the reducible definition `%s%s`, so that the file does not '
+                       'import the statement it proves.' % (name.rsplit('.', 1)[-1], C.STATEMENT_SUFFIX))
+    if 'set_option linter.all false' in sol:
+        changes.append('Module sections start with `set_option` lines that turn linters off, for speed; '
+                       'linters only emit warnings, so this does not change what is proved.')
+    for why, n in _patch_notes(ctx, sol).items():
+        changes.append('A recorded change to the carved text%s: %s' % (
+            ' (%d places)' % n if n > 1 else '', why if why.endswith('.') else why + '.'))
+    if changes:
+        out += ['**What the carve changed.**'] + ['- ' + c for c in changes] + ['']
+    cm = ctx.meta
+    credit = '**Source and credit.** The Lean development is by %s: *%s*, [%s](%s) at commit %s%s.' % (
+        cm['credit'], cm['title'], re.sub(r'^https?://', '', cm['repo'].rstrip('/')), cm['repo'].rstrip('/'),
+        cm['commit'][:7], ', %s' % cm['license'] if cm.get('license') else '')
+    if cm.get('paper'):
+        credit += ' The mathematics it formalizes is that of %s.' % cm['paper'].rstrip('.')
+    out += [credit, '']
+    return '\n'.join(out)
+
+
 def statement_prose(ctx, node):
+    if ctx.native:
+        return native_statement_prose(ctx, node)
     name = C.statement_name(ctx.plan, node)
     decl, ns, opens = stub_statement(ctx.stub(node))
     short = ctx.module_short(node)
@@ -340,6 +604,8 @@ def kind_of(rec):
 
 
 def bundle_prose(ctx, b):
+    if ctx.native:
+        return native_bundle_prose(ctx, b)
     name = b['name']
     text = ctx.read(ctx.lib, 'Def_%s.lean' % name)
     counts = {}
@@ -436,6 +702,8 @@ def _patch_notes(ctx, sol):
 
 
 def explanation(ctx, node):
+    if ctx.native:
+        return native_explanation(ctx, node)
     name = C.statement_name(ctx.plan, node)
     decl, ns, opens = stub_statement(ctx.stub(node))
     sol = ctx.solution(node)

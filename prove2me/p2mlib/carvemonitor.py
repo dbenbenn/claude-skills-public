@@ -32,7 +32,7 @@ import threading
 import time
 
 from . import runlock
-from .carvepipeline import OVERLAP_ONLY as _OVERLAP_ONLY, STEPS as _STEPS
+from .carvepipeline import OVERLAP_ONLY as _OVERLAP_ONLY, STEPS as _STEPS, steps_for as _steps_for
 
 INTERVAL = 60          # seconds between refreshes during a long step
 POLL = 5               # seconds between looks at pipeline_state.json (a step boundary)
@@ -178,8 +178,7 @@ class Carve:
 
     def steps(self, go=None):
         """This mode's steps; without --publish (go False) the publishing steps are left out."""
-        ov = bool(self.params().get('overlap'))
-        s = list(_STEPS) if ov else [x for x in _STEPS if x not in _OVERLAP_ONLY]
+        s = _steps_for(self.params())
         if go is False:
             s = [x for x in s if x not in ('publish', 'publish_early')]
         return s

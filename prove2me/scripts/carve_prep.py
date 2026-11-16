@@ -23,6 +23,12 @@ usage:
       (exact, one Lean run per bundle; waits for a lean-cap slot), --names reads them from a file
       (`NAME` or `NAME MODULE` per line); default: parsed from the bundle sources, with Lean asked
       for a bundle that has an anonymous instance (its name is Lean's to generate).
+  carve_prep.py native-prep CONFIG.json [--times TIMES.jsonl]
+      a native tree's step between `carve.py graph` and `plan` (carve_pipeline --native; p2mlib.nativecarve):
+      the cost model's build log (config `build_logs`[0]) from each module's seconds in --times (a per-module
+      measurement, `{"module", "build_s"}` a line), else those LeanInfo recorded when `graph` read it, less
+      the 3 s import (refused while a module has neither), and config `no_promote` += the theorems resting on
+      a published target of `proves`.
   carve_prep.py filter-patches PATCHES.json LEAN_ROOT OUT.json PREFIX [PREFIX ...]
                        [--compat-ns NS | --root-compat] [--compat FILE] [--header H.lean]
                        [--stdsimplex auto|structure|subtype|off] [--folder FOLDER] [--unif-integrable on|off]
@@ -58,7 +64,8 @@ usage:
   carve_prep.py name-check CONFIG.json
       right after `carve.py gen`: every planned bundle and statement name already live on prove2.me
       with other text, looked up as split_run's dry run does (read-only); exits 1 listing them, so a
-      clash costs minutes, not the hours of measuring before publish (oaiq-068, oaiq-074).
+      clash costs minutes, not the hours of measuring before publish (oaiq-068, oaiq-074). With config
+      `proves`, each published statement a target proves must be live, under the id of `proves_ids`.
   carve_prep.py check-text PUBLISH_DIR [--search FILE ...] [--allow NAME ...] [--kinds bundle,statement]
       explanation rules (p2mlib.explanation) for explanations/*.md; every Lean-looking name in
       backticks in prose/ and explanations/ must occur in out/, the --search files, Mathlib or Lean
@@ -327,6 +334,75 @@ def cmd_ext_defs(argv):
     raw['external_defs'] = graph_external_defs(names, g.owner, g.nodes)
     json.dump(raw, open(pos[0], 'w'), indent=1, ensure_ascii=False)
     print(len(raw['external_defs']), 'external definitions')
+
+
+# ---------------------------------------------------------------- a native tree (carve_pipeline --native)
+
+def native_graph(cfg):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('carve_cli', os.path.join(HERE, 'carve.py'))
+    cv = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cv)
+    return cv.load_graph(cfg)
+
+
+def native_secs(ws):
+    """module -> the seconds LeanInfo recorded when `carve.py graph` elaborated it (the per-module
+    measurement: one module at a time with config `jobs` 1), or None."""
+    import oai_build_modules as BM
+    return BM.cached_build_secs(ws, None)
+
+
+def cmd_native_prep(argv):
+    from p2mlib import carve as C, nativecarve as NC
+    pos = positional(argv, ('--ws', '--times'))
+    if len(pos) != 1:
+        sys.exit(__doc__)
+    raw = json.load(open(pos[0], encoding='utf-8'))
+    cfg = dict(raw, src=os.path.expanduser(raw['src']), work=os.path.expanduser(raw['work']))
+    g = native_graph(cfg)
+    prefix = cfg['prefix']
+    mods = [m for m in g.modules if m == prefix or m.startswith(prefix + '.')]
+    cached = native_secs(cfg['src'])
+    measured = NC.read_times(argv[argv.index('--times') + 1]) if '--times' in argv else {}
+    text, missing = NC.build_lines(mods, lambda m: measured.get(m) or cached(m))
+    if measured:
+        print('times: %d from %s, %d from LeanInfo' % (sum(1 for m in mods if m in measured),
+                                                       argv[argv.index('--times') + 1],
+                                                       sum(1 for m in mods if m not in measured and m not in missing)))
+    if missing:
+        sys.exit('%d of %d modules have no recorded elaboration time (%s%s): the cost model would take 2 s for each '
+                 'and plan blind (oaiq-092). `carve.py graph` records them as it elaborates each module; a module '
+                 'changed or rebuilt since is not in the LeanInfo cache: resume with `--redo graph`'
+                 % (len(missing), len(mods), ', '.join(missing[:5]), ', ...' if len(missing) > 5 else ''))
+    log = os.path.expanduser((cfg.get('build_logs') or [os.path.join(os.path.dirname(os.path.abspath(pos[0])),
+                                                                     'build_adj.log')])[0])
+    _atomic_write(log, text)
+    total = sum(C.parse_build_log(text).values())
+    print('%s: %d modules timed, %.0f s net of the %.0f s import each' % (log, len(mods), total, NC.IMPORT_OVERHEAD))
+    keep = NC.target_no_promote(g, cfg.get('proves') or {}, C.target_users)
+    if keep:
+        raw['no_promote'] = sorted(set(raw.get('no_promote') or ()) | set(keep))
+        print('no_promote: %d theorem(s) rest on a published target and stay inside its piece: %s'
+              % (len(keep), ', '.join(keep[:20]) + (', ...' if len(keep) > 20 else '')))
+    raw['external_defs'] = raw.get('external_defs') or {}
+    _atomic_write(pos[0], json.dumps(raw, indent=1, ensure_ascii=False))
+
+
+def proves_id_problems(cfg, existing):
+    """Problems with a native carve's `proves` on the live platform: each published statement must be live,
+    and its id must begin with the one given (`proves_ids`, from --proves LOCAL=PUBLISHED@ID): the goal's
+    piece is submitted against that theorem and no other. `existing(kind, name)` is splitrun's lookup."""
+    out = []
+    ids = cfg.get('proves_ids') or {}
+    for local, name in sorted((cfg.get('proves') or {}).items()):
+        rec = existing('statement', name)
+        if not rec:
+            out.append('%s: the statement %s it is to prove is not live on prove2.me' % (local, name))
+        elif ids.get(name) and not str(rec.get('id') or '').startswith(ids[name]):
+            out.append('%s: the live statement %s has id %s, not %s (--proves): the wrong statement, or a stale id'
+                       % (local, name, rec.get('id'), ids[name]))
+    return out
 
 
 # ---------------------------------------------------------------- patches
@@ -905,10 +981,21 @@ def cmd_name_check(argv):
     pos = positional(argv, ())
     if len(pos) != 1:
         sys.exit(__doc__)
-    ok, msg = name_check(json.load(open(pos[0], encoding='utf-8')))
+    cfg = json.load(open(pos[0], encoding='utf-8'))
+    ok, msg = name_check(cfg)
     print(msg)
     if not ok:
         sys.exit(1)
+    if cfg.get('proves'):
+        from p2mlib import splitrun as R
+        bad = proves_id_problems(cfg, R.LiveApi().existing)
+        for b in bad:
+            print('PROVES', b)
+        if bad:
+            sys.exit(1)
+        print('proves: %s' % ', '.join('%s -> %s%s' % (k, v, ' (%s)' % cfg['proves_ids'][v]
+                                                        if v in (cfg.get('proves_ids') or {}) else '')
+                                       for k, v in sorted(cfg['proves'].items())))
 
 
 def cmd_prose_template(argv):
@@ -934,7 +1021,8 @@ def cmd_prose_template(argv):
         len(rep['written']), len(rep['kept']), len(rep['needs_written']), pos[0].rstrip('/')))
 
 
-CMDS = {'config': cmd_config, 'ext-defs': cmd_ext_defs, 'filter-patches': cmd_filter_patches,
+CMDS = {'config': cmd_config, 'ext-defs': cmd_ext_defs, 'native-prep': cmd_native_prep,
+        'filter-patches': cmd_filter_patches,
         'publish-prep': lambda a: print(publish_prep(a[0], a[1], a[2].split(','), sync='--sync' in a)[1])
         if len([x for x in a if x != '--sync']) == 3 else sys.exit(__doc__),
         'bundle-prose': cmd_bundle_prose, 'prose-template': cmd_prose_template, 'name-check': cmd_name_check,

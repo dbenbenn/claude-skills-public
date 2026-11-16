@@ -4068,3 +4068,196 @@ def test_gen_line_breaks_long_lines_but_not_frozen_copies(tmp_path):
     msg2 = run2('gen', str(cfg2))
     assert (out2 / 'lib' / hit[0].name).read_text() == flat
     assert 'FROZEN %s' % hit[0].name not in msg2, msg2[-600:]
+
+
+# ---------------------------------------------------------------- native trees (carve_pipeline --native)
+
+def _with_stub(carry):
+    g2 = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)   # private copy: mutated
+    m = 'CarveDev.Base'
+    g2.infos['Theorems.Thm_X'] = g2.infos[m]
+    g2.imports['Theorems.Thm_X'] = ['Init', 'Mathlib', 'Definitions.Def_Other', 'Definitions.Def_More']
+    g2.imports[m] = list(g2.imports.get(m, [])) + ['Theorems.Thm_X']
+    g2.stub_definitions = carry
+    return g2
+
+
+def test_stub_definitions_are_carried_for_a_native_tree():
+    # Artin KP (2026-11-16): `C0ZA` reaches the M4aHerbrand bundles only through the `Thm_*` stubs it
+    # imports and opens their namespaces; a bundle carved from it kept the `open` line and one stub,
+    # and failed "unknown namespace `M4aHerbrand`" (the trial patched seven imports in by hand). With
+    # `stub_definitions` a file walking a module carries the Definitions imports of that module's
+    # theorem stubs, also when the module is reached through a project import; the stub itself is
+    # still imported only where its theorem is used.
+    g2 = _with_stub(True)
+    out = g2.ext_imports(['CarveDev.Base'])
+    assert 'Definitions.Def_Other' in out and 'Definitions.Def_More' in out
+    assert 'Theorems.Thm_X' not in out and 'Mathlib' not in out
+    assert 'Definitions.Def_Other' in g2.ext_imports(['CarveDev.Mid'])     # Mid imports Base
+    hdr = C.header(g2, {'CarveDev.Mid'}, ['B0'], ['CD.x'])
+    assert hdr.index('import Definitions.Def_Other') < hdr.index('import Definitions.Def_B0') \
+        < hdr.index('import Theorems.Thm_CD_x')
+    # off unless asked for (an OpenAI port: CrouzeixHilbert, the test above)
+    assert 'Definitions.Def_Other' not in _with_stub(False).ext_imports(['CarveDev.Base'])
+
+
+def test_cli_sets_stub_definitions_from_the_config(tmp_path):
+    CLI = _cli()
+    cfg = {'work': FIX, 'src': FIX}
+    assert CLI.load_graph(cfg).stub_definitions is False
+    assert CLI.load_graph(dict(cfg, carry_stub_definitions=True)).stub_definitions is True
+
+
+def _proves_plan(g, node='CD.main', name='Pub.main_theorem', **kw):
+    P = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005,
+                    bundle_size=10**6, cost=C.size_costs(g, bytes_per_second=10000),
+                    bundle_prefix='CDB', external=[node], **kw)
+    P['proves'] = {node: name}
+    return P
+
+
+def test_proves_names_the_piece_by_the_published_statement(g, tmp_path):
+    # a native development's theorem (CD.main) proves a statement published under another name: no
+    # stub for it, the piece is Sol_<published slug>.lean, and the node keeps its own name (it cannot
+    # clash with the verifier's copy of the target)
+    P = _proves_plan(g)
+    assert C.statement_name(P, 'CD.main') == 'Pub.main_theorem'
+    assert C.statement_name(P, 'CD.top_aux') == 'CD.top_aux'
+    assert C.piece_target(P, 'CD.main') == 'CD.main' and C.piece_target(P, 'CD.top_aux') == 'CD.top_aux_oai'
+    piece = C.gen_piece(g, P, 'CD.main')
+    assert piece.rstrip().endswith('theorem solution : type_of% @CD.main := @CD.main')
+    assert 'main_oai' not in piece and 'main_theorem_oai' not in piece
+    r = C.generate(g, P, str(tmp_path))
+    names = {os.path.basename(f) for f in r['files']}
+    assert 'Sol_Pub_main_theorem.lean' in names
+    assert 'Thm_Pub_main_theorem.lean' not in names and 'Thm_CD_main.lean' not in names
+    assert 'Sol_CD_main.lean' not in names
+    order = C.publish_order(P, P['external'])
+    assert 'statement:CD.main' not in order['deps'] and 'piece:CD.main' in order['deps']
+    assert C.proves_problems(g, P) == []
+
+
+STUB = '''import Mathlib
+import Definitions.Def_A
+
+namespace Pub
+
+open Foo Bar
+
+open Classical in
+theorem target (n : ℕ) (hn : 0 < n)
+    (F : Type*) [Field F] (ι : F →+* ℂ) :
+  ∃ N₀ : ℕ, ∀ x : F, (fun y : F => (y, [n])) x = (x, [n])
+  := by
+  sorry
+
+end Pub
+'''
+PIECE = '''import Mathlib
+import Definitions.Def_B
+import Theorems.Thm_Pub_target
+import Theorems.Thm_Other
+
+section
+namespace Loc
+open Pub
+/-- proves `target` -/
+theorem pre (n : ℕ) (hn : 0 < n) (F : Type*) [Field F] (ι : F →+* ℂ) (h : n = n) :
+    type_of% (target n hn F ι) := sorry
+theorem goal (n : ℕ) (hn : 0 < n) (F : Type*) [Field F] (ι : F →+* ℂ) :
+    type_of% (Pub.target
+      n hn F ι) := pre n hn F ι rfl
+end Loc
+end
+
+theorem solution : type_of% @Loc.goal := @Loc.goal
+'''
+
+
+def test_target_statement_block_turns_the_stub_into_a_definition():
+    imports, block = C.target_statement_block(STUB, 'Pub.target')
+    assert imports == ['Mathlib', 'Definitions.Def_A']
+    assert 'import' not in block and 'sorry' not in block and 'theorem' not in block
+    assert ('open Classical in\nabbrev target_Statement (n : ℕ) (hn : 0 < n)\n'
+            '    (F : Type*) [Field F] (ι : F →+* ℂ) : Prop :=\n'
+            '  ∃ N₀ : ℕ, ∀ x : F, (fun y : F => (y, [n])) x = (x, [n])\n') in block
+    assert block.startswith('namespace Pub\n\nopen Foo Bar\n') and block.rstrip().endswith('end Pub')
+    with pytest.raises(C.CarveError):
+        C.target_statement_block(STUB, 'Pub.other')
+    with pytest.raises(C.CarveError):                # a proved statement module is no stub
+        C.target_statement_block(STUB.replace('by\n  sorry', 'by\n  trivial'), 'Pub.target')
+
+
+def test_a_piece_never_imports_the_statement_it_proves():
+    # PACKAGING.md 3.2 and risk 10 (Artin KP): `GR.goal` is stated `type_of% (target …)`, so its piece
+    # imported the published statement it proves; the verifier compiles a solution without its target
+    # in scope. The import goes, the statement comes in as a reducible definition with the bundle
+    # imports it needs, and each `type_of% (target args)` reads it.
+    out = C.inline_target_statement(PIECE, 'Pub.target', STUB)
+    heads = [l for l in out.split('\n') if l.startswith('import ')]
+    assert heads == ['import Mathlib', 'import Definitions.Def_B', 'import Theorems.Thm_Other',
+                     'import Definitions.Def_A']
+    assert 'type_of% (target' not in out and 'type_of% (Pub.target' not in out
+    assert '    (target_Statement n hn F ι) := sorry' in out
+    assert '    (Pub.target_Statement\n      n hn F ι) := pre n hn F ι rfl' in out
+    assert out.index('abbrev target_Statement') < out.index('theorem pre')
+    assert out.index('import Definitions.Def_A') < out.index('namespace Pub')
+    assert out.rstrip().endswith('theorem solution : type_of% @Loc.goal := @Loc.goal')
+    # a piece that does not import the target is left alone
+    plain = PIECE.replace('import Theorems.Thm_Pub_target\n', '')
+    assert C.inline_target_statement(plain, 'Pub.target', STUB) == plain
+
+
+def test_a_piece_calling_its_own_target_is_refused():
+    bad = PIECE.replace('pre n hn F ι rfl', 'target n hn F ι')
+    with pytest.raises(C.CarveError, match='other than as `type_of%'):
+        C.inline_target_statement(bad, 'Pub.target', STUB)
+    with pytest.raises(C.CarveError, match='already names'):
+        C.inline_target_statement(PIECE + '\ndef target_Statement := 1\n', 'Pub.target', STUB)
+
+
+def test_gen_piece_inlines_the_published_target(g):
+    # CD.Aux.aux_eq stands in for the published statement the development names (an external theorem,
+    # as in test_external_theorems_are_imported_not_carved); CD.top_aux, which calls it, for the theorem
+    # that proves it. A real use of the target is refused; without the stub text gen says what it lacks.
+    ext = {'CD.Aux.aux_eq': 'Theorems.Thm_CD_Aux_aux_eq'}
+    P = _proves_plan(g, 'CD.top_aux', 'CD.Aux.aux_eq', external_defs=ext)
+    with pytest.raises(C.CarveError, match='no published'):
+        C.gen_piece(g, P, 'CD.top_aux')
+    stub = 'namespace CD.Aux\ntheorem aux_eq : auxOnly = 1 := by\n  sorry\nend CD.Aux\n'
+    with pytest.raises(C.CarveError, match='other than as `type_of%'):
+        C.gen_piece(g, P, 'CD.top_aux', target_stub=stub)
+
+
+def test_proves_problems_keep_the_target_inside_its_piece(g):
+    ext = {'CD.Aux.aux_eq': 'Theorems.Thm_CD_Aux_aux_eq'}
+    P = _proves_plan(g, 'CD.top_aux', 'CD.Aux.aux_eq', external_defs=ext)
+    users = C.target_users(g, 'CD.Aux.aux_eq')
+    assert 'CD.top_aux' in users and 'CD.Aux.aux_eq' not in users
+    others = sorted(n for n, p in P['pieces'].items()
+                    if n != 'CD.top_aux' and any('CD.Aux.aux_eq' in g.nodes[k].deps for k in p['keep']))
+    probs = C.proves_problems(g, P)
+    assert len([p for p in probs if 'the piece of' in p]) == len(others)
+    # a node that is no external target, or mapped to its own name
+    P2 = dict(P, external=[], proves={'CD.top_aux': 'CD.Aux.aux_eq'})
+    assert any('must be a target listed in `external`' in p for p in C.proves_problems(g, P2))
+    P3 = dict(P, proves={'CD.top_aux': 'CD.top_aux'})
+    assert any('published name itself' in p for p in C.proves_problems(g, P3))
+
+
+def test_signature_view_is_the_definitions_a_statement_is_written_with(g):
+    # PACKAGING.md section 4 (Artin KP): the bundles a statement imports are megabytes of proofs, so a
+    # blind reader gets the definitions of its signature closure alone: those its `sig` names and what
+    # they are built from (`deps` of definitions), no theorem, in import order with their context.
+    text, defs, thms = C.signature_view(g, 'CD.uses_sized')
+    assert defs == ['CD.Space', 'CD.Space.size', 'CD.sizedZero']
+    assert thms == ['CD.Space.size_eq']                       # a proof inside sizedZero uses it
+    assert text.startswith('import CarveDev.Base\nimport CarveDev.Mid\n\n')
+    assert text.index('structure Space where') < text.index('def Space.size') < text.index('def sizedZero')
+    assert 'namespace CD' in text
+    assert not re.search(r'^\s*(theorem|lemma)\s', C.strip(text), re.M)
+    assert 'uses_sized' not in text
+    # published definitions are someone else's: neither listed nor walked
+    _, defs2, _ = C.signature_view(g, 'CD.uses_sized', external={'CD.Space': 'Definitions.Def_X'})
+    assert 'CD.Space' not in defs2 and 'CD.sizedZero' in defs2
+    assert C.signature_view(g, 'CD.double_eq')[1] == ['CD.double']

@@ -112,7 +112,7 @@ def imported_modules(cfg, plan):
     mods = set((plan.get('external_defs') or cfg.get('external_defs') or {}).values())
     mods |= set((plan.get('external_theorems') or cfg.get('external_theorems') or {}).values())
     mods |= set(cfg.get('extra_olean_modules') or [])
-    mods |= {'Theorems.Thm_' + C.slug(n) for n in ext}
+    mods |= {'Theorems.Thm_' + C.slug(C.statement_name(plan, n)) for n in ext}
     return sorted(mods)
 
 

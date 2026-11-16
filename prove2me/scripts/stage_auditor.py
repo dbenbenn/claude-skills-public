@@ -39,6 +39,18 @@ Usage:
   stage_auditor.py teardown <slug> [--force]                        -> removes the staging dir
                                                                        (refuses while readback.md or
                                                                         audit.md is missing)
+  stage_auditor.py carve-view CONFIG.json NAME [OUT.lean]           -> a carved statement's definitions
+                                                                       only (p2mlib.carve.signature_view),
+                                                                       to stage beside it in place of
+                                                                       the carve's bundles
+
+A carved statement (carve.py) imports bundles that hold its definitions together with every theorem they
+rest on: megabytes of proofs no reader can take as context (Artin KP, 2026-11-16: ten bundles, 1.95 MB,
+for definitions of 1-79 KB per statement). `carve-view` writes the definitions of the statement's
+signature closure alone, read from the carve graph's `sig`/`deps` (NAME is the graph node or its
+published name; OUT defaults to DIR/readback_views/<slug>.defs.lean beside the config), and lists the
+theorems those definitions use, which the view leaves out. Stage it as the imported file:
+  stage_auditor.py stage <slug> out/lib/Thm_<slug>.lean readback_views/<slug>.defs.lean
 """
 import os, shutil, sys, subprocess
 import re
@@ -472,9 +484,51 @@ def collect_all(mdir, names, teardown_after=False):
     return not bad
 
 
+def carve_view(config, name, out=None):
+    """Write the definitions-only view of a carved statement's signature closure (see the usage) and
+    return its path. `name` is a node of the carve graph, or the published name the plan gives one."""
+    import importlib.util
+    import json
+    spec = importlib.util.spec_from_file_location('carve_cli', os.path.join(HERE, 'carve.py'))
+    cv = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cv)
+    from p2mlib import carve as C
+    cfg = cv.load_config(config)
+    g = cv.load_graph(cfg)
+    plan = {}
+    if os.path.exists(cv.plan_path(cfg)):
+        plan = json.load(open(cv.plan_path(cfg), encoding='utf-8'))
+    node = name if name in g.nodes else None
+    if node is None:
+        for n in list(plan.get('stubs') or ()) + list(plan.get('pieces') or ()):
+            if C.statement_name(plan, n) == name:
+                node = n
+                break
+    if node is None or node not in g.nodes:
+        sys.exit('carve-view: %s is neither a node of the carve graph nor the published name of a planned '
+                 'statement' % name)
+    text, defs, thms = C.signature_view(g, node, external=cv.external_map(cfg))
+    pub = C.statement_name(plan, node) if plan else C.pubname(node)
+    if out is None:
+        out = os.path.join(os.path.dirname(os.path.abspath(config)), 'readback_views',
+                           '%s.defs.lean' % C.slug(pub))
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    with open(out, 'w', encoding='utf-8') as f:
+        f.write(text)
+    print('%s: %d definitions of the signature of %s (%d bytes)' % (out, len(defs), pub, len(text.encode())))
+    if thms:
+        print('theorems the definitions use, left out of the view: %s' % ', '.join(thms))
+    return out
+
+
 def main():
     args = [a for a in sys.argv[1:] if a not in ('--force', '--teardown')]
     force = '--force' in sys.argv[1:]
+    if args and args[0] == 'carve-view':
+        if len(args) not in (3, 4):
+            sys.exit(__doc__)
+        carve_view(args[1], args[2], args[3] if len(args) == 4 else None)
+        sys.exit(0)
     if args and args[0] in ('stage-all', 'collect-all'):
         if len(args) < 2:
             sys.exit(__doc__)

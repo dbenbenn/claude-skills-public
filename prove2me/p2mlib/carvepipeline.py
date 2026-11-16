@@ -18,7 +18,7 @@ import sys
 import time
 import uuid
 
-from . import leantext, oaiport, runlock, snapshot, workspace as wslib
+from . import leantext, nativecarve, oaiport, runlock, snapshot, workspace as wslib
 
 STEPS = ['fetch', 'inputs', 'filter_patches', 'port', 'build', 'wsbuild', 'config', 'graph', 'extdefs', 'plan', 'gen', 'names',
          'order', 'measure', 'calibrate', 'publish_prep', 'prose', 'check_text', 'dryrun', 'publish_early',
@@ -33,7 +33,22 @@ DEFAULT_LEAN_CAP = '~/claude/claude-private/tools/lean-cap'
 PARAM_KEYS = ['folder', 'root_module', 'targets', 'bundle_prefix', 'defs', 'forced', 'patches', 'compat_imports',
               'stdsimplex', 'budget', 'lean_src', 'commit', 'fetch', 'config_set', 'measure_flags', 'meta', 'tags',
               'overlap', 'unif_integrable', 'stream_bundles', 'stream_pieces', 'accept_orphans',
-              'try_over_memory', 'piece_rss_limit', 'try_unsplit_rss', 'foreign']
+              'try_over_memory', 'piece_rss_limit', 'try_unsplit_rss', 'foreign', 'native', 'proves', 'times']
+# Native mode (pipeline.json `native`; carve_pipeline.py --native): the development is our own and already built
+# in WORKSPACE/Solutions/FOLDER, so nothing is fetched, ported or built; `config` and `extdefs` do a native
+# tree's own preparation (p2mlib.nativecarve) and the steps from `graph` on are the port's.
+NATIVE_SKIP = ('fetch', 'inputs', 'filter_patches', 'port', 'build', 'wsbuild')
+NATIVE_REFUSED = ('patches', 'compat_imports', 'stdsimplex', 'unif_integrable', 'lean_src', 'commit', 'fetch',
+                  'foreign', 'defs')      # parameters of the port: they mean nothing for a native tree
+
+
+def steps_for(params):
+    """The steps of a carve with these pipeline.json parameters: every one in overlap mode, else the
+    classic list; a native carve has no fetch ... wsbuild."""
+    s = list(STEPS) if params.get('overlap') else [x for x in STEPS if x not in OVERLAP_ONLY]
+    if params.get('native'):
+        s = [x for x in s if x not in NATIVE_SKIP]
+    return s
 
 
 LIMIT_FACTOR = 1.6      # a measured item this many times the budget is too slow for the verifier
@@ -924,7 +939,8 @@ class Pipeline:
         self.state_path = os.path.join(self.d, 'pipeline_state.json')
         self.state = json.load(open(self.state_path)) if os.path.exists(self.state_path) else {'steps': {}}
         self.lean_src = os.path.abspath(os.path.expanduser(params.get('lean_src') or os.path.join(self.d, 'src', 'lean')))
-        self.meta = os.path.abspath(os.path.expanduser(params.get('meta') or os.path.join(self.d, 'oai_meta.json')))
+        self.meta = os.path.abspath(os.path.expanduser(params.get('meta') or os.path.join(
+            self.d, nativecarve.META_NAME if params.get('native') else 'oai_meta.json')))
         self._kept_rules = set()
         self.ran_now = set()
         self.waiting = None          # what the driver waits for, if anything (the monitoring-page section)
@@ -938,12 +954,35 @@ class Pipeline:
     def folder_dir(self):
         return os.path.join(self.ws, 'Solutions', self.p['folder'])
 
+    # -- native mode ------------------------------------------------------------------------
+    def native(self):
+        return bool(self.p.get('native'))
+
+    def native_roots(self):
+        return [r for r in self.p['root_module'].split(',') if r]
+
+    def native_prefix(self):
+        return 'Solutions.' + self.p['folder'].strip('/').replace('/', '.')
+
+    def native_sources_hash(self):
+        """The identity of what a native carve reads from the workspace: the sources of the roots' import
+        closure (not the whole folder: other work goes on beside it) and the published statements they
+        import. None while the closure cannot be read (step `config` then says why)."""
+        try:
+            mods, ext = nativecarve.closure(self.ws, self.native_prefix(), self.native_roots())
+        except nativecarve.NativeError:
+            return None
+        return hash_paths([nativecarve.module_file(self.ws, m) for m in mods] +
+                          [nativecarve.module_file(self.ws, m) for m in ext if m.startswith('Theorems.')])
+
     def step_inputs_hash(self, s):
         """{name: hash} of what step `s` reads that another step (or the user) produces, taken now. Recorded
         when the step finishes; a later run that finds a recorded hash different has a stale step, and
         it and everything after it run again. `--redo filter_patches` after editing the patches changed
         port_patches.json and left the port unpatched (six batches, 2026-10); `--from` and `--redo` stay
         as they were. config.json is not tracked: calibrate rewrites it on purpose."""
+        if self.native():
+            return self.native_inputs_hash(s)
         pp = os.path.expanduser(self.p['patches']) if self.p.get('patches') else None
         port_out = hash_paths([self.folder_dir()], ('.lean',))
         opts = json.dumps(self.compat_args())
@@ -979,6 +1018,25 @@ class Pipeline:
             h['port options'] = opts
         rule = SNAPSHOT_RULES.get(s)
         if rule and (s != 'filter_patches' or pp):
+            h[rule[0]] = rules_hash(self.snap, rule[1])
+        return h
+
+    def native_inputs_hash(self, s):
+        """step_inputs_hash for a native carve: `config` reads the closure's sources (an edit after the graph
+        was built must be rebuilt and read again: the carver cuts by the compiled command ranges); the steps
+        from `graph` on record what they do for a port."""
+        times = os.path.expanduser(self.p['times']) if self.p.get('times') else None
+        h = {'config': {'sources': self.native_sources_hash()},
+             'extdefs': {'times': hash_paths([times] if times else [])},
+             'gen': {'carve patches': hash_paths([cp] if (cp := self.carve_patches_path()) else [])}}.get(s, {})
+        if s in GEN_READERS:
+            h['gen output'] = self.gen_output_hash(s)
+        if s == 'gen' and (cfg := self.read_config()) is not None:
+            h['plan'] = hash_paths([self.work_paths(cfg)[1]])
+        if s in GRAPH_READERS and (gp := self.graph_path()):
+            h['graph output'] = hash_paths([gp])
+        rule = SNAPSHOT_RULES.get(s)
+        if rule and s not in NATIVE_SKIP:
             h[rule[0]] = rules_hash(self.snap, rule[1])
         return h
 
@@ -1050,7 +1108,7 @@ class Pipeline:
                     and self.state['steps']['gen'].get('finished', '') > rec.get('finished', '~')):
                 # a record from before the gen hash: gen ran again after it (q131)
                 return s, 'gen output'
-            if (s in ('build', 'config') and 'port' not in had and rec['status'] == 'done'
+            if (s in ('build', 'config') and 'port' not in had and rec['status'] == 'done' and not self.native()
                     and self.newest_ported_mtime() > _epoch(rec.get('finished'))):
                 # a record from before the port hash, and the port rewrote a module after it (oaiq-122: an
                 # --upgrade grew Compat.lean, build was skipped, graph read stale .olean ranges)
@@ -1225,8 +1283,11 @@ class Pipeline:
         if isinstance(src, str) and src and os.path.realpath(os.path.expanduser(src)) != os.path.realpath(self.ws):
             problems.append('config.json `src` (%s) is not this run\'s workspace %s (P2M_WORKSPACE): graph, plan and '
                             'measure would read and compile there' % (src, self.ws))
-        owner = self.read_owner()
-        if owner:
+        # a native carve reads Solutions/FOLDER and never writes it: no owner, and no owner file there
+        owner = None if self.native() else self.read_owner()
+        if self.native():
+            pass
+        elif owner:
             them = owner.get('carve')
             if them != here:
                 moved = (owner.get('carve_id') and owner['carve_id'] == self.state.get('carve_id')
@@ -1267,7 +1328,7 @@ class Pipeline:
 
     def steps(self):
         """The steps this carve runs: every one in overlap mode, else the classic list."""
-        return list(STEPS) if self.overlap() else [x for x in STEPS if x not in OVERLAP_ONLY]
+        return steps_for(self.p)
 
     def newest_ported_mtime(self):
         """Whole seconds of the newest ported .lean file's mtime (0 when there is none)."""
@@ -1531,7 +1592,57 @@ class Pipeline:
         mods = self.defs() + [wslib.statement_module(t)[0] for t in self.p['targets']]
         self.run_cmds('wsbuild', [['lake', 'build', *mods]], cwd=self.ws)
 
+    def log_step(self, step, text):
+        """Append what a step done in this process did to DIR/logs/STEP.log (run_cmds does it for tools)."""
+        log = os.path.join(self.d, 'logs', step + '.log')
+        os.makedirs(os.path.dirname(log), exist_ok=True)
+        with open(log, 'a', encoding='utf-8') as f:
+            f.write('==== %s %s (skill %s)\n%s\n' % (_now(), step, os.path.basename(self.snap), text.rstrip('\n')))
+
+    def native_proves(self):
+        try:
+            return nativecarve.parse_proves(self.p.get('proves'))
+        except nativecarve.NativeError as e:
+            raise StepFailed("step 'config' failed: %s" % e)
+
+    def step_config_native(self):
+        """config.json for a tree already built in the workspace (nativecarve.make_config), then what every
+        carve's `config` does: pipeline.json `config_set`, the pipeline's own frozen state, the import-size
+        check. The build log it names is written by `extdefs`, after `graph` has timed every module."""
+        bad = nativecarve.meta_problem(self.meta)
+        if bad:
+            raise StepFailed("step 'config' failed: " + bad)
+        proves, ids = self.native_proves()
+        path = os.path.join(self.d, 'config.json')
+        try:
+            cfg = nativecarve.make_config(self.d, self.ws, self.p['folder'], self.native_roots(), self.p['targets'],
+                                          proves, ids, self.p['bundle_prefix'], self.p.get('forced') or (),
+                                          self.p.get('budget', 55), self.read_config())
+        except nativecarve.NativeError as e:
+            self.log_step('config', 'FAILED: %s' % e)
+            raise StepFailed("step 'config' failed: %s" % e)
+        cfg.update(self.p.get('config_set') or {})
+        self.apply_auto(cfg)
+        json.dump(cfg, open(path, 'w'), indent=1, ensure_ascii=False)
+        self.state['config_set_applied'] = dict(self.p.get('config_set') or {})
+        self.log_step('config', '%s written: native tree %s, roots %s; %d external theorems, %d published modules '
+                      'for the measurement; proves %s' % (
+                          path, cfg['prefix'], ' '.join(cfg['roots']), len(cfg['external_theorems']),
+                          len(cfg['extra_olean_modules']), json.dumps(cfg['proves'], ensure_ascii=False)))
+        self.check_import_sizes_of('config', cfg['extra_olean_modules'])
+
+    def check_import_sizes_of(self, step, mods):
+        big = oversized_imports(self.ws, list(mods))
+        if big:
+            raise StepFailed(
+                "step '%s': %s over the platform's %d-byte cap on an imported source: every bundle, statement and "
+                "proof importing it is refused (\"Source too large for import parser\", q361). Ask the prove2.me "
+                "admins; do not carve this goal meanwhile"
+                % (step, '; '.join('%s is %d bytes' % (m, n) for m, n, _ in big), IMPORT_SOURCE_CAP))
+
     def step_config(self):
+        if self.native():
+            return self.step_config_native()
         bad = check_meta(self.meta, self.lean_src, self.p['root_module'])
         if bad:
             raise StepFailed("step 'config' failed: " + bad)
@@ -1678,13 +1789,21 @@ class Pipeline:
         self.run_cmds('graph', [self.tool('carve', 'graph', 'config.json')])
 
     def step_extdefs(self):
+        if self.native():
+            # a native tree re-declares nothing of the published bundles (external_defs stays empty); what
+            # the plan still lacks is the cost model's build log, from the times `graph` just recorded, and
+            # `no_promote` for what rests on a published target (carve_prep native-prep)
+            times = ['--times', os.path.expanduser(self.p['times'])] if self.p.get('times') else []
+            self.run_cmds('extdefs', [self.tool('carve_prep', 'native-prep', 'config.json', *times)])
+            return None
         a = ['ext-defs', 'config.json']
         for d in self.defs():
             a += ['--def', d]
         self.run_cmds('extdefs', [self.tool('carve_prep', *a)])
 
     def step_plan(self):
-        self.check_def_clashes('plan')          # `frozen` may have come with config_set after config ran
+        if not self.native():
+            self.check_def_clashes('plan')          # `frozen` may have come with config_set after config ran
         self.run_cmds('plan', [self.tool('carve', 'plan', 'config.json')])
         self.check_live_pieces('plan')
 
@@ -2983,7 +3102,21 @@ class Pipeline:
         return ('\nReleased now (publish/release.json; %s): %d piece(s), %s, %s%s.'
                 % (how, len(fast), what, ', '.join(fast), '; held: ' + ', '.join(sorted(held)) if held else ''))
 
+    def default_tags(self):
+        if self.p.get('tags'):
+            return self.p['tags']
+        if self.native():
+            return json.load(open(self.meta, encoding='utf-8')).get('tags') or nativecarve.DEFAULT_TAGS
+        return 'openai-math'
+
+    def meta_args(self):
+        """prose-template's arguments about the source: the fetched tree maps an OpenAI module to its path;
+        a native tree's meta file carries its own `paths`."""
+        return ['--meta', self.meta] + ([] if self.native() else ['--lean-root', self.lean_src])
+
     def source_line(self):
+        if self.native():
+            return nativecarve.source_line(json.load(open(self.meta, encoding='utf-8')))
         m = json.load(open(self.meta))
         return ('OpenAI, %s, OpenAI Math Release, %s, https://github.com/openai/math (result family %s), '
                 'Apache License 2.0' % (m['title'], m['date'], m['family']))
@@ -2993,12 +3126,11 @@ class Pipeline:
         sync = ['--sync'] if self.overlap() and self.publishing_started() else []
         self.check_live_pieces('publish_prep')            # a re-plan by hand (carve.py plan) as well
         self.run_cmds('publish_prep', [self.tool('carve_prep', 'publish-prep', self.d, self.source_line(),
-                                                 self.p.get('tags') or 'openai-math', *sync)])
+                                                 self.default_tags(), *sync)])
 
     def step_prose(self):
         # the sources map each module to its openai/math path (oaiq-035: guessed paths doubled a directory)
-        self.run_cmds('prose', [self.tool('carve_prep', 'prose-template', self.d, '--meta', self.meta,
-                                          '--lean-root', self.lean_src)])
+        self.run_cmds('prose', [self.tool('carve_prep', 'prose-template', self.d, *self.meta_args())])
         log = os.path.join(self.d, 'logs', 'prose.log')
         need = [l for l in open(log).read().splitlines() if 'needs written prose' in l]
         if need:
@@ -3179,10 +3311,10 @@ class Pipeline:
         self.pieces_gates('pieces_prep')
 
     def pieces_gates(self, step):
-        meta = ['--meta', self.meta, '--lean-root', self.lean_src]
+        meta = self.meta_args()
         self.check_live_pieces(step)
         self.run_cmds(step, [
-            self.tool('carve_prep', 'publish-prep', self.d, self.source_line(), self.p.get('tags') or 'openai-math', '--sync'),
+            self.tool('carve_prep', 'publish-prep', self.d, self.source_line(), self.default_tags(), '--sync'),
             self.tool('carve_prep', 'prose-template', self.d, *meta),
             # the prose was checked in check_text (which re-runs after any re-plan): the explanations only
             # (oaiq-047: check-text over 1,279 statements took 50 min)
