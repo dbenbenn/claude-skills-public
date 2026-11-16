@@ -118,11 +118,9 @@ class Context:
         meta = meta if meta is not None else load_meta(d)
         self.native = NC.is_native_meta(meta)
         if self.native:
-            bad = None if all(meta.get(k) for k in NC.META_KEYS) else \
-                '%s: no %r; the file is %s' % (NC.META_NAME, next(k for k in NC.META_KEYS if not meta.get(k)),
-                                               NC.META_FORMAT)
-            if bad:
-                sys.exit(bad)
+            k = NC.meta_missing(meta)
+            if k:
+                sys.exit('%s: no %r; the file is %s' % (NC.META_NAME, k, NC.META_FORMAT))
         self.meta = meta if self.native else check_meta(meta)
         self.consts = {}
         for g in (os.path.join(os.path.expanduser(self.cfg.get('work', '')), 'decl_graph.jsonl'),
@@ -209,9 +207,8 @@ class Context:
 
     def development(self):
         m = self.meta
-        return 'the Lean development *%s* by %s ([%s](%s) at commit %s)' % (
-            m['title'], m['credit'], re.sub(r'^https?://', '', m['repo'].rstrip('/')), m['repo'].rstrip('/'),
-            m['commit'][:7])
+        ref = NC.repo_ref(m)
+        return 'the Lean development *%s* by %s%s' % (m['title'], m['credit'], ' (%s)' % ref if ref else '')
 
     def compiles(self):
         v = self.versions
@@ -528,9 +525,9 @@ def native_explanation(ctx, node):
     if changes:
         out += ['**What the carve changed.**'] + ['- ' + c for c in changes] + ['']
     cm = ctx.meta
-    credit = '**Source and credit.** The Lean development is by %s: *%s*, [%s](%s) at commit %s%s.' % (
-        cm['credit'], cm['title'], re.sub(r'^https?://', '', cm['repo'].rstrip('/')), cm['repo'].rstrip('/'),
-        cm['commit'][:7], ', %s' % cm['license'] if cm.get('license') else '')
+    ref = NC.repo_ref(cm)
+    credit = '**Source and credit.** The Lean development is by %s: *%s*%s%s.' % (
+        cm['credit'], cm['title'], ', %s' % ref if ref else '', ', %s' % cm['license'] if cm.get('license') else '')
     if cm.get('paper'):
         credit += ' The mathematics it formalizes is that of %s.' % cm['paper'].rstrip('.')
     out += [credit, '']

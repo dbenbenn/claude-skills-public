@@ -125,6 +125,21 @@ def test_native_meta_is_checked(tmp_path):
     assert 'oai_meta.json' in N.meta_problem(str(p))       # an OpenAI meta file under the native name
 
 
+def test_private_source_has_no_links(tmp_path):
+    """`"repo": null`: the development's repository is private, so nothing published links to it."""
+    priv = dict(META, repo=None, paths={})
+    p = tmp_path / 'native_meta.json'
+    p.write_text(json.dumps(priv))
+    assert N.meta_problem(str(p)) is None
+    p.write_text(json.dumps({x: v for x, v in priv.items() if x != 'repo'}))
+    assert 'repo' in N.meta_problem(str(p))              # the key must still be there, deliberately null
+    assert N.module_link(priv, 'Solutions.Nat.KP.Sub.Main', 3) is None
+    assert N.module_link(dict(META, repo=None), 'Solutions.Nat.KP.Sub.Main', 3) is None   # even with paths
+    s = N.source_line(priv)
+    assert priv['credit'] in s and priv['title'] in s and 'http' not in s and 'commit' not in s
+    assert N.is_native_meta(priv)
+
+
 def test_module_paths_and_source_line():
     assert N.module_path(META, 'Solutions.Nat.KP.Sub.Main') == 'proofs/kp/lean/Sub/Main.lean'
     assert N.module_path(META, 'Solutions.Nat.C0.B') == 'proofs/c0/lean/B.lean'
@@ -598,6 +613,25 @@ def test_native_templates_pass_check_text_and_the_pronoun_check(tmp_path, capsys
     out = capsys.readouterr().out
     assert e.value.code == 0, out
     assert PR.scan_local([str(d / 'publish' / 'prose'), str(d / 'publish' / 'explanations')]) == []
+
+
+def test_native_templates_for_a_private_source_have_no_links(tmp_path, capsys):
+    """`"repo": null`: credit and commit-free text only, in every item, and check-text still passes."""
+    d, ws = native_carve(tmp_path)
+    (d / 'native_meta.json').write_text(json.dumps(dict(PMETA, repo=None)))
+    T.write_templates(str(d))
+    P = d / 'publish'
+    (P / 'explanations/Pub_target.md').write_text(T.explanation(T.Context(str(d)), 'Loc.goal'))
+    for f in ('prose/Loc_Lemmas_lemA.md', 'prose/NB000.md', 'explanations/Loc_Lemmas_lemA.md',
+              'explanations/Pub_target.md'):
+        t = (P / f).read_text()
+        assert 'github.com' not in t and 'example/dev' not in t and 'ccccccc' not in t, (f, t)
+        assert 'A. Author and B. Author' in t, f
+        _no_openai(t)
+    with pytest.raises(SystemExit) as e:
+        CPREP.cmd_check_text([str(P), '--ws', str(ws)])
+    out = capsys.readouterr().out
+    assert e.value.code == 0, out
 
 
 def test_meta_kind_is_told_from_the_files(tmp_path):

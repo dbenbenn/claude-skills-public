@@ -21,7 +21,8 @@ hand; this module is what that trial supplied by hand, as pure functions the dri
 
       {"title":  "what the development proves, as a title",
        "credit": "the authors of the development, as they are to be credited",
-       "repo":   "https://github.com/OWNER/REPO",          # where its source is kept
+       "repo":   "https://github.com/OWNER/REPO",          # where its source is kept; null for a private
+                                                            # repository: then nothing links to it (credit only)
        "commit": "<40 hex>",                                # the commit the links pin
        "paths":  {"Solutions.Artin.KP": "artin/proofs/kp/lean"},   # workspace module prefix -> directory of the
                                                             # repo holding those modules (longest prefix wins;
@@ -39,9 +40,22 @@ from . import workspace as wslib
 IMPORT = re.compile(r'^import[ \t]+(\S+)', re.M)
 META_NAME = 'native_meta.json'
 META_KEYS = ('title', 'credit', 'repo', 'commit', 'paths')
-META_FORMAT = ('{"title", "credit" (the authors of the development), "repo" (URL of the source repository), '
-               '"commit" (40 hex), "paths" ({workspace module prefix: directory in the repo}), optional "paper", '
-               '"tags", "license"} (p2mlib/nativecarve.py)')
+META_FORMAT = ('{"title", "credit" (the authors of the development), "repo" (URL of the source repository, or '
+               'null when it is private: no links then), "commit" (40 hex), "paths" ({workspace module prefix: '
+               'directory in the repo}), optional "paper", "tags", "license"} (p2mlib/nativecarve.py)')
+NULLABLE_KEYS = {'repo': None, 'paths': {}}   # present, but may be null / empty (a private repository)
+
+
+def meta_missing(m):
+    """The first required key the native meta lacks, or None. `repo` may be null and `paths` empty, but
+    both keys must be there, so a private source is a decision, not an omission."""
+    for k in META_KEYS:
+        if k in NULLABLE_KEYS:
+            if k not in m:
+                return k
+        elif not m.get(k):
+            return k
+    return None
 DEFAULT_TAGS = 'formalization'
 IMPORT_OVERHEAD = 3.0       # s: what `import Mathlib` costs a module, as oai_build_modules --elab-log takes off
 # hand-set config keys a re-run `config` keeps (carve_prep's KEEP_KEYS, less what make_config derives itself)
@@ -258,12 +272,14 @@ def meta_problem(path):
     if m.get('prefixes') or m.get('family'):
         return ('%s has `prefixes`/`family`: that is an oai_meta.json (an openai/math port). A native tree '
                 'needs %s' % (path, META_FORMAT))
-    for k in META_KEYS:
-        if not m.get(k):
-            return '%s: no %r; the file is %s' % (path, k, META_FORMAT)
+    k = meta_missing(m)
+    if k:
+        return '%s: no %r; the file is %s' % (path, k, META_FORMAT)
     if not re.fullmatch(r'[0-9a-f]{40}', m['commit']):
         return '%s: commit must be the full 40-hex commit (links pin it)' % path
-    if not isinstance(m['paths'], dict):
+    if m['repo'] and not m['paths']:
+        return '%s: paths is empty, so nothing would link to %s; give paths or set repo to null' % (path, m['repo'])
+    if not isinstance(m['paths'] or {}, dict):
         return '%s: paths must be {workspace module prefix: directory in the repo}' % path
     return None
 
@@ -285,14 +301,24 @@ def module_path(meta, module):
 
 def module_link(meta, module, line=None):
     p = module_path(meta, module)
-    if not p:
+    if not p or not meta.get('repo'):
         return None
     return '%s/blob/%s/%s%s' % (meta['repo'].rstrip('/'), meta['commit'], p, '#L%d' % line if line else '')
 
 
+def repo_ref(meta):
+    """`[host/owner/repo](url) at commit abc1234`, or None for a private source (`"repo": null`)."""
+    if not meta.get('repo'):
+        return None
+    r = meta['repo'].rstrip('/')
+    return '[%s](%s) at commit %s' % (re.sub(r'^https?://', '', r), r, meta['commit'][:7])
+
+
 def source_line(meta):
     """The `source` field of every item the carve publishes."""
-    out = '%s, %s, %s (commit %s)' % (meta['credit'], meta['title'], meta['repo'].rstrip('/'), meta['commit'][:7])
+    out = '%s, %s' % (meta['credit'], meta['title'])
+    if meta.get('repo'):
+        out += ', %s (commit %s)' % (meta['repo'].rstrip('/'), meta['commit'][:7])
     if meta.get('paper'):
         out += '; after %s' % meta['paper']
     if meta.get('license'):

@@ -813,7 +813,9 @@ carve primitives by hand with a hand-written config; that is what native mode wr
 - **Write `DIR/native_meta.json` first**: `title`, `credit` (the development's authors), `repo`, the full
   `commit`, `paths` ({workspace module prefix: directory in the repo}), optional `paper`, `tags`, `license`.
   The prose templates credit the authors, link each declaration to its line in the repo at that commit, and
-  say nothing of OpenAI; `check-text` runs on them as for a port. The links are only as public as the repo.
+  say nothing of OpenAI; `check-text` runs on them as for a port. The links are only as public as the repo:
+  for a private one write `"repo": null, "paths": {}`, and the texts credit the authors without any link
+  or commit (Artin KP′, whose `p2m-standalone` is private; earlier Artin items carried no links either).
 - **For a statement's blind read-back**, the carve's bundles are megabytes of proofs. `stage_auditor.py
   carve-view DIR/config.json NAME` writes the definitions of its signature closure alone
   (`readback_views/<slug>.defs.lean`); stage that as the imported file.
