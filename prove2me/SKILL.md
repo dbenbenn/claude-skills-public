@@ -923,6 +923,8 @@ together all had verdicts within 15 minutes, against about 13 minutes per verdic
 - `--build-only` (then `edge_audit.py --local`, then a plain run) is the order when the proofs use
   one another.
 
+When several `submit_solution.py` runs are launched from one background shell command, give every path absolutely and read each log before reporting: bc214's first launch sent one of eight (the other seven died on a relative log redirect) and was reported as eight submitted.
+
 Whoever submits a proof, by any route, watches it to its verdict (no routine does), and fixes and
 resubmits a real rejection (dbenbenn, 2026-10-06). After `--replaces`, confirm the old submission's
 `deprecated_at`: two stale sketches once stayed live behind an unread "STOPPED … undone" line.
@@ -1151,6 +1153,14 @@ What made it work:
 - **Copy each Part into the repo's `proofs/` as it lands**, not at the end: provers write into the
   workspace, and a killed run leaves finished Parts there untracked (q157, Viterbo maxsys).
   `workspace_audit.py --folder FOLDER` lists any without a copy.
+- **To port a whole method to a new model, give each Part whole to one prover, with our earlier proofs as
+  templates.** bc214 (2026-11-16, Bordenave–Collins for permutations and matchings): 14 Parts of 2–10 stubs
+  each, about 45 stubs and 16.5k lines; every Part closed first time in 4–15 minutes against a Blueprint
+  written before any proof. An assembly Part (here the upper tail) dispatched in the first wave tests the
+  interfaces while the long Parts run. A later Part's brief lists the finished Parts' reusable lemmas and
+  traps (there: `rw`/`simp`/`group` fail on inverses in `Monoid.Coprod`, an instance diamond; use `exact`).
+  Assemble by copying the tree with one `Close<X>` module per Part restating its stubs, in dependency order
+  (`missions/bc214-fable/tools/assemble_bcf.py`), then cut at the stubs by measured CPU.
 - **Every prover or helper brief says "do not spawn agents"** when the run has an agent cap: a q159
   helper briefed to "optimize" spawned five of its own.
 
@@ -1370,7 +1380,7 @@ Failures that no local build reproduces. The detail and the case behind each is 
 | `WA` "does not match the target type", `CoeT` typeclass timeout | A raw `Classical.choose (Classical.choose_spec …)` in a binder type. Name it with `let` after the colon. |
 | `WA` "failed to synthesize CoeT (∀ {H : Type ?u.4} …) x (∀ {H : Type ?u.3} …)", printed types identical | A universe-polymorphic statement with a heavy type: the verifier's plain type comparison fails and its `CoeT` fallback runs out of `typeclass` budget (opus-kadison, oaiq-039). Never resubmit unchanged: the local check (`localcheck`, since 19c7a63) runs that fallback; state it monomorphically if every importer is, or `carve.py fold` it into its importers' pieces. |
 | "unknown universe level", or `SORRY` on a declaration above the real fault | The verifier runs with `autoImplicit` off and `lake env lean` does not. Hoist every `universe` line to the top of an assembled file. |
-| "FAILED: Compilation timed out after 300s", "Verification timed out after 300s" | The item itself is slow. Over 100 s CPU locally (`prune_solution.py --check`), split before submitting; under it, retry unchanged and split after about two real timeouts. |
+| "FAILED: Compilation timed out after 300s", "Verification timed out after 300s" | The item itself is slow. Over 100 s CPU locally (`prune_solution.py --check`), split before submitting; under it, retry unchanged and split after about two real timeouts. An 84 s piece timed out once and was accepted unchanged on the retry (bc214, 2026-11-16); prepare the split while the retry runs. |
 | `WA` "stuck at solving universe constraint `max ?a ?v =?= max ?b ?v`" | A universe that occurs only under `max` in a statement with heavy binders (oaiq-124). The local check reports it since 2442579; fold the statement, or restate it with every universe bare. |
 | `SORRY` on a carved piece whose local `#print axioms` is clean | The server could not elaborate it (an unknown identifier, say). Compile the *submitted* source against the published bundles before resubmitting (oaiq-120). |
 | "Module compilation timed out" | A cold worker building imported bundles. Retry unchanged, never split, unless an imported *statement* module takes over about 90 s locally (`lean -o`): then every importer fails, and the statement needs restating (its large sides as `abbrev`s in a bundle). |
