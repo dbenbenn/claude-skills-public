@@ -2822,7 +2822,12 @@ class Pipeline:
             return False
         lst = os.path.join(os.path.dirname(plan_path), 'rekeep_candidates.json')
         json.dump(names, open(lst, 'w'))
+        # noted first, as a split is: a driver stopped mid-rekeep puts the plan back on its next start
+        # (recover_interrupted_split; q259 2026-11-17 stopped between the new plan and gen)
+        self.state['rekeep_in_progress'] = {'plan_hash': h, 'at': _now()}
+        self.save()
         self.run_cmds(step, [self.tool('carve', 'rekeep', 'config.json', '@' + lst)])
+        self.state.pop('rekeep_in_progress', None)
         self.check_published_unchanged(step)
         log = os.path.join(self.d, 'logs', step + '.log')
         line = [l for l in open(log, errors='replace').read().splitlines() if l.startswith('REKEPT_PIECES ')]
@@ -3418,9 +3423,33 @@ class Pipeline:
         self.state.pop('split_in_progress', None)
         self.save()
 
+    def recover_interrupted_rekeep(self):
+        """A carve.py rekeep cut off midway (`rekeep_in_progress` left behind): if the plan changed since, put back
+        the plan it saved (plan.pre_rekeep.json, when its hash is the one noted); the rekeep runs again on it at
+        the next measure and regenerates the same pieces (it is deterministic), so files gen had rewritten
+        before the cut come out as they were meant to. Stops for a person when no saved plan matches."""
+        rec = self.state.get('rekeep_in_progress')
+        if not rec:
+            return
+        cfg = self.read_config() or {}
+        plan_path = self.work_paths(cfg)[1]
+        if hash_paths([plan_path]) != rec['plan_hash']:
+            backup = os.path.join(os.path.dirname(plan_path), 'plan.pre_rekeep.json')
+            if not (os.path.exists(backup) and hash_paths([backup]) == rec['plan_hash']):
+                raise StepFailed('a rekeep (%s) was cut off after it changed %s, and no saved plan matches the one '
+                                 'before it: compare with the work/plan.pre_rekeep*.json files and put the right one '
+                                 'back by hand' % (rec['at'], plan_path))
+            shutil.copy(plan_path, plan_path + '.cut_off_rekeep')
+            shutil.copy(backup, plan_path)
+            print('== a rekeep cut off midway (at %s): the plan before it is back (the cut-off one is kept as '
+                  '%s.cut_off_rekeep); it runs again' % (rec['at'], os.path.basename(plan_path)), flush=True)
+        self.state.pop('rekeep_in_progress', None)
+        self.save()
+
     def run(self, stop_after=None, only_redo=(), claim_folder=False):
         self.check_ownership(claim_folder)
         self.recover_interrupted_split()
+        self.recover_interrupted_rekeep()
         self.publishing_started()                 # record evidence seen now as a state fact
         self.migrate_patches_hashes()
         self.save()
