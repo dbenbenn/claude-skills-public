@@ -49,3 +49,7 @@ code{font-size:13px}
 html{overflow-anchor:none}
 .more{font-size:14px;margin:0 0 14px}.more a{text-decoration:none}.more a:hover{text-decoration:underline}
 p.more.card{padding:10px 16px}
+/* section cards (drawSections): slots updated in place; the single-section page */
+h2 .solo{font-size:12px;font-weight:400;margin-left:10px;color:var(--series-1);text-decoration:none}h2 .solo:hover{text-decoration:underline}
+.runbox{margin-top:8px}.runbox summary{cursor:pointer}
+body[data-view="section"] main{max-width:900px}

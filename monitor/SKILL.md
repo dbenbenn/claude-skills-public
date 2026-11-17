@@ -241,6 +241,17 @@ so the two never correct twice. Before this (2026-11-05), a card above the reade
 page jump, and phones, which fire `resize` when the address bar hides, redrew every chart while scrolling;
 resize now redraws only on a real width change.
 
+**One section on its own** (2026-11-17; dbenbenn keeps one carve's card open on a second monitor, and any change
+elsewhere drew the eye): `/page/section.html?id=<section id>`, linked as "on its own ↗" in every section heading.
+Same `main.js` (`data-view="section"`): only that card, no ticking "Updated" line and no "updated N ago" (a
+stopped producer still shows STALE), the Running now table folded into a `<details>` (open state remembered),
+the charted phase remembered per section. On every page a section card is built once and updated in place
+(`drawSections`, `setSlot`): each slot's HTML is replaced only when it differs, and the progress chart gets
+`setData` instead of being rebuilt (rebuilt only for a new phase, total, width or theme). So on that page a
+refresh changes only the counts, bars, rate/ETA and the chart as the work moves (checked by diffing screenshots
+35 s apart). `keepScroll` also corrects a second time in `requestAnimationFrame`: uPlot sizes a new chart in a
+microtask, after the synchronous measurement, which is why the main page still jumped after 2026-11-05.
+
 **Retries and their carves** (2026-11-05, after q172 MUB confused dbenbenn: "two seemingly unrelated names"). A
 retry batch resumes an earlier batch's carve, whose section the driver titles after the job dir's batch. So the
 page: titles every `carve-*` section "Carve of <module>" and says which running agent works on it (the agent card

@@ -21,8 +21,10 @@ function keepScroll(fn){
   const id = el.id, target = () => { let e = $id(id); for (const i of path) { if (!e || !e.children[i]) break; e = e.children[i]; } return e; };
   const before = target().getBoundingClientRect().top;
   fn();
-  const t = target();
-  if (t) { const d = t.getBoundingClientRect().top - before; if (Math.abs(d) >= 1) window.scrollBy(0, d); }
+  const fix = () => { const t = target(); if (t) { const d = t.getBoundingClientRect().top - before; if (Math.abs(d) >= 1) window.scrollBy(0, d); } };
+  fix();
+  // uPlot sizes a new chart in a microtask, after fn() returns: measure again just before the frame is painted
+  requestAnimationFrame(fix);
 }
 
 const TZ = 'Europe/Berlin', tzName = t => new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Berlin',timeZoneName:'short'}).formatToParts(new Date(t*1000)).find(x=>x.type==='timeZoneName').value.replace('GMT+1','CET').replace('GMT+2','CEST');
@@ -221,7 +223,7 @@ function drawDisk(d){
 
 // redraw for a new width only: phones fire resize when the address bar shows or hides while scrolling
 let lastWidth = document.documentElement.clientWidth;
-const redrawAll = () => { if (last) keepScroll(() => { chartKey = ''; drawSystem(last.system); drawDisk(last.system.disk); drawSections(last.sections || []); drawQuota(); }); };
+const redrawAll = () => { if (last) keepScroll(() => { chartKey = ''; drawSystem(last.system); drawDisk(last.system.disk); drawSections(last.sections || []); if (typeof drawQuota === 'function') drawQuota(); }); };
 window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(() => {
   const w = document.documentElement.clientWidth; if (w === lastWidth) return; lastWidth = w; redrawAll(); }, 200); });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
@@ -232,8 +234,8 @@ async function load(){
   if (!s.updated) return;
   last = s;
   keepScroll(() => {
-    $id('h1').textContent = (s.host||'machine') + (VIEW === 'done' ? ' monitor: finished work' : ' monitor');
-    $id('upd').textContent = 'Updated ' + fmtAt(s.updated) + ' · refreshes every 30 s';
+    $id('h1').textContent = (s.host||'machine') + (VIEW === 'done' ? ' monitor: finished work' : VIEW === 'section' ? ' monitor: one section' : ' monitor');
+    if (VIEW !== 'section') $id('upd').textContent = 'Updated ' + fmtAt(s.updated) + ' · refreshes every 30 s';
     const al = $id('alarm');
     al.hidden = !s.alerts.length;
     $id('favicon').href = s.alerts.length ? '/favicon-alarm.svg' : '/favicon.svg';
@@ -262,35 +264,64 @@ function procTable(rows, withCwd){
 }
 
 const secCharts = {}, secZoom = {};   // a progress chart keeps its zoom across refreshes
+// The single-section page (/page/section.html?id=<section id>, data-view="section") shows one card on its own.
+const SEC_ID = VIEW === 'section' ? new URLSearchParams(location.search).get('id') : null;
+const secHref = id => '/page/section.html?id=' + encodeURIComponent(id);
+if (SEC_ID) { const ph = store.get('monitor.secPhase.' + SEC_ID, null); if (ph) selected[SEC_ID] = ph; }   // its chart's phase, remembered
+// A card is built once and then updated in place, slot by slot: a slot's HTML is replaced only when it differs,
+// an empty slot is hidden, and the chart gets new data instead of being rebuilt. So a refresh changes only the
+// pixels whose content changed (dbenbenn 2026-11-17: watching one carve's card, any other change draws the eye).
+const SLOTS = ['head', 'meta', 'note', 'alerts', 'warns', 'phases', 'running', 'chartbox'];
+function setSlot(el, html){ if (el._html === html) return; el._html = html; el.innerHTML = html; el.hidden = !html; }
+function sectionCard(s){
+  let card = $id('sec-' + s.id);
+  if (card) return card;
+  card = document.createElement('section');
+  card.className = 'card'; card.id = 'sec-' + s.id; card.setAttribute('aria-labelledby', 'h-' + s.id);
+  card.innerHTML = SLOTS.map(k => `<div class="slot-${k}" hidden></div>`).join('');
+  card.querySelector('.slot-phases').onclick = e => { const el = e.target.closest('.ph'); if (!el) return;
+    selected[s.id] = el.dataset.name; if (SEC_ID) store.set('monitor.secPhase.' + SEC_ID, el.dataset.name); keepScroll(() => drawSections(last.sections)); };
+  if (VIEW === 'section') {   // the process table changes every 30 s: folded, the open state remembered
+    const r = card.querySelector('.slot-running');
+    r.innerHTML = '<details class="runbox"><summary></summary><div></div></details>'; r._html = null;
+    const d = r.firstChild; d.open = store.get('monitor.secRunOpen', '0') === '1';
+    d.ontoggle = () => store.set('monitor.secRunOpen', d.open ? '1' : '0');
+  }
+  return card;
+}
 function drawSections(all){
   const box = $id('sections');
   if (!box) return;
-  const secs = all.filter(s => isLive(s) === (VIEW === 'main'));
-  for (const k in secCharts) {
-    const u = secCharts[k], xs = u.data[0];
-    if (xs.length && (u.scales.x.min > xs[0] + 1 || u.scales.x.max < xs[xs.length-1] - 1)) secZoom[k] = {min: u.scales.x.min, max: u.scales.x.max};
-    else delete secZoom[k];
-    u.destroy(); delete secCharts[k];
+  const secs = SEC_ID ? all.filter(s => s.id === SEC_ID) : all.filter(s => isLive(s) === (VIEW === 'main'));
+  const keep = new Set(secs.map(s => 'sec-' + s.id));
+  for (const c of [...box.children]) if (!keep.has(c.id)) {
+    const k = c.id.slice(4); if (secCharts[k]) { secCharts[k].destroy(); delete secCharts[k]; delete secZoom[k]; }
+    c.remove();
   }
-  if (!secs.length){ box.innerHTML = `<section class="card"><p class="empty">${VIEW === 'main' ? 'No work in progress has a section right now.' : 'Nothing has finished in the last 24 hours.'}</p></section>`; return; }
-  box.innerHTML = secs.map(s => {
+  if (!secs.length){ box.innerHTML = `<section class="card" id="sec-empty"><p class="empty">${SEC_ID ? `No section <code>${esc(SEC_ID)}</code> right now: it ended more than a day ago or never existed. <a href="/">The whole monitor</a>` : VIEW === 'main' ? 'No work in progress has a section right now.' : 'Nothing has finished in the last 24 hours.'}</p></section>`; return; }
+  secs.forEach((s, i) => {
+    const card = sectionCard(s);
+    if (box.children[i] !== card) box.insertBefore(card, box.children[i] || null);
+    const slot = k => card.querySelector('.slot-' + k);
     const ph = s.phases||[];
     const cv = carveView(s);
-    const meta = [cv.worker, cv.owner ?? (s.owner?esc(s.owner):''), 'updated '+ago(s.age_secs), ...(s.links||[]).map(l=>`<a href="${esc(l.url)}">${esc(cv.relabel(l))}</a>`)].filter(Boolean).join(' · ');
-    return `<section class="card" id="sec-${esc(s.id)}" aria-labelledby="h-${esc(s.id)}">
-      <h2 id="h-${esc(s.id)}">${esc(cv.title)}<span class="st ${s.state}">${s.state.toUpperCase()}</span>${s.stale?`<span class="st stale" title="No update for ${Math.round(s.age_secs/60)} min: has its producer stopped?">STALE</span>`:''}</h2>
-      <p class="meta">${meta}</p>
-      ${s.note?`<p class="chart-sub">${esc(s.note)}</p>`:''}
-      ${(s.alerts||[]).length?`<ul class="salerts">${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:''}
-      ${s.superseded?`<div class="swarns"><p>Superseded: ${esc(s.superseded.why)}${s.superseded.by?` · <a href="#sec-${esc(s.superseded.by)}">its section</a> · <a href="/page/agent.html?name=${encodeURIComponent(s.superseded.by)}">its log</a>`:''}</p>${(s.warnings||[]).length?`<ul>${s.warnings.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:''}</div>`:''}
-      <div class="phases">${ph.map(p => phaseRow(s, p)).join('')}</div>
-      ${(s.running||[]).length?'<h3 style="margin-top:10px">Running now</h3>'+procTable(s.running, false):''}
-      <div class="chartbox"></div></section>`; }).join('');
-  for (const s of secs) {
-    const card = document.getElementById('sec-'+s.id);
-    card.querySelectorAll('.ph').forEach(el => el.onclick = () => { selected[s.id] = el.dataset.name; keepScroll(() => drawSections(last.sections)); });
-    sectionChart(s, card);
-  }
+    const meta = [cv.worker, cv.owner ?? (s.owner?esc(s.owner):''), SEC_ID ? '' : 'updated '+ago(s.age_secs), ...(s.links||[]).map(l=>`<a href="${esc(l.url)}">${esc(cv.relabel(l))}</a>`)].filter(Boolean).join(' · ');
+    setSlot(slot('head'), `<h2 id="h-${esc(s.id)}">${esc(cv.title)}<span class="st ${s.state}">${s.state.toUpperCase()}</span>${s.stale?`<span class="st stale" title="No update for ${Math.round(s.age_secs/60)} min: has its producer stopped?">STALE</span>`:''}${SEC_ID ? '' : `<a class="solo" href="${secHref(s.id)}" title="This section on a page of its own, where only its progress moves">on its own ↗</a>`}</h2>`);
+    setSlot(slot('meta'), meta ? `<p class="meta">${meta}</p>` : '');
+    setSlot(slot('note'), s.note ? `<p class="chart-sub">${esc(s.note)}</p>` : '');
+    setSlot(slot('alerts'), (s.alerts||[]).length ? `<ul class="salerts">${s.alerts.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>` : '');
+    setSlot(slot('warns'), s.superseded ? `<div class="swarns"><p>Superseded: ${esc(s.superseded.why)}${s.superseded.by?` · <a href="${SEC_ID ? secHref(s.superseded.by) : '#sec-'+esc(s.superseded.by)}">its section</a> · <a href="/page/agent.html?name=${encodeURIComponent(s.superseded.by)}">its log</a>`:''}</p>${(s.warnings||[]).length?`<ul>${s.warnings.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:''}</div>` : '');
+    setSlot(slot('phases'), `<div class="phases">${ph.map(p => phaseRow(s, p)).join('')}</div>`);
+    const R = s.running || [];
+    if (SEC_ID) {
+      const r = slot('running'), d = r.firstChild; r.hidden = !R.length;
+      const sum = `Running now: ${R.length} process${R.length === 1 ? '' : 'es'}`;
+      if (d.firstChild.textContent !== sum) d.firstChild.textContent = sum;
+      setSlot(d.lastChild, procTable(R, false)); d.lastChild.hidden = false;
+    } else setSlot(slot('running'), R.length ? '<h3 style="margin-top:10px">Running now</h3>' + procTable(R, false) : '');
+    sectionChart(s, slot('chartbox'));
+  });
+  if (SEC_ID) document.title = carveView(secs[0]).title + ' · monitor';
 }
 
 // A carve's section is written by its driver, named after the batch whose job dir holds the carve. A retry
@@ -331,11 +362,31 @@ function chosenPhase(s){
   return p ? p.name : null;
 }
 
-function sectionChart(s, card){
-  const name = chosenPhase(s); if (!name) return;
+function sectionChart(s, box){
+  const name = chosenPhase(s);
+  if (!name) { if (secCharts[s.id]) { secCharts[s.id].destroy(); delete secCharts[s.id]; } setSlot(box, ''); box._key = null; return; }
   const p = s.phases.find(x=>x.name===name), h = s.history[name];
-  const box = card.querySelector('.chartbox');
-  box.innerHTML = `<h3 style="margin-top:12px">${esc(name)}: progress over time</h3><p class="chart-sub">${p.done.toLocaleString()} of ${p.total.toLocaleString()} · drag to zoom, double-click to reset</p><div></div>`;
+  const data = [h.map(x => x[0]), h.map(x => x[1])];
+  // what the built chart depends on; anything else is new data for the same chart
+  const key = [name, p.total, box.clientWidth, css('--series-1'), css('--text-muted')].join('|');
+  const u = secCharts[s.id];
+  if (u && box._key === key && box.contains(u.root)) {
+    const xs = u.data[0], zoomed = xs.length && (u.scales.x.min > xs[0] + 1 || u.scales.x.max < xs[xs.length-1] - 1);
+    const sub = `${p.done.toLocaleString()} of ${p.total.toLocaleString()} · drag to zoom, double-click to reset`, el = box.querySelector('.chart-sub');
+    if (el.textContent !== sub) el.textContent = sub;
+    if (xs.length !== data[0].length || xs[xs.length-1] !== data[0][data[0].length-1] || u.data[1][xs.length-1] !== data[1][data[1].length-1])
+      u.setData(data, !zoomed);
+    return;
+  }
+  if (u) {
+    const xs = u.data[0];
+    if (xs.length && (u.scales.x.min > xs[0] + 1 || u.scales.x.max < xs[xs.length-1] - 1) && box._key && box._key.split('|')[0] === name) secZoom[s.id] = {min: u.scales.x.min, max: u.scales.x.max};
+    else delete secZoom[s.id];
+    u.destroy(); delete secCharts[s.id];
+  }
+  box._html = null; box.hidden = false;
+  box.innerHTML = `<h3 style="margin-top:12px">${esc(name)}: progress over time</h3><p class="chart-sub">${p.done.toLocaleString()} of ${p.total.toLocaleString()} · drag to zoom, double-click to reset</p><div class="secchart"></div>`;
+  box._key = [name, p.total, box.clientWidth, css('--series-1'), css('--text-muted')].join('|');
   const el = box.querySelector('div');
   const opts = {
     width: Math.max(260, el.clientWidth), height: 220,
@@ -351,7 +402,7 @@ function sectionChart(s, card){
   };
   // a step line: the count holds until the next change
   opts.series[1].paths = uPlot.paths.stepped({align: 1});
-  secCharts[s.id] = new uPlot(opts, [h.map(x => x[0]), h.map(x => x[1])], el);
+  secCharts[s.id] = new uPlot(opts, data, el);
   if (secZoom[s.id]) secCharts[s.id].setScale('x', secZoom[s.id]);
 }
 

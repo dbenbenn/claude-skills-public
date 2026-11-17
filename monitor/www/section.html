@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>monitor: one section</title>
+<link rel="icon" id="favicon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/vendor/uPlot.min.css">
+<script src="/vendor/uPlot.iife.min.js"></script>
+<link rel="stylesheet" href="/main.css"></head>
+<!-- One work section on its own (main.js, data-view="section"): nothing above it can change height, and the card
+     is updated in place, so only its progress moves. No ticking clock line; a stopped producer shows STALE. -->
+<body data-view="section"><main>
+<p class="meta"><span id="h1">monitor: one section</span> · <a href="/">the whole monitor</a></p>
+<p id="upd" hidden></p>
+<div class="alarm" id="alarm" role="alert" hidden></div>
+<div id="sections"></div>
+<p class="meta" id="problems" hidden></p>
+</main>
+<script src="/main.js"></script></body></html>
