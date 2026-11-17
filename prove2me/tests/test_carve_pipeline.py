@@ -2984,18 +2984,23 @@ def test_unmeasured_pieces_are_rederived_against_the_statements_once_per_plan(en
     # q259 2026-11-17: pieces built before a lemma became a statement kept proving their own copy of it (7,710 of
     # 8,767 unsent pieces); before measuring, carve.py rekeep re-derives every piece not live and not measured
     # within the limits, and the run goes on from names when anything changed
-    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30)})
-    for f in ('times.json', 'times.orig.json'):           # P1 not measured yet; P0 measured within the limits
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30), 'P2': (40, 30)})
+    for f in ('times.json', 'times.orig.json'):           # P1, P2 not measured yet; P0 measured within the limits
         t = json.load(open(env.dir / 'carve_work' / f))
         t.pop('piece:P1')
+        t.pop('piece:P2')
         (env.dir / 'carve_work' / f).write_text(json.dumps(t))
-    monkeypatch.setenv('STUB_REKEPT', '["P0", "P1"]')       # P0 is never asked about
+    # P2 is released already: the background publisher may send it at any moment (q259: three were, mid-rekeep)
+    (env.dir / 'publish').mkdir(exist_ok=True)
+    (env.dir / 'publish' / 'release.json').write_text(json.dumps({'plan_sha': 'x', 'pieces': ['piece:P2'], 'open': True}))
+    monkeypatch.setenv('STUB_REKEPT', '["P0", "P1", "P2"]')       # P0 and P2 are never asked about
     r = run(env, *ARGS_NEW, '--publish')
     assert r.returncode == 0, r.stdout + r.stderr
     rk = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'rekeep']
     assert rk and all(a[1] == 'config.json' and a[2].startswith('@') for a in rk)
     assert 're-derived 1 of' in r.stdout
-    assert json.load(open(env.dir / 'carve_work' / 'plan.json'))['pieces']['P1'].get('rekept')
+    pl = json.load(open(env.dir / 'carve_work' / 'plan.json'))['pieces']
+    assert pl['P1'].get('rekept') and not pl['P0'].get('rekept') and not pl['P2'].get('rekept')
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert st.get('rekeep_plan') and sum(st['rekept'].values()) == 1
     # the plan it left is not asked about again: later steps of the same plan skip the call

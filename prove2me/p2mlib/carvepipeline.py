@@ -2809,6 +2809,11 @@ class Pipeline:
         got = self.calibrate_inputs()
         times = (got[2] if got else None) or {}
         live, limit = live_pieces(self.d), self.rss_limit()
+        # released pieces too, trials over memory among them: the background publisher may send one at any moment
+        # (q259 2026-11-17: three sent 22 s after the candidates were taken, then accepted as they were)
+        rel = (_load_json(os.path.join(self.d, 'publish', 'release.json')) or {}).get('pieces')
+        live |= {x.split(':', 1)[1] for x in rel} if isinstance(rel, list) else set()
+        live |= set(self.trying_pieces(times, plan))
         names = sorted(n for n in plan.get('pieces') or {} if n not in live and not (
             (times.get('piece:' + n) or {}).get('ok') and fits_memory(times['piece:' + n], limit)))
         if not names:
