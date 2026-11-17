@@ -192,6 +192,45 @@ def goals_for(name, registry):
     return out
 
 
+CARVE_TITLE = re.compile(r'^(?:\S+ carve |Carve )(\S+): ')
+_run_ids = {}   # run_state.json path -> (mtime, {piece name: id})
+
+
+def carve_goals(sec, registry):
+    """[{name, id, url}]: the prove2.me goals a carve section works towards (2026-11-17, dbenbenn could not tell
+    which carve was for which goal). The carve dir is in the driver's title; its pipeline.json (or config.json)
+    lists the targets by name. Ids from the queue registry (groups[*].ids), else from the carve's own
+    publish/run_state.json (a carve outside the queue that published its goal itself, as q361v3 did)."""
+    m = CARVE_TITLE.match(sec.get('title') or '')
+    if not str(sec.get('id', '')).startswith('carve-') or not m:
+        return []
+    d = os.path.expanduser(m.group(1))
+    targets = []
+    for f in ('pipeline.json', 'config.json'):
+        try:
+            targets = json.load(open(os.path.join(d, f))).get('targets') or []
+        except (OSError, ValueError, AttributeError):
+            continue
+        if targets:
+            break
+    ids = {}
+    for g in ((registry or {}).get('groups') or {}).values():
+        ids.update(g.get('ids') or {})
+    if any(t not in ids for t in targets):
+        rs = os.path.join(d, 'publish', 'run_state.json')
+        try:
+            mt = os.stat(rs).st_mtime
+            if _run_ids.get(rs, (None,))[0] != mt:
+                st = json.load(open(rs))
+                _run_ids[rs] = (mt, {k[6:]: v['id'] for k, v in st.items()
+                                     if k.startswith('piece:') and isinstance(v, dict) and v.get('id')})
+            ids = dict(_run_ids[rs][1], **ids)
+        except (OSError, ValueError, AttributeError):
+            pass
+    return [{'name': t, 'id': ids.get(t), 'url': 'https://prove2.me/theorems/' + ids[t] if ids.get(t) else None}
+            for t in targets if isinstance(t, str)]
+
+
 def process_args():
     """Every argument of every process's command line, as a set (one /proc scan per refresh)."""
     out = set()

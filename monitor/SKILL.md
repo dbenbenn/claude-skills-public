@@ -241,6 +241,13 @@ so the two never correct twice. Before this (2026-11-05), a card above the reade
 page jump, and phones, which fire `resize` when the address bar hides, redrew every chart while scrolling;
 resize now redraws only on a real width change.
 
+**A carve's goals** (2026-11-17; dbenbenn could not tell which carve was for which goal): `monitor.step` adds
+`goals: [{name, id, url}]` to every `carve-*` section (`agents.carve_goals`): the carve dir from the driver's title,
+the targets from its `pipeline.json` (else `config.json`), the ids from the queue registry's `groups[*].ids`, else
+from the carve's `publish/run_state.json` (`piece:<name>`.id, for a carve outside the queue that published its goal
+itself). The card's meta line starts "goal <name>" linking to `https://prove2.me/theorems/<id>`; targets without an
+id (a local check) are not shown.
+
 **One section on its own** (2026-11-17; dbenbenn keeps one carve's card open on a second monitor, and any change
 elsewhere drew the eye): `/page/section.html?id=<section id>`, linked as "on its own ↗" in every section heading.
 Same `main.js` (`data-view="section"`): only that card, no ticking "Updated" line and no "updated N ago" (a

@@ -651,8 +651,12 @@ def step(home, now=None):
     AG.record_costs(costs, AG.AGENTS_DIR, now)
     quota = AG.update_quota(load_json(os.path.join(st, 'quota.json'), {}), AG.AGENTS_DIR, now)
     State.costs = costs
+    reg = load_json(os.path.join(AG.AGENTS_DIR, 'queue', 'registry.json'), None)
     for s in secs:
         s['history'] = hist.get(s['id'], {})
+        g = AG.carve_goals(s, reg)
+        if g:
+            s['goals'] = g
         pats = [(p['label'], p['match']) for p in s.get('processes', [])]
         s['running'] = [proc_view(p, prev, now, next((l for l, m in pats if re.search(m, p['args'])), '?'))
                         for p in procs if p['group'] == s['id']]

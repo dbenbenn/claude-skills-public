@@ -305,7 +305,9 @@ function drawSections(all){
     const slot = k => card.querySelector('.slot-' + k);
     const ph = s.phases||[];
     const cv = carveView(s);
-    const meta = [cv.worker, cv.owner ?? (s.owner?esc(s.owner):''), SEC_ID ? '' : 'updated '+ago(s.age_secs), ...(s.links||[]).map(l=>`<a href="${esc(l.url)}">${esc(cv.relabel(l))}</a>`)].filter(Boolean).join(' · ');
+    const G = (s.goals || []).filter(g => g.url);   // the prove2.me goals a carve works towards (monitor: carve_goals)
+    const goals = G.length ? `goal${G.length > 1 ? 's' : ''} ` + G.map(g => `<a href="${esc(g.url)}" title="${esc(g.name)} on prove2.me"><code>${esc(g.name)}</code></a>`).join(', ') : '';
+    const meta = [goals, cv.worker, cv.owner ?? (s.owner?esc(s.owner):''), SEC_ID ? '' : 'updated '+ago(s.age_secs), ...(s.links||[]).map(l=>`<a href="${esc(l.url)}">${esc(cv.relabel(l))}</a>`)].filter(Boolean).join(' · ');
     setSlot(slot('head'), `<h2 id="h-${esc(s.id)}">${esc(cv.title)}<span class="st ${s.state}">${s.state.toUpperCase()}</span>${s.stale?`<span class="st stale" title="No update for ${Math.round(s.age_secs/60)} min: has its producer stopped?">STALE</span>`:''}${SEC_ID ? '' : `<a class="solo" href="${secHref(s.id)}" title="This section on a page of its own, where only its progress moves">on its own ↗</a>`}</h2>`);
     setSlot(slot('meta'), meta ? `<p class="meta">${meta}</p>` : '');
     setSlot(slot('note'), s.note ? `<p class="chart-sub">${esc(s.note)}</p>` : '');

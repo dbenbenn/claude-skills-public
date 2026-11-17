@@ -302,3 +302,19 @@ def test_state_view_marks_a_dead_running_agent(tmp_path, proc):
     assert view('live')['state'] == 'running' and view('fin')['state'] == 'done'
     assert view('dead')['state'] == 'died' and 'no process' in view('dead')['note']
     assert A.state_view(str(root), 'dead', b'not json') == b'not json'
+
+
+def test_carve_goals(tmp_path):
+    """A carve section links its targets: ids from the queue registry, else from the carve's run_state."""
+    q = tmp_path / 'q'
+    (q / 'publish').mkdir(parents=True)
+    (q / 'pipeline.json').write_text(json.dumps({'targets': ['OAI.a', 'OAI.b', 'OAI.c']}))
+    (q / 'publish' / 'run_state.json').write_text(json.dumps({'piece:OAI.b': {'id': 'bbb'}, 'bundle:X': {'id': 'x'}}))
+    reg = {'groups': {'Mod.Main': {'ids': {'OAI.a': 'aaa'}}}}
+    sec = {'id': 'carve-0123456789', 'title': 'q1-x carve %s: Mod.Main' % q}
+    g = A.carve_goals(sec, reg)
+    assert [(x['name'], x['id']) for x in g] == [('OAI.a', 'aaa'), ('OAI.b', 'bbb'), ('OAI.c', None)]
+    assert g[0]['url'] == 'https://prove2.me/theorems/aaa' and g[2]['url'] is None
+    assert A.carve_goals(dict(sec, title='Carve %s: Mod.Main' % q), None)[1]['id'] == 'bbb'
+    assert A.carve_goals(dict(sec, id='other'), reg) == []
+    assert A.carve_goals(dict(sec, title='q1-x carve %s/nope: M' % q), reg) == []
