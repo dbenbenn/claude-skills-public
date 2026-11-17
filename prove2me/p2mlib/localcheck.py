@@ -27,9 +27,11 @@ compiled locally.
   without sharing and fails, and high-priority `inferInstance` shortcut instances for the carrier's
   classes bring it to 2,613 nodes and it passes. The failure message prints the size.
 """
+import contextlib
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -83,6 +85,29 @@ def server_check_text(solution, preamble, formal_statement, target):
     imps = list(dict.fromkeys(IMPORT.findall(solution) + IMPORT.findall(preamble or '') + ['Lean']))
     rest = IMPORT.sub('', body).lstrip('\n')
     return ''.join('import %s\n' % i for i in imps) + '\n' + rest
+
+
+@contextlib.contextmanager
+def as_module(path):
+    """Lean arguments that compile `path` as a module and write its .olean (and .ilean), into a throwaway
+    directory removed afterwards: they replace the bare path in a `lean` call.
+
+    The verifier compiles a solution as a module, so its 300 s include writing the .olean, and that
+    can dwarf elaboration: q348 (2026-11-17) had two pieces at 30 s and 62 s as a plain compile and
+    140 s and 135 s with the .olean ("`.olean serialization took 140s`" under -Dprofiler=true), all of
+    it the elaborated types of lemmas folded into them; they timed out 15+ times as "Module
+    compilation timed out after 300s" while every plain local check said they were fast. A local
+    timing that predicts the verifier's must therefore write the .olean too. (carve_measure already
+    did, for its edge check, which is why the carve's own figures, 176 s and 191 s, were right.)"""
+    d = tempfile.mkdtemp(prefix='p2m-module-')
+    try:
+        src = os.path.join(d, 'LocalCheck', 'Piece.lean')
+        os.makedirs(os.path.dirname(src))
+        shutil.copyfile(path, src)
+        out = os.path.join(d, 'LocalCheck', 'Piece')
+        yield ['-R', d, '-o', out + '.olean', '-i', out + '.ilean', src]
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 def run_lean(args, cwd, env=None):

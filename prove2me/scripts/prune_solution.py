@@ -296,11 +296,13 @@ def main():
                         '.pruned_%d_%s' % (os.getpid(), os.path.basename(dest)))
     open(cand, 'w', encoding='utf-8').write(out)
     try:
-        # the verifier's elaboration, synchronous (q128)
+        # the verifier's elaboration, synchronous (q128), compiled as a module so the CPU time includes
+        # writing the .olean, as the verifier's does (q348: 30 s as a plain compile, 140 s with the .olean)
         from p2mlib import localcheck
         from p2mlib.carvepipeline import PIECE_CAP, PIECE_RSS_LIMIT
-        rc, output, cpu, rss = localcheck.run_lean(['lake', 'env', 'lean', *localcheck.VERIFIER_FLAGS,
-                                                    os.path.relpath(cand, ws)], ws)
+        with localcheck.as_module(cand) as mod_args:
+            rc, output, cpu, rss = localcheck.run_lean(['lake', 'env', 'lean', *localcheck.VERIFIER_FLAGS,
+                                                        *mod_args], ws)
         # the verifier rejects a sorry as firmly as an error, so a sorry warning fails too; and
         # match `: error` as a prefix, since coded errors print as `: error(lean.unknownIdentifier):`
         errs = [l for l in output.split('\n')

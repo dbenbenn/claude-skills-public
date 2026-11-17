@@ -1,4 +1,5 @@
 """prune_solution.prune: unreachable declarations go, roots stay."""
+import os
 import sys
 
 import pytest
@@ -87,3 +88,28 @@ def test_check_reports_cpu_and_peak_memory_and_warns_over_the_verifier_limits(mo
     _check_run(monkeypatch, tmp_path, 40.0, CP.PIECE_RSS_LIMIT + 50)
     out = capsys.readouterr().out
     assert 'SPLIT' in out and 'memory' in out
+
+
+def test_check_compiles_as_a_module_writing_the_olean(monkeypatch, tmp_path):
+    # q348 (2026-11-17): two pieces were 30 s and 62 s as a plain compile and 140 s and 135 s with the .olean
+    # the verifier writes; they timed out 15+ times while --check said they were fast
+    from p2mlib import localcheck
+    seen = {}
+
+    def fake(args, cwd, env=None):
+        seen['args'] = list(args)
+        src = args[-1]
+        seen['copy'] = open(src).read()           # the candidate, copied where -R makes it a module
+        seen['root'] = args[args.index('-R') + 1]
+        return 0, '', 10.0, 100
+    f = tmp_path / 'Sol.lean'
+    f.write_text(SRC)
+    monkeypatch.setattr(P, 'prune_by_lean', lambda path: SRC)
+    monkeypatch.setattr(localcheck, 'run_lean', fake)
+    monkeypatch.setenv('P2M_WORKSPACE', str(tmp_path))
+    monkeypatch.setattr(sys, 'argv', ['prune_solution.py', str(f), '--check'])
+    P.main()
+    a = seen['args']
+    assert '-o' in a and a[a.index('-o') + 1].endswith('.olean') and '-R' in a
+    assert seen['copy'] == SRC
+    assert not os.path.exists(seen['root'])        # the throwaway module directory is removed
