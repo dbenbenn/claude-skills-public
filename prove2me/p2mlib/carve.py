@@ -2579,6 +2579,98 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     return plan
 
 
+class _PieceKit:
+    """What split_piece and rekeep_pieces share over one plan: `fresh(n)`, the theorems n's piece must
+    prove itself (its proof's closure, stopping at the plan's statements, which it imports instead), and
+    `record(n)`, the plan's piece entry for that keep. `nodes` is the plan's statement set; adding to it
+    (a promotion) changes what fresh and record give from then on."""
+
+    def __init__(self, g, plan, cost, chunker):
+        self.g, self.plan, self.cost = g, plan, cost
+        self.bundles = bundles = plan['bundles']
+        pos = {b['name']: j for j, b in enumerate(bundles)}
+        self.bidx = {k: j for j, b in enumerate(bundles) for k in b['nodes']}
+        self.bimp = [{pos[x] for x in b.get('imports', ()) if x in pos} for b in bundles]
+        self.B = set(self.bidx)
+        self.ext = {g.owner.get(k, k) for k in plan.get('external_defs') or {}}
+        self.nodes = set(plan['nodes'])
+        self.chunked = chunker in ('schedule', 'closure')
+
+    def kids(self, c):
+        return [d for d in self.g.nodes[c].deps if d in self.g.nodes and d not in self.B and d not in self.ext]
+
+    def fresh(self, x):
+        s, todo = set(), [x]
+        while todo:
+            c = todo.pop()
+            if c in s:
+                continue
+            s.add(c)
+            todo += [d for d in self.kids(c) if d not in self.nodes]
+        return s
+
+    def pcost(self, s):
+        return sum(self.cost.get(x, 0.0) for x in s)
+
+    def need(self, keys):
+        g, bidx = self.g, self.bidx
+        ex = implicit_deps(g, keys, self.B) if self.chunked else {}
+        return {bidx[d] for x in keys for d in g.nodes[x].deps | ex.get(x, set()) | {x} if d in bidx}
+
+    def record(self, n):
+        g, bidx, bimp, bundles, nodes, B, ext = self.g, self.bidx, self.bimp, self.bundles, self.nodes, self.B, self.ext
+        keep = self.fresh(n)
+        imps = {d for x in keep for d in g.nodes[x].deps if d in nodes and d not in keep}
+        bks = self.need(keep) - {bidx[x] for x in keep if x in bidx}
+        in_bundles = _bundle_closure(bimp, bks)
+        avail = {k for j in in_bundles for k in bundles[j]['nodes']} | imps | ext
+        keep |= {k for k in g.extra_roots(keep, avail) if k not in nodes and k not in B and k not in ext}
+        bks = self.need(keep - B)
+        return {'keep': sorted(keep), 'imports': sorted(imps),
+                'bundles': [bundles[i]['name'] for i in sorted(_reduce(bimp, bks))],
+                'cost': round(self.pcost(keep), 2), 'size': sum(g.nodes[x].size for x in keep)}
+
+    def stub(self, m):
+        sb = {self.bidx[d] for d in self.g.nodes[m].sig if d in self.bidx}
+        return {'bundles': [self.bundles[i]['name'] for i in sorted(_reduce(self.bimp, sb))]}
+
+
+def rekeep_pieces(g, plan, names, cost, chunker='schedule'):
+    """Re-derive the pieces of `names` against the plan's current statements, without promoting anything:
+    a piece built before a lemma it proves became a statement (by a later split_piece, or late in make_plan's
+    greedy pass) still proves its own copy, and imports the statement instead once re-derived. q259
+    (2026-11-17): 8,167 of 11,095 unsent pieces kept copies of other statements (median 9); 61 of the 511
+    measured were over the verifier's memory, against 2 of the 1,873 that kept none, and 2,125 memory
+    "splits" that promoted nothing (re-derived only) took those pieces from a median 9,333 MiB to 6,792.
+    Only a piece whose re-derived keep is a strict part of its old one changes, and it imports every copy it
+    drops; one the result would put in a publish cycle (piece_cycles) keeps its old entry. Returns (new plan, [changed nodes])."""
+    plan = json.loads(json.dumps(plan))
+    kit = _PieceKit(g, plan, cost, chunker)
+    old, changed = {}, []
+    for n in names:
+        if n not in plan['pieces'] or n not in g.nodes:
+            continue
+        r = kit.record(n)
+        if set(r['keep']) < set(plan['pieces'][n]['keep']):
+            # every copy it drops is imported, whether the proof names it or uses it unseen (a `simp` lemma,
+            # an instance: g.extra_roots), so nothing the proof had goes missing
+            dropped = set(plan['pieces'][n]['keep']) - set(r['keep'])
+            r['imports'] = sorted(set(r['imports']) | (dropped & kit.nodes))
+            old[n] = plan['pieces'][n]
+            plan['pieces'][n] = r
+            changed.append(n)
+    for _ in range(5):
+        cyc = {a for a, _ in piece_cycles(plan) if a in old}
+        if not cyc:
+            break
+        for n in cyc:
+            plan['pieces'][n] = old.pop(n)
+            changed.remove(n)
+    plan['over'] = sorted(set(plan.get('over') or ()) - set(changed) |
+                          {n for n in changed if plan['pieces'][n]['cost'] > plan.get('budget', 1e9)})
+    return plan, changed
+
+
 def split_piece(g, plan, node, target, cost, chunker='schedule', promote_private=(), exclude=()):
     """Split one slow piece without re-planning: promote theorems its proof keeps into new statements
     (each with its own piece) until every piece involved costs at most `target`, and return
@@ -2597,13 +2689,8 @@ def split_piece(g, plan, node, target, cost, chunker='schedule', promote_private
     plan = json.loads(json.dumps(plan))
     if node not in plan['pieces']:
         raise CarveError('%s has no piece in the plan' % node)
-    bundles = plan['bundles']
-    pos = {b['name']: j for j, b in enumerate(bundles)}
-    bidx = {k: j for j, b in enumerate(bundles) for k in b['nodes']}
-    bimp = [{pos[x] for x in b.get('imports', ()) if x in pos} for b in bundles]
-    B = set(bidx)
-    ext = {g.owner.get(k, k) for k in plan.get('external_defs') or {}}
-    nodes = set(plan['nodes'])
+    kit = _PieceKit(g, plan, cost, chunker)
+    B, ext, nodes, fresh, pcost = kit.B, kit.ext, kit.nodes, kit.fresh, kit.pcost
     renames = collision_renames(g)
     excluded = set(exclude)
     b_or_ext = B | ext
@@ -2615,22 +2702,6 @@ def split_piece(g, plan, node, target, cost, chunker='schedule', promote_private
         if nd.private and not (promote_private is True or k in set(promote_private or ())):
             return False
         return ascii_ok(k) and nd.sig <= b_or_ext and not max_only_universes(g, k) and not instance_command(g, k)
-
-    def kids(c):
-        return [d for d in g.nodes[c].deps if d in g.nodes and d not in B and d not in ext]
-
-    def fresh(x):
-        s, todo = set(), [x]
-        while todo:
-            c = todo.pop()
-            if c in s:
-                continue
-            s.add(c)
-            todo += [d for d in kids(c) if d not in nodes]
-        return s
-
-    def pcost(s):
-        return sum(cost.get(x, 0.0) for x in s)
 
     new, work = [], [node]
     while work:
@@ -2649,28 +2720,10 @@ def split_piece(g, plan, node, target, cost, chunker='schedule', promote_private
             new.append(k)
             work.append(k)
             s = fresh(n)
-    chunked = chunker in ('schedule', 'closure')
-
-    def need(keys):
-        ex = implicit_deps(g, keys, B) if chunked else {}
-        return {bidx[d] for x in keys for d in g.nodes[x].deps | ex.get(x, set()) | {x} if d in bidx}
-
-    def psize(s):
-        return sum(g.nodes[x].size for x in s)
     for n in [node] + new:
-        keep = fresh(n)
-        imps = {d for x in keep for d in g.nodes[x].deps if d in nodes and d not in keep}
-        bks = need(keep) - {bidx[x] for x in keep if x in bidx}
-        in_bundles = _bundle_closure(bimp, bks)
-        avail = {k for j in in_bundles for k in bundles[j]['nodes']} | imps | ext
-        keep |= {k for k in g.extra_roots(keep, avail) if k not in nodes and k not in B and k not in ext}
-        bks = need(keep - B)
-        plan['pieces'][n] = {'keep': sorted(keep), 'imports': sorted(imps),
-                             'bundles': [bundles[i]['name'] for i in sorted(_reduce(bimp, bks))],
-                             'cost': round(pcost(keep), 2), 'size': psize(keep)}
+        plan['pieces'][n] = kit.record(n)
     for m in new:
-        sb = {bidx[d] for d in g.nodes[m].sig if d in bidx}
-        plan['stubs'][m] = {'bundles': [bundles[i]['name'] for i in sorted(_reduce(bimp, sb))]}
+        plan['stubs'][m] = kit.stub(m)
     plan['nodes'] = sorted(nodes)
     plan['over'] = sorted(set(plan.get('over') or ()) - {n for n in [node] + new
                                                           if plan['pieces'][n]['cost'] <= target})

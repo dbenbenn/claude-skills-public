@@ -1943,6 +1943,8 @@ class Pipeline:
         return flags
 
     def step_measure(self):
+        if self.rekeep_pieces('measure'):
+            return
         if self.streams_bundles():
             return self.stream_bundles()
         kinds = ['--kinds', 'bundle,statement'] if self.overlap() else []
@@ -2224,6 +2226,8 @@ class Pipeline:
         return rel
 
     def step_measure_pieces(self):
+        if self.rekeep_pieces('measure_pieces'):
+            return
         if self.p.get('go'):
             return self.stream_pieces()
         self.run_cmds('measure_pieces', [self.tool('carve_measure', 'config.json', *self.measure_flags(),
@@ -2783,6 +2787,59 @@ class Pipeline:
         print('== %s: split alone: %s' % (step, '; '.join('%s -> %d new statement(s) %s' % (n, len(v), ', '.join(v))
                                                           for n, v in sorted(done.items()))), flush=True)
         return done
+
+    def rekeep_pieces(self, step):
+        """Before pieces are measured, once per plan: every piece not live, in flight or measured within the
+        limits is re-derived against the plan's current statements (carve.py rekeep), importing the statements
+        it still proved copies of: those promoted after it was built, by make_plan's greedy pass or by a later
+        split. q259 (2026-11-17): 7,710 of 8,767 such pieces changed, planned cost median 15.3 -> 0.7 s,
+        declarations 46 -> 9; pieces keeping copies were over the verifier's memory 30 times as often, and
+        72 hourly split rounds had been re-deriving them a few dozen at a time. Restarts from `names` when
+        anything changed (as a split does); True then. pipeline.json `rekeep`: false turns it off."""
+        if not self.p.get('rekeep', True):
+            return False
+        cfg = self.read_config() or {}
+        plan_path = self.work_paths(cfg)[1]
+        if not os.path.exists(plan_path):
+            return False
+        h = hash_paths([plan_path])
+        if self.state.get('rekeep_plan') == h:
+            return False
+        plan = json.load(open(plan_path))
+        got = self.calibrate_inputs()
+        times = (got[2] if got else None) or {}
+        live, limit = live_pieces(self.d), self.rss_limit()
+        names = sorted(n for n in plan.get('pieces') or {} if n not in live and not (
+            (times.get('piece:' + n) or {}).get('ok') and fits_memory(times['piece:' + n], limit)))
+        if not names:
+            self.state['rekeep_plan'] = h
+            self.save()
+            return False
+        lst = os.path.join(os.path.dirname(plan_path), 'rekeep_candidates.json')
+        json.dump(names, open(lst, 'w'))
+        self.run_cmds(step, [self.tool('carve', 'rekeep', 'config.json', '@' + lst)])
+        self.check_published_unchanged(step)
+        log = os.path.join(self.d, 'logs', step + '.log')
+        line = [l for l in open(log, errors='replace').read().splitlines() if l.startswith('REKEPT_PIECES ')]
+        if not line:
+            raise StepFailed("step '%s': carve.py rekeep printed no REKEPT_PIECES line; log %s" % (step, log))
+        changed = json.loads(line[-1].split(' ', 1)[1])
+        self.state['rekeep_plan'] = hash_paths([plan_path])
+        if not changed:
+            self.save()
+            return False
+        g = self.state['steps'].get('gen')
+        if g and 'in' in g:
+            # rekeep generated exactly the pieces that changed: gen stands for the new plan
+            g['in']['plan'] = self.state['rekeep_plan']
+        self.state.setdefault('rekept', {})[_now()] = len(changed)
+        self.invalidate('names')
+        self.restart = True
+        self.save()
+        print('== %s: re-derived %d of %d unmeasured or over-limit piece(s) against the current statements '
+              '(they import what they proved copies of); again from names' % (step, len(changed), len(names)),
+              flush=True)
+        return True
 
     def live_items(self):
         sp = os.path.join(self.d, 'publish', 'run_state.json')

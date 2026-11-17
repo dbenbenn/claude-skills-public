@@ -21,6 +21,9 @@ usage: carve.py graph CONFIG.json                  # DeclGraph + LeanInfo of eve
                                                    # other item stays as it is. Old plan:
                                                    # work/plan.pre_split_piece.json; prints
                                                    # `SPLIT_PIECES {"NODE": [new nodes]}`
+       carve.py rekeep CONFIG.json NODE[,...]|@FILE [--no-gen]  # re-derive pieces: import the statements
+                                                   # they still prove copies of (q259); prints
+                                                   # `REKEPT_PIECES [nodes]`
        carve.py fold  CONFIG.json NODE ...         # NODEs stop being statements: their pieces go into
                                                    # every importer's piece (plan in place, config `folded`)
 
@@ -704,6 +707,29 @@ def main(argv):
         if '--no-gen' not in rest:
             run_gen(cfg, g, Q, ('bundles', 'stubs', 'pieces'), set(done) | {m for v in done.values() for m in v})
         print('SPLIT_PIECES ' + json.dumps(done, sort_keys=True))
+    elif cmd == 'rekeep':
+        # re-derive pieces against the current statements (C.rekeep_pieces): NODES comma-separated or @FILE (JSON list)
+        if not rest or rest[0].startswith('--'):
+            sys.exit('rekeep: name the pieces (their nodes, comma-separated, or @FILE holding a JSON list)')
+        names = json.load(open(rest[0][1:])) if rest[0].startswith('@') else rest[0].split(',')
+        g, P = load_graph(cfg), json.load(open(plan_path(cfg)))
+        Q, changed = C.rekeep_pieces(g, P, names, costs(cfg, g), cfg.get('chunker', 'bands'))
+        if changed:
+            probs = C.check_plan(g, Q)
+            if probs:
+                sys.exit('rekeep: plan inconsistent:\n' + '\n'.join(probs[:20]))
+            backup = keep_backup(plan_path(cfg), '.pre_rekeep')
+            json.dump(P, open(backup, 'w'), indent=1, sort_keys=True)
+            json.dump(Q, open(plan_path(cfg), 'w'), indent=1, sort_keys=True)
+            print('old plan saved as %s' % backup)
+            for n in changed:
+                print('  %-60s %7.2f -> %7.2f planned s, %d -> %d declarations' % (
+                    n, P['pieces'][n]['cost'], Q['pieces'][n]['cost'], len(P['pieces'][n]['keep']),
+                    len(Q['pieces'][n]['keep'])))
+            if '--no-gen' not in rest:
+                run_gen(cfg, g, Q, ('pieces',), set(changed))
+        print('%d of %d piece(s) re-derived' % (len(changed), len(names)))
+        print('REKEPT_PIECES ' + json.dumps(sorted(changed)))
     elif cmd == 'order':
         order = C.publish_order(json.load(open(plan_path(cfg))), cfg.get('external', ()))
         json.dump(order, open(os.path.join(cfg['work'], 'order.json'), 'w'), indent=1)

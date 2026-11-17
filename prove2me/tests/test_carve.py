@@ -538,6 +538,35 @@ def test_split_piece_promotes_inside_one_piece_and_leaves_the_rest_of_the_plan_a
     assert C.check_plan(g, Q) == [] and C.piece_cycles(Q) == []
 
 
+def test_rekeep_makes_pieces_import_the_statements_they_kept_copies_of(g):
+    # q259 2026-11-17: a lemma promoted after the pieces were built (split_piece promotes inside one piece) was
+    # still proved as a private copy by every other piece keeping it (7,710 of 8,767 unsent pieces there).
+    # rekeep_pieces re-derives pieces against the current statements, promoting nothing, and changes only
+    # those that shrink.
+    P = _whole_plan(g)
+    cost = C.size_costs(g, bytes_per_second=10000)
+    k = 'CD.simpA'                                   # kept by all three pieces
+    keeping = {n for n, p in P['pieces'].items() if k in p['keep'] and n != k}
+    assert len(keeping) == 3
+    Q = json.loads(json.dumps(P))
+    kit = C._PieceKit(g, Q, cost, 'schedule')        # promoted late, as a split does: the others keep their copies
+    kit.nodes.add(k)
+    Q['nodes'] = sorted(kit.nodes)
+    Q['pieces'][k], Q['stubs'][k] = kit.record(k), kit.stub(k)
+    assert C.check_plan(g, Q) == []
+    R, changed = C.rekeep_pieces(g, Q, list(Q['pieces']), cost, 'schedule')
+    assert set(changed) == keeping
+    for m in changed:
+        assert k not in R['pieces'][m]['keep'] and k in R['pieces'][m]['imports']
+        assert R['pieces'][m]['cost'] <= Q['pieces'][m]['cost']
+    assert R['pieces'][k] == Q['pieces'][k]
+    assert R['nodes'] == Q['nodes'] and R['bundles'] == Q['bundles'] and R['stubs'] == Q['stubs']
+    assert C.check_plan(g, R) == [] and C.piece_cycles(R) == []
+    assert C.rekeep_pieces(g, R, list(R['pieces']), cost, 'schedule')[1] == []      # idempotent
+    # only the pieces asked about change
+    assert C.rekeep_pieces(g, Q, sorted(keeping)[:1], cost, 'schedule')[1] == sorted(keeping)[:1]
+
+
 def test_an_instance_command_is_never_a_statement(g):
     # q241 (2026-11-10): the plan promoted `instance poly_forms : PolyTime forms` (an instance of a Prop
     # class is a theorem), measuring passed, and `prose` failed late with "no theorem in the stub"; q240's

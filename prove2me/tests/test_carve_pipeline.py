@@ -76,6 +76,18 @@ STUB = textwrap.dedent('''
         json.dump(_plan, open(_pp, 'w'))
         print('UNSPLITTABLE_PIECES ' + json.dumps(_un))
         print('SPLIT_PIECES ' + json.dumps(_done))
+    if NAME == 'carve' and sys.argv[1] == 'rekeep':
+        # carve.py rekeep: the pieces STUB_REKEPT names (and the run asks about) are re-derived once each
+        _pp = os.path.join(os.getcwd(), 'carve_work', 'plan.json')
+        _plan = json.load(open(_pp))
+        _ask = json.load(open(sys.argv[3][1:])) if sys.argv[3].startswith('@') else sys.argv[3].split(',')
+        _ch = [n for n in json.loads(os.environ.get('STUB_REKEPT', '[]'))
+               if n in _ask and n in _plan['pieces'] and not _plan['pieces'][n].get('rekept')]
+        for _n in _ch:
+            _plan['pieces'][_n] = dict(_plan['pieces'][_n], rekept=True)
+        if _ch:
+            json.dump(_plan, open(_pp, 'w'))
+        print('REKEPT_PIECES ' + json.dumps(_ch))
     # a test scripts a tool's behaviour: STUB_HOOK_<tool>_<first argument, . and - as _>
     exec(os.environ.get('STUB_HOOK_' + NAME + '_' + (sys.argv[1] if len(sys.argv) > 1 else '').replace('.', '_').replace('-', '_'), ''))
 ''')
@@ -2966,6 +2978,31 @@ def test_a_piece_over_the_verifiers_memory_is_split_alone_at_once(env, monkeypat
     assert not st.get('remeasured')                               # a peak is not a thrashing artefact
     assert st['auto_split']['P0']['rss_mib'] == CP.PIECE_RSS_TARGET + 120
     assert 'memory' in (env.dir / 'logs' / 'calibrate.log').read_text()
+
+
+def test_unmeasured_pieces_are_rederived_against_the_statements_once_per_plan(env, monkeypatch):
+    # q259 2026-11-17: pieces built before a lemma became a statement kept proving their own copy of it (7,710 of
+    # 8,767 unsent pieces); before measuring, carve.py rekeep re-derives every piece not live and not measured
+    # within the limits, and the run goes on from names when anything changed
+    _overlap_carve(env, monkeypatch, pieces={'P0': (10, 40), 'P1': (40, 30)})
+    for f in ('times.json', 'times.orig.json'):           # P1 not measured yet; P0 measured within the limits
+        t = json.load(open(env.dir / 'carve_work' / f))
+        t.pop('piece:P1')
+        (env.dir / 'carve_work' / f).write_text(json.dumps(t))
+    monkeypatch.setenv('STUB_REKEPT', '["P0", "P1"]')       # P0 is never asked about
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    rk = [c['argv'] for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'rekeep']
+    assert rk and all(a[1] == 'config.json' and a[2].startswith('@') for a in rk)
+    assert 're-derived 1 of' in r.stdout
+    assert json.load(open(env.dir / 'carve_work' / 'plan.json'))['pieces']['P1'].get('rekept')
+    st = json.load(open(env.dir / 'pipeline_state.json'))
+    assert st.get('rekeep_plan') and sum(st['rekept'].values()) == 1
+    # the plan it left is not asked about again: later steps of the same plan skip the call
+    n = len(rk)
+    r = run(env, *ARGS_NEW, '--publish')
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert len([c for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'rekeep']) == n
 
 
 def test_pieces_are_measured_with_parallel_jobs(env, monkeypatch):

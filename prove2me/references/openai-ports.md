@@ -848,6 +848,14 @@ carve primitives by hand with a hand-written config; that is what native mode wr
   piece a little over (at most `TRY_UNSPLIT_RSS` 8,600 MiB and `TRY_UNSPLIT_SECS` 20 s) that imports at
   most `TRY_UNSPLIT_IMPORTS` (120) statements; q153 had all 331 pieces over 7,150 MiB accepted, each
   importing at most 119. A memory kill (verdicts `hidden`/`dependency_oom`) puts a piece in state `split`.
+- **Pieces re-proving statements' lemmas** (q259, 2026-11-17). A lemma promoted to a statement after a piece
+  was built (by `split-piece`, or late in make_plan's greedy pass) stays a private copy in every other piece
+  that keeps it. On q259, 8,167 of 11,095 unsent pieces kept copies (median 9); those were over the memory
+  limit 30 times as often, and 72 hourly split rounds re-derived them a few dozen at a time (2,125 "splits"
+  promoting nothing, a median 9,333 -> 6,792 MiB). The driver now re-derives every piece not live and not
+  measured within the limits whenever the plan changed, before measuring (`carve.py rekeep`, pipeline.json
+  `rekeep`: false turns it off): 7,614 of 8,659 pieces changed, planned cost median 15.3 -> 0.7 s, imports
+  6 -> 13. A dropped copy is always imported, even one the proof uses unseen (`simp`, instances).
 - **Many imports are their own memory cost** (q154 `GramData.Block3.gram`, 2026-11-10): the verifier
   replays every imported module, which the local peak under-counts. `gram` imported 709 entry statements
   and was killed four times at ~7,450 MiB, and each split only made it import more. A piece like that
