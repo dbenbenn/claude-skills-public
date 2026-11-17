@@ -2990,6 +2990,9 @@ def test_unmeasured_pieces_are_rederived_against_the_statements_once_per_plan(en
         t.pop('piece:P1')
         t.pop('piece:P2')
         (env.dir / 'carve_work' / f).write_text(json.dumps(t))
+    t = json.load(open(env.dir / 'carve_work' / 'times.json'))     # P1 measured over memory before: a stale peak
+    t['piece:P1'] = _tm(40, CP.PIECE_RSS_LIMIT + 2000)
+    (env.dir / 'carve_work' / 'times.json').write_text(json.dumps(t))
     # P2 is released already: the background publisher may send it at any moment (q259: three were, mid-rekeep)
     (env.dir / 'publish').mkdir(exist_ok=True)
     (env.dir / 'publish' / 'release.json').write_text(json.dumps({'plan_sha': 'x', 'pieces': ['piece:P2'], 'open': True}))
@@ -3001,6 +3004,8 @@ def test_unmeasured_pieces_are_rederived_against_the_statements_once_per_plan(en
     assert 're-derived 1 of' in r.stdout
     pl = json.load(open(env.dir / 'carve_work' / 'plan.json'))['pieces']
     assert pl['P1'].get('rekept') and not pl['P0'].get('rekept') and not pl['P2'].get('rekept')
+    # its old peak was dropped with the old text: no split acted on it (q259: 55 pieces split on stale peaks)
+    assert not [c for c in calls(env) if c.get('tool') == 'carve' and c['argv'][0] == 'split-piece']
     st = json.load(open(env.dir / 'pipeline_state.json'))
     assert st.get('rekeep_plan') and sum(st['rekept'].values()) == 1
     # the plan it left is not asked about again: later steps of the same plan skip the call

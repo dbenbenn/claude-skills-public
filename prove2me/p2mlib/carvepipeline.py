@@ -2833,6 +2833,14 @@ class Pipeline:
         if not changed:
             self.save()
             return False
+        # their measurements are of the old text: a split round must not act on them (q259 2026-11-17: 55 re-derived
+        # pieces were split on their old peaks right after the first rekeep)
+        if got:
+            for x in changed:
+                times.pop('piece:' + x, None)
+            tmp = got[4] + '.rekeep.tmp'
+            json.dump(times, open(tmp, 'w'), indent=1)
+            os.replace(tmp, got[4])
         g = self.state['steps'].get('gen')
         if g and 'in' in g:
             # rekeep generated exactly the pieces that changed: gen stands for the new plan
