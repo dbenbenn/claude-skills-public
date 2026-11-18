@@ -154,6 +154,26 @@ def test_drop_records_the_cut_so_it_survives_gen(tmp_path):
     assert M.drop_cuts({'false': ['Theorems.Thm_U'], 'restore': {'Theorems.Thm_U': ['Definitions.Def_S']}}) is None
 
 
+def test_a_piece_replaces_a_false_statement_import_by_its_bundles():
+    # q259 (2026-11-18): 5,431 pieces imported a statement only for its bundle; in a piece (nothing
+    # imports one) the import is replaced by the bundles the edge check compiled, each named once
+    import carve_measure as M
+    from p2mlib import repair as RP
+    res = {'false': ['Theorems.Thm_U', 'Theorems.Thm_V', 'Theorems.Thm_W'],
+           'restore': {'Theorems.Thm_U': ['Definitions.Def_S', 'Definitions.Def_T'],
+                       'Theorems.Thm_V': ['Definitions.Def_T']}}
+    assert M.drop_cuts(res) is None
+    cuts = M.drop_cuts(res, replace=True)
+    assert cuts == ['import Theorems.Thm_U\0import Definitions.Def_S\nimport Definitions.Def_T',
+                    'import Theorems.Thm_V', 'import Theorems.Thm_W']
+    text = 'import Mathlib\nimport Theorems.Thm_U\nimport Theorems.Thm_V\nimport Theorems.Thm_W\n\ntheorem solution : True := trivial\n'
+    new, applied, stale = RP.apply_cuts(text, cuts)
+    assert not stale and len(applied) == 3
+    assert new == 'import Mathlib\nimport Definitions.Def_S\nimport Definitions.Def_T\ntheorem solution : True := trivial\n'
+    # re-applied after gen: a made replacement counts as made, not stale
+    assert M.reapply(new, cuts) == (new, [])
+
+
 def test_a_false_definitions_import_is_reported_not_cut_and_never_fails_the_run():
     # oaiq-039/075 (2026-10-28): cutting a bundle's false import of another bundle (or replacing it, as
     # 9d7c60a2 did for oaiq-037) broke files that used it transitively or named its instances in

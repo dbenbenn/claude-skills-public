@@ -45,7 +45,9 @@ imports any more (orphaned: not a target or forced, so drop them from the plan).
 import (`import Theorems.*`, a theorem-graph edge) fails the run unless --allow-false-edges; a false
 definitions import is reported and kept (cutting one broke dependants, oaiq-039/075).
 --drop-false-edges cuts each false theorem import that needs no replacement, records the cut in <work>/repairs.json (re-applied after every `carve.py gen`, like
-the context-command repairs) and re-measures the file.
+the context-command repairs) and re-measures the file. In a piece (nothing imports one) a false theorem
+import that only brought in bundles is replaced by those bundle imports, which the edge check compiled
+(q259, 2026-11-18: 5,431 pieces); in a bundle or statement such an import is still left to a person.
 
 --profile bundle:NAME[,...] compiles each once more with Lean's profiler (into D/profile, not D/olean) and
 records the diagnosis (serialization-, kernel- or elaboration-bound, naming the declaration) in
@@ -388,6 +390,17 @@ class Measure:
                 self._live = set()
         return self._live
 
+    def sent_pieces(self):
+        """The pieces the publisher already sent (any publish/run_state.json record): their text is
+        submitted, so measure neither repairs their edges nor fails on them (q259)."""
+        if '_sent' not in self.__dict__:
+            try:
+                st = json.load(open(os.path.join(self.d, 'publish', 'run_state.json')))
+                self._sent = {x for x in st if x.startswith('piece:')}
+            except (OSError, ValueError):
+                self._sent = set()
+        return self._sent
+
     def apply_recorded(self, src):
         name = os.path.basename(src)
         text = open(src, encoding='utf-8').read()
@@ -605,10 +618,12 @@ class Measure:
 
     def drop_edges(self, item, res):
         """Cut the item's false imports (when no bundle must replace them) and record the cuts."""
-        cuts = drop_cuts(res)
+        kind, n = item.split(':', 1)
+        if item in self.sent_pieces():
+            return False           # submitted as it is: changing it now would only resend it
+        cuts = drop_cuts(res, replace=kind == 'piece')
         if not cuts:
             return False
-        kind, n = item.split(':', 1)
         src, _ = self.item_files(kind, n)
         new, applied, _ = RP.apply_cuts(open(src, encoding='utf-8').read(), cuts)
         if not applied:
@@ -713,7 +728,12 @@ class Measure:
                 rep['orphaned_statements'] = []
             write_json(os.path.join(self.cfg['work'], 'false_edges.json'), rep, indent=1)
             print_edge_report(rep)
-            if failing_false_edges(rep) and not self.allow_false:
+            failing = failing_false_edges(rep)
+            sent = [f for f in failing if f['item'] in self.sent_pieces()]
+            if sent:
+                print('%d false edge(s) in %d piece(s) already sent: kept, not failing the run' % (
+                    len(sent), len({f['item'] for f in sent})), flush=True)
+            if len(failing) > len(sent) and not self.allow_false:
                 ok = False
         return ok
 
@@ -786,20 +806,25 @@ def diagnose_profile(prof, secs=None, nodes=()):
             ''.join('; %.0f s: %s' % (t, c) for t, c in cmds)))
 
 
-def drop_cuts(res):
+def drop_cuts(res, replace=False):
     """The repair cuts that remove a file's false theorem imports (`import Theorems.*`, the
     theorem-graph edges). A false definitions import is left in place: cutting or replacing it broke
     files that used it transitively or named its instances in `attribute [-instance]` lines (oaiq-039,
     oaiq-075), and it is no graph edge. A statement import that needs a bundle in its place is left to
-    a person (None)."""
+    a person (None) unless `replace` (a piece, which nothing imports): then it becomes the replacement
+    `import Theorems.X\0import Definitions.A\nimport Definitions.B` (repair.apply_cuts), each bundle
+    named once across the file's replacements (q259)."""
     graph = [m for m in res.get('false') or () if m.startswith('Theorems.')]
     if not graph:
         return None
-    cuts = []
+    cuts, added = [], set()
     for m in graph:
-        if res.get('restore', {}).get(m):
+        need = res.get('restore', {}).get(m)
+        if need and not replace:
             return None
-        cuts.append('import ' + m)
+        new = [b for b in need or () if b not in added]
+        added.update(new)
+        cuts.append('import ' + m + ('\0' + '\n'.join('import ' + b for b in new) if new else ''))
     return cuts
 
 
