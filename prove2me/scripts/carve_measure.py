@@ -81,6 +81,7 @@ import json
 import os
 import re
 import resource
+import time
 import shutil
 import subprocess
 import sys
@@ -604,10 +605,14 @@ class Measure:
             return old
         uses, secs = None, 0.0
         if cands:
-            r0 = resource.getrusage(resource.RUSAGE_CHILDREN)
-            uses = EC.scan(*self.compiled_module(item, env), env, self.lean_ws)
-            r1 = resource.getrusage(resource.RUSAGE_CHILDREN)
-            secs = r1.ru_utime - r0.ru_utime + r1.ru_stime - r0.ru_stime
+            mod, roots = self.compiled_module(item, env)
+            # q259 (2026-11-18): the scan (a `lean --run` of several seconds per piece) held the lock that
+            # serializes everything but Lean, so `--jobs 4` re-checking ~5k pieces ran about one Lean at a
+            # time. It reads only its own .olean; wall time, as RUSAGE_CHILDREN is shared by the threads
+            t0 = time.time()
+            with self.unlocked():
+                uses = EC.scan(mod, roots, env, self.lean_ws)
+            secs = time.time() - t0
         self.edge_compile_secs = 0.0
         res = EC.check(text, cands, uses, lambda t: self.compiles(item, t, env), self.imports_of)
         res.update(key=key, file=os.path.basename(src), scan_secs=round(secs, 1),
