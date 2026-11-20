@@ -237,7 +237,10 @@ it. Each line names a defect that a mission of ours actually shipped or nearly s
   bounds $|B(u)|$ (caught by the quote recheck). It also loses where a radical ends: on Viterbo
   (2026-10-30) the page's $l = \sqrt{c_{\rm EHZ}(K \times T)}/2$ came out as
   "l = √ cEHZ(K × T)/2", and a Route "corrected" the printed $\sqrt{c/2}$ to $\sqrt c/2$, a typo the
-  paper never made (caught by the caveat audit). **Before calling anything in the source a misprint,
+  paper never made (caught by the caveat audit). It drops a superscript inside one: Hatami's
+  $\delta=2^{-10^2k^2}$ came out as "2−10 k", read as $2^{-10k^2}$, and a RESUME and a live proof
+  explanation called the paper's bound (14) false for eight days (Narrow DNF, q338; corrected 2026-11-20).
+  **Before calling anything in the source a misprint,
   look at the page image.**
 - **Recheck all the quotes, as the platform holds them.** Every quotation in every field — milestone
   descriptions, natural-language statements, `source`, the mission description — read from the
