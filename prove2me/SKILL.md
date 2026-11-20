@@ -1076,7 +1076,9 @@ BLUEPRINT OUT PARTS… [--target NAME]` merges the result into one file:
   at its head, so each prover compiles alone in seconds (q159: 20 Parts on Tao §4). The copies
   are checked verbatim against the Blueprint and dropped; a changed copy is refused, and a stub
   proved under the Blueprint's own name with the same statement is moved into `Part<X>` (q195).
-  Briefs say: copy Blueprint text but never change it, and prove targets in `Part<X>`;
+  Briefs say: copy Blueprint text but never change it, and prove targets in `Part<X>`. A Part that
+  needs a `Solutions.*` helper is not copy-header: it imports the Blueprint (its copies are kept
+  and fail as "already declared", mms-bansal-walk);
 - `--target <published name>` renames the Blueprint's theorem of that name `_dev` (one whose last
   component is the name, or the name plus `_dev`, is called as it is: q165, q208) and appends
   `theorem solution`; `--published STUB=Theorems.MODULE` proves a stub by a published statement,
