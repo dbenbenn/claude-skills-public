@@ -20,6 +20,8 @@ data, not code: MISSION_DIR/mission.py defines
                stage-all and source_audit.py, from its published statement in Theorems/
   GOAL         the goal theorem's short name (never a milestone); 'ref:<theorem_name>' when the
                goal is already published
+  NOT_LEAN     optional set of backticked names in the prose that are not Lean (C identifiers, file
+               names, an upstream name the republication changed); the dead-reference check skips them
   KEEP_REFS    optional {'<theorem_name>': 'reason'}: references kept on purpose although no statement
                needs them (verify otherwise flags them; see unneeded_refs)
   ORDER        optional item_order as a list of keys (Def names, 'ref:<name>', theorem names);
@@ -413,6 +415,9 @@ def dead_lean_refs(M, mdir, its, mls, desc, call):
                | {os.path.basename(f)[len('Def_'):-len('.lean')]
                   for f in glob.glob(os.path.join(ws, 'Definitions', 'Def_*.lean'))})
     left = [h for h in left if h not in bundles]
+    # a software mission names C identifiers, macros and files in backticks (`crc32_z`, `zlib.h`);
+    # mission.py NOT_LEAN lists them, so only Lean-looking names are resolved (zlib CRC-32, 2026-11-22)
+    left = [h for h in left if h not in set(getattr(M, 'NOT_LEAN', ()))]
     if left:
         imps = sorted({l for f in glob.glob(os.path.join(mdir, 'lib', '*.lean')) + glob.glob(os.path.join(mdir, 'statements', '*.lean'))
                        for l in open(f, encoding='utf-8').read().split('\n') if l.startswith('import ')})
