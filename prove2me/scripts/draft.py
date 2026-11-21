@@ -350,7 +350,7 @@ def _decls(path, seen):
             names.add('.'.join(stack + [m.group(1)]))
     from prune_solution import _workspace
     ws = _workspace()
-    for mod in re.findall(r'^import ((?:Definitions|Theorems)\.\S+)', text, re.M):
+    for mod in re.findall(r'^(?:public\s+)?(?:meta\s+)?import\s+((?:Definitions|Theorems)\.\S+)', text, re.M):
         n, sp = _decls(os.path.join(ws, *mod.split('.')) + '.lean', seen)
         names |= n; spaces |= sp
     return names, spaces

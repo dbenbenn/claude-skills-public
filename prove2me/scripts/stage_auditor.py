@@ -133,7 +133,7 @@ def fresh_oleans(files):
             text = open(f, encoding='utf-8').read()
         except OSError:
             continue
-        for m in re.findall(r'^import\s+((?:Definitions|Theorems)\.\S+)', text, re.M):
+        for m in re.findall(r'^(?:public\s+)?(?:meta\s+)?import\s+((?:Definitions|Theorems)\.\S+)', text, re.M):
             if os.path.exists(os.path.join(WS, m.replace('.', os.sep) + '.lean')):
                 mods.add(m)
     if not mods:
@@ -359,12 +359,12 @@ def mission_items(mdir):
     def bundles(text):
         # transitively: a bundle's own imports are needed to expand it (CFP §5's T bundle uses
         # IsDyadic and mapA from the F bundle, which a statement about T never imports itself)
-        out, todo = [], re.findall(r'^import (Definitions\.\S+)', text, re.M)
+        out, todo = [], re.findall(r'^(?:public\s+)?(?:meta\s+)?import\s+(Definitions\.\S+)', text, re.M)
         while todo:
             p = os.path.join(WS, todo.pop(0).replace('.', os.sep) + '.lean')
             if p not in out:
                 out.append(p)
-                todo += re.findall(r'^import (Definitions\.\S+)', open(p, encoding='utf-8').read(), re.M)
+                todo += re.findall(r'^(?:public\s+)?(?:meta\s+)?import\s+(Definitions\.\S+)', open(p, encoding='utf-8').read(), re.M)
         return out
     out = []
     for D in M.DEFINITIONS:

@@ -143,7 +143,7 @@ def main():
                 written.append(rel)
                 print('   wrote %-8s %s' % (d.get('status'), rel))
             mods.append(rel[:-5].replace(os.sep, '.'))
-            for b in re.findall(r'^import Definitions\.Def_(\S+)', text, re.M):
+            for b in re.findall(r'^(?:public\s+)?(?:meta\s+)?import\s+Definitions\.Def_(\S+)', text, re.M):
                 bid = lookup_bundle(b)
                 if bid and bid not in seen:
                     seen.add(bid); queue.append(bid)

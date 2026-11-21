@@ -276,7 +276,7 @@ def write_bundle_context(mdir, name, dst):
     mods = set()
     for f in [os.path.join(mdir, 'lib', name + '.lean')]:
         if os.path.exists(f):
-            mods |= set(re.findall(r'^import Definitions\.(Def_\w+)', open(f, encoding='utf-8').read(), re.M))
+            mods |= set(re.findall(r'^(?:public\s+)?(?:meta\s+)?import\s+Definitions\.(Def_\w+)', open(f, encoding='utf-8').read(), re.M))
     for pr in pre:
         mods |= set(re.findall(r'^import Definitions\.(Def_\w+)', pr or '', re.M))
     mods.discard(name)
