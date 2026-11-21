@@ -528,6 +528,12 @@ definitions file with `module`, `public import` and `@[expose] public section` a
 and an ordinary (non-module) statement importing it and using the notation (CRC-32 pilot, which
 republishes DeepMind's module-format AArch64 semantics). A module-format bundle can import only
 module-format files; Mathlib is module-format.
+**Metaprogramming is rejected in a bundle too, not only in solutions.** A private probe the same
+day (`CrcProbe_macro`) FAILED before compiling, with one line per construct: `macro`, `syntax`,
+`declare_syntax_cat`, `macro_rules`, `elab`, and even an import of `TermElabM` ("metaprogramming
+is not supported in submissions"). `notation` passes. So a library with a syntax layer (DeepMind's
+`Arm64.Trusted.Surface`) is published without it; its elaborators only produce terms the core
+modules already define.
 
 **Name every concept a statement uses more than once.** A clause written out in several
 statements ("finitely additive", "`G`-invariant") is a definition the reader cannot cite and the
