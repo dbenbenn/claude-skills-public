@@ -534,6 +534,13 @@ day (`CrcProbe_macro`) FAILED before compiling, with one line per construct: `ma
 is not supported in submissions"). `notation` passes. So a library with a syntax layer (DeepMind's
 `Arm64.Trusted.Surface`) is published without it; its elaborators only produce terms the core
 modules already define.
+The same scanner also rejects **the token `extern` anywhere in code** ("binds a declaration to
+native code"), even as an inductive constructor's name, and **interpolated strings `s!"…"`**
+("interpolations embed executable terms the guard cannot scan"). Comments and docstrings are not
+scanned. Write a `s!` string out as its elaboration, `(toString "a" ++ toString (x) ++ … : String)`,
+which yields the identical term. The scanner's rules are not documented, so a large imported
+library gets a private dry run under throwaway names before any Submit
+(`arm64-semantics-p2m/tools/dryrun_publish.py`).
 
 **Name every concept a statement uses more than once.** A clause written out in several
 statements ("finitely additive", "`G`-invariant") is a definition the reader cannot cite and the
