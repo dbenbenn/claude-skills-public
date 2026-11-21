@@ -523,6 +523,12 @@ imports from the identifiers it uses, never from a template: the preamble is fro
 so an unused `import Definitions.X` is a dependency every citing development inherits forever. A
 bundle beside the bundle that imports it changes no dependency and is not worth a click.
 
+**A bundle may use Lean's module system and `notation`.** Private probes on 2026-11-21 published a
+definitions file with `module`, `public import` and `@[expose] public section` and a `notation`,
+and an ordinary (non-module) statement importing it and using the notation (CRC-32 pilot, which
+republishes DeepMind's module-format AArch64 semantics). A module-format bundle can import only
+module-format files; Mathlib is module-format.
+
 **Name every concept a statement uses more than once.** A clause written out in several
 statements ("finitely additive", "`G`-invariant") is a definition the reader cannot cite and the
 source's word never maps onto; define it once in the bundle and use the name. Mathlib's own
@@ -889,7 +895,9 @@ ad-hoc loop: `wait_published.py NAME…` exits when each name is published (look
 job that has scrolled out of `/publish-jobs?limit=N` still counts) or one's newest job has FAILED;
 `wait_published.py --proposal ID` exits when the Submit queue has drained. Its exit is the
 notification. An ad-hoc waiter on `/publish-jobs?limit=6` never exited once later jobs pushed its
-job out of the window (2026-10-06).
+job out of the window (2026-10-06). It looks names up in the public catalogue, so it never sees a **private**
+item publish and runs to its timeout: poll that item's job with `GET /publish-jobs/<job_id>` instead
+(2026-11-21).
 
 **Watch for the approval yourself.** Once a proposal reads `In review`, start
 `scripts/watch_proposal.py PROPOSAL_ID --every 600` as a background command. It exits when the
