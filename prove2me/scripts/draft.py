@@ -11,7 +11,9 @@ non-empty, so a read-back filed on the wrong item passed. This is the one copy. 
 data, not code: MISSION_DIR/mission.py defines
 
   NAME, FIELDS (field ids), MISSION_TYPE ('ResearchPaper' | 'Textbook'), NAMESPACE ('Garrido')
-  DEFINITIONS  [{name, title, nls, tags, page, result[, extra, ref]}]   code: lib/Def_<name>.lean
+  DEFINITIONS  [{name, title, nls, tags, page, result[, extra, ref, readback=False]}]   code: lib/Def_<name>.lean
+               (readback=False: no read-back, only by the human's decision for a republished library;
+               republished=True: another project's library verbatim, so its docstrings are not checked)
   THEOREMS     [{name, title, nls, tags, page, result, milestone_title, milestone_description, ...}]
                (optional `namespace`, when an item is another author's, e.g. a cited external result)
   REFERENCES   [{theorem_id, theorem_name[, milestone_title, milestone_description]}]  (no title:
@@ -108,7 +110,13 @@ def desired(M, mdir):
             'definition': open(os.path.join(mdir, 'lib', 'Def_' + D['name'] + '.lean'), encoding='utf-8').read(),
             'natural_language_statement': D['nls'], 'tags': D.get('tags', getattr(M, 'TAGS', [])),
             'source': M.src(D['page'], D['result'], D.get('extra'), D.get('ref')),
-            'readback': rb('Def_' + D['name']), 'readback_model': READBACK_MODEL}
+            'readback': rb('Def_' + D['name']) if D.get('readback') is not False else None,
+            'readback_model': READBACK_MODEL}
+        if D.get('readback') is False:
+            # a republished library bundle whose fidelity rests on a mechanical identity check, by the
+            # human's decision (zlib CRC-32, 2026-11-22: read-backs only for the bundles that give the
+            # statements their meaning); no testimony is posted for it
+            del items[D['name']]['readback'], items[D['name']]['readback_model']
     for R in M.REFERENCES:
         items['ref:' + R['theorem_name']] = {'kind': 'reference', 'theorem_id': R['theorem_id']}
     for T in M.THEOREMS:
@@ -187,7 +195,7 @@ def diff(M, mdir, call, st):
         if it is None:
             bad.append((k, 'missing item')); continue
         for f in FIELDS[want['kind']]:
-            if not same(live_value(it, f), want[f]):
+            if not same(live_value(it, f), want.get(f)):
                 bad.append((k, f))
     for k, (t, dsc) in miles.items():
         m = lm.get(ids.get(k))
@@ -317,7 +325,9 @@ def bundle_relation_docstrings(M, mdir):
     pat = re.compile(r'`[^`]+` is `[^`]+`(?![-\w])|\b(?:equivalent to|coincides with|the same as)\b')
     for D in getattr(M, 'DEFINITIONS', []):
         f = os.path.join(mdir, 'lib', 'Def_%s.lean' % D['name'])
-        if not os.path.exists(f):
+        if not os.path.exists(f) or D.get('republished'):
+            # republished: another project's library, published verbatim (its docstrings are the
+            # upstream authors' and part of what an identity check compares; zlib CRC-32, 2026-11-22)
             continue
         for doc in re.findall(r'/--(.*?)-/', open(f, encoding='utf-8').read(), re.S):
             m = pat.search(doc)
