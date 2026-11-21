@@ -75,7 +75,8 @@ Write as if yours is the only artifact, because to the person reading the publis
 is.
 
 - **Plain mathematical English and real math notation, in Markdown + KaTeX.** Write $P_i$, not
-  `P i`; $A^{m,n}$, not `A m n`. Avoid Lean syntax and Lean identifiers in this file. Use
+  `P i`; $A^{m,n}$, not `A m n`. Avoid Lean syntax and Lean identifiers in this file, and use no backticks at all: a
+  name that is data (a string, a program symbol such as "crc32_z") goes in plain quotes. Use
   display-math blocks and paragraph breaks for readability.
 - **Account for every binder and hypothesis** — every universally and existentially quantified
   variable, every explicit *and implicit* argument, every typeclass assumption. Omitting a
