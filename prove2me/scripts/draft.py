@@ -575,7 +575,7 @@ def double_backslash(items, miles, desc):
 
 
 EXTRACTION_MATH = re.compile(
-    r"\b[A-Za-z]{1,2} \([A-Za-z0-9]+ ?\)"      # "F (X)", "Pf (X)", "F (Y )": a function applied, with a stray space
+    r"\b(?!(?:to|in|of|by|as|at|on|or|is|be|so|if)\b)[A-Za-z]{1,2} \([A-Za-z0-9]+ ?\)"  # "F (X)", "Pf (X)", "F (Y )": a function applied, with a stray space; not "to (3)", an equation reference (Kadatch-Jenkins, 2026-11-21)
     r"|\([A-Za-z0-9]+ \)"                          # "(Y )"
     r"|\b[a-zA-Z][0-9]\b"                          # "x0", "g1": a lost subscript
     r"|\b[a-zA-Z][a-z0-9]?−1\b"                     # "g1−1", "gn−1": a lost superscript (or subscript)
