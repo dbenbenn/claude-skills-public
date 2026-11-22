@@ -616,6 +616,9 @@ def extraction_math(items, miles, desc):
     for where, t in texts:
         for q in re.finditer(r'“[^”]*”', t):
             plain = re.sub(r'\$[^$]*\$', lambda m: ' ' * len(m.group(0)), q.group(0))
+            # a code span quoted from source code ("the returned `u8`", x25519-dalek 2026-11-22) is
+            # the source's own text, not lost typesetting
+            plain = re.sub(r'`[^`]*`', lambda m: ' ' * len(m.group(0)), plain)
             # a citation key "[M3]", "[M3, Corollary 11.4]" is not a lost subscript (Guth-Maynard)
             plain = re.sub(r'\[[A-Z][A-Za-z]*[0-9]*(?:, [^\]]*)?\]', lambda m: ' ' * len(m.group(0)), plain)
             hits = sorted({m.group(0) for m in EXTRACTION_MATH.finditer(plain)})
