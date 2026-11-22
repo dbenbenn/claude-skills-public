@@ -244,7 +244,7 @@ def unneeded_refs(M, mdir, items, miles, call):
     from prune_solution import _workspace
     ws = _workspace()
     keep = getattr(M, 'KEEP_REFS', {}) or {}
-    imp = lambda t: (set(re.findall(r'^import Definitions\.Def_(\w+)', t or '', re.M)),
+    imp = lambda t: (set(re.findall(r'^(?:public\s+)?(?:meta\s+)?import\s+Definitions\.Def_(\w+)', t or '', re.M)),
                      set(re.findall(r'^import Theorems\.Thm_(\w+?)_(\w+)', t or '', re.M)))
     roots = {M.GOAL} | set(miles)
     defs, thms, seen_pre = set(), set(), []
