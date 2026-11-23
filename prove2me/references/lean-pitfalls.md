@@ -418,3 +418,16 @@ entries).
   List.getD_map]` did not. Bisect a memory overrun by compiling prefixes of the file under a peak-RSS
   measurement (getrusage), before splitting into more published statements. `ulimit -v` breaks Lean
   (`bad_alloc` at the Mathlib import): watch RSS instead.
+
+## `lean FILE -o OUT` outside Lake: pass `-R SRCROOT`, or the module is misnamed
+
+Plain `lean` infers the module's name from the file's path relative to the current directory (its default
+root), not from where the `.olean` is written. Run from a project directory whose sources live in `src/`, it
+names `src/Formalism/X.lean` the module `src.Formalism.X`. Imports still resolve (they go through
+`LEAN_PATH`), so nothing fails at first, but every name Lean derives from the module name changes:
+anonymous instances that need a disambiguating suffix get `_src` where Lake gives `_formalism`, and private
+names are mangled `_private.src.Formalism.X.0…`. A file that names a generated instance explicitly, or uses
+`open private … from Formalism.X`, then fails far downstream. The alpo.ge GRH build (2026-11-23) compiled
+~100k modules this way before `OmPinsTr.lean` hit `Unknown identifier …RatF_formalism` and the build had to be
+redone. Any hand-rolled per-module compile passes `-R <source root>` (as `leaninfo.build_module` does by
+running inside the workspace); check one generated instance name against Lake's before a long run.
