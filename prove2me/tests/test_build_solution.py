@@ -6,14 +6,25 @@ import pytest
 import build_solution as BS
 
 
-def test_external_imports_keeps_bundles_and_published_theorems_only(tmp_path):
+def test_external_imports_keeps_everything_but_solutions(tmp_path):
     a = tmp_path / 'A.lean'
     a.write_text('import Mathlib\nimport Definitions.Def_Monod_PiecewiseProjective\n'
                  'import Solutions.M51.Blueprint\nimport Theorems.Thm_Monod_x\n\ntheorem a : True := trivial\n')
     b = tmp_path / 'B.lean'
     b.write_text('import Definitions.Def_Monod_PiecewiseProjective\nimport Definitions.Def_CFP\n')
     assert BS.external_imports([str(a), str(b)]) == [
-        'Definitions.Def_Monod_PiecewiseProjective', 'Theorems.Thm_Monod_x', 'Definitions.Def_CFP']
+        'Mathlib', 'Definitions.Def_Monod_PiecewiseProjective', 'Theorems.Thm_Monod_x', 'Definitions.Def_CFP']
+
+
+def test_external_imports_carries_narrow_mathlib_not_whole(tmp_path):
+    # q446 2026-11-23: the solution got a bare `import Mathlib` its modules never had (7559 vs 2929 MiB)
+    a = tmp_path / 'A.lean'
+    a.write_text('import Mathlib.Tactic.IntervalCases\nimport Definitions.Def_X_Spec\n')
+    b = tmp_path / 'B.lean'
+    b.write_text('import Mathlib.Data.Nat.Bits\nimport Solutions.X.A\n')
+    out = BS.external_imports([str(a), str(b)])
+    assert out == ['Mathlib.Tactic.IntervalCases', 'Definitions.Def_X_Spec', 'Mathlib.Data.Nat.Bits']
+    assert 'Mathlib' not in out
 
 
 def test_external_imports_skips_dropped_theorems(tmp_path):

@@ -1270,7 +1270,12 @@ than its milestone (Lodha–Moore's torsion proof took milestone 1 as a hypothes
   reachable from `solution`, treats every attributed declaration and `instance` as a root, and
   `--check` re-elaborates with `-DautoImplicit=false`, as the verifier does. Then re-elaborate the
   published statement locally and discharge it with `solution <binders>`: that is the server's
-  type check.
+  type check. **A solution imports the Mathlib modules its development imports, never all of Mathlib
+  by default**: `build_solution.py` passes the modules' own imports on, `resolve_imports.py` adds no
+  Mathlib of its own (`--module Mathlib` asks for all of it), and `--check` prints `WHOLE MATHLIB`
+  for a file that still has the bare line. Narrow that before splitting for memory or time: q446's
+  fnOk_montgomeryPoint_mul_v2 was 7559 MiB / 116 s with it, 2929 MiB / 92 s on its six modules
+  (2026-11-23).
 - **Submit** with `scripts/submit_solution.py THEOREM FILE [--replaces OLD_SID…]` (it calls
   `submit_verify.py`, the bare `POST /verify`). It refuses a `theorem solution` inside a
   `namespace` (close it and write `open Ns in`), `macro`/`syntax`/`elab` (the soundness guard

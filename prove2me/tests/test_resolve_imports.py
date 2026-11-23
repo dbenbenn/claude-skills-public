@@ -73,8 +73,17 @@ def test_header_carries_raw_modules_before_named_theorems(tmp_path):
                                               'Theorems.Thm_CannonFloydParry_bijOn_dyadic',
                                               'Definitions.Def_QFS_A'], ['N.x'], 'QFS')
     assert h == ['import Definitions.Def_QFS_A', 'import Definitions.Def_Monod_PiecewiseProjective',
-                 'import Theorems.Thm_CannonFloydParry_bijOn_dyadic', 'import Theorems.Thm_N_x',
-                 'import Mathlib', '']
+                 'import Theorems.Thm_CannonFloydParry_bijOn_dyadic', 'import Theorems.Thm_N_x', '']
+
+
+def test_header_adds_no_mathlib_of_its_own(tmp_path):
+    # q446 2026-11-23: a bare `import Mathlib` on every solution took fnOk_montgomeryPoint_mul_v2 from
+    # 2929 MiB / 92 s to 7559 MiB / 116 s; Mathlib comes only as the development's modules import it
+    (tmp_path / 'Definitions').mkdir()
+    assert RI.header(str(tmp_path), 'Def_X_', ['Definitions.Def_X_Spec'], [], 'X') == \
+        ['import Definitions.Def_X_Spec', '']
+    h = RI.header(str(tmp_path), 'Def_X_', ['Mathlib.Data.Nat.Basic', 'Definitions.Def_X_Spec'], [], 'X')
+    assert h == ['import Mathlib.Data.Nat.Basic', 'import Definitions.Def_X_Spec', '']
 
 
 def test_error_context_shows_the_offending_lines():

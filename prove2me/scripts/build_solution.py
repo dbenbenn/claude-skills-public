@@ -146,16 +146,19 @@ def drop_redeclared_universes(body, stmt):
 
 
 def external_imports(mods, drop=()):
-    """The `Definitions.*` and `Theorems.*` modules the merged modules import, in first-seen order.
-    The merge strips every import line and resolve_imports.py recovers only names it can trace; a
-    bundle used under `open` (bare `HB` from the Monod bundle) it cannot, so these are passed on as
-    --module (dense-subgroups, 2026-10-03). A --drop target's own statement module is left out:
-    resolve_imports imports it only if it is Proved. Unused theorem imports are pruned later."""
+    """Every non-`Solutions.` module the merged modules import (bundles, published theorems, Mathlib
+    modules), in first-seen order. The merge strips every import line and resolve_imports.py recovers
+    only names it can trace; a bundle used under `open` (bare `HB` from the Monod bundle) it cannot,
+    so these are passed on as --module (dense-subgroups, 2026-10-03). Mathlib is passed on the same
+    way, as the modules import it: resolve_imports adds none of its own, so a development on six
+    Mathlib modules gets a solution on those six, not on all of Mathlib (q446, 2026-11-23: 7559 MiB
+    -> 2929 MiB). A --drop target's own statement module is left out: resolve_imports imports it
+    only if it is Proved. Unused theorem imports are pruned later."""
     dropped = {'Theorems.Thm_' + d.replace('.', '_') for d in drop}
     out = []
     for p in mods:
         for m in re.findall(r'^import\s+(\S+)', open(p, encoding='utf-8').read(), re.M):
-            if m.startswith(('Definitions.', 'Theorems.')) and m not in dropped and m not in out:
+            if not m.startswith('Solutions.') and m not in dropped and m not in out:
                 out.append(m)
     return out
 

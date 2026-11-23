@@ -318,6 +318,11 @@ def main():
         # CPU seconds under synchronous elaboration are what the verifier's 300 s budget sees (parallel wall
         # time hides it: q196, 52 s wall for 126 s); over either limit, split before the first submission
         print('wrote %s\ncompiles clean: %.0f s CPU, peak %d MiB' % (dest, cpu, rss))
+        if re.search(r'(?m)^import Mathlib[ \t]*$', out):
+            # whole Mathlib is ~6.4 GB of the limit by itself; narrow before splitting (q446, 2026-11-23)
+            print('WHOLE MATHLIB: the file imports all of Mathlib (~6.4 GB of the %d MiB limit on its own). '
+                  'Import the Mathlib modules the development uses instead, before splitting for memory or time.'
+                  % PIECE_RSS_LIMIT)
         if cpu > PIECE_CAP:
             print('SPLIT before submitting: over the verifier\'s time (%.0f s CPU > %d s; q196, q209: 119-126 s '
                   'timed out twice). verifier-failures.md, "Proof submissions time out".' % (cpu, PIECE_CAP))

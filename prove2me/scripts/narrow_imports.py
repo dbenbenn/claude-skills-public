@@ -9,6 +9,8 @@ draft.extract_payloads). For every statement whose preamble has a bare `import M
 elaborates to the same `pp.all` term as with all of Mathlib (p2mlib.narrow). Each is printed as
 `NAME: import Mathlib -> <modules>` (or `no Mathlib needed`), or `NAME: KEEP <why>`.
 
+A statement already listed in DIR/published_ids.json is skipped: its preamble is frozen (q445).
+
 --write records the result:
 - a statement in its own file (statements/Thm_*.lean, lib/Thm_<name>.lean): the `import Mathlib` line in
   that file is replaced by the modules (or deleted);
@@ -74,8 +76,19 @@ def main():
     write = '--write' in sys.argv[1:]
     from p2mlib.mission import load
     M = load(mdir)
-    todo = [(k, pre, fs) for k, (pre, fs) in sorted(M.payloads().items())
-            if N.whole_mathlib(pre) and (not only or k in only)]
+    pj = os.path.join(mdir, 'published_ids.json')
+    pub = set(json.load(open(pj, encoding='utf-8'))) if os.path.exists(pj) else set()
+    pub |= {n.rsplit('.', 1)[-1] for n in pub}
+    todo = []
+    for k, (pre, fs) in sorted(M.payloads().items()):
+        if not N.whole_mathlib(pre) or (only and k not in only):
+            continue
+        if k in pub or k.rsplit('.', 1)[-1] in pub:
+            # a published statement is frozen: rewriting its file only makes the folder disagree with
+            # the platform (q445, 2026-11-23); its replacement is a new `_v2` statement
+            print('%s: SKIP published (frozen; replace it with a narrowed copy under a new name)' % k)
+            continue
+        todo.append((k, pre, fs))
     if not todo:
         print('no statement imports all of Mathlib')
         return

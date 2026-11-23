@@ -14,8 +14,9 @@ reading the "Unknown identifier" errors, one round at a time, until none are lef
 BODY.lean is the merged development WITHOUT import lines (see merge.py; wrap each module in its own
 `section ... end` before merging -- module-level `open`s otherwise leak into later modules, which
 silently changes which lemma a bare name like `inv_zero` resolves to). The header written here
-imports every bundle `Definitions/<defs-prefix>*.lean` in the workspace; prune the unused ones
-afterwards. Inlined declarations go in their own `namespace <NS> ... end <NS>` block, with the
+imports every bundle `Definitions/<defs-prefix>*.lean` in the workspace and each --module (prune the
+unused ones afterwards), and no Mathlib unless a --module names it: pass the development's own Mathlib
+imports (`--module Mathlib.Data.Nat.Basic`), or `--module Mathlib` for all of it. Inlined declarations go in their own `namespace <NS> ... end <NS>` block, with the
 `open`s INSIDE the namespace so they end with it (the same leak). Then run prune_solution.py
 --check and submit_solution.py as usual.
 
@@ -126,9 +127,14 @@ def error_context(out, txt, ctx=2, limit=10):
 
 def header(ws, prefix, modules, imports, ns):
     """The import lines: every bundle Definitions/<prefix>*.lean, then each --module as given (the
-    development's own bundle and published-theorem imports, which the merge strips), then each
-    named theorem, then Mathlib. Bundles of another namespace are reachable only through --module:
-    a development on the Monod bundle once failed with "cannot find a source for HB"."""
+    development's own imports, which the merge strips: bundles, published theorems and its Mathlib
+    modules), then each named theorem. Bundles of another namespace are reachable only through
+    --module: a development on the Monod bundle once failed with "cannot find a source for HB".
+
+    Mathlib comes only through --module, never by default. Until 2026-11-23 this appended a bare
+    `import Mathlib` to every solution: q446's fnOk_montgomeryPoint_mul_v2 measured 7559 MiB / 116 s
+    with it (over both limits) and 2929 MiB / 92 s with the six Mathlib modules its development
+    imported. Whole Mathlib is `--module Mathlib`, on purpose."""
     hdr = ['import Definitions.%s' % os.path.basename(f)[:-5]
            for f in sorted(glob.glob(os.path.join(ws, 'Definitions', prefix + '*.lean')))]
     hdr += ['import ' + m for m in modules if 'import ' + m not in hdr]
@@ -139,7 +145,7 @@ def header(ws, prefix, modules, imports, ns):
                                              else (ns, n))
         if line not in hdr:
             hdr.append(line)
-    return hdr + ['import Mathlib', '']
+    return hdr + ['']
 
 
 def main():
@@ -150,7 +156,9 @@ def main():
     ap.add_argument('--import', dest='imports', action='append', default=[])
     ap.add_argument('--defs-prefix', default=None)
     ap.add_argument('--module', dest='modules', action='append', default=[],
-                    help='a module to import as is (a bundle or published theorem the development imported)')
+                    help='a module to import as is (a bundle, published theorem or Mathlib module the development '
+                    'imported); there is no default Mathlib import, so name each Mathlib module, or `Mathlib` for all '
+                    'of it (~6.4 GB of the verifier\'s 7150 MiB)')
     ap.add_argument('--max-iter', type=int, default=15)
     a = ap.parse_args()
     ws = _workspace()
