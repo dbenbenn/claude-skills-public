@@ -14,7 +14,8 @@ extra, tags]}] with code in DIR/lib/Def_<name>.lean, published first; DIR/lib/Th
 the namespaced `theorem … := by sorry`). Already-published names (published_ids.json) are skipped,
 so a rerun only verifies. Before anything is sent (and under --dry), a new item's title or statement with a
 gendered pronoun is refused, by the check submit_solution.py runs on explanations (q286, q338), and so is an
-`import Definitions.Def_X` whose bundle is neither published nor a DEFINITIONS entry (q324). Generalised 2026-09-30 from the per-folder publish.py of
+`import Definitions.Def_X` whose bundle is neither published nor a DEFINITIONS entry (q324), and a new
+statement whose preamble imports all of Mathlib (narrow_imports.py; WHOLE_MATHLIB keeps one on purpose). Generalised 2026-09-30 from the per-folder publish.py of
 p2m-standalone/t-finitely-presented and grigorchuk-growth.
 """
 import json, os, sys, time
@@ -50,6 +51,17 @@ def pronoun_hits(payloads, defs, ids):
             if ws:
                 out.append('%s %s: %s' % (name, field, ', '.join(repr(w) for w in ws)))
     return out
+
+
+def whole_mathlib_new(payloads, ids, keep):
+    """Full names of the statements not yet published whose preamble imports all of Mathlib, unless
+    mission.py WHOLE_MATHLIB {short or full name: reason} keeps them. Every proof that imports such a
+    statement starts at ~6.4 GB of the verifier's 7150 MiB (x25519-dalek helper statements,
+    2026-11-23); narrow_imports.py DIR --write narrows them."""
+    from p2mlib.narrow import whole_mathlib
+    return [p['theorem_name'] for p in payloads
+            if p['theorem_name'] not in ids and whole_mathlib(p.get('preamble'))
+            and p['theorem_name'] not in keep and p['theorem_name'].rsplit('.', 1)[-1] not in keep]
 
 
 def unknown_bundles(payloads, defs, call, ws=None):
@@ -147,6 +159,11 @@ def main():
                  + '\n  (a published bundle missing from the workspace: fetch_theorems.py --names Def_<name>)')
     ids_path = os.path.join(here, 'published_ids.json')
     ids = json.load(open(ids_path)) if os.path.exists(ids_path) else {}
+    wm = whole_mathlib_new(payloads, ids, getattr(M, 'WHOLE_MATHLIB', {}) or {})
+    if wm:
+        sys.exit('preamble imports all of Mathlib, which costs every proof importing the statement ~6.4 GB of the '
+                 "verifier's 7150 MiB:\n  " + '\n  '.join(wm) + '\n  narrow it: narrow_imports.py %s --write '
+                 '(or keep it, with the reason, in mission.py WHOLE_MATHLIB)' % args[0])
     hits = pronoun_hits(payloads, defs, ids)
     if hits:
         sys.exit('gendered pronoun in the prose of a new item (use the surname, "the paper" or "they"):\n  '

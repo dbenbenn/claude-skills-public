@@ -24,6 +24,8 @@ data, not code: MISSION_DIR/mission.py defines
                goal is already published
   NOT_LEAN     optional set of backticked names in the prose that are not Lean (C identifiers, file
                names, an upstream name the republication changed); the dead-reference check skips them
+  WHOLE_MATHLIB optional {'<name>': 'reason'}: statements kept on `import Mathlib` on purpose (verify
+               otherwise flags a Draft statement importing all of Mathlib; see narrow_imports.py)
   KEEP_REFS    optional {'<theorem_name>': 'reason'}: references kept on purpose although no statement
                needs them (verify otherwise flags them; see unneeded_refs)
   ORDER        optional item_order as a list of keys (Def names, 'ref:<name>', theorem names);
@@ -60,9 +62,12 @@ norm = lambda t: ' '.join((t or '').split())
 
 def extract_payloads(path, namespace, bundles, opens=None):
     """{name: (preamble, formal_statement)} from a statements file of top-level `theorem`s inside
-    `namespace <namespace>`. Each preamble imports Mathlib plus exactly the bundles whose
-    identifiers its statement uses (bundles: {module: [identifier, ...]}) -- never a template,
-    since a preamble freezes at publish and an unused import is a permanent false dependency."""
+    `namespace <namespace>`. Each preamble imports exactly the bundles whose identifiers its
+    statement uses (bundles: {module: [identifier, ...]}) -- never a template, since a preamble
+    freezes at publish and an unused import is a permanent false dependency. Its Mathlib imports are
+    MISSION_DIR/imports.json's list for the statement (written by narrow_imports.py --write), else
+    `import Mathlib`, which verify flags on a Draft: all of Mathlib costs every proof that imports
+    the statement ~6.4 GB of the verifier's 7150 MiB (x25519-dalek, 2026-11-23)."""
     # Names and identifiers go by p2mlib.names' one identifier grammar: `theorem (\\w+)` stopped at
     # a prime, and `K\\b` matched inside `K'`. Comments go by the comment-aware stripper (only `--`
     # lines were dropped, so a module doc line beginning "theorem" read as a statement). Not
@@ -71,13 +76,16 @@ def extract_payloads(path, namespace, bundles, opens=None):
     from p2mlib.names import IDENT_START, IDENT_END
     ident = r"[^\W\d][\w'!?₀-ₜ]*(?:\.[^\W\d][\w'!?₀-ₜ]*)*"
     text = strip(open(path, encoding='utf-8').read())
+    nj = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(path))), 'imports.json')
+    narrowed = json.load(open(nj, encoding='utf-8')) if os.path.exists(nj) else {}
     out = {}
     for part in re.split(r'^(?=theorem\s)', text, flags=re.M):
         m = re.match(r'theorem\s+(%s)' % ident, part)
         if not m:
             continue
         body = re.split(r'^end %s\s*$' % re.escape(namespace), part, flags=re.M)[0].strip()
-        imports = ['import Mathlib'] + ['import ' + mod for mod, ids in bundles.items()
+        mathlib = ['import ' + x for x in narrowed[m.group(1)]] if m.group(1) in narrowed else ['import Mathlib']
+        imports = mathlib + ['import ' + mod for mod, ids in bundles.items()
                                          # an id ending in `.` is a namespace prefix ('MooreFoelner.')
                                          if any(re.search(IDENT_START + re.escape(i) + ('' if i.endswith('.') else IDENT_END), body)
                                                 for i in ids)]
@@ -89,6 +97,22 @@ def extract_payloads(path, namespace, bundles, opens=None):
             pre += '\nuniverse ' + u
         out[m.group(1)] = (pre, 'namespace %s\n\n%s\n\nend %s' % (namespace, body, namespace))
     return out
+
+
+def whole_mathlib_preambles(M, its, status):
+    """[(name, why)] for each theorem whose preamble imports all of Mathlib, while the proposal is a
+    Draft (a published preamble is frozen). Every proof that imports such a statement starts at
+    ~6.4 GB of the verifier's 7150 MiB; x25519-dalek's contracts needed no Mathlib at all and their
+    reductions were split for memory only because of it (2026-11-23). mission.py WHOLE_MATHLIB
+    {name: reason} keeps one on purpose."""
+    if (status or '').lower() != 'draft':
+        return []
+    from p2mlib.narrow import whole_mathlib
+    keep = getattr(M, 'WHOLE_MATHLIB', {}) or {}
+    return [(k, 'preamble imports all of Mathlib (~6.4 GB of every importing proof\'s verifier memory): '
+                'run narrow_imports.py MISSION_DIR --write, or list it in mission.py WHOLE_MATHLIB with the reason')
+            for k, it in its.items()
+            if it.get('kind') == 'theorem' and k not in keep and whole_mathlib(it.get('preamble'))]
 
 
 def load(mdir):
@@ -729,6 +753,7 @@ def main():
         its, mls, _, _ = desired(M, mdir)
         bad += unneeded_refs(M, mdir, its, mls, call)
         bad += goal_unquoted(M, its)
+        bad += whole_mathlib_preambles(M, its, d.get('status'))
         bad += declared_name_mismatch(its)
         bad += title_mismatch(its, mls)
         bad += short_bundle_names(M, mdir)

@@ -522,6 +522,14 @@ paper. Reuse published bundles (`Chou.wordBall` served three missions). Compute 
 imports from the identifiers it uses, never from a template: the preamble is frozen at publish,
 so an unused `import Definitions.X` is a dependency every citing development inherits forever. A
 bundle beside the bundle that imports it changes no dependency and is not worth a click.
+The same goes for Mathlib: **a statement does not `import Mathlib` whole.** Every proof that imports
+the statement starts at ~6.4 GB of the verifier's 7150 MiB with it. The x25519-dalek contracts
+needed no Mathlib at all, and their reductions were split for memory only because of that line
+(2026-11-23). `scripts/narrow_imports.py MISSION_DIR --write` replaces it with the modules the
+statement uses. It accepts a narrowed preamble only if the statement elaborates to the same
+`pp.all` term. `draft.py verify` flags a Draft statement that still has the line, and
+`publish_standalone.py` refuses one. mission.py `WHOLE_MATHLIB {name: reason}` keeps it on purpose.
+A bundle that itself imports Mathlib still costs the full amount, so bundles need narrow imports too.
 
 **A bundle may use Lean's module system and `notation`.** Private probes on 2026-11-21 published a
 definitions file with `module`, `public import` and `@[expose] public section` and a `notation`,
@@ -1574,6 +1582,7 @@ script prints its usage when run with no arguments.
 | `live_milestones.py` | Add milestones to a live mission, or edit one, from .md files; a dry run unless --go. |
 | `merge.py` | Concatenate a mission's shared modules into one self-contained prove2.me solution file. |
 | `mkpatches.py` | Port patches from hand-repaired modules: diff the repaired module-route port against the pristine one and write the patches.json entries that reproduce the repairs. |
+| `narrow_imports.py` | Narrow each statement's `import Mathlib` to the Mathlib modules the statement uses, before it publishes. |
 | `oai_batch.py` | Port and check many published OAI goals locally, one single-file port each (never submits). |
 | `oai_build_modules.py` | Compile ported modules (oai_port_modules.py) one at a time, -j1, in import order, into the workspace build tree, printing one `lake build`-format line per module with its CPU seconds (what carve.parse_build_log reads); then write the elaboration log the carve cost model wants. |
 | `oai_fetch.py` | Fetch an openai/math module's OAI.* import closure at a commit, into DEST/lean/... (files already there are reused). |

@@ -149,7 +149,7 @@ def test_bundle_lookup_falls_back_to_q_search(monkeypatch):
 def folder(tmp_path):
     (tmp_path / 'lib').mkdir()
     (tmp_path / 'lib' / 'Def_Bun.lean').write_text('import Mathlib\n\ndef Bun.k : Nat := 1\n')
-    (tmp_path / 'lib' / 'Thm_t.lean').write_text('import Definitions.Def_Bun\nimport Mathlib\n\nnamespace Q\n\ntheorem t : Bun.k = 1 := by\n  sorry\n\nend Q\n')
+    (tmp_path / 'lib' / 'Thm_t.lean').write_text('import Definitions.Def_Bun\n\nnamespace Q\n\ntheorem t : Bun.k = 1 := by\n  sorry\n\nend Q\n')
     (tmp_path / 'mission.py').write_text('''NAMESPACE = 'Q'
 TAGS = ['x']
 DEFINITIONS = [dict(name='Bun', page='1', result='Def 1')]
@@ -222,7 +222,7 @@ def test_only_publishes_the_named_statements(folder, monkeypatch, capsys):
     mp.write_text(mp.read_text().replace("THEOREMS = [dict(name='t', page='2', result='Lemma 1')]",
                                          "THEOREMS = [dict(name='t', page='2', result='Lemma 1'), "
                                          "dict(name='u', page='3', result='Lemma 2')]"))
-    (folder / 'lib' / 'Thm_u.lean').write_text('import Mathlib\n\nnamespace Q\n\ntheorem u : True := by\n  sorry\n\nend Q\n')
+    (folder / 'lib' / 'Thm_u.lean').write_text('import Mathlib.Logic.Basic\n\nnamespace Q\n\ntheorem u : True := by\n  sorry\n\nend Q\n')
     (folder / 'prose' / 'u.md').write_text('---\ntitle: Lemma 2 — u\n---\n\nIt is true.\n')
     fake = FakePublisher()
     monkeypatch.setattr(p2m, 'call', fake.call)
@@ -388,3 +388,20 @@ def test_publish_accepts_an_import_of_a_published_bundle(folder, monkeypatch, tm
     with pytest.raises(SystemExit) as e:
         PS.main()
     assert 'Def_Drafted' in str(e.value)
+
+
+def test_publish_refuses_a_new_statement_importing_all_of_mathlib(folder, monkeypatch):
+    # x25519-dalek 2026-11-23: helper statements published with `import Mathlib` cost every reduction
+    # importing them ~6.4 GB of the verifier's 7150 MiB, though the contracts needed no Mathlib at all
+    import p2m
+    t = folder / 'lib' / 'Thm_t.lean'
+    t.write_text(t.read_text().replace('import Definitions.Def_Bun\n', 'import Definitions.Def_Bun\nimport Mathlib\n'))
+    fake = FakePublisher()
+    monkeypatch.setattr(p2m, 'call', fake.call)
+    monkeypatch.setattr(PS.sys, 'argv', ['publish_standalone.py', str(folder), '--dry'])
+    with pytest.raises(SystemExit) as e:
+        PS.main()
+    assert 'Q.t' in str(e.value) and 'narrow_imports.py' in str(e.value) and fake.posted == []
+    mp = folder / 'mission.py'
+    mp.write_text(mp.read_text() + "WHOLE_MATHLIB = {'t': 'kept on purpose (test)'}\n")
+    PS.main()                                   # kept on purpose: the dry run passes
