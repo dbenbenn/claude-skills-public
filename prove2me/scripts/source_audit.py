@@ -114,8 +114,13 @@ def stage(mdir, name, page_spec=None, force=False):
     # this statement (Monod M7 handed its auditor two Route quotes as "the sentence under audit")
     # (cut at the first *Route* / *External* paragraph, not at a blank line: a quoted sentence may
     # contain a displayed formula set off by blank lines, as Monod's Proposition 9 does)
-    opening = re.split(r'\n\n\*(?:Route|External)\b', T.get('milestone_description') or '')[0]
-    quote = re.findall(r'[“"](.+?)[”"]', opening, re.S)
+    # (also cut at a *Formalization note* or *Correction*: its quotations explain a reading)
+    opening = re.split(r'\n\n\*\*?(?:Route|External|Formalization note|Correction)\b',
+                       T.get('milestone_description') or '')[0]
+    # curly quotes delimit when present, so a straight quote inside a quotation (RFC 8439's
+    # called "r" and "s") does not end it (Poly1305 B, 2026-11-24)
+    quote = (re.findall(r'“(.+?)”', opening, re.S) if '“' in opening
+             else re.findall(r'"(.+?)"', opening, re.S))
     if not quote and T.get('source_quote'):
         quote = [T['source_quote']]
     if not quote and not T.get('bundle'):
