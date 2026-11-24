@@ -1,4 +1,4 @@
-"""publish_status, watch_proposal and check_server_shape."""
+"""publish_status and check_server_shape."""
 import os
 import shutil
 import subprocess
@@ -74,17 +74,6 @@ def test_publish_status_watch_calls_a_stall_only_when_nothing_is_queued(monkeypa
     monkeypatch.setattr(PS, 'snapshot', lambda pid: next(snaps))
     PS.main()
     assert capsys.readouterr().out.count('stall') == 1
-
-
-def test_watch_proposal_exits_on_change(monkeypatch, capsys):
-    import watch_proposal as W
-    states = iter([('In review', None), ('In review', None), ('Approved', 'M1')])
-    monkeypatch.setattr(W, 'state', lambda pid: next(states))
-    monkeypatch.setattr(W.time, 'sleep', lambda s: None)
-    monkeypatch.setattr(W.sys, 'argv', ['watch_proposal.py', 'abcdef12'])
-    W.main()
-    out = capsys.readouterr().out
-    assert 'status In review' in out and 'CHANGED In review -> Approved mission M1' in out
 
 
 @pytest.mark.lean

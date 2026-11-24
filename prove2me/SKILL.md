@@ -922,7 +922,7 @@ item publish and runs to its timeout: poll that item's job with `GET /publish-jo
 
 **Do not watch for the approval yourself.** The tracker's "Missions in flight" card shows review and
 approval, and dbenbenn starts the after-approval step from it. Approval usually takes more than two hours,
-so a session watching the proposal (`scripts/watch_proposal.py`) only keeps itself open; do not start one
+so a session watching the proposal only keeps itself open; do not start one
 (dbenbenn, 2026-11-24). Once the Draft is handed over and its tracker entry exists, the session can end.
 
 **"Compile failed" with a "Retry submit" button is the human's to click.** The retry re-runs
@@ -1612,7 +1612,6 @@ script prints its usage when run with no arguments.
 | `sync_workspace.py` | Session start: sync the platform's rulebook and workspace to upstream head, then check that the live platform still behaves as our scripts assume. |
 | `try_module.py` | Compile one ported module as is and with the transparency option, and list the errors of each. |
 | `wait_published.py` | Wait until named statements or definitions are published, or until a proposal's queue drains. |
-| `watch_proposal.py` | Watch mission proposals until their status changes (e.g. `In review` -> approved). |
 | `watch_targets.py` | Watch published theorems you are about to prove, or are proving, and report status changes. |
 | `workspace_audit.py` | Which untracked files in the prove2me workspace exist nowhere we keep work. |
 <!-- scripts-index:end -->
