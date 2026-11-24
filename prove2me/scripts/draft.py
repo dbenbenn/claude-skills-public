@@ -645,6 +645,9 @@ def extraction_math(items, miles, desc):
             plain = re.sub(r'`[^`]*`', lambda m: ' ' * len(m.group(0)), plain)
             # a citation key "[M3]", "[M3, Corollary 11.4]" is not a lost subscript (Guth-Maynard)
             plain = re.sub(r'\[[A-Z][A-Za-z]*[0-9]*(?:, [^\]]*)?\]', lambda m: ' ' * len(m.group(0)), plain)
+            # a colon-separated byte dump "a8:06:1d:…" is data, not a lost subscript (RFC 8439
+            # test vectors, Poly1305 B 2026-11-24)
+            plain = re.sub(r'\b[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2})+\b', lambda m: ' ' * len(m.group(0)), plain)
             hits = sorted({m.group(0) for m in EXTRACTION_MATH.finditer(plain)})
             if hits:
                 out.append((where, 'quotation has untypeset (pdftotext) math %s: %s' %
