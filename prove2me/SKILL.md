@@ -920,12 +920,10 @@ job out of the window (2026-10-06). It looks names up in the public catalogue, s
 item publish and runs to its timeout: poll that item's job with `GET /publish-jobs/<job_id>` instead
 (2026-11-21).
 
-**Watch for the approval yourself.** Once a proposal reads `In review`, start
-`scripts/watch_proposal.py PROPOSAL_ID --every 600` as a background command. It exits when the
-status changes, and that exit wakes the session. Without it, approval is noticed only when the
-human happens to see it on the site and says so, which was the pattern until 2026-10-02. The watch
-lives only as long as the session, so restart it in a new session while a proposal is still in
-review.
+**Do not watch for the approval yourself.** The tracker's "Missions in flight" card shows review and
+approval, and dbenbenn starts the after-approval step from it. Approval usually takes more than two hours,
+so a session watching the proposal (`scripts/watch_proposal.py`) only keeps itself open; do not start one
+(dbenbenn, 2026-11-24). Once the Draft is handed over and its tracker entry exists, the session can end.
 
 **"Compile failed" with a "Retry submit" button is the human's to click.** The retry re-runs
 Submit, which `mission_captain.md` reserves for the human. What the button does, read from the
