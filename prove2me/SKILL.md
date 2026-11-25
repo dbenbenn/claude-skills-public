@@ -811,8 +811,8 @@ Three things can still go wrong, and the audit spends its effort accordingly:
   objects' `.text`). Mechanical, no judgement.
 - **A statement too strong** is false and gets disproved. That costs a resubmission, nothing worse.
   Prevent it by execution: run every precondition and bound on the semantics at boundary and off-boundary
-  values, including values no caller uses, before stating it. The evaluation files are listed in
-  `mission.py` (`EVAL_CHECKS`) and rerun before the Draft goes out.
+  values, including values no caller uses, before stating it. Keep the evaluation files in the repo's
+  `checks/`, name them in RESUME.md, and rerun them before the Draft goes out (not yet automated).
 - **A statement too weak** is what nothing catches automatically: a precondition no caller can meet, a
   postcondition that says too little, a degenerate representation predicate. This is where the source
   audit earns its cost. Its claims still come from the C and the documentation. Each WEAKER or MISSING
