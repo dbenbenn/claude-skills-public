@@ -800,32 +800,11 @@ source does not. Measured on Garrido III: M3's missing $aua \in St(1)$ was liste
 the source alone and given the near-miss $u \cdot a$; two faithful controls came back faithful.
 About 46k tokens and 100 s per item, roughly the cost of the read-back itself.
 
-## Machine-code missions: what the audit is for
+## Machine-code missions
 
-(dbenbenn, 2026-11-25, after the Debian libsodium mission.) When the formalized object is a binary, the
-paper-era notion of fidelity does not carry over. The object code is in the Lean byte for byte, so the Lean
-cannot silently drift from it; the C source and the documentation are untrusted accounts of the binary.
-Three things can still go wrong, and the audit spends its effort accordingly:
-- **The bytes.** The bundle must hold the shipped code: a provenance chain and a byte comparison (Debian:
-  `Implementation/debian/PROVENANCE.md`, `tools/debian_so_match.py`, and the bundle's code equal to the
-  objects' `.text`). Mechanical, no judgement.
-- **A statement too strong** is false and gets disproved. That costs a resubmission, nothing worse.
-  Prevent it by execution: run every precondition and bound on the semantics at boundary and off-boundary
-  values, including values no caller uses, before stating it. Keep the evaluation files in the repo's
-  `checks/`, name them in RESUME.md, and rerun them before the Draft goes out (not yet automated).
-- **A statement too weak** is what nothing catches automatically: a precondition no caller can meet, a
-  postcondition that says too little, a degenerate representation predicate. This is where the source
-  audit earns its cost. Its claims still come from the C and the documentation. Each WEAKER or MISSING
-  finding is first classified:
-  - *the binary differs from the C* (shown by executing the binary): the statement follows the binary and
-    the milestone's note documents the difference. This is decided by standing rule ("document the
-    difference between what the C code does and what the object code does", dbenbenn 2026-11-25), so the
-    row goes in the summary list for skimming, not to the human one at a time;
-  - *the statement is weaker than the binary's documented or used behaviour*: a genuine row for the human.
-  Non-vacuity of the hypotheses is a published, proved statement, cited in the description.
-- **Code quotes are commentary.** A milestone quotes the code's comments or lines to orient the reader;
-  they are not a sentence the statement must match, and a bundle note need not quote every function it
-  names. UNQUOTED findings on code are dismissed by this rule.
+A mission about compiled code also loads the companion skill `prove2me-program`: choosing and
+provenancing the binary, contracts, executing them before stating them, and what the source audit is
+for when the object is a binary (its classification of WEAKER findings overrides the paper-era one).
 
 ## Expansion 7 — the prose
 
@@ -947,7 +926,8 @@ job out of the window (2026-10-06). It looks names up in the public catalogue, s
 item publish and runs to its timeout: poll that item's job with `GET /publish-jobs/<job_id>` instead
 (2026-11-21).
 
-**Execute a contract's size parameters at values the callers never use.** A compiler that sees every caller of a `static` function may exploit what they pass: Debian's GCC compiled libsodium's `poly1305_blocks` as a loop that ends when the pointer equals `m + bytes`, valid only for multiples of 16, which every caller passes. The contract had been carried over from the clang build (any `bytes ≥ 16`) and checked only at 16, 32, 48 and 80, and the published M1 was disproved within the hour (2026-11-25, submission 88a8159d). Before stating a length or count precondition, run the code at the boundary, at non-multiples and at the smallest and largest values the precondition admits.
+**Execute a contract's size parameters at values the callers never use** (Debian M1 disproof
+88a8159d; `prove2me-program`, "Execute every contract before stating it").
 
 **A statement of ours disproved while the proposal is In review stops the review.** A mission whose
 goal or milestone is false would fail review, so it must not sit in the queue: the moment a disproof
