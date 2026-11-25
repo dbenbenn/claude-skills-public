@@ -920,6 +920,14 @@ job out of the window (2026-10-06). It looks names up in the public catalogue, s
 item publish and runs to its timeout: poll that item's job with `GET /publish-jobs/<job_id>` instead
 (2026-11-21).
 
+**A statement of ours disproved while the proposal is In review stops the review.** A mission whose
+goal or milestone is false would fail review, so it must not sit in the queue: the moment a disproof
+of one of its statements is accepted (often our own queue's, as for libsodium's goal and M2 on
+2026-11-24), tell dbenbenn to withdraw it to Draft, then replace each disproved item with its corrected
+statement (`_v2`, read-back and source audit as usual), keep the Disproved original out of the
+proposal, and hand the Draft back. The tracker card now shows a Disproved statement as an alert under
+Needs you (dbenbenn, 2026-11-25), but say it in the session too.
+
 **Do not watch for the approval yourself.** The tracker's "Missions in flight" card shows review and
 approval, and dbenbenn starts the after-approval step from it. Approval usually takes more than two hours,
 so a session watching the proposal only keeps itself open; do not start one

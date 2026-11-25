@@ -192,7 +192,8 @@ person", so the page reads top-down by what wants attention (`www/glance.js`, `w
 
 **Missions in flight.** `GET /missions.json` serves `MONITOR_HOME/missions.json`, written by the mission
 tracker (`~/claude/claude-private/tools/mission-tracker`, user unit `mission-tracker.service`; its README
-has the steps). Each mission is a row of five steps (Submit, publish, After Submit, review, After
+has the steps). The card also counts the mission's statements by status and shows an alert, and a Needs you
+row, for any that is Disproved. Each mission is a row of five steps (Submit, publish, After Submit, review, After
 approval) with who each waits on, and two buttons: **Check now** (the tracker asks prove2.me) and
 **Start/Retry** a Claude step (a headless agent; the page asks for confirmation). Buttons `POST /request`
 `{action: check|start, key}`; the monitor only writes the request to `MONITOR_HOME/requests/` and never

@@ -161,7 +161,7 @@ function drawNeeds(){
   const rows = [];   // {text (html), sub (html)}
   for (const m of (missionsData && missionsData.missions) || []) {
     const cur = m.steps.find(s => s.state === 'blocked' || s.state === 'failed') || m.steps.find(s => s.state !== 'done');
-    if (m.waits === 'you') rows.push({text: `<a href="#m-${esc(m.key)}">${esc(m.title)}</a>: ${esc(cur.detail || cur.title)}`, tag: 'mission'});
+    if (m.waits === 'you') rows.push({text: `<a href="#m-${esc(m.key)}">${esc(m.title)}</a>: ${esc((m.alerts && m.alerts[0]) || (cur && (cur.detail || cur.title)) || '')}`, tag: 'mission'});
     else if (m.waits === 'start') rows.push({text: `<a href="#m-${esc(m.key)}">${esc(m.title)}</a>: ${esc(cur.title)} is ready to start`, tag: 'mission'});
   }
   for (const h of (handoffsData && handoffsData.handoffs) || []) {
@@ -207,16 +207,19 @@ function missionCard(m){
   const tasks = start ? `<details class="mtasks"><summary>What ${esc(start.title.replace(/:.*/, ''))} will do (${m.tasks[start.id].length} tasks)</summary><ol>${m.tasks[start.id].map(t => `<li>${esc(t)}</li>`).join('')}</ol></details>` : '';
   const res = m.pending && m.pending.result ? `<p class="mres${/^failed/.test(m.pending.result) ? ' bad' : ''}">Last ${esc(m.pending.action)} ${esc(fmtAt(m.pending.at))}: ${esc(m.pending.result)}</p>` : '';
   const err = m.check_error ? `<p class="mres bad">Last API check failed: ${esc(m.check_error)}</p>` : '';
+  const alerts = (m.alerts || []).map(a => `<p class="mres bad"><b>${esc(a)}</b></p>`).join('');
   return `<article class="ms" id="m-${esc(m.key)}">
     <div class="mhead"><span class="mt">${esc(m.title)}</span><span class="badge ${wcls}">${esc(wtxt)}</span>
       <span class="mbtns">
         <button class="btn" data-key="${esc(m.key)}" data-act="check"${busy ? ' disabled' : ''}>${busy && click.action === 'check' ? 'Checking…' : 'Check now'}</button>
         ${start ? `<button class="btn primary" data-key="${esc(m.key)}" data-act="start" data-step="${esc(start.title)}"${busy ? ' disabled' : ''}>${busy && click.action === 'start' ? 'Starting…' : esc(startLabel)}</button>` : ''}
       </span></div>
+    ${alerts}
     <ol class="msteps">${steps}</ol>
     ${tasks}${res}${err}
     <p class="meta">${m.links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join(' · ')}
       ${m.repo ? ' · repo <code>' + esc(m.repo.replace(/^\/home\/[^/]+/, '~')) + '</code>' : ''}${m.memory ? ' · memory <code>' + esc(m.memory) + '</code>' : ''}
+      ${m.statements ? ' · statements: ' + esc(m.statements) : ''}
       · checked ${m.checked ? esc(ago(Math.round(Date.now()/1000 - m.checked))) : 'never'}</p>
   </article>`;
 }
