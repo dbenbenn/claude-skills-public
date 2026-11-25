@@ -123,10 +123,14 @@ def main():
     problems, written = sync(args[0], ws, check, adopt=adopt)
     for p in problems:
         print('   ' + p)
+    if adopt and adopt is not True and not check:
+        named = [m for m in loose if m in adopt]
+        loose = [m for m in loose if m not in adopt]
+        if named:
+            print('   adopted: ' + ' '.join(named))
     if loose:
         print('   %d statement(s) match the draft but are not listed as drafts (published, or copied by '
               'hand)%s: %s' % (len(loose), '; adopted' if adopt is True and not check
-                                else '; adopted the named ones' if adopt and not check
                                 else '; for those not published, rerun with --adopt=MOD,MOD', ' '.join(loose[:6])
                                 + (' ...' if len(loose) > 6 else '')))
     print('%d stub(s) written; %d problem(s)' % (len(written), len(problems)))
