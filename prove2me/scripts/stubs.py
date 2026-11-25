@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Install a mission's draft statements in the workspace as the modules the platform will publish.
 
-usage: stubs.py MISSION_DIR [--check] [--adopt] [--no-build]
+usage: stubs.py MISSION_DIR [--check] [--adopt[=MOD,MOD...]] [--no-build]
 
 Each statement of mission.py becomes Theorems/Thm_<NS>_<name>.lean in the workspace: its preamble
 and formal_statement with proof `sorry`, byte for byte the module the platform publishes at Submit
@@ -68,7 +68,9 @@ def unlisted(mdir, ws=None):
 
 def sync(mdir, ws=None, check=False, adopt=False):
     """(problems, written modules). Writes and records the stubs unless `check`; with `adopt`, also
-    lists as drafts the identical files `unlisted` reports (copied by hand, not published)."""
+    lists as drafts the identical files `unlisted` reports (copied by hand, not published): all of them
+    when `adopt` is True, only the named modules when it is a set. Name them: a bare --adopt also adopts
+    PUBLISHED statements and bundles, which submit_solution.py then refuses to import (2026-11-25)."""
     ws = ws or workspace()
     mdir = os.path.abspath(mdir)
     want, dr = wanted(mdir), drafts(ws)
@@ -80,7 +82,7 @@ def sync(mdir, ws=None, check=False, adopt=False):
             if cur.rstrip() != text.rstrip():
                 problems.append('PUBLISHED-DIFFERS %s: the platform has another %s under this name'
                                 % (mod, 'bundle' if mod.startswith('Definitions.') else 'statement'))
-            elif adopt and not check:
+            elif adopt and not check and (adopt is True or mod in adopt):
                 adopted.append(mod)
             continue
         if cur is not None and dr[mod] != mdir:
@@ -116,13 +118,15 @@ def main():
         sys.exit(__doc__)
     check, ws = '--check' in sys.argv, workspace()
     loose = unlisted(args[0], ws)
-    problems, written = sync(args[0], ws, check, adopt='--adopt' in sys.argv)
+    adopt = '--adopt' in sys.argv or next((set(a.split('=', 1)[1].split(',')) for a in sys.argv
+                                            if a.startswith('--adopt=')), False)
+    problems, written = sync(args[0], ws, check, adopt=adopt)
     for p in problems:
         print('   ' + p)
     if loose:
         print('   %d statement(s) match the draft but are not listed as drafts (published, or copied by '
-              'hand)%s: %s' % (len(loose), '; adopted' if '--adopt' in sys.argv and not check
-                                else '; if not published, rerun with --adopt', ' '.join(loose[:6])
+              'hand)%s: %s' % (len(loose), '; adopted' if adopt is True and not check
+                                else '; for those not published, rerun with --adopt=MOD,MOD', ' '.join(loose[:6])
                                 + (' ...' if len(loose) > 6 else '')))
     print('%d stub(s) written; %d problem(s)' % (len(written), len(problems)))
     if written and '--no-build' not in sys.argv:
