@@ -920,6 +920,8 @@ job out of the window (2026-10-06). It looks names up in the public catalogue, s
 item publish and runs to its timeout: poll that item's job with `GET /publish-jobs/<job_id>` instead
 (2026-11-21).
 
+**Execute a contract's size parameters at values the callers never use.** A compiler that sees every caller of a `static` function may exploit what they pass: Debian's GCC compiled libsodium's `poly1305_blocks` as a loop that ends when the pointer equals `m + bytes`, valid only for multiples of 16, which every caller passes. The contract had been carried over from the clang build (any `bytes ≥ 16`) and checked only at 16, 32, 48 and 80, and the published M1 was disproved within the hour (2026-11-25, submission 88a8159d). Before stating a length or count precondition, run the code at the boundary, at non-multiples and at the smallest and largest values the precondition admits.
+
 **A statement of ours disproved while the proposal is In review stops the review.** A mission whose
 goal or milestone is false would fail review, so it must not sit in the queue: the moment a disproof
 of one of its statements is accepted (often our own queue's, as for libsodium's goal and M2 on
