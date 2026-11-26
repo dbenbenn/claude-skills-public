@@ -27,6 +27,10 @@ hand; this module is what that trial supplied by hand, as pure functions the dri
        "paths":  {"Solutions.Artin.KP": "artin/proofs/kp/lean"},   # workspace module prefix -> directory of the
                                                             # repo holding those modules (longest prefix wins;
                                                             # a module under none is named without a link)
+       "ported_from": "what the workspace tree is a port of",  # optional: the tree was edited from the
+                                                            # repo's commit (renamed, re-imported), so its lines
+                                                            # no longer match: `paths` may then be empty, the
+                                                            # repo is linked at the commit and the texts say so
        "paper":  "the paper the development formalizes, with its DOI link",     # optional
        "tags":   "artin,number-theory",                     # optional publish tags (default formalization)
        "license": "…"}                                      # optional
@@ -277,8 +281,10 @@ def meta_problem(path):
         return '%s: no %r; the file is %s' % (path, k, META_FORMAT)
     if not re.fullmatch(r'[0-9a-f]{40}', m['commit']):
         return '%s: commit must be the full 40-hex commit (links pin it)' % path
-    if m['repo'] and not m['paths']:
-        return '%s: paths is empty, so nothing would link to %s; give paths or set repo to null' % (path, m['repo'])
+    if m['repo'] and not m['paths'] and not m.get('ported_from'):
+        return ('%s: paths is empty, so nothing would link to %s; give paths, set repo to null, or say in '
+                '"ported_from" what the workspace tree is a port of (then the repo is linked at the commit, '
+                'without line links)' % (path, m['repo']))
     if not isinstance(m['paths'] or {}, dict):
         return '%s: paths must be {workspace module prefix: directory in the repo}' % path
     return None
@@ -307,11 +313,15 @@ def module_link(meta, module, line=None):
 
 
 def repo_ref(meta):
-    """`[host/owner/repo](url) at commit abc1234`, or None for a private source (`"repo": null`)."""
+    """`[host/owner/repo](url) at commit abc1234`, or None for a private source (`"repo": null`); for a
+    port (`ported_from`), `…, ported: <what>`."""
     if not meta.get('repo'):
         return None
     r = meta['repo'].rstrip('/')
-    return '[%s](%s) at commit %s' % (re.sub(r'^https?://', '', r), r, meta['commit'][:7])
+    out = '[%s](%s/tree/%s) at commit %s' % (re.sub(r'^https?://', '', r), r, meta['commit'], meta['commit'][:7])
+    if meta.get('ported_from'):
+        out += '; this split is carved from a port of it: %s' % meta['ported_from']
+    return out
 
 
 def source_line(meta):
@@ -319,6 +329,8 @@ def source_line(meta):
     out = '%s, %s' % (meta['credit'], meta['title'])
     if meta.get('repo'):
         out += ', %s (commit %s)' % (meta['repo'].rstrip('/'), meta['commit'][:7])
+    if meta.get('ported_from'):
+        out += '; ported: %s' % meta['ported_from']
     if meta.get('paper'):
         out += '; after %s' % meta['paper']
     if meta.get('license'):

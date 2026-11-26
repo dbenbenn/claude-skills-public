@@ -140,6 +140,21 @@ def test_private_source_has_no_links(tmp_path):
     assert N.is_native_meta(priv)
 
 
+def test_port_links_the_repo_without_lines(tmp_path):
+    """`ported_from`: the workspace tree was edited from the commit (GRHLean, 2026-11-26), so line links would
+    be wrong; the repo is linked at the commit, no declaration is, and the texts say it is a port."""
+    port = dict(META, paths={}, ported_from='renamed under the namespace GRHLean')
+    p = tmp_path / 'native_meta.json'
+    p.write_text(json.dumps(port))
+    assert N.meta_problem(str(p)) is None
+    p.write_text(json.dumps(dict(port, ported_from='')))
+    assert 'ported_from' in N.meta_problem(str(p))
+    assert N.module_link(port, 'Solutions.Nat.KP.Sub.Main', 3) is None
+    assert 'ported: renamed under the namespace GRHLean' in N.source_line(port)
+    r = N.repo_ref(port)
+    assert port['commit'] in r and 'port of it: renamed' in r
+
+
 def test_module_paths_and_source_line():
     assert N.module_path(META, 'Solutions.Nat.KP.Sub.Main') == 'proofs/kp/lean/Sub/Main.lean'
     assert N.module_path(META, 'Solutions.Nat.C0.B') == 'proofs/c0/lean/B.lean'

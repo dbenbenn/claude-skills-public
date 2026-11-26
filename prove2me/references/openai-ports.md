@@ -816,6 +816,9 @@ carve primitives by hand with a hand-written config; that is what native mode wr
   say nothing of OpenAI; `check-text` runs on them as for a port. The links are only as public as the repo:
   for a private one write `"repo": null, "paths": {}`, and the texts credit the authors without any link
   or commit (Artin KP′, whose `p2m-standalone` is private; earlier Artin items carried no links either).
+  A tree edited from the repo's commit (renamed into a namespace, imports narrowed: GRHLean, 2026-11-26)
+  has lines that no longer match: write `"paths": {}` and `"ported_from": "<what was changed>"`, and the
+  texts link the repo at the commit, no declaration, and say the split is carved from a port of it.
 - **For a statement's blind read-back**, the carve's bundles are megabytes of proofs. `stage_auditor.py
   carve-view DIR/config.json NAME` writes the definitions of its signature closure alone
   (`readback_views/<slug>.defs.lean`); stage that as the imported file.
