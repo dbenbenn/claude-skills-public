@@ -390,6 +390,44 @@ def test_a_piece_needing_a_bundle_that_imports_its_statement_is_made_self_contai
     assert C.resolve_piece_cycles(g, _stmt_plan(g)) == []
 
 
+def test_a_self_contained_piece_imports_the_safe_bundles_its_kept_roots_need():
+    # GRHLean (2026-11-27): a self-contained piece kept an instance (an extra root, for typeclass search)
+    # whose dependency sat in the bundle of a safe statement the piece did not import; check_plan said
+    # "needs …, neither kept, imported nor in its bundles". The piece now imports that bundle too.
+    from types import SimpleNamespace as NS
+    N = lambda *deps: NS(deps=set(deps), sorry=False, size=1)
+    nodes = {'t': N('w'), 'w': N(), 'inst': N('d'), 'd': N(), 'u': N(), 'own': N()}
+
+    class G:
+        def __init__(self):
+            self.nodes = nodes
+
+        def closure(self, roots, stop=()):
+            out, todo = set(), list(roots)
+            while todo:
+                k = todo.pop()
+                if k in out:
+                    continue
+                out.add(k)
+                if k not in stop or k in roots:
+                    todo += nodes[k].deps
+            return out
+
+        def extra_roots(self, keep, stop):
+            return {'inst'} if 'inst' not in keep else set()
+    plan = {'bundles': [{'name': 'B0', 'nodes': ['own'], 'imports': []},
+                        {'name': 'B1', 'nodes': ['d'], 'imports': []},
+                        {'name': 'B2', 'nodes': ['w'], 'imports': [], 'statements': ['t']}],
+            'nodes': ['t', 'u'],
+            'stubs': {'t': {'bundles': ['B0']}, 'u': {'bundles': ['B1']}},
+            'pieces': {'t': {'keep': ['t'], 'imports': [], 'bundles': ['B2'], 'size': 1},
+                       'u': {'keep': ['u'], 'imports': [], 'bundles': ['B1'], 'size': 1}}}
+    assert C.resolve_piece_cycles(G(), plan) == ['t']
+    pc = plan['pieces']['t']
+    assert 'inst' in pc['keep'] and 'w' in pc['keep']
+    assert 'B1' in pc['bundles'] and 'B2' not in pc['bundles']
+
+
 def test_an_external_attributed_declaration_is_never_kept_by_a_piece(g):
     # DiamondDistortion (2026-10-19): the published bundle's `@[reducible] def Edge` was an
     # external definition, yet the extra roots (instances and attributed declarations whose

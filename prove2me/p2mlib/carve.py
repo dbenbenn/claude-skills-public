@@ -2811,8 +2811,18 @@ def resolve_piece_cycles(g, plan):
         if bad:
             raise CarveError('self-contained piece %s would contain sorry: %s' % (n, bad))
         imps = sorted({d for k in keep for d in g.nodes[k].deps if d in safe and d not in keep})
+        # what keep needs from the available bundles: its own statement's, and those of the safe
+        # statements, which this piece need not import (an extra root kept for typeclass search can
+        # need such a bundle's member: GRHLean 2026-11-27, "needs …, neither kept, imported nor in its
+        # bundles" in 3 self-contained pieces)
+        bidx = {k: i for i, b in enumerate(plan['bundles']) for k in b['nodes']}
+        reach = set(cl(own))
+        for x in imps:
+            reach |= cl(plan['stubs'][x]['bundles'])
+        need = {bidx[d] for k in keep for d in g.nodes[k].deps if d in bidx and d not in keep} & have_b
         p = plan['pieces'][n]
-        p.update(keep=sorted(keep), imports=imps, bundles=[names[i] for i in sorted(_reduce(bimp, set(cl(own))))],
+        p.update(keep=sorted(keep), imports=imps,
+                 bundles=[names[i] for i in sorted(_reduce(bimp, set(cl(own)) | (need - reach)))],
                  size=sum(g.nodes[k].size for k in keep), selfcontained=True)
         changed.append(n)
     return changed
