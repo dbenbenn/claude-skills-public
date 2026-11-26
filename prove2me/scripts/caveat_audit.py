@@ -91,8 +91,16 @@ def stage(mdir, name, cites, force=False):
     own = bool(T.get('source_pdf'))
     pdf = os.path.join(mdir, T.get('source_pdf') or getattr(M, 'SOURCE_PDF', ''))
     off = T.get('pdf_page_offset', 0) if own else getattr(M, 'PDF_PAGE_OFFSET', 0)
-    want = SA.pages(T['page']) + ([] if own else SA.pages(getattr(M, 'CONTEXT_PAGES', ''))) \
+    # a cited result: `page` is the CITING paper's page and `audit_pages` the cited paper's, as in
+    # source_audit; rendering `page` from the cited PDF handed the IOM fundamental-lemma auditor
+    # Bellare-Rogaway p. 22 instead of pp. 11-12 (2026-11-26). Render both, the citing one tagged.
+    cited = own and T.get('audit_pages') and T.get('page')
+    want = SA.pages(T['audit_pages'] if cited else T['page']) \
+        + ([] if own else SA.pages(getattr(M, 'CONTEXT_PAGES', ''))) \
         + SA.pages(T.get('context_pages', ''))
+    citing_pdf = os.path.join(mdir, getattr(M, 'SOURCE_PDF', '') or '') if cited else ''
+    if citing_pdf and os.path.isfile(citing_pdf):
+        render_pages(citing_pdf, SA.pages(T['page']), getattr(M, 'PDF_PAGE_OFFSET', 0), d, tag='citing')
     # a bundle drawing on several papers renders every part, as source_audit does: with only the
     # first paper's pages the F-amenability bundle's caveat auditor could not check the Kaimanovich,
     # JMMS or Monod quotations (2026-09-30)
