@@ -568,6 +568,14 @@ independent `v` is too loose; `Type (max u v)` keeps "every `X`" and always cont
 could not be called from its `Type*` siblings, so the edge 2.10 ← 2.3 cannot exist. And **re-run every local check file whenever a definition changes**: the universe
 check written for exactly this had been failing silently since the edit that broke it.
 
+**An adversary's resource bounds hold on the runs of the theorem's experiment, not on every
+type-correct reply.** "$\mathcal{A}$ makes at most $q$ queries" counts queries in actual runs. Quantifying
+over every reply of the right type is exact only when some oracle in the experiment can give them all (a
+random-bits oracle); for a real decryption oracle it excludes adversaries the paper covers. IOM GCM
+(2026-11-26): `AuthResources` was restated over the runs with GCM under every permutation (a deterministic
+oracle per key, `AllPathsDet`). Check, too, that the scheme rejects inputs outside its domain: a decryption
+oracle that accepted any nonce made Theorem 2 false (GHASH keeps 64 bits of the length).
+
 When Lean needs a structure the paper takes for granted (a quotient known abelian, a rank),
 build it so the instance exists by construction and say in the natural-language statement that
 the object is isomorphic to the paper's; the read-back will render the construction.
