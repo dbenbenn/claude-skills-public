@@ -47,6 +47,20 @@ stack guard, GOT). Reuse a framework before writing one (SKILL.md, "Framework fi
 - Small exactness lemmas for 128-bit add/mul/extract (`mul128`, `add128`, `extr128`) keep the
   carries readable.
 
+## Bit-level and GF(2) facts (AES-GCM pilot, 2026-11-26)
+
+- **`bv_decide` is unusable in solutions**: on this toolchain it adds an axiom
+  `<name>._native.bv_decide.ax_…` (`#print axioms`). Use `simp`/`interval_cases`/`getLsbD`
+  reasoning, and `decide +kernel` for tables (S-box, `gfMul` by 2 and 3 over all 256 bytes).
+- **Carry-less multiplication (PMULL/GHASH)**: do not case-split or evaluate on basis vectors; map
+  to Mathlib `Polynomial (ZMod 2)` (`reflect`, `AdjoinRoot`): PMULL = polynomial product, SP
+  800-38D `•` = product mod x^128+x^7+x^2+x+1 read msb-first, OpenSSL's twisted key = H/α, the
+  Karatsuba + two-fold reduction is a Montgomery identity. 8 s, reusable
+  (`~/claude/aes-gcm-pilot/lean/AesGcmPilot/Proof/Ghash.lean`). Traps: pass degrees to
+  `reflect_mul` explicitly; `linear_combination` in char 2 needs `ring_nf; simp [two_eq_zero']`.
+- **AES rounds**: `simp` unrolls `evalAesOp`'s loops; per-byte lemmas, then a generic
+  `cipher_eq` (round chain = FIPS `CIPHER`) independent of where round keys come from (`Aes.lean`).
+
 ## Disproofs by kernel evaluation
 
 A disproof cannot import theorems, so it cannot be split: it must fit the verifier on its own.

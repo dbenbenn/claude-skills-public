@@ -19,6 +19,7 @@ Missions so far, each with its repo (RESUME.md, ITEMS.md, DECISIONS.md, `checks/
 | x25519-dalek | DeepMind's libsignal object, 19 blocks | `~/claude/x25519-dalek-aarch64` |
 | BoringSSL Poly1305 | our build; parked | `~/claude/poly1305-boringssl-aarch64` |
 | libsodium Poly1305 | Debian's released `libsodium.a` objects | `~/claude/poly1305-libsodium-aarch64` |
+| AES-GCM pilot | Debian OpenSSL 3.5.9 `libcrypto.a` assembly objects | `~/claude/aes-gcm-pilot` |
 
 Shared packages: the AArch64 semantics (`~/claude/arm64-semantics-p2m`, 56 `Def_Arm64_*` bundles,
 namespace `Arm64`, public) and libc contracts plus link sanity (`~/claude/p2m-standalone/arm64-libc`:
