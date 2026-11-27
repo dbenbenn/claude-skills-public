@@ -144,6 +144,7 @@ carver refuses to keep one; notation is fine).
 """
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -544,6 +545,26 @@ def split_many(g, P, specs, cost, cfg, parts=2.0, skip_unsplittable=False):
     return Q, done, unsplittable
 
 
+def _make_plan_once(cfg, g, cost, frozen, folded, forced, demoted):
+    return C.make_plan(g, cfg['targets'], forced,
+                       cfg.get('budget', 60),
+                       cfg.get('piece_size', 700_000), cfg.get('bundle_budget', 90),
+                       cfg.get('bundle_size', 650_000), cfg.get('band_width', 4), cost,
+                       frozen, cfg.get('bundle_prefix', 'Bundle'),
+                       external_defs=external_map(cfg, g),
+                       statement_suffix=cfg.get('statement_suffix', ''),
+                       external=cfg.get('external', ()),
+                       chunker=cfg.get('chunker', 'bands'),
+                       pinned=cfg.get('pinned'),
+                       bundles_import_statements=cfg.get('bundles_import_statements', True),
+                       promote_private=cfg.get('promote_private', ()),
+                       bundle_theorems=bundle_theorems(cfg, g),
+                       promote_shared=cfg.get('promote_shared', False),
+                       closure_slack=cfg.get('closure_slack'),
+                       exclude=sorted(folded | set(cfg.get('no_promote', ())) | set(demoted)),
+                       prelude=cfg.get('prelude_modules', ()))
+
+
 def main(argv):
     if len(argv) < 3:
         sys.exit(__doc__)
@@ -614,23 +635,31 @@ def main(argv):
         # made seven in-budget pieces that the fold summed into one of 271 s)
         folded = set(cfg.get('folded', ()))
         cost = costs(cfg, g)
-        P = C.make_plan(g, cfg['targets'], [f for f in cfg.get('forced', ()) if f not in folded],
-                        cfg.get('budget', 60),
-                        cfg.get('piece_size', 700_000), cfg.get('bundle_budget', 90),
-                        cfg.get('bundle_size', 650_000), cfg.get('band_width', 4), cost,
-                        frozen, cfg.get('bundle_prefix', 'Bundle'),
-                        external_defs=external_map(cfg, g),
-                        statement_suffix=cfg.get('statement_suffix', ''),
-                        external=cfg.get('external', ()),
-                        chunker=cfg.get('chunker', 'bands'),
-                        pinned=cfg.get('pinned'),
-                        bundles_import_statements=cfg.get('bundles_import_statements', True),
-                        promote_private=cfg.get('promote_private', ()),
-                        bundle_theorems=bundle_theorems(cfg, g),
-                        promote_shared=cfg.get('promote_shared', False),
-                        closure_slack=cfg.get('closure_slack'),
-                        exclude=sorted(folded | set(cfg.get('no_promote', ()))),
-                        prelude=cfg.get('prelude_modules', ()))
+        # a statement whose own bundles wait for its proof (a bundle imports a statement whose proof
+        # reaches it) cannot be published: it is left unpromoted, or unforced, and the plan made again
+        # (GRHLean 2026-11-27: eight rounds by hand after each re-plan). Recorded in the plan.
+        demoted, unforced = [], []
+        forced_now = [f for f in cfg.get('forced', ()) if f not in folded]
+        while True:
+            try:
+                P = _make_plan_once(cfg, g, cost, frozen, folded, forced_now, demoted)
+                break
+            except C.CarveError as e:
+                m = re.match(r'(\S+) cannot be published: its statement needs bundles that wait', str(e))
+                if not m or len(demoted) + len(unforced) >= 200:
+                    raise
+                n = m.group(1)
+                if n in forced_now:
+                    forced_now.remove(n)
+                    unforced.append(n)
+                    print('WARNING: forced %s cannot be a statement (its own bundles wait for its proof): '
+                          'not forced' % n, flush=True)
+                else:
+                    demoted.append(n)
+                    print('not promoted: %s (its own bundles wait for its proof)' % n, flush=True)
+        if demoted or unforced:
+            P['auto_no_promote'] = sorted(demoted)
+            P['auto_unforced'] = sorted(unforced)
         if cfg.get('folded'):
             # a folded node the plan did not make a statement (it is `exclude`d from promotion) has
             # nothing to fold; it is still recorded as folded
