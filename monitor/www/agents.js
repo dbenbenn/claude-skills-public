@@ -138,8 +138,8 @@ function quotaChart(id, col, spanSecs, title){
   const now = last.updated, rows = q.filter(r => r[0] >= now - spanSecs && r[col] != null);
   if (!rows.length) {
     const seen = q.filter(r => r[col] != null), at = seen.length ? seen[seen.length-1][0] : null;
-    el.innerHTML = at ? `<p class="empty">Not reported by the agents' rate-limit records since ${esc(fmtAt(at))}.</p>`
-                      : '<p class="empty">No quota data yet: the sampler reads rate-limit records from the agents\' transcripts.</p>';
+    el.innerHTML = at ? `<p class="empty">Not reported since ${esc(fmtAt(at))}.</p>`
+                      : '<p class="empty">No quota data yet: the sampler polls the subscription usage endpoint, else reads the agents\' rate-limit records.</p>';
     return;
   }
   el.innerHTML = '';
@@ -179,7 +179,11 @@ function drawQuota(){
   else {
     const since = col => { const s = q.filter(r => r[col] != null); return s.length ? ` since ${fmtAt(s[s.length-1][0])}` : ''; };
     const win = (name, p, r, col) => p == null ? `${name} not reported${since(col)}` : `${name} ${p.toFixed(0)}% used, resets ${fmtAt(r)}`;
-    sub.textContent = `${win('7-day window', n[3], n[4], 3)} · newest record across the agents' transcripts (last sample ${ago(Math.round(last.updated - n[0]))})`;
+    const qq = last.quota, src = qq.source === 'api'
+      ? `from the subscription usage endpoint, polled every 5 min (last poll ${ago(Math.round(last.updated - qq.api_t))})`
+      : `newest record across the agents' transcripts (last sample ${ago(Math.round(last.updated - n[0]))})`
+        + (qq.api_error ? ` · usage endpoint failing: ${qq.api_error}` : '');
+    sub.textContent = `${win('7-day window', n[3], n[4], 3)} · ${src}`;
   }
   quotaChart('c-q7', 3, 7*86400, '7-day window');
 }

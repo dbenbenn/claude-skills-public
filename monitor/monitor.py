@@ -649,7 +649,8 @@ def step(home, now=None):
     track(hist, secs, now)
     costs = load_json(os.path.join(st, 'agent_costs.json'), {})
     AG.record_costs(costs, AG.AGENTS_DIR, now)
-    quota = AG.update_quota(load_json(os.path.join(st, 'quota.json'), {}), AG.AGENTS_DIR, now)
+    qapi = load_json(os.path.join(st, 'quota_api.json'), {})
+    quota = AG.update_quota(load_json(os.path.join(st, 'quota.json'), {}), AG.AGENTS_DIR, now, api=qapi)
     State.costs = costs
     reg = load_json(os.path.join(AG.AGENTS_DIR, 'queue', 'registry.json'), None)
     for s in secs:
@@ -675,7 +676,7 @@ def step(home, now=None):
                           trouble=res['trouble'])
     State.inboxes_conf = os.path.join(home, 'inboxes.json')
     status['inboxes'] = inboxes(State.inboxes_conf, now)
-    status['quota'] = {'series': quota['series'], 'columns': ['t', 'five_hour %', 'five_hour resets', 'seven_day %', 'seven_day resets']}
+    status['quota'] = {'source': quota.get('source'), 'api_t': qapi.get('t'), 'api_error': qapi.get('error'), 'series': quota['series'], 'columns': ['t', 'five_hour %', 'five_hour resets', 'seven_day %', 'seven_day resets']}
     save_json(os.path.join(st, 'resources.json'), res)
     save_json(os.path.join(st, 'history.json'), hist)
     save_json(os.path.join(st, 'agent_costs.json'), costs)
@@ -875,6 +876,26 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+USAGE_EVERY = 300
+
+
+def usage_loop(home):
+    """Polls the subscription usage endpoint every 5 min, in its own thread: state/quota_api.json
+    {'t', 'windows', 'error', 'error_t'} (the last good reading is kept through failures)."""
+    p = os.path.join(home, 'state', 'quota_api.json')
+    while True:
+        cur = load_json(p, {})
+        try:
+            cur.update(t=int(time.time()), windows=AG.fetch_usage(), error=None, error_t=None)
+        except Exception as e:                 # expired token, network, a changed reply: fall back
+            cur.update(error=str(e)[:300], error_t=int(time.time()))
+        try:
+            save_json(p, cur)
+        except OSError as e:
+            print('usage poll save failed: %r' % e, flush=True)
+        time.sleep(USAGE_EVERY)
+
+
 def main():
     home = S.home_dir()
     State.home = home
@@ -884,6 +905,7 @@ def main():
     srv = ThreadingHTTPServer(('', PORT), Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     threading.Thread(target=disk_loop, args=(home,), daemon=True).start()
+    threading.Thread(target=usage_loop, args=(home,), daemon=True).start()
     while True:
         try:
             step(home)

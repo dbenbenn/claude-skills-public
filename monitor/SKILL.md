@@ -114,11 +114,20 @@ The main page has two more cards (their order is in "Page layout" below):
 
 - **Subscription quota**: the 7-day window (last 7 days) as a step chart (the 5-hour window, not reported
   by the agents' records since 2026-10-31, was dropped from the page on 2026-11-05; status.json keeps its
-  column), with reset markers (solid = past, dashed = next). The sampler (`agents.update_quota`) reads only the new
+  column), with reset markers (solid = past, dashed = next). **Since 2026-11-27 the source is the subscription
+  usage endpoint** (dbenbenn: the page sat at 11% overnight while the app climbed to 26%, since only queue agents
+  fed it): `monitor.usage_loop`, a thread, GETs `https://api.anthropic.com/api/oauth/usage` every 5 min
+  (`agents.fetch_usage`: Bearer = `claudeAiOauth.accessToken` from `~/.claude/.credentials.json`, header
+  `anthropic-beta: oauth-2025-04-20`; unofficial, may change without notice; not inference, so no quota cost) into
+  `state/quota_api.json` `{t, windows, error, error_t}`. Its `utilization` is already a percent and `resets_at` ISO
+  (rounded to the minute). It never refreshes the token (that rotates the refresh token under Claude Code); an expired
+  token, a network failure or a changed reply is recorded as `error` and shown in the card's subtitle. While the last
+  good reading is under 15 min old (`API_FRESH`) it is the sample (`status.quota.source = 'api'`); otherwise the
+  old fallback below applies (`'transcripts'`). Fallback: the sampler (`agents.update_quota`) reads only the new
   bytes of each `~/claude/headless-agents/*/transcript.jsonl` and takes the `rate_limit_event`
   (`rate_limit_info.unifiedWindows.{five_hour,seven_day}.{utilization,resetsAt}`) from the most recently
   written file. Utilization is a 0..1 fraction there; it is stored and shown as %. The series
-  (`state/quota.json`, 7 days) only moves while some agent is running.
+  (`state/quota.json`, 7 days) moves with the endpoint, or on the fallback only while some agent is running.
 - **Headless agents**: one card per `headless-agents/<name>/`: running first, then agents finished in the
   last 24 h. Name (links to its log), state, model, auth (subscription / API key), start-end, cost so far
   (list price, estimate until the run ends), a cost sparkline (`state/agent_costs.json`, 48 h), the last assistant text

@@ -14,6 +14,7 @@ import json
 import os
 import re
 import time
+import urllib.request
 
 PROC_DIR = '/proc'
 DIED_NOTE = 'no process: died without writing its final state (state.json still says running)'
@@ -352,11 +353,54 @@ def quota_event(text):
     return found
 
 
-def update_quota(q, root, now):
+USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+CREDENTIALS = os.path.expanduser('~/.claude/.credentials.json')
+API_FRESH = 900          # an endpoint reading older than this gives way to the transcripts' records
+
+
+def parse_usage(obj):
+    """The usage endpoint's reply -> {'five_hour': (util %, resets epoch), 'seven_day': (...)}, only the
+    windows it reports (null ones left out). Utilization is already a percent there, unlike the
+    transcripts' 0..1 fraction; resets_at is ISO 8601."""
+    out = {}
+    for k in ('five_hour', 'seven_day'):
+        w = obj.get(k) if isinstance(obj, dict) else None
+        if not isinstance(w, dict):
+            continue
+        try:
+            t = datetime.datetime.fromisoformat(w['resets_at'].replace('Z', '+00:00')).timestamp()
+            out[k] = (round(float(w['utilization']), 2), int(round(t / 60) * 60))   # 15:59:59.5 -> 16:00, as the transcripts say
+        except (KeyError, TypeError, ValueError, AttributeError):
+            pass
+    return out
+
+
+def fetch_usage(cred=CREDENTIALS, now=None, timeout=20):
+    """GET the subscription usage endpoint (unofficial, may change) with Claude Code's OAuth token.
+    Only reads the token: refreshing it would rotate the refresh token under Claude Code, so an
+    expired token raises and the caller falls back. Raises on any failure; returns parse_usage(...)."""
+    now = time.time() if now is None else now
+    with open(cred) as f:
+        o = json.load(f)['claudeAiOauth']
+    if o.get('expiresAt') and o['expiresAt'] / 1000 <= now:
+        raise RuntimeError('OAuth token expired (no Claude Code session has refreshed it)')
+    req = urllib.request.Request(USAGE_URL, headers={
+        'Authorization': 'Bearer ' + o['accessToken'], 'anthropic-beta': 'oauth-2025-04-20',
+        'User-Agent': 'monitor'})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        w = parse_usage(json.loads(r.read()))
+    if not w:
+        raise RuntimeError('usage reply had no five_hour or seven_day window')
+    return w
+
+
+def update_quota(q, root, now, api=None):
     """q = {'offsets': {path: pos}, 'series': [[t, five %, five reset, seven %, seven reset]]}, a window
     the event did not report as None.
-    Reads only the new bytes of each transcript that grew; the event from the most recently written
-    file wins. Appends a sample when the windows changed or 10 minutes passed. Returns q."""
+    api = the poller's {'t', 'windows'}: while under API_FRESH old it is the reading (q['source'] =
+    'api'). Otherwise the transcripts: reads only the new bytes of each transcript that grew; the event
+    from the most recently written file wins. Appends a sample when the windows changed or 10 minutes
+    passed. Returns q."""
     offs = q.setdefault('offsets', {})
     best = None
     for p in glob.glob(os.path.join(root, '*', 'transcript.jsonl')):
@@ -384,6 +428,11 @@ def update_quota(q, root, now):
         if not os.path.exists(p):
             del offs[p]
     series = q.setdefault('series', [])
+    if api and api.get('windows') and now - api.get('t', 0) <= API_FRESH:
+        best = (api['t'], {k: tuple(v) for k, v in api['windows'].items()})
+        q['source'] = 'api'
+    elif best:
+        q['source'] = 'transcripts'
     if best:
         ev = best[1]
         five, seven = ev.get('five_hour', (None, None)), ev.get('seven_day', (None, None))

@@ -318,3 +318,31 @@ def test_carve_goals(tmp_path):
     assert A.carve_goals(dict(sec, title='Carve %s: Mod.Main' % q), None)[1]['id'] == 'bbb'
     assert A.carve_goals(dict(sec, id='other'), reg) == []
     assert A.carve_goals(dict(sec, title='q1-x carve %s/nope: M' % q), reg) == []
+
+
+def test_parse_usage_percent_and_iso_reset():
+    w = A.parse_usage({'five_hour': None, 'seven_day': {'utilization': 26.0, 'resets_at': '2026-12-03T15:59:59.507898+00:00'}})
+    assert w == {'seven_day': (26.0, 1796313600)}
+    assert A.parse_usage({'seven_day': {'utilization': 'x'}}) == {}
+    assert A.parse_usage(None) == {}
+
+
+def test_fetch_usage_refuses_expired_token(tmp_path):
+    c = tmp_path / 'c.json'
+    c.write_text(json.dumps({'claudeAiOauth': {'accessToken': 't', 'expiresAt': 1000}}))
+    with pytest.raises(RuntimeError, match='expired'):
+        A.fetch_usage(str(c), now=2000)
+
+
+def test_update_quota_prefers_fresh_api_reading(tmp_path):
+    d = tmp_path / 'a'; d.mkdir()
+    (d / 'transcript.jsonl').write_text(json.dumps({'type': 'rate_limit_event', 'rate_limit_info': {'unifiedWindows': {
+        'seven_day': {'utilization': 0.11, 'resetsAt': 1796313600}}}}) + '\n')
+    api = {'t': NOW - 60, 'windows': {'seven_day': [26.0, 1796313600]}}
+    q = A.update_quota({}, str(tmp_path), NOW, api=api)
+    assert q['source'] == 'api' and q['series'][-1][3:] == [26.0, 1796313600]
+    # a stale reading gives way to the transcripts
+    (d / 'transcript.jsonl').open('a').write(json.dumps({'type': 'rate_limit_event', 'rate_limit_info': {'unifiedWindows': {
+        'seven_day': {'utilization': 0.3, 'resetsAt': 1796313600}}}}) + '\n')
+    q = A.update_quota(q, str(tmp_path), NOW + A.API_FRESH + 120, api=api)
+    assert q['source'] == 'transcripts' and q['series'][-1][3] == 30.0
