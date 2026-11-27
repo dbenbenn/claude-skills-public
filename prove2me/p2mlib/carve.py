@@ -1362,15 +1362,19 @@ class Graph:
                 c = self.infos[nd.module].commands[nd.cmd]
                 if c.insts is None:
                     continue
-                if lib:
-                    tv = set()
-                    for n in nd.names:
-                        x = self.consts.get(n) or {}
-                        tv.update(x.get('t', ()))
-                        tv.update(x.get('v', ()))
-                    if not lib & tv:
-                        continue
+                tt, tv = set(), set()
+                for n in nd.names:
+                    x = self.consts.get(n) or {}
+                    tt.update(x.get('t', ()))
+                    tv.update(x.get('v', ()))
+                if lib and not lib & (tt | tv):
+                    continue
                 c.insts = list(c.insts) + [n for n in self.nodes[k].names if n not in c.insts]
+                if not lib or lib & tt:
+                    # a statement's own type may need it (`Function.Injective (g A)`, g a natural
+                    # transformation: GRHLean stub mono_of_app_injective)
+                    c.sig_insts = list(c.sig_insts or ()) + \
+                        [n for n in self.nodes[k].names if n not in (c.sig_insts or ())]
         if not wraps:
             return
         for k, nd in self.nodes.items():
