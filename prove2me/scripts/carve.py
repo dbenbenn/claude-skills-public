@@ -69,6 +69,8 @@ CONFIG.json (paths may use ~):
                                               # --native --proves sets it
    "carry_stub_definitions": true,            # a native tree (not a port): a carved file also imports the
                                               # Definitions bundles of the theorem stubs its modules import
+   "own_namespaces": ["GRHLean"],             # the project's own roots: an `open` of a namespace under them
+                                              # that no carved declaration creates is dropped (GRHLean005)
    "statement_suffix": "_s2",                 # published names <name>_s2 (a fresh split of a
                                               # development whose earlier split took the names)
    "statement_suffixes": {"A.b": "_m"},       # one statement published again as A.b_m (q151)
@@ -266,6 +268,7 @@ def load_graph(cfg):
     g.instance_names = names
     # a native tree: files carry the Definitions imports of the theorem stubs their modules import
     g.stub_definitions = bool(cfg.get('carry_stub_definitions'))
+    g.own_namespaces = list(cfg.get('own_namespaces') or ())
     return g
 
 

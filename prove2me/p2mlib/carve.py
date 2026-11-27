@@ -3680,6 +3680,16 @@ def _binder_cut_edits(t, a, b, bad):
     return edits, not [w for w in rest if w not in ('omit', 'include', 'in')]
 
 
+def own_dead_ns(g, x):
+    """Is x a namespace under one of the project's own roots (`g.own_namespaces`, config
+    `own_namespaces`) that no declaration of the graph creates? Such a namespace existed in the port
+    only through declarations the carve does not reach (GRHLean 2026-11-27: `open _root_.GRHLean.Filter`
+    kept in bundle GRHLean005, "unknown namespace", GRHLean.Filter made only by an unused alias), so an
+    `open` of it is dropped like that of any project namespace the file does not have."""
+    roots = getattr(g, 'own_namespaces', None) or ()
+    return x not in g.proj_ns and any(x == r or x.startswith(r + '.') for r in roots)
+
+
 class Carver:
     """Cut declarations out of a development's modules, keeping the context they need.
 
@@ -4600,7 +4610,7 @@ class Carver:
             # closed, like proj_ns). Keeping every reading doubled `prior` per token, 2^k strings
             # for an `open` of k tokens (q247 2026-11-11: carve gen at 40 GiB on one stub)
             prior += [x for x in cands if (x in g.ns_stems or x in alive) and x not in prior]
-            known = [x for x in cands if x in g.proj_ns or x in g.ext_ns]
+            known = [x for x in cands if x in g.proj_ns or x in g.ext_ns or own_dead_ns(g, x)]
             if not known:
                 continue                      # Mathlib's, say: carving cannot change it
             now = [x for x in cands if x in g.ext_ns or (x in alive and self.alive_pos.get(x, -1) < c.index)]

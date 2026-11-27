@@ -4362,3 +4362,14 @@ def test_signature_view_is_the_definitions_a_statement_is_written_with(g):
     _, defs2, _ = C.signature_view(g, 'CD.uses_sized', external={'CD.Space': 'Definitions.Def_X'})
     assert 'CD.Space' not in defs2 and 'CD.sizedZero' in defs2
     assert C.signature_view(g, 'CD.double_eq')[1] == ['CD.double']
+
+
+def test_an_open_of_a_dead_own_namespace_is_known_to_the_carver():
+    # GRHLean (2026-11-27): `open _root_.GRHLean.Filter`, a namespace only an unreached alias made, was
+    # read as a library namespace and kept in bundle GRHLean005 ("unknown namespace")
+    from types import SimpleNamespace as NS
+    g = NS(proj_ns={'GRHLean', 'GRHLean.Data'}, own_namespaces=['GRHLean'])
+    assert C.own_dead_ns(g, 'GRHLean.Filter')
+    assert not C.own_dead_ns(g, 'GRHLean.Data')          # a live project namespace: the usual rules
+    assert not C.own_dead_ns(g, 'Filter')                # the library's
+    assert not C.own_dead_ns(NS(proj_ns=set()), 'GRHLean.Filter')   # no own roots configured
