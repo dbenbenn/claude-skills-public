@@ -4079,6 +4079,13 @@ class Carver:
                 if o is not None:
                     blocks[o].add(c.index)
         for o, members in blocks.items():
+            # a namespace block the source left empty (`namespace PeriodPair end PeriodPair`) is
+            # there to create the namespace for a later `open`; dropped, that `open` came before the
+            # namespace's first kept declaration and lost the token (GRHLean level-2 bundle T003,
+            # 2026-11-27: `open _root_.GRHLean.PeriodPair` gone, "Unknown identifier `area`")
+            if info.commands[o].short_kind == 'namespace' and \
+                    all(info.commands[i].short_kind == 'end' for i in members):
+                continue
             members = members | {o}
             if not (members & (kept | keep_global)):
                 drop |= members

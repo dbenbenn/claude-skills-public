@@ -4434,3 +4434,34 @@ def test_a_deriving_command_under_variable_in_declares_its_instances():
     c = NS(decl_kind=None, short_kind='in', inner_kind='Lean.Parser.Command.deriving', names=[])
     assert C._is_decl_command(c)
     assert not C._is_decl_command(NS(decl_kind=None, short_kind='in', inner_kind='Lean.Parser.Command.open', names=[]))
+
+
+# The GRHLean port opens `_root_.GRHLean.PeriodPair` near the top of a module and creates that
+# namespace just before with an empty `namespace PeriodPair end PeriodPair`; its first declaration
+# comes later. The carver dropped the empty block, so the `open` came before the namespace existed
+# and lost the token (level-2 bundle T003, 2026-11-27: "Unknown identifier `area`").
+
+def test_an_empty_namespace_block_is_kept_for_a_later_open():
+    from p2mlib.leaninfo import Command, Pos
+    p = Pos(1, 0, 0)
+    def cmd(i, kind, ns, ctx, decl_kind=None, names=()):
+        return Command(index=i, kind='Lean.Parser.Command.' + kind, start=p, end=p, namespace=ns,
+                       opens=[], attrs=[], names=list(names), decl_kind=decl_kind,
+                       context=[(o, []) for o in ctx])
+    cmds = [cmd(0, 'namespace', '', [None]),
+            cmd(1, 'namespace', 'A', [None, 0]),
+            cmd(2, 'end', 'A.B', [None, 0, 1]),
+            cmd(3, 'open', 'A', [None, 0]),
+            cmd(4, 'declaration', 'A', [None, 0], 'definition', ['B.f']),
+            cmd(5, 'namespace', 'A', [None, 0]),
+            cmd(6, 'declaration', 'A.C', [None, 0, 5], 'definition', ['g']),
+            cmd(7, 'end', 'A.C', [None, 0, 5]),
+            cmd(8, 'end', 'A', [None, 0])]
+    info = type('I', (), {'commands': cmds})()
+    g = type('G', (), {'infos': {'M': info}, '_scoped_cmds': set()})()
+    carver = C.Carver.__new__(C.Carver)
+    carver.g = g
+    drop = carver._drops('M', {4}, set())
+    assert 1 not in drop and 2 not in drop            # the empty block stays
+    assert {5, 6, 7} <= drop                           # a block whose declaration went goes whole
+    assert 0 not in drop and 4 not in drop
