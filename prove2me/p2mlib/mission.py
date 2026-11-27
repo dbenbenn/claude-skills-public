@@ -118,7 +118,7 @@ def statement_payloads(mdir):
     for f in sorted(os.listdir(sdir)):
         if f.startswith('Thm_') and f.endswith('.lean'):
             pre, fs = statement_payload(os.path.join(sdir, f))
-            m = re.search(r'^theorem\s+(\S+)', fs, re.M)
+            m = re.search(r'^(?:theorem|lemma)\s+(\S+)', fs, re.M)   # a carved stub keeps `lemma`
             if not m:
                 raise SystemExit('statements/%s has no theorem' % f)
             out[m.group(1).rsplit('.', 1)[-1]] = (pre, fs)
@@ -141,7 +141,7 @@ def lib_payloads(mdir):
     for f in sorted(os.listdir(os.path.join(mdir, 'lib'))):
         if f.startswith('Thm_') and f.endswith('.lean'):
             pre, fs = lib_payload(os.path.join(mdir, 'lib', f))
-            m = re.search(r'^theorem\s+(\S+)', fs, re.M)
+            m = re.search(r'^(?:theorem|lemma)\s+(\S+)', fs, re.M)   # a carved stub keeps `lemma`
             if not m:
                 raise SystemExit('lib/%s has no theorem' % f)
             out[m.group(1).rsplit('.', 1)[-1]] = (pre, fs)

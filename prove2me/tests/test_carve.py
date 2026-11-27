@@ -3546,6 +3546,19 @@ def test_a_local_attribute_of_an_imported_declaration_is_applied_again(g):
     assert 'attribute [local simp]' not in C.gen_stub(g, p, 'CD.CL.uses_k')
 
 
+def test_a_local_attribute_with_modifiers_is_wanted_by_its_tactic():
+    # GRHLean top-down level 1: `@[local grind! .] instance instHeegD` went into a bundle, and the piece's
+    # `by grind [PrimeSevenModEight]` failed: the token looked for was `grind!`, which no proof writes
+    w = C.local_attr_wanted
+    assert w('grind! .', 'by grind [PrimeSevenModEight]', 'instHeegD')
+    assert w('grind =', 'by grind', 'foo')
+    assert not w('grind! .', 'by simp', 'instHeegD')
+    assert w('grind! .', 'exact (instHeegD P).2', 'instHeegD')
+    assert w('gcongr', 'by gcongr', 'x') and not w('gcongr', 'by simp', 'x')
+    assert w('simp', 'by simp', 'k_eq') and not w('simp', 'by rfl', 'k_eq')
+    assert w('instance 100', 'by rfl', 'i')
+
+
 def test_a_theorem_with_universes_only_under_max_is_not_made_a_statement(g):
     # oaiq-124: `{σ : Type (max us v)}` (`us` nowhere bare): WA "stuck at solving universe
     # constraint"; the carver keeps such a theorem inside its importers' pieces

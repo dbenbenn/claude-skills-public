@@ -294,6 +294,15 @@ def test_standalone_lib_layout_gets_default_payloads(tmp_path):
     assert mission.lib_payload(str(tmp_path / 'lib' / 'Thm_foo.lean')) == m.payloads()['foo']
 
 
+def test_a_lib_statement_declared_with_lemma_has_a_payload(tmp_path):
+    # GRHLean top-down level 1 (2026-11-27): a carved stub keeps the source's `lemma`; stubs.py stopped with
+    # "lib/Thm_x.lean has no theorem" although workspace.statement_decl accepts it
+    (tmp_path / 'mission.py').write_text("THEOREMS = []\n")
+    (tmp_path / 'lib').mkdir()
+    (tmp_path / 'lib' / 'Thm_foo.lean').write_text('import Mathlib\n\nsection\nnamespace N\n\nlemma foo : True := by\n  sorry\n\nend N\nend\n')
+    assert list(mission.load(str(tmp_path)).payloads()) == ['foo']
+
+
 def test_explicit_payloads_win_over_the_lib_default(tmp_path):
     (tmp_path / 'mission.py').write_text("THEOREMS = []\nPROSE = {}\ndef payloads():\n    return {'x': ('a', 'b')}\n")
     (tmp_path / 'lib').mkdir()

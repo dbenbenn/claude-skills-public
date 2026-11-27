@@ -410,6 +410,19 @@ def _uses_token(text, tok):
     return tok in text
 
 
+def local_attr_wanted(attr, text, short):
+    """Is the local attribute `attr` (what follows `local` in `@[local …]`: `simp`, `gcongr`,
+    `grind! .`, `instance 100`) needed in front of command text `text`, which names the attributed
+    declaration as `short` or not? `instance` always; `simp` by a default simp call; any by the
+    attribute's own name used as a token, its modifiers dropped (`grind! .` and `grind =` are used by
+    the tactic `grind`: GRHLean top-down level 1, `@[local grind! .] instance instHeegD` in a bundle,
+    and `grind` in the piece's `dvd_norm_c₀` failed without it), or by the declaration's name."""
+    head = attr.split()[0]
+    if head == 'instance' or (head == 'simp' and _default_simp_call(text)):
+        return True
+    return _uses_token(text, head.rstrip('!?')) or _uses_token(text, short)
+
+
 def decl_ns(c):
     """The namespace a command's body is read in: declaring `A.B.f` in namespace N reads the body
     in N.A.B (Erdős 3 v2 B188: `simp only [tensorPower_eval]` inside
@@ -4521,9 +4534,7 @@ class Carver:
             k = g.cmd_node.get((m, vi))
             if not k or k in self.keep or not instance_imported(k, have, self.rename):
                 continue
-            want = [x for x in locs if x.split()[0] == 'instance' or
-                    (x.split()[0] == 'simp' and _default_simp_call(text)) or
-                    _uses_token(text, x.split()[0]) or _uses_token(text, pubname(k).rsplit('.', 1)[-1])]
+            want = [x for x in locs if local_attr_wanted(x, text, pubname(k).rsplit('.', 1)[-1])]
             if want:
                 done.add((vi, chain))
                 out.append('attribute [local %s] _root_.%s\n' % (', local '.join(want),
