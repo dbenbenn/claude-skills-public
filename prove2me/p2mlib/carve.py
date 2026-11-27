@@ -3711,6 +3711,50 @@ def _no_attribute_targets(txt):
     return not t[_attribute_list_end(t, a, len(t)):].strip()
 
 
+_LIB_SIMP_ENTRY = re.compile(r'simp(?![\w\-])')
+
+
+def library_simp_commands(g):
+    """{module: [(entries, [full names])]}: the global `attribute [simp …]` commands (every entry a
+    simp one: `simp`, `simp ←`, `simp↓ low`, …) of each project module, with the library constants
+    (not this carve's declarations)
+    they name, as Lean resolved them in the port. Such a command changes the simp set of every
+    module importing its module, and names no carved declaration, so nothing carried it: a carved
+    file whose sections come from modules that import it, but holding no section of its own module,
+    lost it (GRHLean bottom-up, 2026-11-27: `attribute [simp] Real.log_mul log_div log_rpow log_sqrt
+    norm_le_one ne pos …` of Lib/Analytic/PolyaVinogradov; simp, grind and bound failed in seven
+    proofs of four carves, mended by hand with explicit lists before this). Targets this carve
+    declares are left out: the existing attribute handling covers them. `-simp` is not collected: an
+    erasure lasts only to the end of its scope, so it never reached an importing module."""
+    ours = set(g.consts)
+    for nd in g.nodes.values():
+        ours.update(nd.names)
+    out = {}
+    for m, info in g.infos.items():
+        for c in info.commands:
+            if c.short_kind != 'attribute':
+                continue
+            txt = leanedit.text(info, c.index)
+            if _is_local(txt):
+                continue
+            ents = [e for e in attribute_entries(txt) or () if _LIB_SIMP_ENTRY.match(e)]
+            if not ents or len(ents) != len(attribute_entries(txt) or ()):
+                continue
+            lend = _attribute_list_end(info.text_bytes, c.start.byte, c.end.byte)
+            spans = [(i['start'], i['end']) for i in c.idents or [] if i['role'] == 'ref' and i['start'] >= lend]
+            names = []
+            for a, b in spans:
+                got = [r[2] for r in c.resolved or [] if a <= r[0] < b and r[2]]
+                if len(got) != 1:
+                    names = None            # unresolved or ambiguous: leave the command alone
+                    break
+                if got[0] not in ours and got[0] not in names:
+                    names.append(got[0])
+            if names:
+                out.setdefault(m, []).append((ents, names))
+    return out
+
+
 def _attribute_list_end(t, a, b):
     """Byte offset just past the `]` closing the attribute list of the command in t[a:b] (b if none)."""
     i = t.find(b'[', a, b)
@@ -3892,10 +3936,12 @@ class Carver:
             # with nothing after it does not parse (Heisenberg 2026-10-25)
             hide = [h for h in self._unseen_instances(m, have, earlier, rename) if h and h.strip()]
             simps = [h for h in self._unseen_simps(m, have, earlier, rename) if h and h.strip()]
-            if hide or simps:
+            libs = self._seen_library_simps(m, have)
+            if hide or simps or libs:
                 head = 'section\n-- module %s\n' % m
                 sec = head + ('attribute [-instance] %s\n' % ' '.join(hide) if hide else '') + \
-                    ('attribute [-simp] %s\n' % ' '.join(simps) if simps else '') + sec[len(head):]
+                    ('attribute [-simp] %s\n' % ' '.join(simps) if simps else '') + \
+                    ''.join(libs) + sec[len(head):]
             out.append(sec)
             earlier |= {k for k in keep if g.nodes[k].module == m}
         # reducibility of an external declaration, once at the top: the port's attribute is global
@@ -3936,6 +3982,32 @@ class Carver:
                 if i in rename:
                     full = full.rsplit('.', 1)[0] + '.' + rename[i] if '.' in full else rename[i]
             out.append('_root_.' + full)
+        return out
+
+    def _seen_library_simps(self, m, have):
+        """`attribute [local simp] …` lines restoring, at the top of module m's section, the global
+        simp attributes on library constants that the modules m imports declared
+        (`library_simp_commands`): in the port m elaborated with them, and a carved file has them
+        only if it holds the declaring module's own section. `local`, so they end with the section
+        and reach neither the file's other sections nor its importers. Not when the file keeps or
+        imports a declaration of the declaring module: that module's section, which keeps the global
+        command, is then in this file or in a bundle it imports (the prelude's, in every file)."""
+        g = self.g
+        if not hasattr(g, '_lib_simp_cmds'):
+            g._lib_simp_cmds = library_simp_commands(g)
+            g._mod_names = collections.defaultdict(set)
+            for k, nd in g.nodes.items():
+                if nd.module in g._lib_simp_cmds:
+                    g._mod_names[nd.module].update(nd.names)
+        out, hv = [], have if isinstance(have, (set, frozenset)) else set(have or ())
+        for d in sorted(g._lib_simp_cmds):
+            if d == m or not g.sees(m, d):
+                continue
+            if any(g.nodes[k].module == d for k in self.keep) or g._mod_names[d] & hv:
+                continue
+            for ents, names in g._lib_simp_cmds[d]:
+                ents = ['local ' + e for e in ents]
+                out.append('attribute [%s] %s\n' % (', '.join(ents), ' '.join('_root_.' + n for n in names)))
         return out
 
     def _unseen_simps(self, m, have, earlier, rename):

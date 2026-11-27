@@ -4541,3 +4541,62 @@ def test_stated_declarations_leave_their_proofs_uncarved():
     assert C.check_plan(g2, p) == []
     with pytest.raises(C.CarveError, match='not a theorem'):
         C.mark_stated(g2, ['CD.Aux.auxOnly'])
+
+
+# GRHLean bottom-up (2026-11-27): Lib/Analytic/PolyaVinogradov declares a global
+# `attribute [simp] Real.log_mul …` on library lemmas. No carved declaration names them, so a carved
+# file whose sections come from modules importing it, holding no section of its own module, lost it,
+# and simp, grind and bound steps failed in seven proofs of four carves.
+
+def _lib_simp_graph():
+    from p2mlib.leaninfo import Command, Pos
+    src = ('attribute [simp] Real.log_mul ne\n'
+           'attribute [-simp] Nat.add_zero\n'
+           'attribute [local simp] Real.log_div\n'
+           'attribute [simp, norm_cast] Real.log_pow\n'
+           'attribute [simp] mine\n')
+    tb = src.encode()
+    cmds, at = [], 0
+    for i, line in enumerate(src.splitlines(keepends=True)):
+        a, b = at, at + len(line.encode()) - 1
+        lend = tb.index(b']', a) + 1
+        idents, resolved, j = [], [], lend
+        for tok in tb[lend:b].decode().split():
+            s = tb.index(tok.encode(), j)
+            idents.append({'role': 'ref', 'name': tok, 'start': s, 'end': s + len(tok)})
+            resolved.append([s, s + len(tok), {'ne': 'NeZero.ne', 'mine': 'P.mine'}.get(tok, tok)])
+            j = s + len(tok)
+        cmds.append(Command(index=i, kind='Lean.Parser.Command.attribute', start=Pos(i + 1, 0, a),
+                            end=Pos(i + 1, 0, b), namespace='', opens=[], attrs=[], names=[],
+                            idents=idents, resolved=resolved))
+        at = b + 1
+    info = type('I', (), {'commands': cmds, 'text_bytes': tb,
+                          'slice': lambda self, a, b: tb[a:b].decode()})()
+    other = type('I', (), {'commands': [], 'text_bytes': b''})()
+    nd = lambda m, names: type('N', (), {'module': m, 'names': names})()
+    g = type('G', (), {'infos': {'Lib.PV': info, 'Use': other, 'Far': other},
+                       'consts': {'P.mine': {}},
+                       'nodes': {'P.mine': nd('Lib.PV', ['P.mine']), 'u': nd('Use', ['u'])},
+                       'sees': staticmethod(lambda m, d: m == 'Use' and d == 'Lib.PV')})()
+    return g
+
+
+def test_global_simp_attributes_on_library_lemmas_are_collected_with_resolved_names():
+    g = _lib_simp_graph()
+    # only the all-simp global command, its library targets by their resolved names; not `-simp`
+    # (an erasure ends with its scope), not `local`, not one with another attribute, not ours
+    assert C.library_simp_commands(g) == {'Lib.PV': [(['simp'], ['Real.log_mul', 'NeZero.ne'])]}
+
+
+def test_a_module_importing_a_library_simp_attribute_gets_it_back_locally():
+    g = _lib_simp_graph()
+    carver = C.Carver.__new__(C.Carver)
+    carver.g, carver.keep = g, {'u'}
+    want = ['attribute [local simp] _root_.Real.log_mul _root_.NeZero.ne\n']
+    assert carver._seen_library_simps('Use', set()) == want
+    assert carver._seen_library_simps('Far', set()) == []          # never imported it
+    assert carver._seen_library_simps('Lib.PV', set()) == []       # its own section keeps it
+    # the declaring module's section is in an imported bundle, or in this file: already in force
+    assert carver._seen_library_simps('Use', {'P.mine'}) == []
+    carver.keep = {'u', 'P.mine'}
+    assert carver._seen_library_simps('Use', set()) == []
