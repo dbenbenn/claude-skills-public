@@ -1318,7 +1318,7 @@ class Graph:
         name one that an instance of a coercion class wraps (its value's project constants other
         than its own type's) is taken to use that instance. An over-estimate when the function is
         also written out: the instance then comes along, which costs nothing."""
-        wraps = {}
+        wraps, libcoe = {}, {}
         for k, nd in self.nodes.items():
             cls = self.instance_class(k) if nd.instance else None
             if not cls or cls[0] not in COERCION_CLASSES:
@@ -1336,6 +1336,37 @@ class Graph:
                 w = {t for t in ts - set(nd.names) if t in self.owner}
             if w:
                 wraps[k] = w
+            if not (w & set(self.owner)) and \
+                    not any(d in self.owner for n in nd.names for d in (self.consts.get(n) or {}).get('v', ())):
+                # a coercion between library types wrapping library functions (`Coe Type (Φ → Type)`
+                # by `fun n _ ↦ n`; a CoeFun on ValuationSubring): nothing of the project marks its
+                # uses (GRHLean002/003 2026-11-27, "Application type mismatch", "Function expected").
+                # Taken as used by every declaration of a module that sees it and mentions the
+                # library constants of its type (all of them when its type names none)
+                lib = set()
+                for n in nd.names:
+                    lib.update((self.consts.get(n) or {}).get('t', ()))
+                lib -= set(self.owner) | set(nd.names)
+                lib = {x for x in lib if x.split('.')[0] not in COERCION_CLASSES and x not in COERCION_CLASSES}
+                libcoe[k] = lib
+        for k, lib in libcoe.items():
+            m0 = self.nodes[k].module
+            for j, nd in self.nodes.items():
+                if j == k or not self.sees(nd.module, m0) or \
+                        (nd.module == m0 and nd.cmd < self.nodes[k].cmd):
+                    continue
+                c = self.infos[nd.module].commands[nd.cmd]
+                if c.insts is None:
+                    continue
+                if lib:
+                    tv = set()
+                    for n in nd.names:
+                        x = self.consts.get(n) or {}
+                        tv.update(x.get('t', ()))
+                        tv.update(x.get('v', ()))
+                    if not lib & tv:
+                        continue
+                c.insts = list(c.insts) + [n for n in self.nodes[k].names if n not in c.insts]
         if not wraps:
             return
         for k, nd in self.nodes.items():

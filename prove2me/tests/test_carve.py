@@ -4394,3 +4394,23 @@ def test_a_prelude_module_is_bundled_first_and_everything_imports_it(g):
         assert P <= C._bundle_closure(bimp, [pos[x] for x in d['bundles']])
     assert [x for x in C.check_plan(g, p) if 'sorry' not in x] == []
     C.publish_order(p)
+
+
+def test_a_library_coercion_instance_is_taken_as_used_where_it_is_visible(tmp_path):
+    # GRHLean (2026-11-27): `instance : Coe Type (Φ → Type) := ⟨fun n _ ↦ n⟩` elaborates away and wraps
+    # no project function, so nothing recorded its uses and bundle GRHLean002 lacked it
+    from types import SimpleNamespace as NS
+    g = C.Graph.__new__(C.Graph)
+    cmd = lambda: NS(insts=[], sig_insts=[], declares=None)
+    g.infos = {'M': NS(commands=[cmd(), cmd(), cmd()]), 'N': NS(commands=[cmd()])}
+    g.nodes = {'inst': NS(instance=True, names=['inst'], module='M', cmd=1),
+               'early': NS(instance=False, names=['early'], module='M', cmd=0),
+               'late': NS(instance=False, names=['late'], module='M', cmd=2),
+               'other': NS(instance=False, names=['other'], module='N', cmd=0)}
+    g.infos['M'].commands[1].declares = [('inst', 'Coe', [])]
+    g.consts = {'inst': {'t': ['Coe'], 'v': ['Coe.mk']}, 'early': {}, 'late': {}, 'other': {}}
+    g.owner = {k: k for k in g.nodes}
+    g.sees = lambda m, d: m == d or (m, d) == ('N', 'M')
+    g._add_coercion_instances()
+    assert 'inst' in g.infos['M'].commands[2].insts and 'inst' in g.infos['N'].commands[0].insts
+    assert 'inst' not in g.infos['M'].commands[0].insts
