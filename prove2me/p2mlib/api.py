@@ -146,6 +146,20 @@ def graph_theorem_names(g):
             if n.get('node_type') == 'theorem' and n.get('status') != 'Definition'}
 
 
+def sketch_children(tid, call=None):
+    """{submission id: set of theorem names it imports} for every decomposition of theorem `tid`
+    (deprecated ones included), from /theorems/:id/decompositions; definitions bundles are left out.
+    Not from /graph: on a large tree (GRH goal, 2026-11-27: 799 nodes at depth 5) the graph call timed
+    out three times and came back as {'__error': ...}, which submit_solution read as a KeyError
+    after a successful submission. A failed call raises instead of reading as "no edges"."""
+    call = call or globals()['call']
+    r = call('GET', '/theorems/%s/decompositions' % tid)
+    if not isinstance(r, dict) or '__error' in r or 'decompositions' not in r:
+        raise RuntimeError('GET /theorems/%s/decompositions failed: %s' % (tid, str(r)[:300]))
+    return {d['submission_id']: {c['theorem_name'] for c in d.get('children') or [] if c.get('theorem_name')}
+            for d in r['decompositions']}
+
+
 def live_sketch_edges(tid, call=None):
     """{submission id: set of theorem names it imports} for the live (accepted, not deprecated)
     proofs of theorem `tid`, from its graph."""

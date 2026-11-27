@@ -66,6 +66,11 @@ def fake_platform(live_edges=None, live=None, dep_status=None):
                                   'status': p['status'], 'deprecated_at': None})
                     edges.append({'source': 'D', 'target': 'sketch-' + p['id']})
             return {'nodes': nodes, 'edges': edges}
+        if path == '/theorems/T/decompositions':
+            return {'decompositions': [
+                {'submission_id': p['id'], 'deprecated_at': None,
+                 'children': [{'theorem_id': 'D', 'theorem_name': 'N.dep'}] if p['edges'] else []}
+                for p in live if not p['deprecated_at']]}
         if path.startswith('/theorems/T/submissions?'):
             return {'submissions': [{k: v for k, v in p.items() if k not in ('edges', 'content')} for p in live],
                     'total': len(live)}
@@ -300,3 +305,14 @@ def test_import_names_falls_back_to_the_carve_published_lib(ws, tmp_path):
     out.mkdir(parents=True)
     (tmp_path / 'x.lean').rename(out / 'Thm_OAI_M_row3_e.lean')
     assert S.import_names(sol(tmp_path, text), carve=str(carve)) == {'N.dep', 'OAI.M.row3_e'}
+
+
+def test_sketch_children_raises_on_an_error_reply():
+    # 2026-11-27: the GRH goal's /graph timed out ({'__error': ...}) and submit_solution crashed with a
+    # KeyError after the submission had been accepted; a failed read must say so, not read as no edges
+    from p2mlib import api
+    with pytest.raises(RuntimeError):
+        api.sketch_children('T', call=lambda m, p, b=None: {'__error': 'retries exhausted'})
+    assert api.sketch_children('T', call=lambda m, p, b=None: {'decompositions': [
+        {'submission_id': 's', 'children': [{'definition_id': 'B', 'definition_name': 'Bundle'},
+                                            {'theorem_id': 'D', 'theorem_name': 'dep'}]}]}) == {'s': {'dep'}}

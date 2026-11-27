@@ -69,12 +69,8 @@ def import_names(path, carve=None):
 
 
 def sketch_edges(tid, sid):
-    g = call('GET', '/theorems/%s/graph' % tid)
-    names = api.graph_theorem_names(g)
-    node = 'sketch-' + sid
-    present = any(e['source'] == node or e['target'] == node for e in g['edges'])
-    return present, {names[e['source']] for e in g['edges']
-                     if e['target'] == node and names.get(e['source'])}
+    kids = api.sketch_children(tid, call=call)
+    return sid in kids, kids.get(sid, set())
 
 
 def live_proofs(tid, replaces=()):
@@ -83,15 +79,12 @@ def live_proofs(tid, replaces=()):
     /submissions, not from the graph: the graph has a sketch node only for a proof with theorem
     edges, so two full proofs of one theorem were never compared (Lodha-Moore, 2026-10-04)."""
     subs = call('GET', '/theorems/%s/submissions?status=ACCEPTED,SKETCH_ACCEPTED&limit=200' % tid)
-    g = call('GET', '/theorems/%s/graph' % tid)
-    names = api.graph_theorem_names(g)
+    kids = api.sketch_children(tid, call=call)
     out = []
     for s in (subs or {}).get('submissions') or []:
         if s.get('deprecated_at') or any(s['id'].startswith(r) for r in replaces):
             continue
-        node = 'sketch-' + s['id']
-        edges = {names[e['source']] for e in g['edges']
-                 if e['target'] == node and names.get(e['source'])}
+        edges = kids.get(s['id'], set())
         content = (call('GET', '/submissions/%s/solution' % s['id']) or {}).get('content') or ''
         out.append(dict(id=s['id'], status=s.get('status'), username=s.get('username'), edges=edges,
                         content=content, explanation=s.get('explanation') or ''))
