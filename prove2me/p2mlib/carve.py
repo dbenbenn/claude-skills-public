@@ -2257,7 +2257,7 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
               bundle_size=650_000, band_width=4.0, cost=None, frozen=None, bundle_prefix='Bundle',
               external_defs=None, statement_suffix='', external=(), chunker='bands', pinned=None,
               bundles_import_statements=True, promote_private=(), bundle_theorems=(),
-              promote_shared=False, closure_slack=None, exclude=()):
+              promote_shared=False, closure_slack=None, exclude=(), prelude=()):
     """The split: bundles, nodes (published statements) and each node's piece.
 
     - Bundle material B: every reachable non-theorem, what reachable statements need, their
@@ -2303,7 +2303,13 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
       its statement and proof need from the bundles is pinned into bundles of its own, and the
       order is: those bundles, the statement, its proof (accepted), then the bundles importing it.
       The stub's `sorry` shows in those bundles' axioms locally, as in a piece's. Off, such a
-      theorem is a CarveError, as before."""
+      theorem is a CarveError, as before.
+    - `prelude`: modules every module of the development imports whose global commands matter
+      everywhere (GRHLean's Base: `attribute [instance low] Classical.propDecidable`, instance
+      priorities and simp set-up of library declarations, which no carved declaration names, so
+      bundle GRHLean006 lost them: "failed to synthesize DecidableEq n"). All their declarations,
+      theorems included, are bundle material pinned first, and every other bundle, statement and
+      piece imports those bundles."""
     cost = cost if cost is not None else size_costs(g)
     targets, forced = list(targets), list(forced)
     for t in targets + forced:
@@ -2314,6 +2320,17 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
     for k in reach:
         seeds |= g.nodes[k].sig
     seeds |= {k for k in bundle_theorems if k in reach and k not in targets and k not in forced}
+    pre = set()
+    if prelude:
+        # a stubbed (sorry) declaration of the prelude stays out, with what rests on it
+        start = [k for k, nd in g.nodes.items() if nd.module in set(prelude)]
+        start = [k for k in start if not any(g.nodes[x].sorry for x in g.closure([k]))]
+        pre = g.closure(start)
+        bad = sorted(k for k in pre if k in targets or k in forced)
+        if bad:
+            raise CarveError('prelude declarations cannot be statements: %s' % bad[:5])
+        seeds |= pre
+        pinned = [sorted(pre)] + (list(pinned.values()) if isinstance(pinned, dict) else list(pinned or ()))
     fz_chunks = []
     if frozen:
         old, names = frozen
@@ -2573,10 +2590,32 @@ def make_plan(g, targets, forced=(), budget=60.0, piece_size=700_000, bundle_bud
         plan['max_only_universes'] = mu
     if frozen and conflicts:
         plan['frozen_external_conflicts'] = {m: sorted(v) for m, v in sorted(conflicts.items())}
+    if pre:
+        plan['prelude'] = sorted(pre)
+        import_prelude(plan, pre)
     if stmts:
         for n in resolve_piece_cycles(g, plan):
             plan['pieces'][n]['cost'] = round(pcost(set(plan['pieces'][n]['keep'])), 2)
     return plan
+
+
+def import_prelude(plan, pre):
+    """Make every bundle, stub and piece of `plan` reach the bundles holding the prelude declarations
+    `pre` (make_plan's `prelude`). Edits `plan` in place."""
+    pos, bimp, _ = _plan_index(plan)
+    P = {i for i, b in enumerate(plan['bundles']) if set(b['nodes']) & pre}
+    names = [b['name'] for b in plan['bundles']]
+    under = _bundle_closure(bimp, sorted(P))      # what the prelude bundles import: never made to import them
+    for i, b in enumerate(plan['bundles']):
+        if i in under or P <= _bundle_closure(bimp, [i]):
+            continue
+        bimp[i] = sorted(set(bimp[i]) | P)
+        b['imports'] = [names[j] for j in sorted(_reduce(bimp, set(bimp[i])))]
+        bimp[i] = [pos[x] for x in b['imports']]
+    for d in list(plan['stubs'].values()) + list(plan['pieces'].values()):
+        have = _bundle_closure(bimp, [pos[x] for x in d['bundles'] if x in pos])
+        if not P <= have:
+            d['bundles'] = [names[j] for j in sorted(_reduce(bimp, {pos[x] for x in d['bundles'] if x in pos} | P))]
 
 
 class _PieceKit:

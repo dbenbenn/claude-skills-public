@@ -64,7 +64,7 @@ DEFAULT_TAGS = 'formalization'
 IMPORT_OVERHEAD = 3.0       # s: what `import Mathlib` costs a module, as oai_build_modules --elab-log takes off
 # hand-set config keys a re-run `config` keeps (carve_prep's KEEP_KEYS, less what make_config derives itself)
 KEEP_KEYS = ('patches', 'frozen', 'pinned', 'repaired', 'instance_names', 'measured',
-             'bundles_import_statements', 'literal_patches', 'own_namespaces')
+             'bundles_import_statements', 'literal_patches', 'own_namespaces', 'prelude_modules')
 
 
 class NativeError(Exception):

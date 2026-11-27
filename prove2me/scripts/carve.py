@@ -69,6 +69,8 @@ CONFIG.json (paths may use ~):
                                               # --native --proves sets it
    "carry_stub_definitions": true,            # a native tree (not a port): a carved file also imports the
                                               # Definitions bundles of the theorem stubs its modules import
+   "prelude_modules": ["Solutions.GRHLean.Lib.General.LinearAlgebra.Base"],   # every bundle imports
+                                              # the bundles of these modules (their global attributes)
    "own_namespaces": ["GRHLean"],             # the project's own roots: an `open` of a namespace under them
                                               # that no carved declaration creates is dropped (GRHLean005)
    "statement_suffix": "_s2",                 # published names <name>_s2 (a fresh split of a
@@ -588,6 +590,8 @@ def main(argv):
             sys.exit('split plan inconsistent:\n' + '\n'.join(probs[:20]))
         backup = keep_backup(plan_path(cfg), '.pre_split')
         json.dump(P, open(backup, 'w'), indent=1)
+        if Q.get('prelude'):
+            C.import_prelude(Q, set(Q['prelude']))   # a re-split keeps every file on the prelude
         json.dump(Q, open(plan_path(cfg), 'w'), indent=1)
         old = {b['name'] for b in P['bundles']}
         for n in slow:
@@ -625,7 +629,8 @@ def main(argv):
                         bundle_theorems=bundle_theorems(cfg, g),
                         promote_shared=cfg.get('promote_shared', False),
                         closure_slack=cfg.get('closure_slack'),
-                        exclude=sorted(folded | set(cfg.get('no_promote', ()))))
+                        exclude=sorted(folded | set(cfg.get('no_promote', ()))),
+                        prelude=cfg.get('prelude_modules', ()))
         if cfg.get('folded'):
             # a folded node the plan did not make a statement (it is `exclude`d from promotion) has
             # nothing to fold; it is still recorded as folded
@@ -666,6 +671,8 @@ def main(argv):
         if probs:
             sys.exit('folded plan inconsistent:\n' + '\n'.join(probs[:20]))
         json.dump(P, open(plan_path(cfg)[:-5] + '.pre_fold.json', 'w'), indent=1, sort_keys=True)
+        if Q.get('prelude'):
+            C.import_prelude(Q, set(Q['prelude']))   # a re-split keeps every file on the prelude
         json.dump(Q, open(plan_path(cfg), 'w'), indent=1, sort_keys=True)
         raw = json.load(open(argv[2]))
         raw['folded'] = sorted(set(raw.get('folded', [])) | set(rest))
@@ -705,6 +712,8 @@ def main(argv):
             sys.exit('split-piece: plan inconsistent:\n' + '\n'.join(probs[:20]))
         backup = keep_backup(plan_path(cfg), '.pre_split_piece')
         json.dump(P, open(backup, 'w'), indent=1, sort_keys=True)
+        if Q.get('prelude'):
+            C.import_prelude(Q, set(Q['prelude']))   # a re-split keeps every file on the prelude
         json.dump(Q, open(plan_path(cfg), 'w'), indent=1, sort_keys=True)
         print('old plan saved as %s' % backup)
         if '--no-gen' not in rest:
@@ -723,6 +732,8 @@ def main(argv):
                 sys.exit('rekeep: plan inconsistent:\n' + '\n'.join(probs[:20]))
             backup = keep_backup(plan_path(cfg), '.pre_rekeep')
             json.dump(P, open(backup, 'w'), indent=1, sort_keys=True)
+            if Q.get('prelude'):
+                C.import_prelude(Q, set(Q['prelude']))   # a re-split keeps every file on the prelude
             json.dump(Q, open(plan_path(cfg), 'w'), indent=1, sort_keys=True)
             print('old plan saved as %s' % backup)
             for n in changed:

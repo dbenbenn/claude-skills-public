@@ -4373,3 +4373,24 @@ def test_an_open_of_a_dead_own_namespace_is_known_to_the_carver():
     assert not C.own_dead_ns(g, 'GRHLean.Data')          # a live project namespace: the usual rules
     assert not C.own_dead_ns(g, 'Filter')                # the library's
     assert not C.own_dead_ns(NS(proj_ns=set()), 'GRHLean.Filter')   # no own roots configured
+
+
+def test_a_prelude_module_is_bundled_first_and_everything_imports_it(g):
+    # GRHLean (2026-11-27): Base's global `attribute [instance low] Classical.propDecidable` names no
+    # declaration of the carve, so bundle GRHLean006, which needed none of Base's declarations, lost it
+    # ("failed to synthesize DecidableEq n"). A prelude module's declarations, theorems included, are
+    # bundled first, and every bundle, statement and piece reaches those bundles.
+    p = C.make_plan(g, TARGETS, budget=0.05, piece_size=10**6, bundle_budget=0.005, bundle_size=10**6,
+                    cost=C.size_costs(g, bytes_per_second=10000), bundle_prefix='CDB',
+                    prelude=['CarveDev.Base'])
+    pre = set(p['prelude'])
+    assert pre and not any(g.nodes[k].sorry for k in pre)
+    pos, bimp, bidx = C._plan_index(p)
+    P = {bidx[k] for k in pre}
+    assert all(k in bidx for k in pre)
+    for i, b in enumerate(p['bundles']):
+        assert i in P or P <= C._bundle_closure(bimp, [i]) or 'CD.sorried' in b['nodes'], b['name']
+    for d in list(p['stubs'].values()) + list(p['pieces'].values()):
+        assert P <= C._bundle_closure(bimp, [pos[x] for x in d['bundles']])
+    assert [x for x in C.check_plan(g, p) if 'sorry' not in x] == []
+    C.publish_order(p)
