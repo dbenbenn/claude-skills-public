@@ -5085,6 +5085,25 @@ def header(g, mods, bundles=(), thms=(), collapse_mathlib=True, extra=()):
     return ''.join('import %s\n' % x for x in dict.fromkeys(ext))
 
 
+def mark_stated(g, names):
+    """Forced statements this carve states and leaves Open: a top-down cut publishes each as a leaf and
+    carves its proof at a later level, so the graph forgets the proof's dependencies (deps := what the
+    statement needs, `sig`, and the notations in force). The plan then puts nothing of the proof in a
+    bundle or a piece, where otherwise a forced source lemma's whole proof is carved below it (GRH
+    level 3, 2026-11-27: four forced lemmas planned 380 bundles, the rest of the tree)."""
+    for n in names:
+        k = g.owner.get(n, n)
+        if k not in g.nodes:
+            raise CarveError('unknown stated declaration %s' % n)
+        nd = g.nodes[k]
+        if not nd.theorem:
+            raise CarveError('stated declaration %s is not a theorem' % n)
+        nd.deps = (set(nd.sig) | set(nd.ndeps)) - {k}
+        nd.term = set(nd.tdeps)
+        nd.sdeps = nd.sdeps & nd.sig
+        nd.ideps = nd.ideps & nd.sig
+
+
 def mark_repaired(g, names):
     """Treat these declarations as sorry-free: a post-carve patch supplies the proof the port
     stubbed (generate then refuses any bundle or piece that still contains `sorry`). `names` is a

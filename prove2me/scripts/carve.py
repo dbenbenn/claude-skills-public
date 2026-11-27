@@ -116,6 +116,7 @@ CONFIG.json (paths may use ~):
                                               # the live pieces, less the slow ones', itself)
    "repaired": {"OAI.Erdos3.x": ["OAI.Erdos3.y"]},  # stubbed sorry a patch replaces: name -> what the patched proof uses (or a plain list)
                                               # (generation refuses a file still containing sorry)
+   "stated": ["NS.lemma"],  # forced statements left Open: their proofs are not carved (a top-down cut's leaves)
    "instance_names": "work/instance_names.json"}  # {port name: name in a published bundle} for
                                               # anonymous local instances a frozen bundle kept
                                               # unnamed (Lean's name there differs from the
@@ -265,6 +266,7 @@ def load_graph(cfg):
         sys.exit('no %s: run `carve.py graph` first' % graph_path(cfg))
     g = C.Graph.load(graph_path(cfg), cfg['src'])
     C.mark_repaired(g, cfg.get('repaired') or [])
+    C.mark_stated(g, cfg.get('stated') or [])
     names = cfg.get('instance_names') or {}
     if isinstance(names, str):
         names = json.load(open(os.path.expanduser(names), encoding='utf-8'))

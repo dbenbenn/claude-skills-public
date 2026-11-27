@@ -4524,3 +4524,20 @@ def test_a_grind_pattern_of_a_gone_theorem_is_dropped():
     carver._gone = lambda tok, *a, **k: tok in ('gone', 'x')   # a pattern variable reads as gone too
     drop = carver._drops('M', {0}, {'keep'})
     assert 1 in drop and 2 not in drop
+
+
+def test_stated_declarations_leave_their_proofs_uncarved():
+    # a top-down cut publishes a forced source lemma as an Open leaf: its proof (here top_aux := aux_eq)
+    # must put nothing in a bundle or a piece, while its statement's needs (auxOnly) stay bundle material
+    # (GRH level 3, 2026-11-27: four forced lemmas planned 380 bundles)
+    g2 = C.Graph.load(os.path.join(FIX, 'decl_graph.jsonl'), FIX)
+    full = C.make_plan(g2, ['CD.top_aux'], cost=C.size_costs(g2), bundle_prefix='X')
+    inb = lambda p: {k for b in p['bundles'] for k in b['nodes']}
+    assert 'CD.Aux.aux_eq' in inb(full) | set(full['pieces']['CD.top_aux']['keep'])
+    C.mark_stated(g2, ['CD.top_aux'])
+    p = C.make_plan(g2, ['CD.top_aux'], cost=C.size_costs(g2), bundle_prefix='X')
+    assert 'CD.Aux.aux_eq' not in inb(p) | set(p['pieces']['CD.top_aux']['keep'])
+    assert 'CD.Aux.auxOnly' in inb(p)
+    assert C.check_plan(g2, p) == []
+    with pytest.raises(C.CarveError, match='not a theorem'):
+        C.mark_stated(g2, ['CD.Aux.auxOnly'])
