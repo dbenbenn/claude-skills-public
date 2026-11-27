@@ -308,7 +308,11 @@ def load_decl_graph(path, dups=None):
 
 
 def _is_decl_command(c):
+    # `variable … in deriving instance …` is an `in` command wrapping the deriving: its instances are
+    # its declarations too (GRHLean AmaxStructure, 2026-11-27: they belonged to no node, so the command
+    # was copied into every file of its module, without the variables it needs)
     return bool(c.decl_kind) and c.decl_kind != 'example' or c.short_kind in ('mutual', 'alias', 'aliasLR', 'deriving') or \
+        (c.short_kind == 'in' and (getattr(c, 'inner_kind', None) or '').rsplit('.', 1)[-1] == 'deriving') or \
         (bool(c.names) and c.short_kind not in NOTATION | REFUSED)
 
 

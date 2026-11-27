@@ -4414,3 +4414,10 @@ def test_a_library_coercion_instance_is_taken_as_used_where_it_is_visible(tmp_pa
     g._add_coercion_instances()
     assert 'inst' in g.infos['M'].commands[2].insts and 'inst' in g.infos['N'].commands[0].insts
     assert 'inst' not in g.infos['M'].commands[0].insts
+
+
+def test_a_deriving_command_under_variable_in_declares_its_instances():
+    from types import SimpleNamespace as NS
+    c = NS(decl_kind=None, short_kind='in', inner_kind='Lean.Parser.Command.deriving', names=[])
+    assert C._is_decl_command(c)
+    assert not C._is_decl_command(NS(decl_kind=None, short_kind='in', inner_kind='Lean.Parser.Command.open', names=[]))
