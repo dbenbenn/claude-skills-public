@@ -444,6 +444,24 @@ def test_a_piece_a_bundle_waits_for_through_another_statement_is_a_cycle():
     assert ('t', 'B1') in C.piece_cycles(plan)
 
 
+def test_a_cycle_through_another_piece_and_its_bundle_is_a_piece_cycle():
+    # GRHLean (2026-11-27): piece formEnd_ext imported bundle 199, which imports statement lineMultiplier,
+    # whose piece imported bundle 156, which imports statement formEnd_ext
+    plan = {'bundles': [{'name': 'B0', 'nodes': ['a'], 'imports': []},
+                        {'name': 'B1', 'nodes': ['b'], 'imports': ['B0'], 'statements': ['t']},
+                        {'name': 'B2', 'nodes': ['c'], 'imports': ['B0'], 'statements': ['s']}],
+            'nodes': ['s', 't'],
+            'stubs': {'s': {'bundles': ['B0']}, 't': {'bundles': ['B0']}},
+            'pieces': {'s': {'keep': ['s'], 'imports': [], 'bundles': ['B1']},
+                       't': {'keep': ['t'], 'imports': [], 'bundles': ['B2']}}}
+    with pytest.raises(C.CarveError, match='depends on itself'):
+        C.publish_order(plan)
+    cyc = C.piece_cycles(plan)
+    assert ('t', 'B2') in cyc and ('s', 'B1') in cyc
+    pos, bimp, _ = C._plan_index(plan)
+    assert {plan['bundles'][i]['name'] for i in C._needs_piece(plan, bimp, 't')} == {'B1', 'B2'}
+
+
 def test_an_external_attributed_declaration_is_never_kept_by_a_piece(g):
     # DiamondDistortion (2026-10-19): the published bundle's `@[reducible] def Edge` was an
     # external definition, yet the extra roots (instances and attributed declarations whose
