@@ -43,6 +43,8 @@ DECLGRAPH = os.path.join(os.path.dirname(HERE), 'lean', 'DeclGraph.lean')
 SIZE_CAP = 1 << 20                     # prove2.me refuses a solution or statement over 1 MiB
 
 NOTATION = {'notation', 'mixfix', 'notation3'}
+# `seal X` / `unseal X` (Lean.Parser.commandSeal__/commandUnseal__): name declarations, like an attribute
+SEAL_COMMANDS = {'commandSeal__', 'commandUnseal__'}
 # the platform refuses these in any submitted file (prove2me SKILL: "notation ok, macros refused")
 REFUSED = {'macro', 'syntax', 'macro_rules', 'elab', 'elab_rules', 'syntaxAbbrev', 'syntaxCat',
            'declare_syntax_cat'}
@@ -4022,6 +4024,13 @@ class Carver:
                     drop.add(c.index)
                 elif not _is_local(leanedit.text(info, c.index)):
                     keep_global.add(c.index)
+            elif c.short_kind in SEAL_COMMANDS:
+                # `unseal compactMean` with compactMean carved elsewhere: "Unknown constant" (GRHLean
+                # level-2 bundle T010, 2026-11-27); it goes with its targets, like an attribute
+                refs = [i for i in c.idents or [] if i['role'] == 'ref']
+                opens = g.scope_opens(info, c, m)
+                if refs and all(self._gone(i['name'], c, m, have, opens, idn=i) for i in refs):
+                    drop.add(c.index)
             elif c.short_kind == 'export' and self._export_alive(info, c, m, have):
                 # an export makes aliases that outlive its block (`namespace PA / export
                 # PolynomialAlgorithm (denote) / end PA`): with a name it exports still here, the

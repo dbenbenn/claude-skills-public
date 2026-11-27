@@ -4465,3 +4465,27 @@ def test_an_empty_namespace_block_is_kept_for_a_later_open():
     assert 1 not in drop and 2 not in drop            # the empty block stays
     assert {5, 6, 7} <= drop                           # a block whose declaration went goes whole
     assert 0 not in drop and 4 not in drop
+
+
+# `unseal compactMean` copied into a bundle that does not hold compactMean: "Unknown constant"
+# (GRHLean level-2 bundle T010, 2026-11-27). It goes with its targets, like an attribute.
+
+def test_an_unseal_of_a_gone_declaration_is_dropped():
+    from p2mlib.leaninfo import Command, Pos
+    p = Pos(1, 0, 0)
+    def cmd(i, kind, ns, ctx, decl_kind=None, names=(), idents=None):
+        return Command(index=i, kind=kind, start=p, end=p, namespace=ns, opens=[], attrs=[],
+                       names=list(names), decl_kind=decl_kind, context=[(o, []) for o in ctx],
+                       idents=idents)
+    ref = lambda n: [{'role': 'ref', 'name': n, 'start': 0, 'end': 1}]
+    cmds = [cmd(0, 'Lean.Parser.Command.declaration', '', [None], 'definition', ['keep']),
+            cmd(1, 'Lean.Parser.commandUnseal__', '', [None], idents=ref('gone')),
+            cmd(2, 'Lean.Parser.commandUnseal__', '', [None], idents=ref('keep'))]
+    info = type('I', (), {'commands': cmds})()
+    g = type('G', (), {'infos': {'M': info}, '_scoped_cmds': set(),
+                       'scope_opens': staticmethod(lambda *a: [])})()
+    carver = C.Carver.__new__(C.Carver)
+    carver.g = g
+    carver._gone = lambda tok, *a, **k: tok == 'gone'
+    drop = carver._drops('M', {0}, {'keep'})
+    assert 1 in drop and 2 not in drop
