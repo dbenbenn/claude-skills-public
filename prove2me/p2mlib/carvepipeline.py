@@ -56,6 +56,20 @@ MAX_REPLANS = 2
 MAX_SCALE = 8.0
 
 
+
+def imports_whole_mathlib(path):
+    """Does the file's header say `import Mathlib`? The header is read whole, line by line: a fixed-size
+    head cut a 438-import header in the middle of `import Mathlib.Topology…` (GRHLean, 2026-11-27: 20
+    false WHOLE MATHLIB warnings)."""
+    with open(path, errors='replace') as fh:
+        for line in fh:
+            t = line.strip()
+            if t == 'import Mathlib':
+                return True
+            if t and not t.startswith(('import ', '--', '/-', 'module', 'public import', 'prelude')):
+                return False
+    return False
+
 class StepFailed(Exception):
     pass
 
@@ -1870,9 +1884,7 @@ class Pipeline:
             dd = os.path.join(out, sub)
             for f in sorted(os.listdir(dd)) if os.path.isdir(dd) else ():
                 if f.endswith('.lean'):
-                    with open(os.path.join(dd, f), errors='replace') as fh:
-                        head = fh.read(20000)
-                    if re.search(r'(?m)^import Mathlib\s*$', head):
+                    if imports_whole_mathlib(os.path.join(dd, f)):
                         hits.append('%s/%s' % (sub, f))
         self.state['whole_mathlib'] = hits
         self.save()

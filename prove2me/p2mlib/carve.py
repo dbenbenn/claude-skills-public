@@ -2751,10 +2751,27 @@ def max_only_universes(g, k):
     return list((g.consts.get(k) or {}).get('mu') or ())
 
 
+def _proved_after(plan, s):
+    """The pieces statement `s` waits for to be Proved: its own and, transitively, those of the
+    statements its piece imports (publish_order's proved_after)."""
+    out, todo = set(), [s]
+    while todo:
+        x = todo.pop()
+        if x in out or x not in plan['pieces']:
+            continue
+        out.add(x)
+        todo.extend(plan['pieces'][x].get('imports', ()))
+    return out
+
+
 def _needs_piece(plan, bimp, n):
-    """Indices of the bundles that wait for piece `n`: those importing statement n, and every
-    bundle importing one of them."""
-    direct = {i for i, b in enumerate(plan['bundles']) if n in b.get('statements', ())}
+    """Indices of the bundles that wait for piece `n`: those importing a statement that is Proved only
+    once n's piece is (statement n itself, or one whose proof imports n's statement, transitively:
+    GRHLean 2026-11-27, bundle GRHLean032 imported exists_avatar, whose proof went through
+    exists_hasPrimeDensity, whose piece imported a bundle above GRHLean032), and every bundle
+    importing one of them."""
+    direct = {i for i, b in enumerate(plan['bundles'])
+              if any(n == st or n in _proved_after(plan, st) for st in b.get('statements', ()))}
     if not direct:
         return set()
     return {i for i in range(len(plan['bundles'])) if _bundle_closure(bimp, [i]) & direct}

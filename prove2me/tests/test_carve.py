@@ -428,6 +428,22 @@ def test_a_self_contained_piece_imports_the_safe_bundles_its_kept_roots_need():
     assert 'B1' in pc['bundles'] and 'B2' not in pc['bundles']
 
 
+def test_a_piece_a_bundle_waits_for_through_another_statement_is_a_cycle():
+    # GRHLean (2026-11-27): bundle B1 imports statement s, whose piece imports statement t; t's piece
+    # imports B2, which imports B1. B1 waits for t's piece through s (publish_order), so t's piece is
+    # in a cycle that piece_cycles did not report, and `names` stopped on "depends on itself".
+    plan = {'bundles': [{'name': 'B0', 'nodes': ['a'], 'imports': []},
+                        {'name': 'B1', 'nodes': ['b'], 'imports': ['B0'], 'statements': ['s']},
+                        {'name': 'B2', 'nodes': ['c'], 'imports': ['B1']}],
+            'nodes': ['s', 't'],
+            'stubs': {'s': {'bundles': ['B0']}, 't': {'bundles': ['B0']}},
+            'pieces': {'s': {'keep': ['s'], 'imports': ['t'], 'bundles': ['B0']},
+                       't': {'keep': ['t'], 'imports': [], 'bundles': ['B2']}}}
+    with pytest.raises(C.CarveError, match='depends on itself'):
+        C.publish_order(plan)
+    assert ('t', 'B1') in C.piece_cycles(plan)
+
+
 def test_an_external_attributed_declaration_is_never_kept_by_a_piece(g):
     # DiamondDistortion (2026-10-19): the published bundle's `@[reducible] def Edge` was an
     # external definition, yet the extra roots (instances and attributed declarations whose

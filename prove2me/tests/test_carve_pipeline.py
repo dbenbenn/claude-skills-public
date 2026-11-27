@@ -3641,3 +3641,17 @@ def test_oversized_imports_lists_each_big_file_once_with_its_chain(tmp_path):
     assert CP.oversized_imports(str(tmp_path), ['Theorems.Thm_T'], cap=50) == [
         ('Definitions.Def_B', 60, ['Theorems.Thm_T', 'Definitions.Def_B'])]
     assert CP.oversized_imports(str(tmp_path), ['Theorems.Thm_T', 'Definitions.Missing'], cap=60) == []
+
+
+def test_whole_mathlib_flag_reads_the_whole_header(tmp_path):
+    # GRHLean (2026-11-27): a 438-import header passed the 20,000-byte head mid-line, so
+    # `import Mathlib.Topology.LocalAtTarget` read as `import Mathlib`
+    f = tmp_path / 'Def_X.lean'
+    long = ''.join('import Mathlib.Some.Module%04d\n' % i for i in range(800))
+    f.write_text(long + 'import Definitions.Def_Y\n\nnamespace X\nend X\n')
+    assert len(long) > 20000
+    assert not CP.imports_whole_mathlib(str(f))
+    f.write_text(long + 'import Mathlib\n\ndef x := 1\n')
+    assert CP.imports_whole_mathlib(str(f))
+    f.write_text('import Mathlib.Data.Nat.Basic\n\n-- import Mathlib\ndef x := 1\n')
+    assert not CP.imports_whole_mathlib(str(f))
