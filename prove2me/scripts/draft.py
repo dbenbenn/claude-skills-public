@@ -610,6 +610,14 @@ def double_backslash(items, miles, desc):
         # (2026-10-01). Our prose never wants either.
         for m in re.finditer(r'.{0,20}\\[\'"]', t):
             out.append((where, 'escaped quote `%s` (a raw-string backslash leaked into prose)' % m.group(0)))
+        # the platform's markdown ends inline math at the next `$`, escaped or not, so `$X \stackrel{\$}{…}$`
+        # breaks at `\$`; KaTeX's `\textdollar` is text-mode only and errors in math. Write
+        # `\text{\textdollar}` (IOM GCM 2026-11-27: dbenbenn saw both in the Draft; tested with
+        # micromark-extension-math + KaTeX)
+        for m in re.finditer(r'.{0,20}(?<!\\)\\\$', t):
+            out.append((where, '`\\$` in prose `%s` (ends inline math early; write \\text{\\textdollar})' % m.group(0)))
+        for m in re.finditer(r'.{0,20}(?<!\\text\{)\\textdollar', t):
+            out.append((where, 'bare `\\textdollar` `%s` (text-mode only; write \\text{\\textdollar})' % m.group(0)))
     return out
 
 

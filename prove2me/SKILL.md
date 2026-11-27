@@ -87,6 +87,16 @@ measurements behind the audit rules).
    line**, and never a disposition of your own, however obvious. `draft.py verify` counts every
    undecided row as BAD, and reopens an item's rows when its audit is re-run; re-record an
    unchanged finding with the human's earlier words.
+   **Take every fidelity gap seriously, and fix it while drafting** (dbenbenn, 2026-11-27: "we've
+   often regretted it when we allow formalized version to diverge from the paper"). Drafting is the
+   cheapest time there will ever be: after publish the statement and the bundle freeze, and a
+   documented divergence is a permanent caveat on every proof built on it. So a gap that makes the
+   Lean differ from the paper gets a fix by default, with *documented* as the exception when no fix
+   matches the source. Before recommending *documented* for cost, count the real re-run: only the
+   read-backs that render the changed declarations go stale, not every item. On IOM GCM the D30 row
+   (authenticity resource bounds quantified over impossible oracle replies) was first recommended
+   *documented* on an estimate of 27 re-runs; the true cost was 3, and the fix made Theorem 2 match
+   the paper's "makes at most q queries".
    When a row is decided **documented** (explained in the statement's Formalization Note rather
    than fixed), run `scripts/caveat_audit.py` on the item: the source audit never sees prose, so
    this is the only check that the note names the gap accurately and asserts nothing the Lean or
@@ -567,14 +577,6 @@ independent `v` is too loose; `Type (max u v)` keeps "every `X`" and always cont
 `ULift G`. Siblings sharing a bundle quantify at one universe: q271's `theorem_2_3` at `{F : Type}`
 could not be called from its `Type*` siblings, so the edge 2.10 ← 2.3 cannot exist. And **re-run every local check file whenever a definition changes**: the universe
 check written for exactly this had been failing silently since the edit that broke it.
-
-**An adversary's resource bounds hold on the runs of the theorem's experiment, not on every
-type-correct reply.** "$\mathcal{A}$ makes at most $q$ queries" counts queries in actual runs. Quantifying
-over every reply of the right type is exact only when some oracle in the experiment can give them all (a
-random-bits oracle); for a real decryption oracle it excludes adversaries the paper covers. IOM GCM
-(2026-11-26): `AuthResources` was restated over the runs with GCM under every permutation (a deterministic
-oracle per key, `AllPathsDet`). Check, too, that the scheme rejects inputs outside its domain: a decryption
-oracle that accepted any nonce made Theorem 2 false (GHASH keeps 64 bits of the length).
 
 When Lean needs a structure the paper takes for granted (a quotient known abelian, a rank),
 build it so the instance exists by construction and say in the natural-language statement that

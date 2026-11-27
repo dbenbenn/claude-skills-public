@@ -253,3 +253,12 @@ def test_theorem_link_to_a_missing_or_deprecated_id_flagged():
     out = D.dead_platform_links(items, miles, desc, call)
     assert sorted(w for w, _ in out) == ['b', 'description', 'm milestone']
     assert sorted(asked) == sorted('/theorems/' + t for t in (good, gone, old))   # each id looked up once
+
+
+def test_dollar_in_math_flagged():
+    # IOM GCM 2026-11-27: `\$` ended inline math early and a bare `\textdollar` errored in KaTeX
+    items = {'a': {'natural_language_statement': r'$X \stackrel{\$}{\leftarrow} \mathcal{X}$'},
+             'b': {'natural_language_statement': r'$\mathcal{A}^{\textdollar}$'},
+             'c': {'natural_language_statement': r'$\mathcal{A}^{\text{\textdollar}}$ is fine'}}
+    where = [w for w, _ in D.double_backslash(items, {}, '')]
+    assert 'a' in where and 'b' in where and 'c' not in where
