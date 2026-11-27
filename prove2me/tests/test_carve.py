@@ -4489,3 +4489,38 @@ def test_an_unseal_of_a_gone_declaration_is_dropped():
     carver._gone = lambda tok, *a, **k: tok == 'gone'
     drop = carver._drops('M', {0}, {'keep'})
     assert 1 in drop and 2 not in drop
+
+
+def test_namespace_prefixes_skips_realized_equation_lemmas():
+    # GRHLean 2026-11-27: `def Sat` owns `Sat.eq_1`; a carved file without any `Sat.*` declaration
+    # has no namespace Sat, so `open Sat` must go ("unknown namespace `_root_.GRHLean.Sat`")
+    assert C.namespace_prefixes('GRHLean.Sat.eq_1') == ['GRHLean']
+    assert C.namespace_prefixes('GRHLean.Sat.eq_def') == ['GRHLean']
+    assert C.namespace_prefixes('GRHLean.Sat.eq_unfold') == ['GRHLean']
+    assert C.namespace_prefixes('GRHLean.Sat.of_mem') == ['GRHLean', 'GRHLean.Sat']
+    assert C.namespace_prefixes('GRHLean.Sat.exists.match_1') == ['GRHLean', 'GRHLean.Sat', 'GRHLean.Sat.exists']
+    assert C.namespace_prefixes('GRHLean.Sat.equiv_1') == ['GRHLean', 'GRHLean.Sat']
+
+
+# `grind_pattern twoRho_lt_twoRho => …` copied into a bundle without that theorem: "Unknown
+# constant" (GRHLean level-2b bundle T006, 2026-11-27). It goes with its theorem.
+
+def test_a_grind_pattern_of_a_gone_theorem_is_dropped():
+    from p2mlib.leaninfo import Command, Pos
+    p = Pos(1, 0, 0)
+    def cmd(i, kind, ns, ctx, decl_kind=None, names=(), idents=None):
+        return Command(index=i, kind=kind, start=p, end=p, namespace=ns, opens=[], attrs=[],
+                       names=list(names), decl_kind=decl_kind, context=[(o, []) for o in ctx],
+                       idents=idents)
+    refs = lambda *ns: [{'role': 'ref', 'name': n, 'start': 0, 'end': 1} for n in ns]
+    cmds = [cmd(0, 'Lean.Parser.Command.declaration', '', [None], 'theorem', ['keep']),
+            cmd(1, 'Lean.Parser.Command.grindPattern', '', [None], idents=refs('gone', 'f', 'x')),
+            cmd(2, 'Lean.Parser.Command.grindPattern', '', [None], idents=refs('keep', 'f', 'x'))]
+    info = type('I', (), {'commands': cmds})()
+    g = type('G', (), {'infos': {'M': info}, '_scoped_cmds': set(),
+                       'scope_opens': staticmethod(lambda *a: [])})()
+    carver = C.Carver.__new__(C.Carver)
+    carver.g = g
+    carver._gone = lambda tok, *a, **k: tok in ('gone', 'x')   # a pattern variable reads as gone too
+    drop = carver._drops('M', {0}, {'keep'})
+    assert 1 in drop and 2 not in drop

@@ -146,6 +146,19 @@ def join(p, tok):
     return p + '.' + tok if p else tok
 
 
+_REALIZED = re.compile(r'eq_\d+|eq_def|eq_unfold')
+
+
+def namespace_prefixes(name):
+    """The namespaces a constant's name makes exist: ns_prefixes(name), except that an equation
+    lemma Lean realizes on demand (`X.eq_1`, `X.eq_def`, `X.eq_unfold`) creates no namespace `X`
+    where it is not realized, as in a carved file (GRHLean 2026-11-27: `def Sat` owning
+    `Sat.eq_1` kept `open _root_.GRHLean.Sat` in bundle GRHLeanT005, "unknown namespace")."""
+    if _REALIZED.fullmatch(name.rsplit('.', 1)[-1]):
+        name = name.rsplit('.', 1)[0]
+    return ns_prefixes(name)
+
+
 # ================================================================ Lean runs
 
 def run_decl_graph(out, prefix, roots, ws=None, timeout=7200, also=()):
@@ -3847,14 +3860,14 @@ class Carver:
         # HeckeInverseAmplification` emitted before the later module that re-creates it)
         alive = set()
         for p in have - self.keep_names:
-            alive.update(ns_prefixes(p))
+            alive.update(namespace_prefixes(p))
         by_mod = collections.defaultdict(set)
         by_pos = collections.defaultdict(dict)           # module -> namespace -> first command making it
         for k in keep:
             for n in g.have_names([k]):
                 m0 = g.nodes[k].module
-                by_mod[m0].update(ns_prefixes(n))
-                for x in ns_prefixes(n):
+                by_mod[m0].update(namespace_prefixes(n))
+                for x in namespace_prefixes(n):
                     by_pos[m0][x] = min(by_pos[m0].get(x, g.nodes[k].cmd), g.nodes[k].cmd)
         out = []
         earlier = set()
@@ -4030,6 +4043,13 @@ class Carver:
                 refs = [i for i in c.idents or [] if i['role'] == 'ref']
                 opens = g.scope_opens(info, c, m)
                 if refs and all(self._gone(i['name'], c, m, have, opens, idn=i) for i in refs):
+                    drop.add(c.index)
+            elif c.short_kind == 'grindPattern':
+                # `grind_pattern thm => …` with thm carved elsewhere: "Unknown constant" (GRHLean
+                # level-2b bundle T006, 2026-11-27: twoRho_lt_twoRho); it goes with its theorem
+                refs = [i for i in c.idents or [] if i['role'] == 'ref']
+                opens = g.scope_opens(info, c, m)
+                if refs and self._gone(refs[0]['name'], c, m, have, opens, idn=refs[0]):
                     drop.add(c.index)
             elif c.short_kind == 'export' and self._export_alive(info, c, m, have):
                 # an export makes aliases that outlive its block (`namespace PA / export

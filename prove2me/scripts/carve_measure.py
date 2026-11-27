@@ -692,6 +692,13 @@ class Measure:
         scope = self.scope(kinds, only)
         for wave in C.publish_order(self.plan, self.ext)['waves']:
             todo = [item for item in wave if item in scope]
+            # a piece `carve.py gen pieces NAME` did not write (one generated for the target only,
+            # GRHLean level 2b 2026-11-27) is reported and skipped, not a crash in apply_recorded
+            gone = [i for i in todo if i.startswith('piece:') and
+                    not os.path.exists(self.item_files('piece', i.split(':', 1)[1])[0])]
+            for item in gone:
+                print('%-9s %6s   not generated, skipped: %s' % ('piece', '-', item.split(':', 1)[1]), flush=True)
+            todo = [i for i in todo if i not in gone]
             serial = [i for i in todo if not i.startswith('piece:') or self.jobs <= 1]
             par = [i for i in todo if i not in serial]
             for item in serial:

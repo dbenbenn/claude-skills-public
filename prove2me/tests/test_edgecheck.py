@@ -219,6 +219,9 @@ def test_measure_kinds_measures_only_those_items_in_publish_order(tmp_path, monk
     m = M.Measure.__new__(M.Measure)
     m.cfg, m.ws, m.olean, m.plan, m.ext = {'work': str(tmp_path)}, '', '', plan, {'A.main'}
     m.times, m.times_path, m.edges, m.allow_false = {}, str(tmp_path / 'times.json'), {}, False
+    m.lib = m.sol = str(tmp_path)
+    for n in plan['pieces']:                     # pieces gen wrote (an unwritten one is skipped)
+        open(m.item_files('piece', n)[0], 'w').write('-- %s\n' % n)
     seen = []
     monkeypatch.setattr(M, 'copy_published', lambda *a: None)
     monkeypatch.setattr(m, 'env', lambda: {})

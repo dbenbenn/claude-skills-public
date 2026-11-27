@@ -211,6 +211,8 @@ def test_only_measures_just_the_named_items(tmp_path, monkeypatch):
             'pieces': {'P': {'bundles': ['A'], 'imports': []}, 'Q': {'bundles': ['A'], 'imports': []}}, 'external': []}
     M, m = _obj(tmp_path, plan)
     monkeypatch.setattr(M, 'copy_published', lambda *a: None)
+    for n in plan['pieces']:
+        open(m.item_files('piece', n)[0], 'w').write('-- %s\n' % n)
     seen = []
     m.measure = lambda item, env, force, repair: seen.append(item) or {'secs': 1.0, 'ok': True, 'errors': []}
     m.edge_check = lambda item, env, force: {'imports': {}, 'false': [], 'restore': {}, 'file': 'f'}
@@ -259,6 +261,8 @@ def test_pieces_of_a_wave_are_measured_in_parallel_and_the_rest_in_order(tmp_pat
             'pieces': {n: {'bundles': ['A'], 'imports': []} for n in 'PQRS'}, 'external': []}
     M, m = _obj(tmp_path, plan)
     monkeypatch.setattr(M, 'copy_published', lambda *a: None)
+    for n in plan['pieces']:
+        open(m.item_files('piece', n)[0], 'w').write('-- %s\n' % n)
     m.jobs = 3
     live, peak, order = [0], [0], []
     gate = threading.Lock()
@@ -279,3 +283,19 @@ def test_pieces_of_a_wave_are_measured_in_parallel_and_the_rest_in_order(tmp_pat
     assert order[0] == 'bundle:A' and sorted(order[1:]) == ['piece:%s' % n for n in 'PQRS']
     assert peak[0] == 3
     assert set(json.load(open(m.times_path))) == {'bundle:A'} | {'piece:%s' % n for n in 'PQRS'}
+
+
+def test_a_piece_that_was_not_generated_is_skipped_not_a_crash(tmp_path, monkeypatch, capsys):
+    # GRHLean level 2b (2026-11-27): `gen pieces TARGET` writes the target's piece only; the forced
+    # statements' pieces have no file, and apply_recorded crashed on the first of them
+    plan = {'bundles': [{'name': 'A', 'imports': [], 'nodes': ['x']}], 'stubs': {'P': {'bundles': ['A']}, 'Q': {'bundles': ['A']}},
+            'pieces': {'P': {'bundles': ['A'], 'imports': []}, 'Q': {'bundles': ['A'], 'imports': []}}, 'external': []}
+    M, m = _obj(tmp_path, plan)
+    monkeypatch.setattr(M, 'copy_published', lambda *a: None)
+    open(m.item_files('piece', 'Q')[0], 'w').write('-- Q\n')
+    seen = []
+    m.measure = lambda item, env, force, repair: seen.append(item) or {'secs': 1.0, 'ok': True, 'errors': []}
+    m.edge_check = lambda item, env, force: {'imports': {}, 'false': [], 'restore': {}, 'file': 'f'}
+    assert m.run_all(kinds=['piece'])
+    assert seen == ['piece:Q']
+    assert 'not generated, skipped: P' in capsys.readouterr().out
