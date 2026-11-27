@@ -2751,47 +2751,73 @@ def max_only_universes(g, k):
     return list((g.consts.get(k) or {}).get('mu') or ())
 
 
-def _proved_after(plan, s):
-    """The pieces statement `s` waits for to be Proved: its own and, transitively, those of the
-    statements its piece imports (publish_order's proved_after)."""
-    out, todo = set(), [s]
+def _needs_piece(plan, bimp, n):
+    """Indices of the bundles that wait for piece `n`: every bundle from which publish_deps reaches
+    piece:n (it imports statement n, or a statement whose proof imports a statement waiting for n, or a
+    bundle importing one of them, through any chain of bundles, statements and pieces: GRHLean
+    2026-11-27, piece formEnd_ext -> bundle 199 -> piece lineMultiplier -> bundle 156 -> statement
+    formEnd_ext)."""
+    deps = publish_deps(plan)
+    rev = {}
+    for x, ys in deps.items():
+        for y in ys:
+            rev.setdefault(y, []).append(x)
+    pos = {b['name']: i for i, b in enumerate(plan['bundles'])}
+    out, seen, todo = set(), {'piece:' + n}, ['piece:' + n]
     while todo:
         x = todo.pop()
-        if x in out or x not in plan['pieces']:
-            continue
-        out.add(x)
-        todo.extend(plan['pieces'][x].get('imports', ()))
+        for y in rev.get(x, ()):
+            if y not in seen:
+                seen.add(y)
+                todo.append(y)
+                if y.startswith('bundle:'):
+                    out.add(pos[y[7:]])
     return out
-
-
-def _needs_piece(plan, bimp, n):
-    """Indices of the bundles that wait for piece `n`: those importing a statement that is Proved only
-    once n's piece is (statement n itself, or one whose proof imports n's statement, transitively:
-    GRHLean 2026-11-27, bundle GRHLean032 imported exists_avatar, whose proof went through
-    exists_hasPrimeDensity, whose piece imported a bundle above GRHLean032), and every bundle
-    importing one of them."""
-    direct = {i for i, b in enumerate(plan['bundles'])
-              if any(n == st or n in _proved_after(plan, st) for st in b.get('statements', ()))}
-    if not direct:
-        return set()
-    return {i for i in range(len(plan['bundles'])) if _bundle_closure(bimp, [i]) & direct}
 
 
 def piece_cycles(plan):
-    """[(node, bundle)]: a piece that imports (directly, through bundle imports or through a
-    statement it imports) a bundle waiting for that piece's own statement to be Proved."""
-    pos, bimp, _ = _plan_index(plan)
-    out = []
-    for n, p in sorted(plan['pieces'].items()):
-        tainted = _needs_piece(plan, bimp, n)
-        if not tainted:
+    """[(node, bundle)]: a piece in an import cycle of publish_deps, with each bundle of that cycle (one
+    that waits for the piece and that the piece waits for)."""
+    deps = publish_deps(plan)
+    # Tarjan's strongly connected components, iteratively
+    index, low, on, stack, comps, k = {}, {}, set(), [], [], [0]
+    for root in deps:
+        if root in index:
             continue
-        cl = _bundle_closure(bimp, [pos[x] for x in p['bundles'] if x in pos])
-        for i in p['imports']:
-            cl |= _bundle_closure(bimp, [pos[x] for x in plan['stubs'][i]['bundles'] if x in pos])
-        for j in sorted(cl & tainted):
-            out.append((n, plan['bundles'][j]['name']))
-    return out
+        work = [(root, iter(deps.get(root, ())))]
+        index[root] = low[root] = k[0]; k[0] += 1; stack.append(root); on.add(root)
+        while work:
+            v, it = work[-1]
+            w = next(it, None)
+            if w is None:
+                work.pop()
+                if work:
+                    u = work[-1][0]
+                    low[u] = min(low[u], low[v])
+                if low[v] == index[v]:
+                    comp = []
+                    while True:
+                        x = stack.pop(); on.discard(x); comp.append(x)
+                        if x == v:
+                            break
+                    if len(comp) > 1:
+                        comps.append(comp)
+                continue
+            if w not in deps:
+                continue
+            if w not in index:
+                index[w] = low[w] = k[0]; k[0] += 1; stack.append(w); on.add(w)
+                work.append((w, iter(deps.get(w, ()))))
+            elif w in on:
+                low[v] = min(low[v], index[w])
+    out = []
+    for comp in comps:
+        bs = sorted(x[7:] for x in comp if x.startswith('bundle:'))
+        for x in sorted(comp):
+            if x.startswith('piece:'):
+                for b in bs:
+                    out.append((x[6:], b))
+    return sorted(out)
 
 
 def resolve_piece_cycles(g, plan):
@@ -2810,7 +2836,25 @@ def resolve_piece_cycles(g, plan):
         return _bundle_closure(bimp, [pos[x] for x in bs if x in pos])
 
     changed = []
-    for n in sorted({c[0] for c in piece_cycles(plan)}):
+    # a resolved piece's new imports can put another piece in a cycle (a bundle waits for a piece
+    # through the statements other proofs import, _needs_piece): repeat until none is left
+    todo = sorted({c[0] for c in piece_cycles(plan)})
+    rounds = 0
+    while todo:
+        rounds += 1
+        if rounds > 50:
+            raise CarveError('resolve_piece_cycles: still cycles after 50 rounds: %s' % ', '.join(todo[:10]))
+        for n in todo:
+            _resolve_piece(g, plan, n, pos, bimp, names, ext, nodes, cl)
+            if n not in changed:
+                changed.append(n)
+        todo = sorted({c[0] for c in piece_cycles(plan)})
+    return changed
+
+
+def _resolve_piece(g, plan, n, pos, bimp, names, ext, nodes, cl):
+    """resolve_piece_cycles for one piece."""
+    if True:
         tainted = _needs_piece(plan, bimp, n)
         own = plan['stubs'].get(n, {}).get('bundles', [])
         if cl(own) & tainted:
@@ -2841,8 +2885,6 @@ def resolve_piece_cycles(g, plan):
         p.update(keep=sorted(keep), imports=imps,
                  bundles=[names[i] for i in sorted(_reduce(bimp, set(cl(own)) | (need - reach)))],
                  size=sum(g.nodes[k].size for k in keep), selfcontained=True)
-        changed.append(n)
-    return changed
 
 
 def split_bundles(g, plan, names, cost, budget, bundle_prefix=None, top_keeps_name=False):
@@ -3489,6 +3531,26 @@ def publish_order(plan, external=()):
     statements it imports: a bundle may import only a Proved theorem), `statement:NODE` (after
     its bundles; none for `external` nodes, published by someone else), `piece:NODE` (after its
     own statement, the statements it imports and its bundles)."""
+    deps = publish_deps(plan, external)
+    level, busy = {}, set()
+
+    def lv(x):
+        if x not in level:
+            if x in busy:
+                raise CarveError('publish order: %s depends on itself (an import cycle through %s)'
+                                 % (x, ', '.join(sorted(busy))))
+            busy.add(x)
+            level[x] = 1 + max([lv(y) for y in deps[x]], default=-1)
+            busy.discard(x)
+        return level[x]
+    for x in deps:
+        lv(x)
+    waves = [sorted(x for x in deps if level[x] == i) for i in range(max(level.values(), default=-1) + 1)]
+    return {'deps': deps, 'waves': waves}
+
+
+def publish_deps(plan, external=()):
+    """publish_order's dependency graph: {item: [items it waits for]}."""
     deps = {}
 
     def proved_after(names):
@@ -3516,21 +3578,7 @@ def publish_order(plan, external=()):
         if n not in external:
             d.append('statement:' + n)
         deps['piece:' + n] = d
-    level, busy = {}, set()
-
-    def lv(x):
-        if x not in level:
-            if x in busy:
-                raise CarveError('publish order: %s depends on itself (an import cycle through %s)'
-                                 % (x, ', '.join(sorted(busy))))
-            busy.add(x)
-            level[x] = 1 + max([lv(y) for y in deps[x]], default=-1)
-            busy.discard(x)
-        return level[x]
-    for x in deps:
-        lv(x)
-    waves = [sorted(x for x in deps if level[x] == i) for i in range(max(level.values(), default=-1) + 1)]
-    return {'deps': deps, 'waves': waves}
+    return deps
 
 
 # ================================================================ carving
