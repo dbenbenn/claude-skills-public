@@ -162,6 +162,13 @@ automated; do it by hand and say so in the hand-over).
 - **Hooks and placement**: evaluate with two externs at one address and with adversarial hooks
   that still meet the hook contracts, to confirm the statement depends on `LinkOk` and nothing
   weaker.
+- **Clauses no evaluation reaches**: an existential representation's side conditions (closure
+  rules such as "a represented state stays represented when these fields change", invariants such
+  as "`mres` ≡ |C| mod 16") are properties of the prover's `Rep`, not of a run, so no execution
+  tests them. Check them against each other by hand: build the smallest state one clause forces
+  into `Rep` and test every other clause on it. AES-GCM's `ViewStep` (2026-11-28) admitted a context
+  one byte past a block boundary with `mres = 0`, which `MresOk` forbids, so `∃ Rep, GcmOk Rep` was
+  false; `GcmView` lacked "|C| is a multiple of 16". A caveat auditor caught it, not the checks.
 
 A disproof found while the proposal is In review stops the review; `prove2me` says what to do.
 
