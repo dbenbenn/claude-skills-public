@@ -10,10 +10,12 @@ machine's memory and CPU (split into four categories, below), load, kernel
 stall pressure, every Lean/lake process with its working directory, and a red banner for machine trouble.
 Below: **one section per piece of work**, written by whoever runs that work.
 
-It is one process, `monitor.py`, run as a service that starts at boot and runs as dbenbenn: the NixOS
-system unit `monitor.service`, declared in `~/nixos-config/configuration.nix`
-(`systemd.services.monitor`, `User = "dbenbenn"`). It samples every 30 s, keeps 48 h, and serves the
-page itself. No Claude involvement.
+It is one process, `monitor.py`, run as a service that starts at boot: since 2026-11-28 on bosgame the
+skill's own `monitor.service` as a systemd user unit of `claude` (linked into `~/.config/systemd/user`;
+linger starts it without a login), published by `tailscale serve --bg 8765` (claude is Tailscale's
+operator there). On nixos until then it was a system unit running as dbenbenn, declared in
+`~/nixos-config` (`systemd.services.monitor`). It samples every 30 s, keeps 48 h, and serves the page
+itself. No Claude involvement.
 
 ## Publishing your work's section
 
