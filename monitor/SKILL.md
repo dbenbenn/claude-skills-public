@@ -205,9 +205,12 @@ person", so the page reads top-down by what wants attention (`www/glance.js`, `w
 tracker (`~/claude/claude-private/tools/mission-tracker`, user unit `mission-tracker.service`; its README
 has the steps). The card also counts the mission's statements by status and shows an alert, and a Needs you
 row, for any that is Disproved. Each mission is a row of five steps (Submit, publish, After Submit, review, After
-approval) with who each waits on, and two buttons: **Check now** (the tracker asks prove2.me) and
-**Start/Retry** a Claude step (a headless agent; the page asks for confirmation). Buttons `POST /request`
-`{action: check|start, key}`; the monitor only writes the request to `MONITOR_HOME/requests/` and never
+approval) with who each waits on, and up to three buttons: **Check now** (the tracker asks prove2.me),
+**Submit / Retry submit** on a Draft with items left to publish (2026-11-28, dbenbenn: a button for
+when the site's Submit is flaky; the tracker starts `tools/p2m_submit.py` with the API key as the unit
+`p2m-submit-<key>-N`, whose progress is the section `submit-<proposal[:8]>`), and **Start/Retry** a
+Claude step (a headless agent). The page asks for confirmation before the last two. Buttons `POST /request`
+`{action: check|start|submit, key}` (`submit` only for missions); the monitor only writes the request to `MONITOR_HOME/requests/` and never
 runs anything itself. It accepts a request only with the header `X-Monitor-Request: 1` and a JSON
 content type (a cross-site form can send neither without a preflight this server never answers), a
 body of at most 1 KiB, and an `Origin`, when present, naming this host (`post_request`, tested in

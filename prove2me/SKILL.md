@@ -961,8 +961,10 @@ in the browser, for each non-reference item in the listed order, `POST
 PENDING longer than 20 minutes (Lodha–Moore: 20–50) therefore shows "Compile failed" or "Failed to
 fetch" while the server job carries on, and each item needs a re-click; published items turn into
 references and are skipped. Tell the human this rather than reading the failure as a compile error,
-and suggest `~/claude/claude-private/tools/p2m_submit.py PROPOSAL_ID`, which makes the same calls
-without the 20-minute cap; the human runs it, never you.
+and point to the **Retry submit** button on the mission's tracker card, which runs
+`~/claude/claude-private/tools/p2m_submit.py PROPOSAL_ID` (the same calls without the 20-minute cap,
+with the API key) as a unit with its own monitor section; the human clicks it, or tells you to run
+`tracker.py submit KEY`, never you unasked (2026-11-28).
 The failed attempt need not stay visible in `/publish-jobs` (Moore M24, 2026-10-02: only the
 re-queued PENDING job was listed). What the captain can do is tell transient from real: run
 `scripts/check_server_shape.py MISSION_DIR NAME` on the failed item. It compiled in 3 s locally, so

@@ -202,3 +202,6 @@ def test_handoffs_route_and_requests(server, tmp_path, monkeypatch):
     assert s == 202
     assert len(list((home / 'handoff-requests').iterdir())) == 1 and not (home / 'requests').exists()
     assert post(base, '/request', {'action': 'start', 'key': 'gm', 'kind': 'shell'})[0] == 400
+    # Retry submit is the mission tracker's only
+    assert post(base, '/request', {'action': 'submit', 'key': 'gm', 'kind': 'handoff'})[0] == 400
+    assert post(base, '/request', {'action': 'submit', 'key': 'gm'})[0] == 202

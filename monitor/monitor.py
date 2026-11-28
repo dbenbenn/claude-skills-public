@@ -754,7 +754,7 @@ def agents_body(now=None):
     return State.agents[1]
 
 
-REQUEST_ACTIONS = ('check', 'start')
+REQUEST_ACTIONS = ('check', 'start', 'submit')    # submit: the mission tracker's Retry submit only
 REQUEST_KEY = re.compile(r'^[a-z0-9][a-z0-9-]{0,39}$')
 # which service a click is for -> the directory it reads (each service removes what it reads)
 REQUEST_DIRS = {'mission': 'requests', 'handoff': 'handoff-requests'}
@@ -806,8 +806,9 @@ def post_request(headers, body):
     except ValueError:
         return 400, {'error': 'bad json'}
     if not isinstance(r, dict) or r.get('action') not in REQUEST_ACTIONS or not REQUEST_KEY.match(str(r.get('key', ''))) \
-            or r.get('kind', 'mission') not in REQUEST_DIRS:
-        return 400, {'error': 'want {action: check|start, key, kind?: mission|handoff}'}
+            or r.get('kind', 'mission') not in REQUEST_DIRS \
+            or r['action'] == 'submit' and r.get('kind', 'mission') != 'mission':
+        return 400, {'error': 'want {action: check|start|submit, key, kind?: mission|handoff} (submit: missions only)'}
     d = os.path.join(State.home, REQUEST_DIRS[r.get('kind', 'mission')])
     os.makedirs(d, exist_ok=True)
     rid = '%d-%s' % (time.time_ns(), r['key'])

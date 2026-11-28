@@ -208,13 +208,16 @@ function missionCard(m){
   const res = m.pending && m.pending.result ? `<p class="mres${/^failed/.test(m.pending.result) ? ' bad' : ''}">Last ${esc(m.pending.action)} ${esc(fmtAt(m.pending.at))}: ${esc(m.pending.result)}</p>` : '';
   const err = m.check_error ? `<p class="mres bad">Last API check failed: ${esc(m.check_error)}</p>` : '';
   const alerts = (m.alerts || []).map(a => `<p class="mres bad"><b>${esc(a)}</b></p>`).join('');
+  const sr = m.submit_retry || {};
+  const subRun = sr.running ? `<p class="mres">Submit run <code>${esc(sr.unit || '')}</code> going since ${esc(fmtAt(sr.started))} · <a href="/#h-${esc(sr.section)}">live progress</a></p>` : '';
   return `<article class="ms" id="m-${esc(m.key)}">
     <div class="mhead"><span class="mt">${esc(m.title)}</span><span class="badge ${wcls}">${esc(wtxt)}</span>
       <span class="mbtns">
         <button class="btn" data-key="${esc(m.key)}" data-act="check"${busy ? ' disabled' : ''}>${busy && click.action === 'check' ? 'Checking…' : 'Check now'}</button>
+        ${sr.offered ? `<button class="btn primary" data-key="${esc(m.key)}" data-act="submit" data-label="${esc(sr.label)}"${busy ? ' disabled' : ''}>${busy && click.action === 'submit' ? 'Starting…' : esc(sr.label)}</button>` : ''}
         ${start ? `<button class="btn primary" data-key="${esc(m.key)}" data-act="start" data-step="${esc(start.title)}"${busy ? ' disabled' : ''}>${busy && click.action === 'start' ? 'Starting…' : esc(startLabel)}</button>` : ''}
       </span></div>
-    ${alerts}
+    ${alerts}${subRun}
     <ol class="msteps">${steps}</ol>
     ${tasks}${res}${err}
     <p class="meta">${m.links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join(' · ')}
@@ -252,6 +255,7 @@ document.addEventListener('click', async e => {
   if (!b) return;
   const key = b.dataset.key, action = b.dataset.act;
   if (action === 'start' && !confirm(`Start a headless Claude agent (on the subscription) for “${b.dataset.step}” of ${key}?`)) return;
+  if (action === 'submit' && !confirm(`${b.dataset.label} ${key} on prove2.me? This runs p2m_submit.py with the API key: the site button's calls (publish each item, then launch) with no 20-minute cap.`)) return;
   pendingClicks[key] = {action};
   keepScroll(drawMissions);
   try {
